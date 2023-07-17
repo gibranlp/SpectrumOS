@@ -1,0 +1,2 @@
+# SpectrumOS
+SpectrumOS  Linux Distribution
