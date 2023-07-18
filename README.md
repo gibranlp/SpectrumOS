@@ -8,6 +8,4 @@ SpectrumOS is an Archlinx based distribution with Qtile as WM, focused on produc
 
 ## Wallpapers
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png" width="15%"></a>
-
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal2-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal2-1.png" width="15%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png" width="15%"></a><a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-2.png" width="15%"></a><a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-3.png" width="15%"></a><a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-4.png" width="15%"></a><a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-5.png" width="15%"></a><a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wal1-6.png" width="15%"></a>
