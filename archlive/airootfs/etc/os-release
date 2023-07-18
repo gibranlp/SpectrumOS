@@ -1,0 +1,10 @@
+NAME="SpectrumOS"
+PRETTY_NAME="SpectrumOS"
+ID=spectrumos
+BUILD_ID=rolling
+ANSI_COLOR="38;2;23;147;209"
+HOME_URL="https://gibranlp.dev/"
+DOCUMENTATION_URL="https://https://github.com/gibranlp/SpectrumOS/"
+SUPPORT_URL="https://https://github.com/gibranlp/SpectrumOS/"
+BUG_REPORT_URL="https://https://github.com/gibranlp/SpectrumOS/"
+LOGO=spectrumos-logo
