@@ -5,3 +5,13 @@
 </p>
 
 SpectrumOS is an Archlinx based distribution with Qtile as WM, focused on productivity and a good looking system based on the wallpaper colors.
+
+## Wallpapers
+
+https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png
+
+
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png"<img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png" width="15%"></a>
+
+
+https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png
