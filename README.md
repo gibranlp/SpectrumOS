@@ -22,7 +22,7 @@ At SpectrumOS, we prioritize a seamless computing experience. That's why Spectru
 
 ## Getting Started
 
-To embark on your SpectrumOS journey, please refer to our detailed installation guide and documentation in the [wiki section](link-to-wiki). You will find step-by-step instructions, troubleshooting tips, and configuration options to make the most of SpectrumOS and embrace the dynamic beauty of the Dynamic Color Spectrum.
+To embark on your SpectrumOS journey, please refer to our detailed installation guide and documentation in the [wiki section](#). You will find step-by-step instructions, troubleshooting tips, and configuration options to make the most of SpectrumOS and embrace the dynamic beauty of the Dynamic Color Spectrum.
 
 ## Community and Support
 
@@ -30,11 +30,11 @@ SpectrumOS is backed by a vibrant and helpful community of users and developers.
 
 ## Contributing
 
-We appreciate any contribution to SpectrumOS, whether it's bug reports, feature requests, or pull requests. Please refer to our [contributing guidelines](link-to-contributing-guidelines) for detailed information on how to contribute to the project and be a part of the colorful SpectrumOS community.
+We appreciate any contribution to SpectrumOS, whether it's bug reports, feature requests, or pull requests. Please refer to our [contributing guidelines](#) for detailed information on how to contribute to the project and be a part of the colorful SpectrumOS community.
 
 ## License
 
-SpectrumOS is open-source software released under the [insert license here]. Please see the [license file](link-to-license-file) for more information.
+SpectrumOS is open-source software released under the [insert license here]. Please see the [license file](#) for more information.
 
 Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchanting beauty of the Dynamic Color Spectrum!
 
