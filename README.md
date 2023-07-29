@@ -44,7 +44,7 @@ Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchant
 
 ## Screenshots
 
-### Light Themes
+### Light Schemes
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png" width="19%"></a>
@@ -53,7 +53,7 @@ Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchant
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png" width="19%"></a>
 
-### Themes
+### Bar Themes
 
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png" width="19%"></a>
