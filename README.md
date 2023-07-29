@@ -49,5 +49,16 @@ Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchant
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png" width="19%"></a>
 <a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png" width="19%"></a>
+
+### Themes
+
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4.png" width="19%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5.png" width="19%"></a>
 
 
