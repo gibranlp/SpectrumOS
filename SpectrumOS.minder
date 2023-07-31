@@ -1,0 +1,239 @@
+<?xml version="1.0"?>
+<minder version="1.15.2" parent-etag="2313388091" etag="4045440606">
+  <theme name="default" label="Light" index="2"/>
+  <styles>
+    <style level="0" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="rounded" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="10" nodepadding="10" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="1" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="2" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="3" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="4" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="5" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="6" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="7" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="8" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="9" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+    <style level="10" isset="true" branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true" connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+  </styles>
+  <images/>
+  <nodes>
+    <node id="0" posx="-142.223388671875" posy="703.1055908203125" width="133" height="49" side="left" fold="false" treesize="714" layout="To right" group="false">
+      <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+      <nodename maxwidth="200">
+        <text data="SpectrumOS"/>
+      </nodename>
+      <nodenote></nodenote>
+      <nodes>
+        <node id="6" posx="70.776611328125" posy="370.6055908203125" width="78" height="49" side="right" fold="false" treesize="49" color="#7a36b1" colorroot="true" layout="To right" group="false">
+          <style branchmargin="93" branchradius="25" linktype="curved" linkwidth="2" linkarrow="true" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+          <nodename maxwidth="200">
+            <text data="Wiki"/>
+          </nodename>
+          <nodenote></nodenote>
+          <nodes>
+            <node id="15" posx="221.776611328125" posy="370.6055908203125" width="174" height="49" side="right" fold="false" treesize="49" color="#7a36b1" colorroot="false" layout="To right" group="false">
+              <style branchmargin="93" branchradius="25" linktype="curved" linkwidth="2" linkarrow="true" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+              <nodename maxwidth="200">
+                <text data="Crear Sitio de Wiki"/>
+              </nodename>
+              <nodenote></nodenote>
+              <nodes>
+                <node id="21" posx="468.776611328125" posy="370.6055908203125" width="219" height="49" task="0" side="right" fold="false" treesize="49" color="#7a36b1" colorroot="false" layout="To right" group="false">
+                  <style branchmargin="93" branchradius="25" linktype="curved" linkwidth="2" linkarrow="true" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                  <nodename maxwidth="200">
+                    <text data="spectrumos.gibranlp.dev"/>
+                  </nodename>
+                  <nodenote></nodenote>
+                </node>
+              </nodes>
+            </node>
+          </nodes>
+        </node>
+        <node id="1" posx="70.776611328125" posy="727.6055908203125" width="95" height="49" side="right" fold="false" treesize="665" color="#f37329" colorroot="true" layout="To right" group="false">
+          <style branchmargin="93" branchradius="25" linktype="curved" linkwidth="2" linkarrow="true" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+          <nodename maxwidth="200">
+            <text data="Github"/>
+          </nodename>
+          <nodenote></nodenote>
+          <nodes>
+            <node id="22" posx="238.776611328125" posy="727.6055908203125" width="112" height="49" side="right" fold="false" treesize="665" color="#f37329" colorroot="false" layout="To right" group="false">
+              <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+              <nodename maxwidth="200">
+                <text data="Branches"/>
+              </nodename>
+              <nodenote></nodenote>
+              <nodes>
+                <node id="2" posx="430.776611328125" posy="444.1055908203125" width="62" height="49" side="right" fold="false" treesize="98" color="#f9c440" colorroot="true" layout="To right" group="false">
+                  <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                  <nodename maxwidth="200">
+                    <text data="Main"/>
+                  </nodename>
+                  <nodenote></nodenote>
+                  <nodes>
+                    <node id="7" posx="592.776611328125" posy="444.1055908203125" width="84" height="49" side="right" fold="false" treesize="98" color="#f9c440" colorroot="false" layout="To right" group="false">
+                      <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                      <nodename maxwidth="200">
+                        <text data="Readme"/>
+                      </nodename>
+                      <nodenote></nodenote>
+                      <nodes>
+                        <node id="8" posx="776.776611328125" posy="419.6055908203125" width="124" height="49" side="right" fold="false" treesize="49" color="#f9c440" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Release Notes"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="9" posx="776.776611328125" posy="468.6055908203125" width="109" height="49" side="right" fold="false" treesize="49" color="#f9c440" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Link to Wiki"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                      </nodes>
+                    </node>
+                  </nodes>
+                </node>
+                <node id="3" posx="430.776611328125" posy="552.6055908203125" width="72" height="49" side="right" fold="false" treesize="119" color="#3689e6" colorroot="true" layout="To right" group="false">
+                  <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                  <nodename maxwidth="200">
+                    <text data="ISO"/>
+                  </nodename>
+                  <nodenote></nodenote>
+                  <nodes>
+                    <node id="12" posx="582.776611328125" posy="552.6055908203125" width="168" height="49" side="right" fold="false" treesize="119" color="#3689e6" colorroot="false" layout="To right" group="false">
+                      <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                      <nodename maxwidth="200">
+                        <text data="ISO Development"/>
+                      </nodename>
+                      <nodenote></nodenote>
+                      <nodes>
+                        <node id="18" posx="830.776611328125" posy="517.6055908203125" width="246" height="70" task="0" side="right" fold="false" treesize="70" color="#3689e6" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="239" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="239">
+                            <text data="Mover Archivos de ISO a este branch"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="19" posx="830.776611328125" posy="587.6055908203125" width="166" height="49" task="0" side="right" fold="false" treesize="49" color="#3689e6" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Crear ISO Branch"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                      </nodes>
+                    </node>
+                  </nodes>
+                </node>
+                <node id="4" posx="430.776611328125" posy="752.1055908203125" width="101" height="49" side="right" fold="false" treesize="280" color="#333333" colorroot="true" layout="To right" group="false">
+                  <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                  <nodename maxwidth="200">
+                    <text data="Dotfiles"/>
+                  </nodename>
+                  <nodenote></nodenote>
+                  <nodes>
+                    <node id="13" posx="611.776611328125" posy="752.1055908203125" width="197" height="49" side="right" fold="false" treesize="280" color="#333333" colorroot="false" layout="To right" group="false">
+                      <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                      <nodename maxwidth="200">
+                        <text data="Dotfiles Development"/>
+                      </nodename>
+                      <nodenote></nodenote>
+                      <nodes>
+                        <node id="17" posx="888.776611328125" posy="636.6055908203125" width="202" height="49" task="0" side="right" fold="false" treesize="49" color="#333333" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Mover todo de QARSlp"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="20" posx="888.776611328125" posy="685.6055908203125" width="138" height="49" task="0" side="right" fold="false" treesize="49" color="#333333" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Crear Branch"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="29" posx="888.776611328125" posy="734.6055908203125" width="237" height="70" task="0" side="right" fold="false" treesize="70" color="#333333" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Agregar Rofi para el api key de Openweather"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="30" posx="888.776611328125" posy="825.6055908203125" width="239" height="70" side="right" fold="false" treesize="112" color="#333333" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Actualizar arte ascii para los archivos"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                          <nodes>
+                            <node id="31" posx="1227.776611328125" posy="804.6055908203125" width="243" height="112" task="0" side="right" fold="false" treesize="112" color="#333333" colorroot="false" layout="To right" group="false">
+                              <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                              <nodename maxwidth="200">
+                                <text data="http://patorjk.com/software/taag/#p=display&amp;f=Stop&amp;t=SpectrumOS"/>
+                              </nodename>
+                              <nodenote></nodenote>
+                            </node>
+                          </nodes>
+                        </node>
+                      </nodes>
+                    </node>
+                  </nodes>
+                </node>
+                <node id="23" posx="430.776611328125" posy="976.1055908203125" width="78" height="49" side="right" fold="false" treesize="168" color="#f37329" colorroot="false" layout="To right" group="false">
+                  <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                  <nodename maxwidth="200">
+                    <text data="Wiki"/>
+                  </nodename>
+                  <nodenote></nodenote>
+                  <nodes>
+                    <node id="24" posx="608.776611328125" posy="976.1055908203125" width="226" height="49" side="right" fold="false" treesize="168" color="#f37329" colorroot="false" layout="To right" group="false">
+                      <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                      <nodename maxwidth="200">
+                        <text data="Html files with all the wiki"/>
+                      </nodename>
+                      <nodenote></nodenote>
+                      <nodes>
+                        <node id="25" posx="934.776611328125" posy="916.6055908203125" width="213" height="70" task="0" side="right" fold="false" treesize="70" color="#f37329" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Hacer copia de Hugo de Helgen para con este"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="26" posx="934.776611328125" posy="986.6055908203125" width="240" height="49" task="0" side="right" fold="false" treesize="49" color="#f37329" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Hacer propio tema de Hugo"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                        <node id="28" posx="914.776611328125" posy="1035.6055908203125" width="138" height="49" task="0" side="right" fold="false" treesize="49" color="#f37329" colorroot="false" layout="To right" group="false">
+                          <style branchmargin="100" branchradius="25" linktype="curved" linkwidth="4" linkarrow="false" linkdash="solid" nodeborder="underlined" nodewidth="200" nodeborderwidth="4" nodefill="false" nodemargin="8" nodepadding="6" nodefont="Sans 11" nodemarkup="true"/>
+                          <nodename maxwidth="200">
+                            <text data="Crear Branch"/>
+                          </nodename>
+                          <nodenote></nodenote>
+                        </node>
+                      </nodes>
+                    </node>
+                  </nodes>
+                </node>
+              </nodes>
+            </node>
+          </nodes>
+        </node>
+      </nodes>
+    </node>
+  </nodes>
+  <groups/>
+  <connections>
+    <connection from_id="9" to_id="6" drag_x="471.12107849121162" drag_y="218.11737060546864">
+      <style connectiondash="dotted" connectionlwidth="2" connectionarrow="fromto" connectionpadding="3" connectionfont="Sans 10" connectiontwidth="100"/>
+      <title></title>
+      <note></note>
+    </connection>
+  </connections>
+  <stickers/>
+</minder>
