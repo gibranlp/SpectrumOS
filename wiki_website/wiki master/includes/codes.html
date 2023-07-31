@@ -1,0 +1,76 @@
+<section id="codes">
+    <h2 class="section-title"> 
+        <a href="#codes">#</a>
+        <span>Codes</span>
+    </h2>
+
+    <p class="section-description">
+
+        <!-- default alert -->
+        <div class="alert simple default" role="alert">
+            <span class="alert-content">
+                <span>You must describe the structure bellow to highlight any codeblocks:</span>
+                <code class="in-line"> &lt;pre&gt;&lt;code class="language-{language}"&gt; .. &lt;/code&gt; &lt;/pre&gt; </code>
+                <br>
+                <span>Make sure you change the {language} with the desired highlighted language & the dots with the proper code.</span>
+            </span>
+        </div>
+
+        <br>
+
+        <!-- default alert -->
+        <div class="alert simple default" role="alert">
+            <strong class="alert-title">Important</strong>
+            <span class="alert-content">Please pay attention to escaping < & > in any codeblock. replace them with & lt; and & gt;</span>
+        </div>
+    </p>
+
+    <div class="section-content col-flexed gap-3">
+<!-- html code ///// -->
+<pre>
+<code class="language-html">&lt;h1&gt; Hello world &lt;/h1&gt;</code></pre>
+
+<!-- js code ////// -->
+<pre>
+<code class="language-js"> console.log('Hello world') </code></pre>
+
+<!-- php code ////// -->
+<pre>
+<code class="language-php"> echo 'Hello world'; </code></pre>
+
+<!-- c code -->
+<pre>
+<code class="language-c">#include &lt;stdio.h&gt;
+ 
+int main() {
+   printf("Hello world");
+   return 0;
+}</code>
+</pre>
+
+<!-- c# code -->
+<pre>
+<code class="language-c#">namespace TawthiqTemplate
+{
+    class Tawthiq {        
+        static void Main(string[] args)
+        {
+            System.Console.WriteLine("Hello world");
+        }
+    }
+}</code>   
+</pre>
+
+<!-- java code -->
+<pre>
+<code class="language-java">import java.io.*;
+ 
+class GFG {
+    public static void main (String[] args) {
+       System.out.println("Hello world");
+    }
+}</code>   
+</pre>
+    </div>
+
+</section>

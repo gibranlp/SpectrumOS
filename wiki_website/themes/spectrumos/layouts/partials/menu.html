@@ -1,0 +1,41 @@
+<!-- navigation panel -->
+<nav class="navbar navbar-default navbar-fixed-top nav-transparent overlay-nav sticky-nav nav-white nav-border-bottom" role="navigation">
+    <div class="container">
+        <div class="row">
+            <!-- logo -->
+            <div class="col-md-2 col-sm-2 col-xs-6"><a class="logo-light" href="{{ if .Site.Params.Logo.LogoHomeLink }}{{ .Site.Params.Logo.LogoHomeLink }}{{else}}{{ .Site.BaseURL }}{{ end }}"><img alt="" src="../../images/logow.png" class="logo" /></a><a class="logo-dark" href="{{ if .Site.Params.Logo.LogoHomeLink }}{{ .Site.Params.Logo.LogoHomeLink }}{{else}}{{ .Site.BaseURL }}{{ end }}"><img alt="" src="../../images/logo.png" class="logo" /></a></div>
+            <!-- end logo -->
+            <!-- toggle navigation -->
+                    <div class="navbar-header col-sm-8 col-xs-2 pull-right">
+                        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span> </button>
+                    </div>
+                    <!-- toggle navigation end -->
+            <!-- main menu -->
+            <div class="col-md-10 no-padding-right accordion-menu text-right">
+                <div class="navbar-collapse collapse">
+                    <ul id="accordion" class="nav navbar-nav navbar-right panel-group">
+                        <!-- menu item -->
+                        {{- $currentPage := . -}}
+                        {{ range .Site.Menus.main -}}
+                        <li class="dropdown panel">
+                            {{ if .HasChildren }}
+                            <a href="{{ .URL | absLangURL }}" data-hover="dropdown">{{ .Name }}</a>
+                            <ul id="collapse1" class="dropdown-menu panel-collapse collapse">
+                                {{ range .Children }}
+                                  <li><a href="{{ .URL | absLangURL }}">{{ .Name }}</a></li>
+                                {{ end }}
+                              </ul>
+                              {{ else }}
+                              <a href="{{ .URL | absLangURL }}">{{ .Name }}</a>
+                              {{ end  }}
+                        </li>
+                        {{- end }}
+                        <!-- End Menu Item-->
+                     </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+<!-- end navigation panel -->
+<!-- end main menu -->

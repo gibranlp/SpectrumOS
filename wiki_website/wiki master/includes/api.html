@@ -1,0 +1,268 @@
+<section id="api" class="long-section">
+    <h2 class="section-title">
+        <a href="#api">#</a>
+        <span>API</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+
+        <!-- simple use ////////////////////// -->
+        <div class="section-description content-item">Base</div>
+
+        <!-- green /////// -->
+        <div class="route green">
+            <span class="route-verb">GET</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Get all users</span>
+        </div>
+
+        <!-- red //////// -->
+        <div class="route red">
+            <span class="route-verb">DELETE</span>
+            <span class="route-url">/api/v1/users/{user}</span>
+            <span class="route-desc">Delete a specific user</span>
+        </div>
+
+        <!-- indigo /////////// -->
+        <div class="route indigo">
+            <span class="route-verb">PATCH</span>
+            <span class="route-url">/api/v1/users/{user}</span>
+            <span class="route-desc">Update a specific user's data</span>
+        </div>
+
+        <!-- sky /////////////// -->
+        <div class="route sky">
+            <span class="route-verb">POST</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Create a new user</span>
+        </div>
+
+        <!-- amber /////////////// -->
+        <div class="route amber">
+            <span class="route-verb">PUT</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Create a new user</span>
+        </div>
+
+        <!-- with responses /////////////////// -->
+        <div class="section-description content-item">With responses</div>
+
+        <!-- green /////// -->
+        <div>
+            <div class="route green">
+                <span class="route-verb">GET</span>
+                <span class="route-url">/api/v1/users</span>
+                <span class="route-desc">Get all users</span>
+            </div>
+            <pre>
+<code class="language-json">[
+  {
+    "id": 1,
+    "name": "Leanne Graham",
+    "username": "Bret",
+    "email": "Sincere@april.biz"
+  },
+  {
+    "id": 2,
+    "name": "Ervin Howell",
+    "username": "Antonette",
+    "email": "Shanna@melissa.tv"
+  },
+  {
+    "id": 3,
+    "name": "Clementine Bauch",
+    "username": "Samantha",
+    "email": "Nathan@yesenia.net"
+  }
+]</code></pre>
+        </div>
+
+        <!-- red //////// -->
+        <div>
+            <div class="route red">
+                <span class="route-verb">DELETE</span>
+                <span class="route-url">/api/v1/users/{user}</span>
+                <span class="route-desc">Delete a specific user</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User was deleted successfuly"
+}</code></pre>
+        </div>
+
+        <!-- indigo //////// -->
+        <div>
+            <div class="route indigo">
+                <span class="route-verb">PATCH</span>
+                <span class="route-url">/api/v1/users/{user}</span>
+                <span class="route-desc">Update a specific user's data</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User's data was updated successfuly"
+}</code></pre>
+        </div>
+
+        <!-- sky //////// -->
+        <div>
+            <div class="route sky">
+                <span class="route-verb">POST</span>
+                <span class="route-url">/api/v1/users</span>
+                <span class="route-desc">Create a new user</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User was created successfuly"
+}</code></pre>
+        </div>
+
+        
+        <!-- contained in accordion ///////////////////////////// -->
+        <div class="section-description content-item">Contained in an accordion</div>
+
+        <div class="accordion-container">
+            <!-- green /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route green">
+                        <span class="route-verb">GET</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Get all users</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">[
+  {
+    "id": 1,
+    "name": "Leanne Graham",
+    "username": "Bret",
+    "email": "Sincere@april.biz"
+  },
+  {
+    "id": 2,
+    "name": "Ervin Howell",
+    "username": "Antonette",
+    "email": "Shanna@melissa.tv"
+  },
+  {
+    "id": 3,
+    "name": "Clementine Bauch",
+    "username": "Samantha",
+    "email": "Nathan@yesenia.net"
+  }
+]</code></pre>
+                </div>
+            </div>
+
+            <!-- red /////// -->
+            <div class="accordion-item current">
+                <div class="accordion-header">
+                    <div class="route red">
+                        <span class="route-verb">DELETE</span>
+                        <span class="route-url">/api/v1/users/{user}</span>
+                        <span class="route-desc">Delete a specific user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User was deleted successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- indigo /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route indigo">
+                        <span class="route-verb">PATCH</span>
+                        <span class="route-url">/api/v1/users/{user}</span>
+                        <span class="route-desc">Update a specific user's data</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User's data was updated successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- sky /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route sky">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- amber /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route amber">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+  status:200,
+  message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- contained in tabs ///////////////////////////// -->
+        <div class="section-description content-item">Contained in tabs</div>
+
+        <!-- sky -->
+        <div class="tabs-container">
+            <div class="tab-navs">
+                <div data-target="#first-api-window" class="tab-nav current">End point</div>
+                <div data-target="#second-api-window" class="tab-nav">Headers</div>
+                <div data-target="#third-api-window" class="tab-nav">body</div>
+                <div data-target="#fourth-api-window" class="tab-nav">Response</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-api-window" class="tab-window current p-unset">
+                    <div class="route sky">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div id="second-api-window" class="tab-window p-unset">
+                    <pre><code class="language-shell">Content-Type: application/json
+Authorization: Bearer {token}
+Accept: application/json</code></pre>
+                </div>
+                <div id="third-api-window" class="tab-window p-unset">
+                    <pre><code class="language-json">{
+  "name": "Leanne Graham",
+  "username": "Bret",
+  "email": "Sincere@april.biz"
+}</code></pre>
+                </div>
+                <div id="fourth-api-window" class="tab-window p-unset">
+                    <pre><code class="language-json">{
+   status:200,
+   message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>

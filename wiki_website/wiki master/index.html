@@ -1,0 +1,3627 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documento - HTML template for documentating digital products & APIs</title>
+  <link rel="icon" href="favicon.png"><script defer src="assets/js/index-v1.1.js"></script><script defer src="assets/js/highlight.js"></script><link href="assets/css/index-v1.1.css" rel="stylesheet"></head>
+  <body class="dark" dir="ltr">
+    <div id="app" data-theme="amber" data-layout="boxed" data-display="one-page" class="app-container">
+      <!-- sidebar toggler start ////////////////// -->
+      <div class="sidebar-opener-container main-text-color">
+    <button id="sidebar-open">
+      <svg class="h-8 w-8" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+      </svg>
+    </button>
+</div>
+      <!-- sidebar toggler end ////////////// -->
+
+      <!-- sidebar start //////////////////// -->
+      <aside class="sidebar">
+   <!-- sidemenu container -->
+   <div class="sidemenu-container">
+      <!-- close sidebar button -->
+      <div class="sidebar-closer-container">
+         <button class="mr-auto" id="sidebar-close">
+            <svg class="h-8 w-8" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <line x1="18" y1="6" x2="6" y2="18"/>  <line x1="6" y1="6" x2="18" y2="18"/></svg>     
+         </button>
+      </div>
+
+      <div class="flex items-center px-4">
+         <div class="logo-container m-auto">
+            <img width="280px" src="assets/images/f666ed05c017bec8a743.png" alt="Tawthiq">
+            <small class="main-text-color font-extrabold">v1.0</small>
+          </div>
+      </div>
+      
+      <div class="lists-container">
+         <ul>
+            <li>
+               <a href="#" class="has-nested">
+                 <span>Get started</span>
+                 <svg class="caret caret-closed" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                 <svg class="caret caret-opened" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+               </a>
+               <ul class="nested">
+                  <li>
+                     <a href="#general">Overview</a>
+                  </li>
+               </ul>
+            </li>
+
+            <li>
+               <a href="#" class="has-nested">
+                  <span>UX elements</span>
+                  <svg class="caret caret-closed" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <svg class="caret caret-opened" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+               </a>
+               <ul class="nested">
+                  <li>
+                     <a href="#codes">Codes</a>
+                  </li>
+                  <li>
+                     <a href="#modals">Popups</a>
+                  </li>
+                  <li>
+                     <a href="#accordion">Accordion</a>
+                  </li>
+                  <li>
+                     <a href="#alerts">Alerts</a>
+                  </li>
+                  <li>
+                     <a href="#tabs">Tabs & windows</a>
+                  </li>
+                  <li>
+                     <a href="#headings">Headings</a>
+                  </li>
+                  <li>
+                     <a href="#texts">Texts</a>
+                  </li>
+                  <li>
+                     <a href="#blockquotes">Blockquotes</a>
+                  </li>
+                  <li>
+                     <a href="#cards">Cards</a>
+                  </li>
+                  <li>
+                     <a href="#badges">Badges</a>
+                  </li>
+                  <li>
+                     <a href="#lists">Lists</a>
+                  </li>
+                  <li>
+                     <a href="#imgs">Images</a>
+                  </li>
+                  <li>
+                     <a href="#tables">Tables</a>
+                  </li>
+               </ul>
+            </li>
+
+            <li>
+               <a href="#" class="has-nested">
+                  <span>CSS</span>
+                  <svg class="caret caret-closed" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                 <svg class="caret caret-opened" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+               </a>
+               <ul class="nested">
+                  <li>
+                     <a href="#flexbox">Flexbox</a>
+                  </li>
+                  <li>
+                     <a href="#grid">Grid system</a>
+                  </li>
+                  <li>
+                     <a href="#box-modal">Box modal</a>
+                  </li>
+               </ul>
+            </li>
+
+            <li>
+               <a href="#api">API</a>
+            </li>
+
+            <li>
+               <a href="#" class="has-nested">
+                  <span>Sample pages</span>
+                  <svg class="caret caret-closed" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                 <svg class="caret caret-opened" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+               </a>
+               <ul class="nested">
+                  <li>
+                     <a href="#changelog">Changelog</a>
+                  </li>
+                  
+                  <li>
+                     <a href="#contact-us">Contact us</a>
+                  </li>
+                  <li>
+                     <a href="#gallery">Gallery</a>
+                  </li>
+                  <li>
+                     <a href="#pricing">Pricing</a>
+                  </li>
+                  <li>
+                     <a href="#statistics">Statistics</a>
+                  </li>
+               </ul>
+            </li>
+            
+         </ul>
+      </div>
+   </div>
+</aside>
+      <!-- sidebar end ////////////////////// -->
+
+      <!-- scroll to top button start ///////////////// -->
+      <button id="scroll-top" class="scroll-top main-text-color hidden">
+    <svg class="h-8 w-8" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <circle cx="12" cy="12" r="10"/>  <polyline points="16 12 12 8 8 12"/>  <line x1="12" y1="16" x2="12" y2="8"/></svg>
+</button>
+      <!-- scroll to top button end ////////////////// -->
+
+      <!-- content start ///////////////////// -->
+      <div class="content-container">
+
+        <!-- sections container -->
+        <div class="sections-container" id="top">
+          <!-- getstarted start ////////////// -->
+          <section id="general" class="current">
+    
+    <div class="search-input mb-10">
+        <input type="text" name="search" placeholder="Look for something ..">
+        <button class="icon">
+            <svg width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <circle cx="10" cy="10" r="7"/>  <line x1="21" y1="21" x2="15" y2="15"/></svg>
+        </button>
+    </div>
+
+    <div>
+        <h2 class="section-title">
+            <a href="#getstarted">#</a>
+            <span>Get started</span>
+        </h2>
+    
+        <div class="section-content">
+            <h3 class="h3">Documento - HTML template for documentating digital products & APIs</h3>
+            <hr class="mt-5 mb-5">
+            <p class="mt-4 mb-4">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+            <hr class="mt-5 mb-5">
+            <div>
+                <p class="content-item section-description">Overview</p>
+                <div class="grid-of-2">
+                    <div class="flex gap-2 items-center">
+                        <h6 class="h6">Author & Product owner</h6>
+                        <a href="https://github.com/adnane-ka" target="_blank" class="main-text-color">Adnane Kadri</a>
+                    </div>
+        
+                    <div class="flex gap-2 items-center">
+                        <h6 class="h6">Created at:</h6>
+                        <span class="main-text-color">12/16/2022</span>
+                    </div>
+        
+                    <div class="flex gap-2 items-center">
+                        <h6 class="h6">Updated at:</h6>
+                        <span class="main-text-color">01/01/2023</span>
+                    </div>
+        
+                    <div class="flex gap-2 items-center">
+                        <h6 class="h6">Version:</h6>
+                        <span class="main-text-color">1.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="mt-5 mb-5">
+            <p class="content-item section-description">Why?</p>
+            <p class="mt-4 mb-4">Because the quality of documentation is the quality of the product, and Documento template combines both: the quality as product and the quality as a documentation.</p>
+
+            <hr class="mt-5 mb-5">
+            <p class="content-item section-description">For who?</p>
+            <p class="mt-4 mb-4">Whether you're developing a digital product or building an API, you'll absolutly need this documentation template to save time and guarntee quality at the same time.</p>
+        </div>
+
+    </div>
+</section>
+          <!-- getstarted end //////////////// -->
+
+          <!-- codes start //////////////// -->
+          <section id="codes">
+    <h2 class="section-title"> 
+        <a href="#codes">#</a>
+        <span>Codes</span>
+    </h2>
+
+    <p class="section-description">
+
+        <!-- default alert -->
+        <div class="alert simple default" role="alert">
+            <span class="alert-content">
+                <span>You must describe the structure bellow to highlight any codeblocks:</span>
+                <code class="in-line"> &lt;pre&gt;&lt;code class="language-{language}"&gt; .. &lt;/code&gt; &lt;/pre&gt; </code>
+                <br>
+                <span>Make sure you change the {language} with the desired highlighted language & the dots with the proper code.</span>
+            </span>
+        </div>
+
+        <br>
+
+        <!-- default alert -->
+        <div class="alert simple default" role="alert">
+            <strong class="alert-title">Important</strong>
+            <span class="alert-content">Please pay attention to escaping < & > in any codeblock. replace them with & lt; and & gt;</span>
+        </div>
+    </p>
+
+    <div class="section-content col-flexed gap-3">
+<!-- html code ///// -->
+<pre>
+<code class="language-html">&lt;h1&gt; Hello world &lt;/h1&gt;</code></pre>
+
+<!-- js code ////// -->
+<pre>
+<code class="language-js"> console.log('Hello world') </code></pre>
+
+<!-- php code ////// -->
+<pre>
+<code class="language-php"> echo 'Hello world'; </code></pre>
+
+<!-- c code -->
+<pre>
+<code class="language-c">#include &lt;stdio.h&gt;
+ 
+int main() {
+   printf("Hello world");
+   return 0;
+}</code>
+</pre>
+
+<!-- c# code -->
+<pre>
+<code class="language-c#">namespace TawthiqTemplate
+{
+    class Tawthiq {        
+        static void Main(string[] args)
+        {
+            System.Console.WriteLine("Hello world");
+        }
+    }
+}</code>   
+</pre>
+
+<!-- java code -->
+<pre>
+<code class="language-java">import java.io.*;
+ 
+class GFG {
+    public static void main (String[] args) {
+       System.out.println("Hello world");
+    }
+}</code>   
+</pre>
+    </div>
+
+</section>
+          <!-- codes end //////////////// -->
+  
+          <!-- modals start //////////////// -->
+          <section id="modals">
+    <h2 class="section-title"> 
+        <a href="#modals">#</a>
+        <span>Popups</span>
+    </h2>
+
+    <div class="section-content">
+        <!-- buttons ////////////////// -->
+        <div>
+            <p class="content-item section-description">Sizes</p>
+            <button data-target-modal="#modal-1" class="modal-opener badge badge-success sharp badge-xl p-2">Base</button>
+            <button data-target-modal="#modal-2" class="modal-opener badge badge-danger sharp badge-xl p-2">Wide</button>
+        </div>
+
+        <div>
+            <p class="content-item section-description">Blur</p>
+            <button data-target-modal="#modal-3" class="modal-opener badge badge-info sharp badge-xl p-2">Blurred</button>
+            <button data-target-modal="#modal-1" class="modal-opener badge badge-success sharp badge-xl p-2">Base</button>
+        </div>
+
+        <div>
+            <p class="content-item section-description">Positioning</p>
+            <button data-target-modal="#modal-4" class="modal-opener badge badge-warning sharp badge-xl p-2">Top</button>
+            <button data-target-modal="#modal-5" class="modal-opener badge badge-default sharp badge-xl p-2">Bottom</button>
+            <button data-target-modal="#modal-6" class="modal-opener badge badge-success sharp badge-xl p-2">Right</button>
+            <button data-target-modal="#modal-7" class="modal-opener badge badge-danger sharp badge-xl p-2">Left</button>
+        </div>
+
+
+        <!-- modals ////////////////// -->
+        <!-- default -->
+        <div id="modal-1" class="modal-window">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-1" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- large -->
+        <div id="modal-2" class="modal-window lg">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-2" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- blured -->
+        <div id="modal-3" class="modal-window blured">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-3" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- top -->
+        <div id="modal-4" class="modal-window top">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-4" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- bottom -->
+        <div id="modal-5" class="modal-window bottom">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-5" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- right -->
+        <div id="modal-6" class="modal-window right">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-6" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- left -->
+        <div id="modal-7" class="modal-window left">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-7" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+          <!-- modals end //////////////// -->
+  
+          <!-- accordion start ////////////// -->
+          <section id="accordion">
+    <h2 class="section-title"> 
+        <a href="#accordion">#</a>
+        <span>Accordion</span> 
+    </h2>
+
+    <div class="section-content">
+        <div class="section-description content-item">Base</div>
+
+        <div class="accordion-container">
+            <div class="accordion-item current">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header text-xl p-4">Accordion title</div>
+                <div class="accordion-body p-4">Accordion window content. this can contain any other type of content such as images, codeblocks or paragraphs.</div>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- accordion end //////////////// -->
+  
+          <!-- alerts start //////////////// -->
+          <section id="alerts">
+    <h2 class="section-title"> 
+        <a href="#alerts">#</a>
+        <span>Alerts</span> 
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+        <!-- simple alerts  //////////// -->
+        <div class="content-item section-description">Base</div>
+
+        <!-- danger -->
+        <div class="alert simple danger" role="alert">
+            <strong class="alert-title">Alert title</strong>
+            <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            <span class="alert-icon">
+              <svg class="icon" role="button" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- success -->
+        <div class="alert simple success" role="alert">
+            <strong class="alert-title">Alert title</strong>
+            <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            <span class="alert-icon">
+              <svg class="icon" role="button" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- info -->
+        <div class="alert simple info" role="alert">
+            <strong class="alert-title">Alert title</strong>
+            <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            <span class="alert-icon">
+              <svg class="icon" role="button" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- warning -->
+        <div class="alert simple warning" role="alert">
+            <strong class="alert-title">Alert title</strong>
+            <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            <span class="alert-icon">
+              <svg class="icon" role="button" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- default -->
+        <div class="alert simple default" role="alert">
+            <strong class="alert-title">Alert title</strong>
+            <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            <span class="alert-icon">
+              <svg class="icon" role="button" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+
+        <!-- simple alerts end //////////// -->
+
+
+        <!-- iconed alerts //////////////// -->
+        <div class="section-description content-item">Iconed</div>
+
+        <!-- danger -->
+        <div class="alert iconed danger" role="alert">
+            <span class="alert-icon">
+                <svg class="icon" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M8 13.5v-8a1.5 1.5 0 0 1 3 0v6.5m0 -6.5v-2a1.5 1.5 0 0 1 3 0v8.5m0 -6.5a1.5 1.5 0 0 1 3 0v6.5m0 -4.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2a7 6 0 0 1 -5 -3l-2.7 -5.25a1.4 1.4 0 0 1 2.75 -2l.9 1.75"/></svg>
+            </span>
+            <div class="col-flexed">
+                <strong class="alert-title">Alert title</strong>
+                <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            </div>
+        </div>
+
+        <!-- success -->
+        <div class="alert iconed success" role="alert">
+            <span class="alert-icon">
+                <svg class="icon" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M7 12l5 5l10 -10"/>  <path d="M2 12l5 5m5 -5l5 -5"/></svg>
+            </span>
+            <div class="col-flexed">
+                <strong class="alert-title">Alert title</strong>
+                <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            </div>
+        </div>
+
+        <!-- info -->
+        <div class="alert iconed info" role="alert">
+            <span class="alert-icon">
+                <svg class="icon" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <circle cx="12" cy="12" r="10"/>  <line x1="12" y1="16" x2="12" y2="12"/>  <line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </span>
+            <div class="col-flexed">
+                <strong class="alert-title">Alert title</strong>
+                <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            </div>
+        </div>
+
+        <!-- warning -->
+        <div class="alert iconed warning" role="alert">
+            <span class="alert-icon">
+                <svg class="icon" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>  <line x1="12" y1="9" x2="12" y2="13"/>  <line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <div class="col-flexed">
+                <strong class="alert-title">Alert title</strong>
+                <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            </div>
+        </div>
+
+        <!-- default -->
+        <div class="alert iconed default" role="alert">
+            <span class="alert-icon">
+                <svg class="icon" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/>
+                </svg>
+            </span>
+            <div class="col-flexed">
+                <strong class="alert-title">Alert title</strong>
+                <span class="alert-content">Alert content. an alert is a state of careful watching and readiness especially for danger or opportunity.</span>
+            </div>
+        </div>
+
+        <!-- iconed alerts end //////////// -->
+    </div>
+</section>
+          <!-- alerts end //////////////// -->
+  
+          <!-- tabs start //////////////// -->
+          <section id="tabs">
+    <h2 class="section-title"> 
+        <a href="#tabs">#</a>
+        <span>Tabs & windows</span> 
+    </h2>
+    
+    <div class="section-content col-flexed gap-8">
+        
+        <!-- default -->
+        <div class="section-description content-item">Base</div>
+        <div class="tabs-container">
+            <div class="tab-navs">
+                <div data-target="#first-window" class="tab-nav current">First window</div>
+                <div data-target="#second-window" class="tab-nav">Second window</div>
+                <div data-target="#third-window" class="tab-nav">Third window</div>
+                <div data-target="#fourth-window" class="tab-nav">Fourth window</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-window" class="tab-window current">First window content</div>
+                <div id="second-window" class="tab-window">Second window content</div>
+                <div id="third-window" class="tab-window">Third window content</div>
+                <div id="fourth-window" class="tab-window">Fourth window content</div>
+            </div>
+        </div>
+
+        <!-- underlined -->
+        <div class="section-description content-item">Underlined</div>
+        <div class="tabs-container">
+            <div class="tab-navs underlined">
+                <div data-target="#first-underline-window" class="tab-nav current">First window</div>
+                <div data-target="#second-underline-window" class="tab-nav">Second window</div>
+                <div data-target="#third-underline-window" class="tab-nav">Third window</div>
+                <div data-target="#fourth-underline-window" class="tab-nav">Fourth window</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-underline-window" class="tab-window current">First window content</div>
+                <div id="second-underline-window" class="tab-window">Second window content</div>
+                <div id="third-underline-window" class="tab-window">Third window content</div>
+                <div id="fourth-underline-window" class="tab-window">Fourth window content</div>
+            </div>
+        </div>
+
+        <!-- default + fwidth -->
+        <div class="section-description content-item">Full width</div>
+        <div class="tabs-container">
+            <div class="tab-navs fw">
+                <div data-target="#first-fw-window" class="tab-nav current">First window</div>
+                <div data-target="#second-fw-window" class="tab-nav">Second window</div>
+                <div data-target="#third-fw-window" class="tab-nav">Third window</div>
+                <div data-target="#fourth-fw-window" class="tab-nav">Fourth window</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-fw-window" class="tab-window current">First window content</div>
+                <div id="second-fw-window" class="tab-window">Second window content</div>
+                <div id="third-fw-window" class="tab-window">Third window content</div>
+                <div id="fourth-fw-window" class="tab-window">Fourth window content</div>
+            </div>
+        </div>
+
+        <!-- underlined + fwidth -->
+        <div class="section-description content-item">Underlined & Full width</div>
+        <div class="tabs-container">
+            <div class="tab-navs underlined fw">
+                <div data-target="#first-underline-fw-window" class="tab-nav current">First window</div>
+                <div data-target="#second-underline-fw-window" class="tab-nav">Second window</div>
+                <div data-target="#third-underline-fw-window" class="tab-nav">Third window</div>
+                <div data-target="#fourth-underline-fw-window" class="tab-nav">Fourth window</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-underline-fw-window" class="tab-window current">First window content</div>
+                <div id="second-underline-fw-window" class="tab-window">Second window content</div>
+                <div id="third-underline-fw-window" class="tab-window">Third window content</div>
+                <div id="fourth-underline-fw-window" class="tab-window">Fourth window content</div>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- tabs end //////////////// -->
+  
+          <!-- headings start //////////////// -->
+          <section id="headings">
+    <h2 class="section-title"> 
+        <a href="#headings">#</a>
+        <span>Headings</span> 
+    </h2>
+
+    <div class="section-content col-flexed gap-6">
+        <h1 class="h1"> # <span>First level heading</span> </h1>
+        <h2 class="h2"> # <span>Second level heading</span> </h2>
+        <h3 class="h3"> # <span>Third level heading</span> </h3>
+        <h4 class="h4"> # <span>Fourth level heading</span> </h4>
+        <h5 class="h5"> # <span>Fifth level heading</span> </h5>
+        <h6 class="h6"> # <span>Sixth level heading</span> </h6>
+        <h5 class="h5"> # <span>Fifth level heading</span> </h5>
+        <h4 class="h4"> # <span>Fourth level heading</span> </h4>
+        <h3 class="h3"> # <span>Third level heading</span> </h3>
+        <h2 class="h2"> # <span>Second level heading</span> </h2>
+        <h1 class="h1"> # <span>First level heading</span> </h1>
+    </div>
+</section>
+          <!-- headings end //////////////// -->
+  
+          <!-- texts start //////////////// -->
+          <section id="texts">
+    <h2 class="section-title"> 
+        <a href="#texts">#</a>
+        <span>Texts</span> 
+    </h2>
+
+    <div class="section-content col-flexed gap-6">
+        
+        <!-- styles -->
+        <div>
+            <div class="section-description content-item">Styles</div>
+    
+            <!-- marked -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.marked</code>
+                <span>To highlight any content of the text</span> 
+                <span class="marked">This one for example</span>
+            </p>
+    
+            <!-- line-through -->
+            <p class="line-through">
+                <span>this text can be considered as deleted text </span>
+                <span>Use the class</span>
+                <code class="in-line">.line-through</code>
+            </p>
+            
+            <!-- underline -->
+            <p class="underline">
+                <span>Use the class</span>
+                <code class="in-line">.underline</code> 
+                <span>To underline texts</span>
+            </p>
+    
+            <!-- overline -->
+            <p class="overline">
+                <span>Use the class</span>
+                <code class="in-line">.overline</code>
+                <span>To overline texts</span>
+            </p>
+    
+            <!-- font-semibold -->
+            <p class="font-semibold">
+                <span>Use the class</span> 
+                <code class="in-line">.font-semibold</code>
+                <span>To make texts bold</span>
+            </p>
+    
+            <!-- font-bold -->
+            <p class="font-bold">
+                <span>Use the class</span>
+                <code class="in-line">.font-bold</code>
+                <span>To make texts bolder</span>
+            </p>
+    
+            <!-- italic -->
+            <p class="italic">
+                <span>Use the class</span>
+                <code class="in-line">.italic</code>
+                <span>To make texts italic</span>
+            </p>
+        </div>
+
+
+        <!-- sizes -->
+        <div>
+            <div class="section-description content-item">Sizes</div>
+    
+            <!-- text-sm -->
+            <p class="text-sm">
+                <span>This is small text</span>
+                <code class="in-line">.text-sm</code>
+            </p>
+    
+            <!-- text-lg -->
+            <p class="text-lg">
+                <span>This is a large text</span>
+                <code class="in-line">.text-lg</code>
+            </p>
+    
+            <!-- text-xl -->
+            <p class="text-xl">
+                <span>This is an extra large text</span>
+                <code class="in-line">.text-xl</code>
+            </p>
+    
+            <!-- text-2xl -->
+            <p class="text-2xl">
+                <span>This is an extra extra large text</span>
+                <code class="in-line">.text-2xl</code>
+            </p>
+        </div>
+
+        <!-- colors -->
+        <div>
+            <div class="section-description content-item">Colors</div>
+    
+            <!-- text-danger -->
+            <p class="text-danger">
+                <span>Use the class</span>
+                <code class="in-line">.text-danger</code>
+                <span>To express failure</span> 
+            </p>
+    
+            <!-- text-success -->
+            <p class="text-success">
+                <span>Use the class</span> 
+                <code class="in-line">.text-success</code> 
+                <span>To express success</span>
+            </p>
+    
+            <!-- text-info -->
+            <p class="text-info">
+                <span>Use the class</span>
+                <code class="in-line">.text-info</code> 
+                <span>To notify or inform</span>
+            </p>
+    
+            <!-- text-warning -->
+            <p class="text-warning">
+                <span>Use the class</span> 
+                <code class="in-line">.text-warning</code> 
+                <span>To warn</span>
+            </p>
+        </div>
+        
+    </div>
+</section>
+          <!-- texts end //////////////// -->
+          
+          <!-- blockquotes start //////////////// -->
+          <section id="blockquotes">
+    <h2 class="section-title"> 
+        <a href="#blockquotes">#</a>
+        <span>Blockquotes</span> 
+    </h2>
+
+    <div class="section-content col-flexed gap-8">
+        <!-- simple /////////////////////////// -->
+        <div>
+            <div class="section-description content-item">Base</div>
+            <blockquote class="simple">
+                <p>The quality of documentation is the quality of the product, and Documento template combines both: the quality as product and the quality as a documentation.</p>
+                <span>Originator</span>
+            </blockquote>
+        </div>
+
+        <!-- bordered ///////////////////////// -->
+        <div>
+            <div class="section-description content-item">Bordered</div>
+            <blockquote class="bordered">
+                <p class="bq-paragraph">The quality of documentation is the quality of the product, and Documento template combines both: the quality as product and the quality as a documentation.</p>
+                <span>Originator</span>
+            </blockquote>
+        </div>
+
+        <!-- iconed /////////////////////////// -->
+        <div>
+            <div class="section-description content-item">Iconed</div>
+            <blockquote class="iconed">
+                <svg aria-hidden="true" class="icon" viewbox="0 0 24 27" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.017 18L14.017 10.609C14.017 4.905 17.748 1.039 23 0L23.995 2.151C21.563 3.068 20 5.789 20 8H24V18H14.017ZM0 18V10.609C0 4.905 3.748 1.038 9 0L9.996 2.151C7.563 3.068 6 5.789 6 8H9.983L9.983 18L0 18Z" fill="currentColor"/></svg>
+                <p>The quality of documentation is the quality of the product, and Documento template combines both: the quality as product and the quality as a documentation.</p>
+                <span>Originator</span>
+            </blockquote>
+        </div>
+    </div>
+</section>
+          <!-- blockquotes end //////////////// -->
+  
+          <!-- cards start //////////////// -->
+          <section id="cards">
+    <h2 class="section-title"> 
+      <a href="#cards">#</a>
+      <span>Cards</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+        <div class="grid-of-3">
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-of-2">
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-of-1">
+            <div class="card">
+                <img class="lazy card-img" src="#" data-src="https://dummyimage.com/720x400" alt="blog">
+                <div class="card-body">
+                  <h2 class="card-subtitle">Tech</h2>
+                  <h1 class="card-title">Documento - HTML template for documentating digital products & APIs</h1>
+                  <p class="card-content">HTML Template that provides a set of templates, components & tools needed to well-document your digital products & APIs.</p>
+                  <div class="card-footer">
+                    <a class="cfooter-item main-text-color"><span>More</span>
+                      <svg class="w-4 h-4 ml-2" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </a>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>1.2K
+                    </span>
+                    <span class="cfooter-item">
+                      <svg class="w-4 h-4 mr-1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                      </svg>6
+                    </span>
+                  </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- cards end //////////////// -->
+  
+          <!-- badges start //////////////// -->
+          <section id="badges">
+    <h2 class="section-title"> 
+        <a href="#badges">#</a>
+        <span>Badges</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+
+        <div>
+            <div class="section-description content-item">Colors</div>
+            
+            <!-- badge success /// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-success</code> 
+                <span>To get a badge like so</span> 
+                <span class="badge badge-success">Badge</span>
+            </p>
+    
+            <!-- badge danger //// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-danger</code> 
+                <span>To get a badge like so</span> 
+                <span class="badge badge-danger">Badge</span>
+            </p>
+    
+            <!-- badge warning //// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-warning</code> 
+                <span>To get a badge like so</span> 
+                <span class="badge badge-warning">Badge</span>
+            </p>
+    
+            <!-- badge info //// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-info</code>
+                <span>To get a badge like so</span> 
+                <span class="badge badge-info">Badge</span>
+            </p>
+    
+            <!-- badge default //// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-default</code> 
+                <span>To get a badge like so</span> 
+                <span class="badge badge-default">Badge</span>
+            </p>
+        </div>
+
+
+        <div>
+            <div class="section-description content-item">Sizes</div>
+            
+            <!-- badge sm /// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-sm</code>
+                <span>To size a badge like so</span>
+                <span class="badge badge-success badge-sm">Badge</span>
+            </p>
+    
+            <!-- badge lg /// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-lg</code> 
+                <span>To size a badge like so</span>
+                <span class="badge badge-danger badge-lg">badge</span>
+            </p>
+    
+            <!-- badge xl /// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-xl</code>
+                <span>To size a badge like so</span>
+                <span class="badge badge-info badge-xl">Badge</span>
+            </p>
+    
+            <!-- badge 2xl /// -->
+            <p>
+                <span>Use the class</span> 
+                <code class="in-line">.badge-2xl</code> 
+                <span>To size a badge like so</span>
+                <span class="badge badge-warning badge-2xl">Badge</span>
+            </p>
+        </div>
+    </div>
+</section>
+          <!-- badges end //////////////// -->
+  
+          <!-- lists start //////////////// -->
+          <section id="lists">
+    <h2 class="section-title"> 
+        <a href="#lists">#</a>
+        <span>Lists</span>
+    </h2>
+
+    <div class="section-content grid-of-4">
+        <!-- ul simple -->
+        <div>
+            <div class="section-description content-item">Base</div>
+            <ul>
+                <li>First item</li>
+                <li>Second item</li>
+                <li>Third item</li>
+                <li>Fourth item</li>
+            </ul>
+        </div>
+
+        <!-- ul disc -->
+        <div>
+            <div class="section-description content-item">Disc</div>
+            <ul class="list-disc">
+                <li>First item</li>
+                <li>Second item</li>
+                <li>Third item</li>
+                <li>Fourth item</li>
+            </ul>
+        </div>
+
+        <!-- ul decimal -->
+        <div>
+            <div class="section-description content-item">Decimal</div>
+            <ul class="list-decimal">
+                <li>First item</li>
+                <li>Second item</li>
+                <li>Third item</li>
+                <li>Fourth item</li>
+            </ul>
+        </div>
+
+        <!-- ul square -->
+        <div>
+            <div class="section-description content-item">Square</div>
+            <ul class="list-square">
+                <li>First item</li>
+                <li>Second item</li>
+                <li>Third item</li>
+                <li>Fourth item</li>
+            </ul>
+        </div>
+
+        <!-- ul roman -->
+        <div>
+            <div class="section-description content-item">Roman</div>
+            <ul class="list-roman">
+                <li>First item</li>
+                <li>Second item</li>
+                <li>Third item</li>
+                <li>Fourth item</li>
+            </ul>
+        </div>
+    </div>
+</section>
+          <!-- lists end //////////////// -->
+           
+          <!-- imgs start //////////////// -->
+          <section id="imgs" class="long-section">
+    <h2 class="section-title"> 
+        <a href="#imgs">#</a>
+        <span>Images</span>
+    </h2>
+
+    <div class="section-description">
+        <span>Use the class</span> 
+        <code class="in-line">lazy</code>
+        <span>And define image path in the attribute</span>
+        <code class="in-line">data-src</code>
+        <span>To lazy load images</span>
+    </div>
+
+    <div class="section-content col-flexed gap-4">
+        <div>
+            <div>
+                <div class="section-description content-item">Responsive</div>
+                <img src="#" data-src="https://dummyimage.com/500x300" class="w-full h-full lazy" alt>
+            </div>
+
+            <div>
+                <div class="section-description content-item">Auto</div>
+                <img src="#" data-src="https://dummyimage.com/500x300" alt class="lazy">
+            </div>
+
+            <div>
+                <div class="section-description content-item">With shadow</div>
+                <img src="#" data-src="https://dummyimage.com/500x300" class="shadow-lg lazy" alt>
+            </div>
+
+            <div>
+                <div class="section-description content-item">Rounded</div>
+                <img src="#" data-src="https://dummyimage.com/500" class="rounded-full lazy" alt>
+            </div>
+
+            <div>
+                <div class="section-description content-item">Borderless</div>
+                <img src="#" data-src="https://dummyimage.com/500" class="rounded-lg lazy" alt>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- imgs end //////////////// -->
+  
+          <!-- tables start //////////////// -->
+          <section id="tables" class="long-section">
+    <h2 class="section-title"> 
+        <a href="#tables">#</a>
+        <span>Tables</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-4">
+        <!-- simple table -->
+        <div>
+            <div class="section-description content-item">Base</div>
+    
+            <table class="table-auto">
+                <thead>
+                  <tr>
+                    <th>First column title</th>
+                    <th>Second column title</th>
+                    <th>Third column title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- borderless table -->
+        <div>
+            <div class="section-description content-item">Borderless</div>
+    
+            <table class="table-auto borderless">
+                <thead>
+                  <tr>
+                    <th>First column title</th>
+                    <th>Second column title</th>
+                    <th>Third column title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- rows-only table -->
+        <div>
+            <div class="section-description content-item">Rows only</div>
+    
+            <table class="table-auto rows-only">
+                <thead>
+                  <tr>
+                    <th>First column title</th>
+                    <th>Second column title</th>
+                    <th>Third column title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- columns-only table -->
+        <div>
+            <div class="section-description content-item">Columns only</div>
+    
+            <table class="table-auto columns-only">
+                <thead>
+                  <tr>
+                    <th>First column title</th>
+                    <th>Second column title</th>
+                    <th>Third column title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                  <tr>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                    <td>Cell</td>
+                  </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+          <!-- tables end //////////////// -->
+  
+          <!-- flexbox start //////////////// -->
+          <section id="flexbox" class="long-section">
+    <h2 class="section-title"> 
+        <a href="#flexbox">#</a>
+        <span>Flexbox</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+        
+        <!-- flexed container -->
+        <div class="section-description">
+            <code class="in-line">.flex</code>
+        </div>
+        <div class="flex">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+        </div>
+
+        <!-- flexed container / grow -->
+        <div class="section-description">
+           <code class="in-line">.flex-1</code>
+        </div>
+        <div class="flex">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4 flex-1">4</div>
+        </div>
+
+        <!-- flexed container / grow -->
+        <div class="section-description">
+           <code class="in-line">.flex-1</code>
+        </div>
+        <div class="flex">
+            <div class="card p-4 flex-1">1</div>
+            <div class="card p-4 flex-1">2</div>
+            <div class="card p-4 flex-1">3</div>
+            <div class="card p-4 flex-1">4</div>
+        </div>
+
+        <!-- flexed container / margin -->
+        <div class="section-description">
+           <code class="in-line">.mr-auto</code>
+        </div>
+        <div class="flex">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4 mr-auto">4</div>
+        </div>
+
+        <!-- flexed wrap -->
+        <div class="section-description">
+           <code class="in-line">.flex-wrap</code>
+        </div>
+        <div class="flex flex-wrap">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4 w-1/2">3</div>
+            <div class="card p-4 w-1/2">4</div>
+        </div>
+
+        <!-- col-flexed -->
+        <div class="section-description">
+           <code class="in-line">.col-flexed</code>
+        </div>
+        <div class="col-flexed">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+        </div>
+
+        <div class="grid-of-2">
+            <!-- flexed gap-1 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-1</code>
+                </div>
+                <div class="flex gap-1">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+    
+            <!-- flexed gap-2 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-2</code>
+                </div>
+                <div class="flex gap-2">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+    
+            <!-- flexed gap-3 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-3</code>
+                </div>
+                <div class="flex gap-3">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+    
+            <!-- flexed gap-4 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-4</code>
+                </div>
+                <div class="flex gap-4">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+    
+            <!-- flexed gap-5 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-5</code>
+                </div>
+                <div class="flex gap-5">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+
+            <!-- flexed gap-6 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-6</code>
+                </div>
+                <div class="flex gap-6">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+
+            <!-- flexed gap-7 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-7</code>
+                </div>
+                <div class="flex gap-7">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+
+            <!-- flexed gap-8 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-8</code>
+                </div>
+                <div class="flex gap-8">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+
+            <!-- flexed gap-9 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-9</code>
+                </div>
+                <div class="flex gap-9">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+
+            <!-- flexed gap-10 -->
+            <div>
+                <div class="section-description">
+                   <code class="in-line">.gap-10</code>
+                </div>
+                <div class="flex gap-10">
+                    <div class="card p-4">1</div>
+                    <div class="card p-4">2</div>
+                    <div class="card p-4">3</div>
+                    <div class="card p-4">4</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- flexbox end //////////////// -->
+  
+          <!-- grid start //////////////// -->
+          <section id="grid" class="long-section">
+    <h2 class="section-title"> 
+        <a href="#grid">#</a>
+        <span>Grid system</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+      <!-- grid-of-1 -->
+      <div>
+         <div class="section-description">
+            <code class="in-line">.grid-of-1</code>
+         </div>
+         <div class="grid-of-1">
+             <div class="card p-4">1</div>
+             <div class="card p-4">2</div>
+             <div class="card p-4">3</div>
+             <div class="card p-4">4</div>
+         </div>
+      </div>
+
+      <!-- grid-of-2 -->
+      <div>
+        <div class="section-description">
+           <code class="in-line">.grid-of-2</code>
+        </div>
+        <div class="grid-of-2">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+        </div>
+      </div>
+
+      <!-- grid-of-3 -->
+      <div>
+        <div class="section-description">
+           <code class="in-line">.grid-of-3</code>
+        </div>
+        <div class="grid-of-3">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+        </div>
+      </div>
+
+      <!-- grid-of-4 -->
+      <div>
+        <div class="section-description">
+           <code class="in-line">.grid-of-43</code>
+        </div>
+        <div class="grid-of-4">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+        </div>
+      </div>
+
+      <!-- grid-of-5 -->
+      <div>
+        <div class="section-description">
+           <code class="in-line">.grid-of-5</code>
+        </div>
+        <div class="grid-of-5">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+            <div class="card p-4">5</div>
+        </div>
+      </div>
+
+      <!-- grid-of-6 -->
+      <div>
+        <div class="section-description">
+           <code class="in-line">.grid-of-6</code>
+        </div>
+        <div class="grid-of-6">
+            <div class="card p-4">1</div>
+            <div class="card p-4">2</div>
+            <div class="card p-4">3</div>
+            <div class="card p-4">4</div>
+            <div class="card p-4">5</div>
+            <div class="card p-4">6</div>
+        </div>
+      </div>
+
+    </div>
+</section>
+          <!-- grid end //////////////// -->
+  
+          <!-- box-modal start //////////////// -->
+          <section id="box-modal" class="long">
+    <h2 class="section-title"> 
+        <a href="#box-modal">#</a>
+        <span>Box modal</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+      <!-- paddings ////////////////////// -->
+      <div class="section-description content-item">
+        padding
+      </div>
+      <div class="grid-of-3">
+        <!-- p-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.p-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-1">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>
+          </div>
+        </div>
+
+        <!-- p-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-2">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-3">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-4">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-5">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-6">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-7">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-8">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-9">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- p-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.p-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 p-10">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      </div>
+
+      <!-- paddings right ////////////////////// -->
+      <div class="section-description content-item">
+        padding-right
+      </div>
+      <div class="grid-of-3">
+        <!-- pr-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.pr-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-1">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- pr-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-2">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-3">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-4">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-5">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-6">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-7">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-8">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-9">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pr-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pr-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pr-10">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      </div>
+
+      <!-- paddings left ////////////////////// -->
+      <div class="section-description content-item">
+        padding-left
+      </div>
+      <div class="grid-of-3">
+        <!-- pl-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.pl-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-1">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- pl-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-2">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-3">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-4">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-5">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-6">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-7">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-8">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-9">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pl-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pl-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pl-10">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      </div>
+
+      <!-- paddings top ////////////////////// -->
+      <div class="section-description content-item">
+        padding-top
+      </div>
+      <div class="grid-of-3">
+        <!-- pt-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.pt-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-1">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- pt-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-2">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-3">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-4">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-5">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-6">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-7">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-8">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-9">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pt-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pt-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pt-10">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      </div>
+
+      <!-- paddings bottom ////////////////////// -->
+      <div class="section-description content-item">
+        padding-bottom
+      </div>
+      <div class="grid-of-3">
+        <!-- pb-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.pb-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-1">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- pb-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-2">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-3">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-4">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-5">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-6">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-7">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-8">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-9">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- pb-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.pb-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 pb-10">
+              <div class="main-bg-color text-zinc-50">&nbsp;</div>   
+          </div>
+        </div>
+      </div>
+      
+      <!-- margins ////////////////////// -->
+      <div class="section-description content-item">
+        margins
+      </div>
+      <div class="grid-of-3">
+        <!-- m-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.m-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-1">&nbsp;</div>
+          </div>
+        </div>
+
+        <!-- m-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-2">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-3">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-4">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-5">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-6">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-7">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-8">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-9">&nbsp;</div>   
+          </div>
+        </div>
+
+        <!-- m-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.m-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 m-10">&nbsp;</div>   
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- margins  right////////////////////// -->
+      <div class="section-description content-item">
+        margins right
+      </div>
+      <div class="grid-of-3">
+        <!-- mr-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.mr-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-1">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- mr-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-2">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-3">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-4">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-5">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-6">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-7">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-8">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-9">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mr-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mr-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 mr-10">&nbsp;</div>   
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- margin left //////////// -->
+      <div class="section-description content-item">
+        margins left
+      </div>
+      <div class="grid-of-3">
+        <!-- ml-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.ml-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-1">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- ml-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-2">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-3">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-4">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-5">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-6">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-7">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-8">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-9">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- ml-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.ml-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50">
+              <div class="main-bg-color text-zinc-50 ml-10">&nbsp;</div>   
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- margin top //////////// -->
+      <div class="section-description content-item">
+        margins top
+      </div>
+      <div class="grid-of-3">
+        <!-- mt-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.mt-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-1 w-full">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- mt-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-2 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-3 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-4 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-5 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-6 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-7 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-8 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-9 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mt-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mt-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mt-10 w-full">&nbsp;</div>   
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- margin bottom //////////// -->
+      <div class="section-description content-item">
+        margins bottom
+      </div>
+      <div class="grid-of-3">
+        <!-- mb-1 -->
+        <div>
+          <div class="section-description">
+           <code class="in-line">.mb-1</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-1 w-full">&nbsp;</div>
+          </div>
+        </div>
+      
+        <!-- mb-2 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-2</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-2 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-3 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-3</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-3 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-4 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-4</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-4 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-5 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-5</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-5 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-6 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-6</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-6 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-7 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-7</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-7 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-8 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-8</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-8 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-9 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-9</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-9 w-full">&nbsp;</div>   
+          </div>
+        </div>
+      
+        <!-- mb-10 -->
+        <div>
+          <div class="section-description">
+            <code class="in-line">.mb-10</code>
+          </div>
+          <div class="container bg-zinc-800 dark:bg-zinc-50 flex">
+              <div class="main-bg-color text-zinc-50 mb-10 w-full">&nbsp;</div>   
+          </div>
+        </div>
+        
+      </div>
+
+    </div>
+</section>
+          <!-- box-modal end //////////////// -->
+  
+          <!-- api start //////////////// -->
+          <section id="api" class="long-section">
+    <h2 class="section-title">
+        <a href="#api">#</a>
+        <span>API</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-3">
+
+        <!-- simple use ////////////////////// -->
+        <div class="section-description content-item">Base</div>
+
+        <!-- green /////// -->
+        <div class="route green">
+            <span class="route-verb">GET</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Get all users</span>
+        </div>
+
+        <!-- red //////// -->
+        <div class="route red">
+            <span class="route-verb">DELETE</span>
+            <span class="route-url">/api/v1/users/{user}</span>
+            <span class="route-desc">Delete a specific user</span>
+        </div>
+
+        <!-- indigo /////////// -->
+        <div class="route indigo">
+            <span class="route-verb">PATCH</span>
+            <span class="route-url">/api/v1/users/{user}</span>
+            <span class="route-desc">Update a specific user's data</span>
+        </div>
+
+        <!-- sky /////////////// -->
+        <div class="route sky">
+            <span class="route-verb">POST</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Create a new user</span>
+        </div>
+
+        <!-- amber /////////////// -->
+        <div class="route amber">
+            <span class="route-verb">PUT</span>
+            <span class="route-url">/api/v1/users</span>
+            <span class="route-desc">Create a new user</span>
+        </div>
+
+        <!-- with responses /////////////////// -->
+        <div class="section-description content-item">With responses</div>
+
+        <!-- green /////// -->
+        <div>
+            <div class="route green">
+                <span class="route-verb">GET</span>
+                <span class="route-url">/api/v1/users</span>
+                <span class="route-desc">Get all users</span>
+            </div>
+            <pre>
+<code class="language-json">[
+  {
+    "id": 1,
+    "name": "Leanne Graham",
+    "username": "Bret",
+    "email": "Sincere@april.biz"
+  },
+  {
+    "id": 2,
+    "name": "Ervin Howell",
+    "username": "Antonette",
+    "email": "Shanna@melissa.tv"
+  },
+  {
+    "id": 3,
+    "name": "Clementine Bauch",
+    "username": "Samantha",
+    "email": "Nathan@yesenia.net"
+  }
+]</code></pre>
+        </div>
+
+        <!-- red //////// -->
+        <div>
+            <div class="route red">
+                <span class="route-verb">DELETE</span>
+                <span class="route-url">/api/v1/users/{user}</span>
+                <span class="route-desc">Delete a specific user</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User was deleted successfuly"
+}</code></pre>
+        </div>
+
+        <!-- indigo //////// -->
+        <div>
+            <div class="route indigo">
+                <span class="route-verb">PATCH</span>
+                <span class="route-url">/api/v1/users/{user}</span>
+                <span class="route-desc">Update a specific user's data</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User's data was updated successfuly"
+}</code></pre>
+        </div>
+
+        <!-- sky //////// -->
+        <div>
+            <div class="route sky">
+                <span class="route-verb">POST</span>
+                <span class="route-url">/api/v1/users</span>
+                <span class="route-desc">Create a new user</span>
+            </div>
+            <pre><code class="language-json">{
+    status:200,
+    message:"User was created successfuly"
+}</code></pre>
+        </div>
+
+        
+        <!-- contained in accordion ///////////////////////////// -->
+        <div class="section-description content-item">Contained in an accordion</div>
+
+        <div class="accordion-container">
+            <!-- green /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route green">
+                        <span class="route-verb">GET</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Get all users</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">[
+  {
+    "id": 1,
+    "name": "Leanne Graham",
+    "username": "Bret",
+    "email": "Sincere@april.biz"
+  },
+  {
+    "id": 2,
+    "name": "Ervin Howell",
+    "username": "Antonette",
+    "email": "Shanna@melissa.tv"
+  },
+  {
+    "id": 3,
+    "name": "Clementine Bauch",
+    "username": "Samantha",
+    "email": "Nathan@yesenia.net"
+  }
+]</code></pre>
+                </div>
+            </div>
+
+            <!-- red /////// -->
+            <div class="accordion-item current">
+                <div class="accordion-header">
+                    <div class="route red">
+                        <span class="route-verb">DELETE</span>
+                        <span class="route-url">/api/v1/users/{user}</span>
+                        <span class="route-desc">Delete a specific user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User was deleted successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- indigo /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route indigo">
+                        <span class="route-verb">PATCH</span>
+                        <span class="route-url">/api/v1/users/{user}</span>
+                        <span class="route-desc">Update a specific user's data</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User's data was updated successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- sky /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route sky">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+    status:200,
+    message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- amber /////// -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <div class="route amber">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <pre><code class="language-json">{
+  status:200,
+  message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- contained in tabs ///////////////////////////// -->
+        <div class="section-description content-item">Contained in tabs</div>
+
+        <!-- sky -->
+        <div class="tabs-container">
+            <div class="tab-navs">
+                <div data-target="#first-api-window" class="tab-nav current">End point</div>
+                <div data-target="#second-api-window" class="tab-nav">Headers</div>
+                <div data-target="#third-api-window" class="tab-nav">body</div>
+                <div data-target="#fourth-api-window" class="tab-nav">Response</div>
+            </div>
+
+            <div class="tabs-content">
+                <div id="first-api-window" class="tab-window current p-unset">
+                    <div class="route sky">
+                        <span class="route-verb">POST</span>
+                        <span class="route-url">/api/v1/users</span>
+                        <span class="route-desc">Create a new user</span>
+                    </div>
+                </div>
+                <div id="second-api-window" class="tab-window p-unset">
+                    <pre><code class="language-shell">Content-Type: application/json
+Authorization: Bearer {token}
+Accept: application/json</code></pre>
+                </div>
+                <div id="third-api-window" class="tab-window p-unset">
+                    <pre><code class="language-json">{
+  "name": "Leanne Graham",
+  "username": "Bret",
+  "email": "Sincere@april.biz"
+}</code></pre>
+                </div>
+                <div id="fourth-api-window" class="tab-window p-unset">
+                    <pre><code class="language-json">{
+   status:200,
+   message:"User was created successfuly"
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+          <!-- api end //////////////// -->
+  
+          <!-- changelog start //////////////// -->
+          <section id="changelog">
+    <h2 class="section-title"> 
+        <a href="#changelog">#</a>
+        <span>Changelog</span>
+    </h2>
+
+    <div class="section-content">
+        <div>
+            <h3 class="h3 text-default content-item">12/12/2020 ~ v1.0</h3>
+
+            <ul class="my-4 list-disc col-flexed gap-2">
+                <li class="flex gap-2">
+                    <span class="badge badge-success">ADDED</span>
+                    <p>Implemented a new feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-danger">DELETED</span>
+                    <p>Got rid of an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-info">UPDATED</span>
+                    <p>Update an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-success">ADDED</span>
+                    <p>Implemented a new feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-danger">DELETED</span>
+                    <p>Got rid of an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-info">UPDATED</span>
+                    <p>Update an existing feature</p>
+                </li>
+            </ul>
+        </div>
+
+        <div>
+            <h3 class="h3 text-default content-item">12/12/2021 ~ v1.1</h3>
+
+            <ul class="my-4 list-disc col-flexed gap-2">
+                <li class="flex gap-2">
+                    <span class="badge badge-success">ADDED</span>
+                    <p>Implemented a new feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-danger">DELETED</span>
+                    <p>Got rid of an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-info">UPDATED</span>
+                    <p>Update an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-success">ADDED</span>
+                    <p>Implemented a new feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-danger">DELETED</span>
+                    <p>Got rid of an existing feature</p>
+                </li>
+
+                <li class="flex gap-2">
+                    <span class="badge badge-info">UPDATED</span>
+                    <p>Update an existing feature</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+</section>
+          <!-- changelog end //////////////// -->
+          
+          <!-- contact-us start //////////////// -->
+          <section id="contact-us" class="long-section">
+    <h2 class="section-title"> 
+        <a href="#contact-us">#</a>
+        <span>Contact us</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-10">
+        <!-- first model -->
+        <div class="section-description content-item"><span>Sample</span> 1</div>
+        <div class="relative">
+            <div class="absolute inset-0 bg-gray-300">
+                <iframe width="100%" height="100%" frameborder="0" marginheight="0" marginwidth="0" title="contact-us-map" scrolling="no" style="filter:opacity(0.4);" src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d86021.828396681!2d3.151371494973608!3d36.75124364895013!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sdz!4v1671189197683!5m2!1sen!2sdz" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+            <div class="container px-5 py-24 mx-auto flex">
+              <div class="form-container lg:w-2/5">
+                <h2 class="h2">Contact us</h2>
+                <p class="text-default my-3">Contact us form subtitle</p>
+    
+                <div class="input-container">
+                  <label for="email" class="form-label">Email address</label>
+                  <input type="email" id="email" name="email" class="form-control">
+                </div>
+    
+                <div class="input-container">
+                  <label for="message" class="form-label">Your message</label>
+                  <textarea id="message" name="message" class="form-control"></textarea>
+                </div>
+    
+                <button class="badge main-bg-color badge-lg p-2">Send</button>
+                <p class="text-xs text-gray-500 mt-3">Contact us footer text</p>
+              </div>
+            </div>
+        </div>
+
+        <!-- second model -->
+        <div class="section-description content-item"><span>Sample</span> 2</div>
+        <div class="grid-of-2">
+            <div>
+                <iframe width="100%" height="100%" frameborder="0" marginheight="0" marginwidth="0" title="contact-us-map" scrolling="no" style="filter:opacity(0.4);" src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d86021.828396681!2d3.151371494973608!3d36.75124364895013!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sdz!4v1671189197683!5m2!1sen!2sdz" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+            <div class="container flex">
+              <div class="form-container mx-auto">
+                <h2 class="h2">Contact us</h2>
+                <p class="text-default my-3">Contact us form subtitle</p>
+    
+                <div class="input-container">
+                  <label for="email" class="form-label">Email address</label>
+                  <input type="email" id="email" name="email" class="form-control">
+                </div>
+    
+                <div class="input-container">
+                  <label for="message" class="form-label">Your message</label>
+                  <textarea id="message" name="message" class="form-control"></textarea>
+                </div>
+    
+                <button class="badge main-bg-color badge-lg p-2">Send</button>
+                <p class="text-muted">Contact us footer text</p>
+              </div>
+            </div>
+        </div>
+
+        <!-- third model -->
+        <div class="section-description content-item"><span>Sample</span> 3</div>
+        <div class="grid-of-1">
+            <div class="form-container">
+                <h2 class="h2">Contact us</h2>
+                <p class="text-default my-3">Contact us form subtitle</p>
+    
+                <div class="input-container">
+                  <label for="email" class="form-label">Email address</label>
+                  <input type="email" id="email" name="email" class="form-control">
+                </div>
+    
+                <div class="input-container">
+                  <label for="message" class="form-label">Your message</label>
+                  <textarea id="message" name="message" class="form-control"></textarea>
+                </div>
+    
+                <button class="badge main-bg-color badge-lg p-2">Send</button>
+                <p class="text-xs text-gray-500 mt-3">Contact us footer text</p>
+            </div>
+        </div>
+
+    </div>
+</section>
+          <!-- contact-us end //////////////// -->
+  
+          <!-- gallery start //////////////// -->
+          <section id="gallery">
+    <h2 class="section-title"> 
+        <a href="#gallery">#</a>
+        <span>Gallery</span>
+    </h2>
+
+    <div class="section-content">
+        <div class="gallery-container">
+          <div class="gallery-title">
+            <h3 class="h3">Gallery title</h3>
+            <p>Gallery description</p>
+          </div>
+          <div class="gallery-grid">
+            <div class="grid-row">
+              <div class="grid-item w-1/2">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/500x300">
+              </div>
+              <div class="grid-item w-1/2">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/501x301">
+              </div>
+              <div class="grid-item w-full">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/600x360">
+              </div>
+            </div>
+            <div class="grid-row">
+              <div class="grid-item w-full">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/601x361">
+              </div>
+              <div class="grid-item w-1/2">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/502x302">
+              </div>
+              <div class="grid-item w-1/2">
+                <img alt="gallery" class="gallery-img lazy" src="#" data-src="https://dummyimage.com/503x303">
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+</section>
+          <!-- gallery end //////////////// -->
+  
+          <!-- pricing start //////////////// -->
+          <section id="pricing">
+    <h2 class="section-title"> 
+        <a href="#pricing">#</a>
+        <span>Pricing</span>
+    </h2>
+
+    <div class="section-content">
+        <div class="flex flex-col text-center w-full mb-20 gap-4">
+            <h1 class="h1">Pricing</h1>
+            <p class="text-deault">Pricing subtitle</p>
+            <div class="flex mx-auto border-2 main-border-color">
+              <button class="badge main-bg-color sharp p-2">Monthly</button>
+              <button class="badge badge-transparent sharp p-2">Yearly</button>
+            </div>
+        </div>
+
+        <div class="grid-of-3">
+            <div class="card p-6">
+                <h2 class="h6">Base</h2>
+                <h1 class="h2">Free</h1>
+                <hr class="my-5">
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <button class="badge badge-default w-full badge-lg">More</button>
+                <p class="text-muted">Details</p>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="h6">Prod</h2>
+                <h1 class="h2">38$ / <span>Month</span></h1>
+                <hr class="my-5">
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                 <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                  <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                  <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                <button class="badge main-bg-color w-full badge-lg">More</button>
+                <p class="text-muted">More</p>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="h6">VIP</h2>
+                <h1 class="h2">120$ / <span>Month</span></h1>
+                <hr class="my-5">
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                  <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </span>
+                  <span>Feature</span>
+                </p>
+                <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                  <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                  <p class="flex items-center text-default mb-2">
+                    <span class="w-4 h-4 mx-2 inline-flex items-center justify-center bg-gray-400 text-white rounded-full flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" class="w-3 h-3" viewbox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </span>
+                    <span>Feature</span>
+                  </p>
+                <button class="badge badge-default w-full badge-lg">Month</button>
+                <p class="text-muted">Details</p>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- pricing end //////////////// -->
+  
+          <!-- statistics start //////////////// -->
+          <section id="statistics">
+    <h2 class="section-title"> 
+        <a href="#statistics">#</a>
+        <span>Statistics</span>
+    </h2>
+
+    <div class="section-content col-flexed gap-4">
+        <!-- simple -->
+        <div class="grid-of-4">
+          <div class="p-4">
+            <h2 class="h2">2.7K</h2>
+            <p class="text-default">Users</p>
+          </div>
+          <div class="p-4">
+            <h2 class="h2">1.8K</h2>
+            <p class="text-default">Subscribes</p>
+          </div>
+          <div class="p-4">
+            <h2 class="h2">35</h2>
+            <p class="text-default">Downloads</p>
+          </div>
+          <div class="p-4">
+            <h2 class="h2">4</h2>
+            <p class="text-default">Products</p>
+          </div>
+        </div>
+
+        <!-- cards -->
+        <div class="grid-of-4">
+            <div class="card p-4">
+              <h2 class="h2">2.7K</h2>
+              <p class="text-default">Users</p>
+            </div>
+            <div class="card p-4">
+              <h2 class="h2">1.8K</h2>
+              <p class="text-default">Subscribes</p>
+            </div>
+            <div class="card p-4">
+              <h2 class="h2">35</h2>
+              <p class="text-default">Downloads</p>
+            </div>
+            <div class="card p-4">
+              <h2 class="h2">4</h2>
+              <p class="text-default">Products</p>
+            </div>
+        </div>
+
+        <!-- icons + cards -->
+        <div class="grid-of-4">
+            <div class="card p-4 iconed">
+              <svg class="h-12 w-12" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              <div>
+                <h2 class="h2">2.7K</h2>
+                <p class="text-default">Users</p>
+              </div>
+            </div>
+            <div class="card p-4 iconed">
+              <svg class="h-12 w-12" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>  <circle cx="8.5" cy="7" r="4"/>  <polyline points="17 11 19 13 23 9"/></svg>
+              <div>
+                <h2 class="h2">1.8K</h2>
+                <p class="text-default">Subscribes</p>
+              </div>
+            </div>
+            <div class="card p-4 iconed">
+              <svg class="h-12 w-12" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>  <polyline points="7 10 12 15 17 10"/>  <line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <div>
+                <h2 class="h2">35</h2>
+                <p class="text-default">Downloads</p>
+              </div>
+            </div>
+            <div class="card p-4 iconed">
+              <svg class="h-12 w-12" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>  <line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              <div>
+                <h2 class="h2">4</h2>
+                <p class="text-default">Products</p>
+              </div>
+            </div>
+        </div>
+    </div>
+</section>
+          <!-- statistics end //////////////// --> 
+        </div>
+        <!-- end of sections container -->
+
+        <!-- table of contents -->
+        <div class="table-of-contents" id="table-of-contents">
+           <h2 class="title text-lg font-bold" data-display-title="Table of contents"></h2>
+           <ul class="w-full mt-5">
+           </ul>
+        </div>
+        <!-- end of table of contents -->
+
+        <!-- theme-configurator start //////////////// -->
+        <div class="theme-configurator">
+    <div class="configurator-container">
+        <button class="open-button">
+            <svg class="h-8 w-8 main-text-color" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>              
+        </button>
+    
+        <div class="form-container">
+            <!-- configure color -->
+            <div>
+                <h6 class="h6 font-bold">Choose a theme color</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-wrap gap-3">
+                    <button data-theme="amber" class="theme-color"></button>
+                    <button data-theme="cyan" class="theme-color"></button>
+                    <button data-theme="emerald" class="theme-color"></button>
+                    <button data-theme="lime" class="theme-color"></button>
+                    <button data-theme="orange" class="theme-color"></button>
+                    <button data-theme="purple" class="theme-color"></button>
+                    <button data-theme="red" class="theme-color"></button>
+                    <button data-theme="rose" class="theme-color"></button>
+                </div>
+            </div>
+
+            <!-- configure layout -->
+            <div>
+                <h6 class="h6 font-bold">Choose a layout</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-wrap gap-3">
+                    <label>
+                        <span>Full width</span>
+                        <input value="fwidth" type="radio" class="theme-layout" name="theme-layout">
+                    </label>
+                    <label>
+                        <span>Boxed</span>
+                        <input value="boxed" type="radio" class="theme-layout" name="theme-layout">
+                    </label>
+                </div>
+            </div>
+
+            <!-- configure display -->
+            <div>
+                <h6 class="h6 font-bold">Choose a display</h6>
+                <hr class="my-2 main-border-color">
+                <div class="grid-of-1 gap-2">
+                    <label class="flex">
+                        <span>Single page</span>
+                        <input value="one-page" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                    <label class="flex">
+                        <span>Slides</span>
+                        <input value="slides" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                    <label class="flex">
+                        <span>Minimal</span>
+                        <input value="minimal" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                </div>
+            </div>
+
+            <!-- configure theme -->
+            <div>
+                <h6 class="h6 font-bold">Choose a mode</h6>
+                <hr class="my-2 main-border-color">
+                <button class="mode-switcher mt-3">
+                    <svg class="light-icon" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <circle cx="12" cy="12" r="5"/>  <line x1="12" y1="1" x2="12" y2="3"/>  <line x1="12" y1="21" x2="12" y2="23"/>  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>  <line x1="1" y1="12" x2="3" y2="12"/>  <line x1="21" y1="12" x2="23" y2="12"/>  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    <svg class="dark-icon" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M16.2 4a9.03 9.03 0 1 0 3.9 12a6.5 6.5 0 1 1 -3.9 -12"/></svg>
+                </button>
+            </div>
+
+            <!-- configure direction -->
+            <div>
+                <h6 class="h6 font-bold">Choose a direction</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-col gap-3">
+                    <label>
+                        <span>RTL</span>
+                        <input value="rtl" type="radio" class="direction" name="direction">
+                    </label>
+                    <label>
+                        <span>LTR</span>
+                        <input value="ltr" type="radio" class="direction" name="direction">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+        <!-- theme-configurator end //////////////// --> 
+
+        <!-- preloader start //////////////// -->
+        <div class="preloader-container active" id="preloader">
+    <svg class="preloader-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewbox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+    </svg>
+</div>
+        <!-- preloader /////////////////// -->
+      <!-- content ends ////////////////////// -->
+    </div>
+  </div></body>
+</html>

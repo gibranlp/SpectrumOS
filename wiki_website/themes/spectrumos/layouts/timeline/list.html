@@ -1,0 +1,50 @@
+{{ define "main" }}
+<!-- head section -->
+<section class="page-title parallax3 parallax-fix page-title-large">
+    <div class="opacity-medium bg-black"></div>
+    <img class="parallax-background-img" src="../../images/code.jpg" alt="" />
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 col-sm-12 text-center animated fadeInUp">
+                <div class="separator-line bg-green no-margin-top margin-four"></div>
+                <!-- page title -->
+                <h1 class="white-text">Helgen Timeline!</h1>
+                <!-- end page title -->
+            </div>
+        </div>
+    </div>
+</section>
+<!-- end head section -->
+{{ $paginator := .Paginate .Data.Pages }}
+
+
+<main class="posts">
+    {{ if .Content }}
+    <div class="content">{{ .Content }}</div>
+    {{ end }}
+
+    <section class="timeline" style="padding:0;">
+      <div style="text-align: left!important">
+        {{ range .Pages.ByDate.Reverse  }} 
+
+        <div class="timeline-item">
+            <div class="timeline-img"></div>
+
+            <div class="timeline-content js--fadeInLeft">
+                <h2 class="margin-three"><a href="{{.Permalink}}"><span class="post-title">{{.Title}}</span></a></h2>
+                <div class="date">{{ .Date.Format "Jan 2, 2006"}}</div>
+                <p>
+                    {{.Params.Eventname}}<br>
+                    {{.Params.Eventlocation}}
+
+                </p> 
+            </div>
+        </div>  
+        {{ end }}   
+    </div>
+</section>
+
+
+
+</main>
+{{ end }}

@@ -1,0 +1,90 @@
+<div class="theme-configurator">
+    <div class="configurator-container">
+        <button class="open-button">
+            <svg class="h-8 w-8 main-text-color" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>              
+        </button>
+    
+        <div class="form-container">
+            <!-- configure color -->
+            <div>
+                <h6 class="h6 font-bold">Choose a theme color</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-wrap gap-3">
+                    <button data-theme="amber" class="theme-color"></button>
+                    <button data-theme="cyan" class="theme-color"></button>
+                    <button data-theme="emerald" class="theme-color"></button>
+                    <button data-theme="lime" class="theme-color"></button>
+                    <button data-theme="orange" class="theme-color"></button>
+                    <button data-theme="purple" class="theme-color"></button>
+                    <button data-theme="red" class="theme-color"></button>
+                    <button data-theme="rose" class="theme-color"></button>
+                </div>
+            </div>
+
+            <!-- configure layout -->
+            <div>
+                <h6 class="h6 font-bold">Choose a layout</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-wrap gap-3">
+                    <label>
+                        <span>Full width</span>
+                        <input value="fwidth" type="radio" class="theme-layout" name="theme-layout">
+                    </label>
+                    <label>
+                        <span>Boxed</span>
+                        <input value="boxed" type="radio" class="theme-layout" name="theme-layout">
+                    </label>
+                </div>
+            </div>
+
+            <!-- configure display -->
+            <div>
+                <h6 class="h6 font-bold">Choose a display</h6>
+                <hr class="my-2 main-border-color">
+                <div class="grid-of-1 gap-2">
+                    <label class="flex">
+                        <span>Single page</span>
+                        <input value="one-page" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                    <label class="flex">
+                        <span>Slides</span>
+                        <input value="slides" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                    <label class="flex">
+                        <span>Minimal</span>
+                        <input value="minimal" type="radio" name="theme-display" class="mr-auto theme-display">
+                    </label>
+                </div>
+            </div>
+
+            <!-- configure theme -->
+            <div>
+                <h6 class="h6 font-bold">Choose a mode</h6>
+                <hr class="my-2 main-border-color">
+                <button class="mode-switcher mt-3">
+                    <svg class="light-icon" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <circle cx="12" cy="12" r="5"/>  <line x1="12" y1="1" x2="12" y2="3"/>  <line x1="12" y1="21" x2="12" y2="23"/>  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>  <line x1="1" y1="12" x2="3" y2="12"/>  <line x1="21" y1="12" x2="23" y2="12"/>  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    <svg class="dark-icon" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M16.2 4a9.03 9.03 0 1 0 3.9 12a6.5 6.5 0 1 1 -3.9 -12"/></svg>
+                </button>
+            </div>
+
+            <!-- configure direction -->
+            <div>
+                <h6 class="h6 font-bold">Choose a direction</h6>
+                <hr class="my-2 main-border-color">
+                <div class="flex flex-col gap-3">
+                    <label>
+                        <span>RTL</span>
+                        <input value="rtl" type="radio" class="direction" name="direction">
+                    </label>
+                    <label>
+                        <span>LTR</span>
+                        <input value="ltr" type="radio" class="direction" name="direction">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

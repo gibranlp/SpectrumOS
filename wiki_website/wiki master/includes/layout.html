@@ -1,0 +1,141 @@
+<section id="layout">
+    <div>
+        <h2 class="section-title"> 
+            <a href="#layout">#</a>
+            <span>code structure</span>
+        </h2>
+    </div>
+    <div class="section-content">
+        <div class="section-description">General</div>
+        <pre>
+<code class="language-html">&lt;!DOCTYPE html>
+&lt;html dir="<span>ltr</span>" lang="<span>en</span>">
+    &lt;head>
+    &lt;meta charset="utf-8" />
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0">
+    &lt;title> <span>Documento - HTML template for documentating digital products & APIs</span> &lt;/title>
+
+    &lt;!-- <span>the main css file</span> -->
+
+    &lt;!-- <span>the main js file</span> -->
+
+    &lt;!-- <span>highlight.js file</span> -->
+
+    &lt;/head>
+    &lt;body dir="rtl">
+       &lt;!-- <span>template container</span> -->       
+       &lt;div id="app" data-theme="amber" data-layout="fwidth" data-display="slides" class="app-container">
+            &lt;!-- <span>put sidebar here</span> //////////////////// -->
+
+            &lt;!-- <span>start of content container</span> ///////////////////// -->
+            &lt;div class="content-container">
+
+                &lt;!-- <span>start of sections container</span> ///////////////////// -->
+                &lt;div class="sections-container" id="top">
+                    &lt;!-- <span>put any sections here</span> ///////////////////// -->
+                &lt;/div>
+                &lt;!-- <span>end of sections container</span> ///////////////////// -->
+
+                &lt;!-- <span>table of contents starts here</span> ///////////////////// -->
+                &lt;div class="table-of-contents" id="table-of-contents">
+                    &lt;h2 class="title text-lg font-bold" data-display-title="<span>any text here will be diplayed as table of contents title</span>">&lt;/h2>
+                    &lt;ul class="w-full mt-5">
+                       &lt;!-- <span>leave blank</span> //////////////////// -->
+                    &lt;/ul>
+                &lt;/div>
+                &lt;!-- <span>end of table of contents</span> ///////////////////// -->
+
+            &lt;/div>
+            &lt;!-- <span>end of content container</span> ///////////////////// -->
+       &lt;/div>
+       &lt;!-- <span>end of template container</span> -->
+    &lt;/body>
+&lt;/html></code>
+        </pre>
+
+        <div class="section-description">Table of contents</div>
+        <!-- info -->
+        <div class="alert simple default" role="alert">
+            <strong class="alert-title">Important</strong>
+            <span class="alert-content">
+               <span>the table of contents items are auto-generated from the current active section</span>
+               <br>
+               <span>so you don't need to descibe any content inside</span> 
+               <code class="in-line">ul</code>
+               <span>inside the table of contents</span>
+               <br>
+               <span>any items inside any section that has the class bellow will be considered as a content item for that section</span> 
+               <br>
+               <code class="in-line">content-item</code>
+            </span>
+        </div>
+        <pre>
+<code class="language-html">&lt;!-- <span>table of contents starts here</span> ///////////////////// -->
+&lt;div class="table-of-contents" id="table-of-contents">
+    &lt;h2 class="title text-lg font-bold" data-display-title="<span>any text here will be diplayed as table of contents title</span>">&lt;/h2>
+    &lt;ul class="w-full mt-5">
+       &lt;!-- <span>leave blank</span> //////////////////// -->
+    &lt;/ul>
+&lt;/div>
+&lt;!-- <span>end of table of contents</span> ///////////////////// --></code>
+        </pre>
+
+        <p>in this item for example, base will considered as content item and automatically previewed in the table of contents section</p>
+        <pre>
+<code class="language-html">&lt;div class="content-item section-description"> 
+    <span>Base</span>
+&lt;/div></code>
+                    </pre>
+
+        <div class="section-description">sidebar</div>
+        <ul>
+            <li>
+                <span>any list item that contains a nested list should have an anchor that has the class</span>
+                <code class="in-line">has-nested</code>
+                <pre><code class="language-html">&lt;li>
+  &lt;a href="#" class="has-nested">
+      ..
+  &lt;/a>
+&lt;/li></code>
+                </pre>
+            </li>
+
+            <li>
+                <span>any nested lists should have the class</span>
+                <code class="in-line">nested</code>
+                <pre><code class="language-html">&lt;li>
+    &lt;ul class="nested">
+       &lt;li>
+          &lt;a href="#">
+              ..
+          &lt;/a>
+       &lt;/li>
+    &lt;/ul>
+&lt;/li></code>
+                </pre>
+            </li>
+        </ul>
+
+        <div class="section-description">sections</div>
+        <ul>
+            <li>
+                <span>any section can be structured as bellow</span>
+                <pre><code class="language-html">&lt;section id="sectionId">
+    &lt;h2 class="section-title"> 
+        &lt;a href="#sectionId">#&lt;/a>
+        <span>section title here</span>
+    &lt;/h2>
+    
+    &lt;div class="section-description">
+        <span>section description here</span>
+    &lt;/div>
+    
+    &lt;div class="section-content">
+        <span>section content here</span>
+    &lt;/div>
+&lt;/section></code>
+                </pre>
+            </li>
+        </ul>
+    </div>
+</section>

@@ -1,0 +1,130 @@
+<section id="modals">
+    <h2 class="section-title"> 
+        <a href="#modals">#</a>
+        <span>Popups</span>
+    </h2>
+
+    <div class="section-content">
+        <!-- buttons ////////////////// -->
+        <div>
+            <p class="content-item section-description">Sizes</p>
+            <button data-target-modal="#modal-1" class="modal-opener badge badge-success sharp badge-xl p-2">Base</button>
+            <button data-target-modal="#modal-2" class="modal-opener badge badge-danger sharp badge-xl p-2">Wide</button>
+        </div>
+
+        <div>
+            <p class="content-item section-description">Blur</p>
+            <button data-target-modal="#modal-3" class="modal-opener badge badge-info sharp badge-xl p-2">Blurred</button>
+            <button data-target-modal="#modal-1" class="modal-opener badge badge-success sharp badge-xl p-2">Base</button>
+        </div>
+
+        <div>
+            <p class="content-item section-description">Positioning</p>
+            <button data-target-modal="#modal-4" class="modal-opener badge badge-warning sharp badge-xl p-2">Top</button>
+            <button data-target-modal="#modal-5" class="modal-opener badge badge-default sharp badge-xl p-2">Bottom</button>
+            <button data-target-modal="#modal-6" class="modal-opener badge badge-success sharp badge-xl p-2">Right</button>
+            <button data-target-modal="#modal-7" class="modal-opener badge badge-danger sharp badge-xl p-2">Left</button>
+        </div>
+
+
+        <!-- modals ////////////////// -->
+        <!-- default -->
+        <div id="modal-1" class="modal-window">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-1" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- large -->
+        <div id="modal-2" class="modal-window lg">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-2" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- blured -->
+        <div id="modal-3" class="modal-window blured">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-3" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- top -->
+        <div id="modal-4" class="modal-window top">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-4" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- bottom -->
+        <div id="modal-5" class="modal-window bottom">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-5" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- right -->
+        <div id="modal-6" class="modal-window right">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-6" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- left -->
+        <div id="modal-7" class="modal-window left">
+            <div class="modal-card">
+                <h3 class="h3">Popup window title</h3>
+                <hr class="my-4">
+                <p class="text-default">Popup window content. this can contain any other type of content such as images, codeblocks or paragraphs.</p>
+                <hr class="my-4">
+                <div class="flex gap-1">
+                    <button class="flex-1 main-bg-color text-zinc-50 p-2">Save</button>
+                    <button data-target-modal="#modal-7" class="modal-closer flex-1 badge badge-default sharp badge-lg p-2">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
