@@ -1,0 +1,6 @@
+[submodule "dotfiles"]
+	path = dotfiles
+	url = git@github.com:gibranlp/dotfiles.git
+[submodule "ISO"]
+	path = ISO
+	url = git@github.com:gibranlp/ISO.git
