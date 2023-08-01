@@ -84,4 +84,8 @@ Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchant
 
 #### Haishoku
 
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4-sm.png" width="25%"></a>
 
