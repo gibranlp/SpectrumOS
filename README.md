@@ -38,54 +38,62 @@ Embrace the dynamic and captivating world of SpectrumOS, inspired by the enchant
 
 ## SpectrumOS Wallpapers
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-2-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-3-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-4-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-5-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-6-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-1-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-3-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-4-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-1-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-2-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-1-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-2-sm.png" width="25%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-3-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/Wall1-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-2-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-3-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-4-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-5-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall1-6-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-1-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-3-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall2-4-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-1-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall3-2-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-1-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-2-sm.png" width="22%"></a> <a href="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/Wallpapers/wall4-3-sm.png" width="22%"></a>
 
 ## Features
 
 ### Light Schemes
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme4-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme5-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme6-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/light_theme/light_theme7-sm.png" width="22%"></a>
+
+***
 
 ### Bar Themes
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes1-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes4-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/themes/themes5-sm.png" width="22%"></a>
+
+***
 
 ### Color Schemes
 
 #### Pywal Default (Wal)
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal1-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal4-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal1-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/wal4-sm.png" width="22%"></a>
 
-#### Colorz (A more colorful scheme)
+#### Colorz (A More Colorful scheme)
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz1-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz4-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz1-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorz4-sm.png" width="22%"></a>
 
-#### Colorthief (A darker scheme)
+#### Colorthief (A Darker Scheme)
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief1-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief4-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief1-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/colorthief4-sm.png" width="22%"></a>
 
-#### Haishoku
+#### Haishoku (This one is fun to see the result)
 
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3-sm.png" width="25%"></a>
-<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4-sm.png" width="25%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku1-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku2-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku3-sm.png" width="22%"></a>
+<a href="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4.png"><img src="https://github.com/gibranlp/SpectrumOS/blob/main/screenshots/backends/haishoku4-sm.png" width="22%"></a>
+
+***
+
+## Control Panel
 
