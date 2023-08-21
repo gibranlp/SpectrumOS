@@ -1,7 +1,7 @@
 # SpectrumOS - Enhance your Linux experience with the Dynamic Color Spectrum!
 
 <p align="center">
-  ![plymouth-450](https://github.com/gibranlp/SpectrumOS/assets/2806964/9d280e72-a52f-4dd3-8c8e-827a1443259d)
+  <img src="https://github.com/gibranlp/SpectrumOS/assets/2806964/9d280e72-a52f-4dd3-8c8e-827a1443259d">
 </p>
 
 Welcome to SpectrumOS, a cutting-edge Linux distribution based on Arch Linux and powered by Qtile. SpectrumOS aims to revolutionize your desktop environment by seamlessly integrating the Dynamic Color Spectrum. With SpectrumOS, your system and Qtile themes dynamically adapt to the colors of your wallpaper, creating a visually stunning and immersive experience inspired by the vast colors of your wallpapers.
