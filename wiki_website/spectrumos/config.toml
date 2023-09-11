@@ -1,0 +1,121 @@
+baseURL = "/"
+title   = "SpectrumOS"
+languageCode = "en-us"
+theme = "spectrumos"
+
+PygmentsCodeFences = true
+PygmentsStyle = "monokai"
+
+paginate  = 10
+rssLimit  = 10  # Maximum number of items in the RSS feed.
+copyright = "This work is licensed under a MIT License." 
+
+# googleAnalytics = "G-7RCGLMFCLK"
+# disqusShortname = ""
+
+archetypeDir = "archetypes"
+contentDir   = "content"
+dataDir      = "data"
+layoutDir    = "layouts"
+publishDir   = "public"
+
+buildDrafts  = false
+buildFuture  = false
+buildExpired = false
+canonifyURLs = true
+
+enableRobotsTXT = true
+enableGitInfo   = false
+enableEmoji     = true
+enableMissingTranslationPlaceholders = false
+disableRSS     = true
+disableSitemap = false
+disable404     = false
+disableHugoGeneratorInject = false
+
+[permalinks]
+  posts = "/posts/:year/:month/:title/"
+
+[author]
+  name = "gibranlp"
+
+[blackfriday]
+  hrefTargetBlank = true
+
+[taxonomies]
+  tag      = "tags"
+  category = "categories"
+  series   = "series"
+
+[params]
+
+  customCSS = [
+  "../../css/index-v1.1.css"]
+  
+  customJS  = [
+  "../../js/index-v1.1.js",
+  "../../js/highlight.js"]
+
+  dateform        = "Jan 2, 2006"
+  dateformShort   = "Jan 2"
+  dateformNum     = "2006-01-02"
+  dateformNumTime = "2006-01-02 15:04 -0700"
+
+  # Metadata mostly used in document's head
+  description = "Helgen Technologies, automation, right place, heavy machinery, automate, robots"
+  keywords = "helgen, automation, robotics, automate, heavy, machinery"
+  images = [""]
+
+  homeSubtitle = "Your Automated Workforce"
+
+  # Prefix of link to the git commit detail page. GitInfo must be enabled.
+   # gitUrl = ""
+
+  # Set disableReadOtherPosts to true in order to hide the links to other posts.
+  disableReadOtherPosts = false
+
+  # Sharing buttons
+  # There are a lot of buttons preconfigured. If you want to change them,
+  # generate the buttons here: https://sharingbuttons.io
+  # and add them into your own `layouts/partials/sharing-buttons.html`
+  enableSharingButtons = false
+
+  # Integrate Javascript files or stylesheets by adding the url to the external assets or by
+  # linking local files with their path relative to the static folder, e.g. "css/styles.css"
+  
+
+  # Toggle this option need to rebuild SCSS, requires extended version of Hugo
+  justifyContent = false  # Set "text-align: justify" to .post-content.
+
+#### Main Menu
+[menu]
+  [[menu.main]]
+    identifier = "home"
+    name       = "Home"
+    url        = "/"
+    weight     = 1
+
+[[menu.main]]
+  parent = "home"
+  name = "Wiki"
+  url = "/wiki/"
+  weight = 2
+
+[[menu.main]]
+  parent = "home"
+  name = "Contribution Guidelines"
+  url = "/guidelines/"
+  weight = 3
+
+
+[markup]
+  defaultMarkdownHandler = "goldmark"
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+[[menu.main]]
+    identifier = "master"
+    name       = "master"
+    url        = "/master/"
+    weight     = 1

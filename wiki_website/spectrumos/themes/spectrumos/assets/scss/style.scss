@@ -1,0 +1,259 @@
+$primary: #3F51B5;
+$dark-primary: #303F9F;
+$light-primary: #C5CAE9;
+$text: #FFFFFF;
+$blue-text:#151F35;
+$primary-text: #212121;
+$secondary-text: #757575;
+$accent: #51F3DA;
+
+$dark_blue:#151F35;
+$med_blue:#2C3C5B;
+$light_blue:#5E738E;
+$lighter_blue:#869CB8;
+
+$dark_green:#0AC5A8;
+$light_green:#51F3DA;
+
+$dark_gray:#A7ACB0;
+$mid_gray:#BDBDC2;
+$white:#FFFFFF;
+
+.hero-table { 
+  margin-left: 10%;
+  margin-right: 10%;
+}
+
+.timeline {
+
+	position: relative;
+
+	&::before {
+		content: '';
+		background: $light_blue;
+		width: 5px;
+		height: 95%;
+		position: absolute;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+}
+
+.timeline-item {
+	width: 100%;
+	margin-bottom: 70px;
+
+	&:nth-child(even) {
+
+		.timeline-content {
+			float: right;
+			padding: 40px 30px 10px 30px;
+
+			.date {
+				right: auto;
+				left: 0;
+			}
+
+			&::after {
+				content: '';
+				position: absolute;
+				border-style: solid;
+				width: 0;
+				height: 0;
+				top: 30px;
+				left: -15px;
+				border-width: 10px 15px 10px 0;
+				border-color: transparent #f5f5f5 transparent transparent;
+			}
+		}
+	}
+
+	&::after {
+		content: '';
+		display: block;
+		clear: both;
+	}
+}
+
+.jaguar {
+	background:url("../images/land0.png") no-repeat;
+	background-size:80%;
+	height: 130px;
+}
+
+.jaguar:hover {
+	background:url("../images/land1.png") no-repeat;
+	background-size:80%;
+}
+.ge {
+	background:url("../images/ge0.png") no-repeat;
+	background-size:70%;
+	height: 135px;
+}
+
+.ge:hover {
+	background:url("../images/ge1.png") no-repeat;
+	background-size:70%;
+}
+.ford {
+	background:url("../images/ford0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.ford:hover {
+	background:url("../images/ford1.png") no-repeat;
+	background-size:80%;
+}
+.dell {
+	background:url("../images/dell0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.dell:hover {
+	background:url("../images/dell1.png") no-repeat;
+	background-size:80%;
+}
+.qual {
+	background:url("../images/qual0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.qual:hover {
+	background:url("../images/qual1.png") no-repeat;
+	background-size:80%;
+}
+.schu {
+	background:url("../images/schu0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.schu:hover {
+	background:url("../images/schu1.png") no-repeat;
+	background-size:80%;
+}
+.goldc {
+	background:url("../images/gold0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.goldc:hover {
+	background:url("../images/gold1.png") no-repeat;
+	background-size:80%;
+}
+.teck {
+	background:url("../images/teck0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.teck:hover {
+	background:url("../images/teck1.png") no-repeat;
+	background-size:80%;
+}
+.bimbo {
+	background:url("../images/bimbo0.png") no-repeat;
+	background-size:80%;
+	height: 110px;
+}
+
+.bimbo:hover {
+	background:url("../images/bimbo1.png") no-repeat;
+	background-size:80%;
+}
+
+.timeline-content {
+	position: relative;
+	width: 45%;
+	padding: 40px 30px;
+	border-radius: 4px;
+	background: $med_blue;
+	box-shadow: 0 20px 25px -15px rgba(0, 0, 0, .3);
+
+	&::after {
+		content: '';
+		position: absolute;
+		border-style: solid;
+		width: 0;
+		height: 0;
+		top: 30px;
+		right: -15px;
+		border-width: 10px 0 10px 15px;
+		border-color: transparent transparent transparent #f5f5f5;
+	}
+}
+
+.timeline-content a{
+	color:#fff !important;
+}
+
+.timeline-content p{
+	color:$light_green;
+}
+
+.timeline-img {
+	width: 30px;
+	height: 30px;
+	background: $light_green;
+	border-radius: 50%;
+	position: absolute;
+	left: 50%;
+	margin-top: 25px;
+	margin-left: -15px;
+}
+
+.timeline-card {
+	padding: 0!important;
+
+	p {
+		padding: 0 20px;
+	}
+
+	a {
+		margin-left: 20px;
+	}
+}
+
+.timeline-item {
+  .timeline-img-header {
+			background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0, .4)), url('https://picsum.photos/1000/800/?random') center center no-repeat;
+			background-size: cover;
+		}
+}
+
+.timeline-img-header {
+
+	height: 200px;
+	position: relative;
+	margin-bottom: 20px;
+
+	h2 {
+		color: $text;
+		position: absolute;
+		bottom: 5px;
+		left: 20px;
+	}
+}
+
+blockquote {
+	margin-top: 30px;
+	color: $light_green;
+	border-left-color: $dark_blue;
+	padding: 0 20px;
+}
+
+.date {
+	background: $accent;
+	display: inline-block;
+	color: $blue-text;
+	padding: 5px;
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+
+

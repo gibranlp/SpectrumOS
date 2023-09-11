@@ -1,0 +1,65 @@
+<body class="dark" dir="ltr">
+<div id="app" data-theme="emerald" data-layout="fwidth" data-display="one-page" class="app-container">
+    <!-- sidebar toggler start ////////////////// -->
+    <div class="sidebar-opener-container main-text-color">
+  <button id="sidebar-open">
+    <svg class="h-8 w-8" fill="none" viewbox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+    </svg>
+  </button>
+</div>
+    <!-- sidebar toggler end ////////////// -->
+
+    <!-- sidebar start //////////////////// -->
+    <aside class="sidebar">
+ <!-- sidemenu container -->
+ <div class="sidemenu-container">
+    <!-- close sidebar button -->
+    <div class="sidebar-closer-container">
+       <button class="mr-auto" id="sidebar-close">
+          <svg class="h-8 w-8" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <line x1="18" y1="6" x2="6" y2="18"/>  <line x1="6" y1="6" x2="18" y2="18"/></svg>     
+       </button>
+    </div>
+
+    <div class="flex items-center px-4">
+       <div class="logo-container m-auto">
+          <a href="{{ if .Site.Params.Logo.LogoHomeLink }}{{ .Site.Params.Logo.LogoHomeLink }}{{else}}{{ .Site.BaseURL }}{{ end }}">
+          <img width="600px" src="../images/logoh.png" alt="SpectrumOS">
+          </a>
+          <p class="main-text-color font-extrabold text-center">v2.13</p>
+        </div>
+    </div>
+
+    <div class="lists-container">
+        <ul>
+            <!-- menu item -->
+            {{- $currentPage := . -}}
+            {{ range .Site.Menus.main -}}
+           <li class="active">
+            {{ if .HasChildren }}
+              <a href="{{ .URL | absLangURL }}" class="has-nested">
+                <span>{{ .Name }}</span>
+                <svg class="caret caret-closed" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="12" y1="5" x2="12" y2="19"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg class="caret caret-opened" width="24" height="24" viewbox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </a>
+              <ul class="nested">
+                {{ range .Children }}
+                 <li><a href="{{ .URL | absLangURL }}">{{ .Name }}</a></li>
+                 {{ end }}
+              </ul>
+              {{ else }}
+                <a href="{{ .URL | absLangURL }}">{{ .Name }}</a>
+              {{ end  }}
+           </li>
+           {{- end }}
+        </ul>
+     </div>
+  </div>
+</aside>
+     <!-- sidebar end ////////////////////// -->
+
+     <!-- scroll to top button start ///////////////// -->
+     <button id="scroll-top" class="scroll-top main-text-color hidden">
+   <svg class="h-8 w-8" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">  <circle cx="12" cy="12" r="10"/>  <polyline points="16 12 12 8 8 12"/>  <line x1="12" y1="16" x2="12" y2="8"/></svg>
+</button>
+     <!-- scroll to top button end ////////////////// -->

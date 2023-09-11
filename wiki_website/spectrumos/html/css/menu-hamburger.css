@@ -1,0 +1,156 @@
+
+html, body {
+    height: 100%;
+    width: 100%;
+}
+.menu-wrap a {
+    color: #b8b7ad;
+}
+.menu-wrap a:hover, .menu-wrap a:focus {
+    color: #c94e50;
+}
+.menu-button {
+    background: rgba(0, 0, 0, 1) none repeat scroll 0 0;
+    border: medium none;
+    color: transparent;
+    height: 33px;
+    margin: 60px 70px;
+    padding: 0;
+    position: fixed;
+    text-indent: 2.5em;
+    width: 36px;
+    z-index: 1000;
+}
+.menu-button::before {
+    background: rgba(0, 0, 0, 0) url("../images/pull-menu.png") no-repeat scroll center center;
+    bottom: 0.5em;
+    content: "";
+    left:-7px;
+    position: absolute;
+    top: -9px;
+    width: 50px;
+    height:50px;
+}
+.menu-button:hover {
+    opacity: 0.6;
+}
+.menu-button-orange {
+    background: rgba(25, 25, 25, 1) none repeat scroll 0 0;
+    border: medium none;
+    color: transparent;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    position: fixed;
+    text-indent: 2.5em;
+    width: 40px;
+    z-index: 1000;
+    border: 1px solid #ef824c !important;
+    right: 0;
+    top: 0px;
+}  
+.menu-button-orange::before {
+    background: rgba(0, 0, 0, 0) url("../images/pull-menu-orange.png") repeat scroll center center;
+    bottom: 0.5em;
+    content: "";
+    left: 0.5em;
+    position: absolute;
+    right: 0.5em;
+    top: 0.5em;
+}
+.menu-button-orange:hover {
+    opacity: 0.6;
+}
+.shrink-nav .menu-button-orange {height: 34px; width: 36px; top: 0;}
+
+
+.menu-button-yellow {
+    background: rgba(25, 25, 25, 1) none repeat scroll 0 0;
+    border: medium none;
+    color: transparent;
+    height: 50px;
+    margin: 0;
+    padding: 0;
+    position: fixed;
+    text-indent: 2.5em;
+    width: 50px;
+    z-index: 1000;
+    border: 1px solid #fdd947 !important;
+    right: 0;
+    top: -7px;
+}  
+.menu-button-yellow::before {
+    background: rgba(0, 0, 0, 0) url("../images/pull-menu-yellow.png") repeat scroll center center;
+    bottom: 0.5em;
+    content: "";
+    left: 0.5em;
+    position: absolute;
+    right: 0.5em;
+    top: 0.5em;
+}
+.menu-button-yellow:hover {
+    opacity: 0.6;
+}
+.shrink-nav .menu-button-yellow {height: 34px; width: 36px; top: 0;}
+
+
+
+.close-button {
+    background: #fff;
+    border: medium none;
+    color: transparent;
+    font-size: 0.75em;
+    height: 24px;
+    overflow: hidden;
+    position: absolute;
+    right: 0;
+    text-indent: 1em;
+    top: 0;
+    width: 24px;
+}
+.close-button::before, .close-button::after {
+    background: #000;
+    content: "";
+    height: 32%;
+    left: 50%;
+    position: absolute;
+    top: 35%;
+    width: 2px;
+}
+.close-button::before {
+    transform: rotate(45deg);
+}
+.close-button::after {
+    transform: rotate(-45deg);
+}
+.menu-wrap {
+    font-size: 1.15em;
+    left: -275px;
+    padding: 60px 30px;
+    position: fixed;
+    width: 245px;
+    z-index: 1001;
+    background: #000;
+}
+.menu, .icon-list {
+    height: 100%;
+}
+.icon-list a span {
+    font-weight: 700;
+    margin-left: 10px;
+}
+.show-menu .menu-wrap {
+    left: 60px;
+}
+.show-menu .icon-list, .show-menu .icon-list a {
+    transform: translate3d(0px, 0px, 0px);
+    transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1) 0s;
+}
+.show-menu .icon-list a {
+    transition-duration: 0.9s;
+}
+.show-menu .content::before {
+    opacity: 1;
+    transform: translate3d(0px, 0px, 0px);
+    transition: opacity 0.8s cubic-bezier(0.7, 0, 0.3, 1) 0s;
+}

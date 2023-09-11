@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Helgen Technologies</title>
+    <link>/</link>
+    <description>Recent content on Helgen Technologies</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>This work is licensed under a MIT License.</copyright>
+    <lastBuildDate>Sun, 19 Dec 2021 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Helgen Technologies receives nomination from Spark Crowd Funding</title>
+      <link>/timeline/02-spark-crowfunding/</link>
+      <pubDate>Sun, 19 Dec 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/timeline/02-spark-crowfunding/</guid>
+      <description>Helgen has been recognized as one of the top 100 most ambitious company’s in Ireland.
+Spark Crowd Funding, founded in 2018, provides Irish companies with an opportunity to gain attention form a variety of private investors. This organization allow companies like Helgen to secure funding necessary for growth.
+Equity crowdfunding has proven to be very popular and advantageous in the UK and US. Irish investors are likely to invest in Irish companies, Spark Crowd funding connects the dots by uniquely joining investors with innovative companies.</description>
+    </item>
+    
+    <item>
+      <title>Helgen awarded silver at Ireland National Startup Awards</title>
+      <link>/timeline/01-foundation/</link>
+      <pubDate>Mon, 13 Dec 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/timeline/01-foundation/</guid>
+      <description>The National Startup Awards celebrated its tenth anniversary this year. Helgen Technologies sets the bar for intelligent autonomous systems by taking silver in the &amp;ldquo;Emerge Tech Startup&amp;rdquo; category.
+The National Startup awards acknowledge early-stage companies by providing them with an opportunity to gain national and international recognition from other companies and potential investors.
+The start-up specializes in the complex retrofitting of heavy equipment to convert into autonomous systems, which will be utilized in different verticals, such as mining and waste industries.</description>
+    </item>
+    
+    <item>
+      <title>About Us</title>
+      <link>/about/_about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/about/_about/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Press</title>
+      <link>/press/_press/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/press/_press/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>

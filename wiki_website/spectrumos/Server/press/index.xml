@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Presses on Helgen Technologies</title>
+    <link>/press/</link>
+    <description>Recent content in Presses on Helgen Technologies</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>This work is licensed under a MIT License.</copyright><atom:link href="/press/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Press</title>
+      <link>/press/_press/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/press/_press/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>
