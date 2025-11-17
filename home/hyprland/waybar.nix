@@ -236,7 +236,7 @@
       }
 
       /* Pywal colors will be imported here */
-      @import "~/.cache/wal/colors-waybar.css";
+      @import "/home/gibranlp/.cache/wal/colors-waybar.css";
     '';
   };
 }

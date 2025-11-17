@@ -12,11 +12,7 @@
   # XDG Portal for screen sharing, file pickers, etc.
   xdg.portal = {
     enable = true;
-    extraPortals = with pkgs; [
-      xdg-desktop-portal-hyprland
-      xdg-desktop-portal-gtk
-    ];
-    config.common.default = "*";
+    extraPortals = [pkgs.xdg-desktop-portal-gtk];
   };
 
   # Polkit for privilege escalation
