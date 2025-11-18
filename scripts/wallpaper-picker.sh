@@ -2,7 +2,7 @@
 
 WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
 SDDM_WALLPAPER="/usr/share/sddm/wallpapers/current.jpg"
-SDDM_COLORS="/usr/share/sddm/themes/spectrum-theme/Colors.qml"
+SDDM_COLORS="/var/lib/sddm/.cache/spectrum/Colors.qml"
 
 mkdir -p "$WALLPAPER_DIR"
 # This is with sudo, run it separatedly
