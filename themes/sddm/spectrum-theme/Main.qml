@@ -2,25 +2,27 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import SddmComponents 2.0
+import "." 1.0
 
 Rectangle {
     id: root
     width: 1920
     height: 1080
 
-    property string background: "#1e1e2e"
-    property string foreground: "#cdd6f4"
-    property string color1: "#f38ba8"
-    property string color2: "#a6e3a1"
-    property string color3: "#f9e2af"
-    property string color4: "#89b4fa"
-    property string wallpaperPath: "/home/gibranlp/.cache/wal/sddm-wallpaper.jpg"
+    // Use Colors singleton directly
+    property color background: Colors.background
+    property color foreground: Colors.foreground
+    property color color1: Colors.color1
+    property color color2: Colors.color2
+    property color color3: Colors.color3
+    property color color4: Colors.color4
+    property string wallpaperPath: "/usr/share/sddm/wallpapers/current.jpg"
 
     // Background wallpaper
     Image {
         id: wallpaper
         anchors.fill: parent
-        source: "file://" + wallpaperPath
+        source: wallpaperPath
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
 

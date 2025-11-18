@@ -17,14 +17,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-            pkgs-unstable = import nixpkgs-unstable {
-        inherit system;
-        overlays = [
-          (final: prev: {
-            hugo = final.hugo; # Ensure unstable hugo is available
-          })
-        ];
-      };
+      pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
     in
     {
 

@@ -42,6 +42,9 @@
       spectrum-update = "sudo nixos-rebuild switch --flake ~/SpectrumOS#spectrum-laptop";
       spectrum-colors = "~/SpectrumOS/scripts/spectrum-update.sh";
       update = "nix flake update ~/SpectrumOS && spectrum-update";
+      lzd = "lazydocker";
+      tsm = "transmission-remote";
+      sshelgen = "ssh -i ~/.ssh/rsa_deploy itadmin@199.85.208.94";
     };
 
     oh-my-zsh = {
@@ -95,7 +98,11 @@
     wget
     curl
     yt-dlp    
-    hugo
+    pkgs-unstable.hugo
+    cmus
+    neovim
+    lazydocker
+    zotify
 
     # PDF viewer
     zathura
@@ -103,6 +110,9 @@
     # Web browsers
     firefox
     
+    #Mail Client
+    evolution
+
     # Pywal and dependencies
     pywal
     imagemagick
