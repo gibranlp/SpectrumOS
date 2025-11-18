@@ -33,6 +33,7 @@
           ./modules/hyprland.nix
           ./modules/graphics/nvidia.nix
           ./modules/sddm.nix
+	  ./modules/docker.nix
           
           home-manager.nixosModules.home-manager
           {

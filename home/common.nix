@@ -71,11 +71,28 @@
     # File managers
     ranger
     yazi
-    
+    thunar
+    xfce.thunar-volman
+    xfce.thunar-archive-plugin
+        
     # Image viewers
     feh
     imv
     
+    # Development Tools
+    docker
+    docker-compose
+    
+    #Communication
+    telegram-desktop
+    discord
+    whatsapp-for-linux
+    
+    # Utilities
+    bitwarden
+    thefuck
+    transmission_4
+
     # PDF viewer
     zathura
     
@@ -90,6 +107,12 @@
     grim
     slurp
     swappy
+
+    # Archiving tools
+    file-roller
+    unzip
+    unrar
+    p7zip
   ];
 
   # GTK theme (will be synced with pywal later)
