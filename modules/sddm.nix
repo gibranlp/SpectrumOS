@@ -24,4 +24,8 @@ in
     libsForQt5.qt5.qtquickcontrols2
     libsForQt5.qt5.qtsvg
   ];
+
+  system.activationScripts.sddmThemeWritable = ''
+    chmod -R 755 /run/current-system/sw/share/sddm/themes/spectrum-theme/
+  '';
 }
