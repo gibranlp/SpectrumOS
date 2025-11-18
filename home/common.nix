@@ -71,7 +71,7 @@
     # File managers
     ranger
     yazi
-    thunar
+    xfce.thunar
     xfce.thunar-volman
     xfce.thunar-archive-plugin
         
@@ -92,6 +92,9 @@
     bitwarden
     thefuck
     transmission_4
+    wget
+    curl
+    yt-dlp    
 
     # PDF viewer
     zathura
