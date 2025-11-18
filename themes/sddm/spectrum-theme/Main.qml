@@ -14,7 +14,7 @@ Rectangle {
     property string color2: "#a6e3a1"
     property string color3: "#f9e2af"
     property string color4: "#89b4fa"
-    property string wallpaperPath: "/home/gibranlp/.cache/wal/wal"
+    property string wallpaperPath: "/home/gibranlp/.cache/wal/sddm-wallpaper.jpg"
 
     // Background wallpaper
     Image {

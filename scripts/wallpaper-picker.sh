@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-# Wallpaper picker with pywal integration
 WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
+SDDM_WALLPAPER="/home/gibranlp/.cache/wal/sddm-wallpaper.jpg"
 
-# Make sure directory exists
 mkdir -p "$WALLPAPER_DIR"
 
-# Use rofi to select wallpaper with custom theme
 WALLPAPER=$(find "$WALLPAPER_DIR" -type f \( -name "*.jpg" -o -name "*.png" \) | rofi -dmenu -i -p "Select Wallpaper" -theme ~/.config/rofi/theme.rasi)
 
 if [ -n "$WALLPAPER" ]; then
@@ -16,9 +14,12 @@ if [ -n "$WALLPAPER" ]; then
     # Generate colors with pywal
     wal -i "$WALLPAPER"
     
-    # Restart waybar to apply colors (using systemd)
+    # Copy wallpaper for SDDM (with proper permissions)
+    cp "$WALLPAPER" "$SDDM_WALLPAPER"
+    chmod 644 "$SDDM_WALLPAPER"
+    
+    # Restart waybar
     systemctl --user restart waybar.service
     
-    # Send notification
     notify-send "SpectrumOS" "Wallpaper and colors updated!" -i "$WALLPAPER"
 fi
