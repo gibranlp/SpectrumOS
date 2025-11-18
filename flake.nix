@@ -17,15 +17,23 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
+            pkgs-unstable = import nixpkgs-unstable {
+        inherit system;
+        overlays = [
+          (final: prev: {
+            hugo = final.hugo; # Ensure unstable hugo is available
+          })
+        ];
+      };
     in
     {
+
       # Laptop configuration (Nvidia)
       nixosConfigurations.spectrum-laptop = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { 
           inherit inputs pkgs-unstable;
-          hostname = "spectrum-laptop";
+          hostname = "Helgen";
         };
         modules = [
           ./hosts/laptop/default.nix
