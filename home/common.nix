@@ -95,7 +95,7 @@
     wget
     curl
     yt-dlp    
-    nixos.hugo
+    hugo
 
     # PDF viewer
     zathura
