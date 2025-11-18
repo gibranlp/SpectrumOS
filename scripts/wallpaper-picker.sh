@@ -6,8 +6,8 @@ WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
 # Make sure directory exists
 mkdir -p "$WALLPAPER_DIR"
 
-# Use rofi to select wallpaper
-WALLPAPER=$(find "$WALLPAPER_DIR" -type f \( -name "*.jpg" -o -name "*.png" \) | rofi -dmenu -i -p "Select Wallpaper" -theme ~/.cache/wal/colors-rofi-dark.rasi)
+# Use rofi to select wallpaper with custom theme
+WALLPAPER=$(find "$WALLPAPER_DIR" -type f \( -name "*.jpg" -o -name "*.png" \) | rofi -dmenu -i -p "Select Wallpaper" -theme ~/.config/rofi/theme.rasi)
 
 if [ -n "$WALLPAPER" ]; then
     # Set wallpaper with swww
