@@ -198,9 +198,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 30
         width: 200
-        
         model: sessionModel
-        currentIndex: sessionModel.lastIndex
     }
 
     // Power buttons
