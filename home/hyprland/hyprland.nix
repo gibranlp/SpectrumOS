@@ -13,7 +13,6 @@
 
       # Autostart
       exec-once = [
-        "waybar"
         "swww-daemon"
         "mako"
         # Pywal will be triggered after wallpaper change
