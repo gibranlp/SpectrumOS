@@ -95,7 +95,8 @@
     wget
     curl
     yt-dlp    
-
+    hugo
+    
     # PDF viewer
     zathura
     
