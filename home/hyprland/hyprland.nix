@@ -87,6 +87,7 @@
 
       bind = [
         # Basic bindings
+        "$mainMod, $mainMod, exec, rofi -show drun"
         "$mainMod, Return, exec, kitty"
         "$mainMod, Q, killactive"
         "$mainMod, M, exit"
