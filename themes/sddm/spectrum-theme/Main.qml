@@ -201,7 +201,6 @@ Rectangle {
         
         model: sessionModel
         currentIndex: sessionModel.lastIndex
-        textRole: "name"
     }
 
     // Power buttons
