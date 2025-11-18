@@ -165,7 +165,7 @@ Rectangle {
                         }
                     }
 
-                    contentitem: Text {
+                    contentItem: Text {
                         text: loginButton.text
                         font.pixelSize: 18
                         font.weight: Font.Bold
@@ -199,7 +199,7 @@ Rectangle {
                 opacity: 0.9
             }
 
-            contentitem: Text {
+            contentItem: Text {
                 text: sessionCombo.displayText
                 color: root.foreground
                 font.pixelSize: 14
@@ -226,7 +226,7 @@ Rectangle {
                     opacity: 0.9
                 }
 
-                contentitem: Text {
+                contentItem: Text {
                     text: "⏻"
                     font.pixelSize: 24
                     color: root.foreground
@@ -248,7 +248,7 @@ Rectangle {
                     opacity: 0.9
                 }
 
-                contentitem: Text {
+                contentItem: Text {
                     text: "⟳"
                     font.pixelSize: 24
                     color: root.foreground
