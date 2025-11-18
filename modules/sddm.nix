@@ -1,33 +1,27 @@
 # modules/sddm.nix
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 
+let
+  spectrumTheme = pkgs.stdenv.mkDerivation {
+    name = "sddm-spectrum-theme";
+    src = ../themes/sddm/spectrum-theme;
+    installPhase = ''
+      mkdir -p $out/share/sddm/themes/spectrum-theme
+      cp -r $src/* $out/share/sddm/themes/spectrum-theme/
+    '';
+  };
+in
 {
   services.displayManager.sddm = {
     enable = true;
     wayland.enable = true;
-    
-    # We'll set up custom theme later with pywal colors
-    theme = "breeze";
-    
-    settings = {
-      Theme = {
-        # Current theme is placeholder, we'll create spectrum theme
-        Current = "breeze";
-        CursorTheme = "breeze_cursors";
-      };
-    };
+    theme = "spectrum-theme";
   };
 
-  # Install SDDM themes package
   environment.systemPackages = with pkgs; [
+    spectrumTheme
     libsForQt5.qt5.qtgraphicaleffects
     libsForQt5.qt5.qtquickcontrols2
     libsForQt5.qt5.qtsvg
   ];
-
-  # Note: We'll create a custom SDDM theme later that reads from
-  # /etc/spectrum-theme/ where we'll put:
-  # - current wallpaper
-  # - pywal colors
-  # This theme will be in the themes/ directory of our flake
 }

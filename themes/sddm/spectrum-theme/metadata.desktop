@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=Spectrum Theme
+Description=A beautiful SDDM theme that adapts to your pywal colors
+Author=SpectrumOS
+License=MIT
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/gibranlp/SpectrumOS
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=spectrum-theme
+Theme-API=2.0
