@@ -57,7 +57,8 @@ yay -S --needed --noconfirm \
     ttf-jetbrains-mono-nerd \
     ttf-firacode-nerd \
     noto-fonts \
-    noto-fonts-emoji
+    noto-fonts-emoji \
+    poddl
 
 echo ""
 echo -e "${BLUE}Installing terminal and launcher...${NC}"
@@ -73,7 +74,8 @@ yay -S --needed --noconfirm \
     python-pywal16 \
     imagemagick \
     swww \
-    wpaperd
+    wpaperd \
+    python-pywalfox
 
 echo ""
 echo -e "${BLUE}Installing utilities...${NC}"
@@ -89,7 +91,7 @@ yay -S --needed --noconfirm \
     btop \
     htop \
     neofetch \
-    fastfetch
+    walogram
 
 echo ""
 echo -e "${BLUE}Installing file managers...${NC}"
@@ -101,7 +103,8 @@ yay -S --needed --noconfirm \
     gvfs-mtp \
     file-roller \
     ranger \
-    yazi
+    yazi \
+    ntfs-3g
 
 echo ""
 echo -e "${BLUE}Installing development tools...${NC}"
@@ -113,7 +116,8 @@ yay -S --needed --noconfirm \
     npm \
     python \
     python-pip \
-    hugo
+    hugo \
+    xsel
 
 echo ""
 echo -e "${BLUE}Installing communication apps...${NC}"
@@ -126,7 +130,6 @@ echo ""
 echo -e "${BLUE}Installing productivity apps...${NC}"
 yay -S --needed --noconfirm \
     bitwarden \
-    obsidian \
     firefox
 
 echo ""
@@ -134,11 +137,12 @@ echo -e "${BLUE}Installing media tools...${NC}"
 yay -S --needed --noconfirm \
     gimp \
     kdenlive \
-    transmission-gtk \
+    transmission-cli \
     yt-dlp \
     mpv \
     imv \
-    feh
+    feh \ 
+    kdeconnect
 
 echo ""
 echo -e "${BLUE}Installing system tools...${NC}"

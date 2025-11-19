@@ -1,0 +1,15 @@
+[SddmGreeterTheme]
+Name=SpectrumOS
+Description=Theme for SpectrumOS
+Author=Gibran Ortega
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/gibranlp/SpectrumOS
+Screenshot=Preview.png
+MainScript=Main.qml
+ConfigFile=theme.conf
+TranslationsDirectory=translations
+Email=info@gibranlp.dev
+Theme-Id=SpectrumOS
+Theme-API=2.11

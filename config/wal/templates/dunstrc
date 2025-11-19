@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+# _____             _                 _____ _____ 
+#|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
+#|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
+#|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
+#      |_|   
+# SpectrumOS - Embrace the Chromatic Symphony!
+# By: gibranlp <thisdoesnotwork@gibranlp.dev>
+# MIT licence 
+#
+[global]
+    ### Display ###
+
+    monitor = 0
+    follow = none
+
+    ### Geometry ###
+    width = (0, 450)
+    height = (50, 150)
+    origin = top-right
+    offset = (10, 10)
+
+    scale = 0
+    notification_limit = 5
+
+    ### Progress bar ###
+    progress_bar = true
+    progress_bar_height = 6
+    progress_bar_frame_width = 1
+    progress_bar_min_width = 60
+    progress_bar_max_width = 300
+
+    indicate_hidden = yes
+
+    transparency = 0
+    separator_height = 0
+
+    padding = 5
+    horizontal_padding = 5
+    text_icon_padding = 0
+
+    frame_width = 3
+
+    frame_color = "{color0}"
+
+    gap_size = 6
+    separator_color = auto
+
+    sort = yes
+    idle_threshold = 120
+
+    ### Text ###
+    font = Courier Prime Medium 14.5
+    line_height = 0
+    markup = full
+
+    format = " <b>%s</b>\n%b\n%p\n%n"
+
+    alignment = left
+    vertical_alignment = center
+    show_age_threshold = -1
+    ellipsize = middle
+    ignore_newline = no
+    stack_duplicates = true
+    hide_duplicate_count = true
+    show_indicators = yes
+
+    ### Icons ###
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 150
+    icon_path = /usr/share/icons/gnome/16x16/status/:/usr/share/icons/gnome/16x16/devices/
+
+    ### History ###
+    sticky_history = yes
+    history_length = 20
+
+    ### Misc/Advanced ###
+    dmenu = /usr/bin/dmenu -p dunst:
+    browser = /usr/bin/xdg-open
+    always_run_script = true
+    title = Dunst
+    class = Dunst
+    corner_radius = 0
+    ignore_dbusclose = false
+
+    ### Wayland ###
+    force_xwayland = false
+
+    ### Legacy ###
+    force_xinerama = false
+
+    ### mouse ###
+    mouse_left_click = close_current
+    mouse_middle_click = do_action, close_current
+    mouse_right_click = close_all
+
+
+[experimental]
+    per_monitor_dpi = true
+
+
+[urgency_low]
+    background = "{color1}"
+    foreground = "{color0}"
+    frame_color = "{color0}"
+    timeout = 6
+    format = " <b>%s</b>\n%b\n%p\n%n"
+
+
+[urgency_normal]
+    background = "{color3}"
+    foreground = "{color0}"
+    frame_color = "{color0}"
+    timeout = 10
+    format = "󰂞 <b>%a\n%s</b>\n%b\n%p\n%n"
+    highlight = "{color0}"
+
+
+[urgency_critical]
+    background = "#ff0000"
+    foreground = "{color0}"
+    frame_color = "{color0}"
+    timeout = 20
+    format = "󰵙 <b>%s</b>\n%b\n%p\n%n"
+
+
+[Slack]
+    appname = Slack
+    format = "<b> Slack</b>\n%s\n%b"
+    new_icon = Slack
+
+[Discord]
+    appname = Discord Canary
+    format = "<b> Discord</b>\n%s\n%b"
+    new_icon = Discord
+
+[ImageMagick]
+    appname = ImageMagick
+    format = "System Notification\n%s\n%b"
+    timeout = 10
+
+[Mozilla Firefox]
+    appname = Firefox
+    format = "󰈹 Firefox\n%s\n%b"
+    new_icon = Mozilla Firefox
+    timeout = 10
+
+[ncspot]
+    appname = ncspot
+    format = "<b> Now Playing</b>\n%s\n%b"
+    timeout = 10
+
+[Spotify]
+    appname = Spotify
+    format = "<b> Now Playing</b>\n%s\n%b"
+    timeout = 10
+
+[Transmission]
+    appname = Transmission
+    format = "<b> Transmission\n%s\n%b"
+    new_icon = Transmission
+    timeout = 10
+
+[Telegram]
+    appname = TelegramDesktop
+    format = "<b> New Message\n%s\n%b"
+    new_icon = Transmission
+    timeout = 10
+
+[Pamixer]
+    appname = Volume
+    format = "<b> Volume</b>\n%s\n%b"
+    timeout = 5
+    set_stack_tag = "volume"
+
+[Blueman]
+    appname = blueman
+    format = "<b>󰂱 Bluetooth</b>\n%s\n%b"
+    timeout = 10
+
+[Calendar]
+    appname = Calendar
+    format = "<b> Calendar</b>\n%s\n%b"
+    timeout = 10
+
+[Farge]
+    appname = Farge
+    format = "<b>󰴱 Color</b>\n%s\n%b"
+    timeout = 10
+
+[Flameshot]
+    appname = flameshot
+    format = "<b> Screenshot</b>\n%s\n%b"
+    timeout = 10
+
+[Calculator]
+    appname = Calculator
+    format = "<b>󰪚 Calculator</b>\n%s %b"
+    timeout = 10
+
+[Thunar]
+    appname = thunar
+    format = "<b> Thunar</b>\n%s %b"
+    timeout = 10
+
+[Chrome]
+    appname = google-chrome
+    format = "<b> Google Chrome</b>\n%s %b"
+    timeout = 10
+
+[notify-send]
+    appname = notify-send
+    format = "<b> SpectrumOS</b>\n%s %b"
+    timeout = 10
+
+[Pomodoro]
+    appname = pomodoro
+    format = "<b> Pomodoro</b>\n%s %b"
+    timeout = 10
+
+[Whatsdesk]
+    appname = whatsdesk
+    format = "<b> Whatsdesk</b>\n%s %b"
+    timeout = 10
+
+[evolution-mail-notification]
+    appname = evolution-mail-notification
+    format = "<b>󰺻 Evolution</b>\n%s %b"
+    timeout = 10
+
+[Notes]
+    appname = notes
+    format = "<b>󱓵 Notes</b>\n%s %b"
+    timeout = 10

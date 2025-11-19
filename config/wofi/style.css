@@ -1,0 +1,58 @@
+@import "/home/gibranlp/.cache/wal/colors-wofi.css";
+
+window {
+    margin: 0px;
+    border: 3px solid @color4;
+    background-color: @background;
+    border-radius: 15px;
+}
+
+#input {
+    margin: 10px;
+    padding: 10px;
+    border: 2px solid @color4;
+    background-color: @color0;
+    color: @foreground;
+    border-radius: 10px;
+}
+
+#inner-box {
+    margin: 10px;
+    background-color: @background;
+}
+
+#outer-box {
+    margin: 5px;
+    background-color: @background;
+}
+
+#scroll {
+    margin: 0px;
+    background-color: @background;
+}
+
+#text {
+    margin: 5px;
+    color: @foreground;
+}
+
+#entry:selected {
+    background-color: @color4;
+    border-radius: 10px;
+}
+
+#entry:selected #text {
+    color: @background;
+    font-weight: bold;
+}
+
+#entry {
+    padding: 5px;
+    margin: 3px;
+    border-radius: 10px;
+}
+
+#entry:hover {
+    background-color: @color1;
+    border-radius: 10px;
+}
