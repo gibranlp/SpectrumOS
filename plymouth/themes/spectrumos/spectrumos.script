@@ -1,0 +1,80 @@
+// Set background color
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+// Screen info
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+// Load images
+for (i = 0; i < 140; i++) {
+    flyingman_image[i] = Image("progress-" + i + ".png");
+}
+
+// Create sprite
+flyingman_sprite = Sprite();
+flyingman_sprite.SetImage(flyingman_image[0]);
+
+// Center the sprite
+flyingman_sprite.SetX((screen_width - flyingman_image[0].GetWidth()) / 2);
+flyingman_sprite.SetY((screen_height - flyingman_image[0].GetHeight()) / 2);
+
+// Animation
+progress = 0;
+
+fun refresh_callback() {
+    flyingman_sprite.SetImage(flyingman_image[Math.Int(progress / 2) % 140]);
+    progress++;
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// Helper to center text
+fun center_x(width) {
+    return (screen_width - width) / 2;
+}
+
+// Position below animation
+under_image_y = flyingman_sprite.GetY() + flyingman_image[0].GetHeight() + 20;
+
+// Password prompt
+fun password_callback(prompt, bullets) {
+    // Clear old prompts
+    global.prompt_sprite = null;
+    global.bullet_sprites = null;
+    
+    // Show prompt text
+    prompt_image = Image.Text("Enter Password", 1, 1, 1);
+    global.prompt_sprite = Sprite(prompt_image);
+    global.prompt_sprite.SetX(center_x(prompt_image.GetWidth()));
+    global.prompt_sprite.SetY(under_image_y);
+    
+    // Show bullets
+    bullet_image = Image.Text("•", 1, 1, 1);
+    global.bullet_sprites = [];
+    
+    for (i = 0; i < bullets; i++) {
+        global.bullet_sprites[i] = Sprite(bullet_image);
+        global.bullet_sprites[i].SetX(center_x(bullets * bullet_image.GetWidth()) + i * bullet_image.GetWidth());
+        global.bullet_sprites[i].SetY(under_image_y + 30);
+    }
+}
+
+Plymouth.SetDisplayPasswordFunction(password_callback);
+
+// Message display
+fun message_callback(text) {
+    message_image = Image.Text(text, 1, 1, 1);
+    message_sprite = Sprite(message_image);
+    message_sprite.SetPosition(center_x(message_image.GetWidth()), 10);
+}
+
+Plymouth.SetMessageFunction(message_callback);
+
+// Normal mode (clear prompts)
+fun normal_callback() {
+    global.prompt_sprite = null;
+    global.bullet_sprites = null;
+}
+
+Plymouth.SetDisplayNormalFunction(normal_callback);

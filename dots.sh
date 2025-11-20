@@ -29,6 +29,80 @@ function install_hyprland_config(){
     cp -rv ~/SpectrumOS/config/hypr/* $HOME/.config/hypr/
 }
 
+function install_plymouth(){
+    # Install Plymouth
+    yay -S plymouth --noconfirm
+    
+    # Copy theme to Plymouth themes directory
+    sudo cp -rv ~/SpectrumOS/plymouth/themes/spectrumos /usr/share/plymouth/themes/
+    
+    # Set the default theme
+    sudo plymouth-set-default-theme -R spectrumos
+    
+    # Add Plymouth hook to mkinitcpio
+    # Backup original mkinitcpio.conf
+    sudo cp /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
+    
+    # Check if plymouth is already in HOOKS, if not add it
+    if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
+        sudo sed -i 's/HOOKS=(base udev/HOOKS=(base udev plymouth/' /etc/mkinitcpio.conf
+        echo "Plymouth hook added to mkinitcpio.conf"
+    else
+        echo "Plymouth hook already present in mkinitcpio.conf"
+    fi
+    
+    # Reload systemd daemon
+    sudo systemctl daemon-reload
+    
+    sudo mkdir -p /etc/pacman.d/hooks
+    sudo cp ~/SpectrumOS/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/plymouth-quit-fix.hook
+
+    # Regenerate initramfs
+    sudo mkinitcpio -P
+    
+    # Update GRUB configuration (if using GRUB)
+    if [ -f /etc/default/grub ]; then
+        sudo cp /etc/default/grub /etc/default/grub.backup
+        
+        # Add quiet splash to kernel parameters if not present
+        if ! grep -q "quiet splash" /etc/default/grub; then
+            sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash /' /etc/default/grub
+            echo "Added 'quiet splash' to GRUB parameters"
+        fi
+        
+        sudo grub-mkconfig -o /boot/grub/grub.cfg
+        echo "GRUB configuration updated"
+    fi
+    
+    # If using systemd-boot instead
+    if [ -d /boot/loader/entries ]; then
+        if [ -d /boot/loader/entries ]; then
+            echo "Detected systemd-boot. Updating boot entries..."
+            
+            # Backup all entry files
+            sudo cp -r /boot/loader/entries /boot/loader/entries.backup
+            
+            # Add quiet splash to all entry files if not present
+            for entry in /boot/loader/entries/*.conf; do
+                if [ -f "$entry" ]; then
+                    # Check if quiet splash is already present
+                    if ! grep -q "quiet splash" "$entry"; then
+                        # Add quiet splash to the options line
+                        sudo sed -i '/^options/ s/$/ quiet splash/' "$entry"
+                        echo "Added 'quiet splash' to $(basename $entry)"
+                    else
+                        echo "'quiet splash' already present in $(basename $entry)"
+                    fi
+                fi
+            done
+            
+            echo "systemd-boot entries updated!"
+        fi
+    fi
+    
+    echo "Plymouth installation complete! Reboot to see the boot splash."
+}
+
 # Install ROFI themes
 function install_rofi_themes(){
     mkdir -p $HOME/.config/rofi/
@@ -58,7 +132,7 @@ function install_waybar_config(){
 
 # Function to display usage information
 function usage() {
-    echo "Usage: $0 [--bin] [--create-local] [--hypr] [--rofi] [--sddm] [--wal-templates] [--waybar]"
+    echo "Usage: $0 [--bin] [--create-local] [--hypr] [--plymouth] [--rofi] [--sddm] [--wal-templates] [--waybar]"
     exit 1
 }
 
@@ -77,6 +151,9 @@ for arg in "$@"; do
             ;;
         --hypr)
             install_hyprland_config
+            ;;
+        --plymouth)
+            install_plymouth
             ;;
         --rofi)
             install_rofi_themes

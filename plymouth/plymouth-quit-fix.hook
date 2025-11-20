@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = plymouth
+Target = plymouth-git
+
+[Action]
+Description = Ensuring Plymouth quit delay is maintained
+When = PostTransaction
+Exec = /bin/sh -c 'mkdir -p /etc/systemd/system/plymouth-quit.service.d && echo "[Service]" > /etc/systemd/system/plymouth-quit.service.d/override.conf && echo "ExecStartPre=/usr/bin/sleep 5" >> /etc/systemd/system/plymouth-quit.service.d/override.conf && systemctl daemon-reload'

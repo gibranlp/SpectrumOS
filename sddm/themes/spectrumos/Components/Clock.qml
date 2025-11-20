@@ -25,7 +25,7 @@ Column {
     id: clock
     spacing: 0
     width: parent.width / 2
-
+    topPadding:100 
     Row {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 2
@@ -33,7 +33,7 @@ Column {
         
         Label {
             text: "¡"
-            color: colors.color7
+            color: colors.color0
             font.pointSize: root.font.pointSize * 3
             renderType: Text.QtRendering
         }

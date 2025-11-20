@@ -36,7 +36,7 @@ if ! pgrep -x swww-daemon > /dev/null; then
 fi
 
 # Set wallpaper with swww
-swww img "$WALLPAPER" --transition-type fade --transition-duration 2
+swww img "$WALLPAPER" --transition-type random --transition-duration 2
 
 # Generate colors with pywal
 wal -i "$WALLPAPER"

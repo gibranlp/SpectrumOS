@@ -1,0 +1,12 @@
+# This is the file to edit /usr/lib/systemd/system/plymouth-quit.service
+
+[Unit]
+Description=Terminate Plymouth Boot Screen
+After=rc-local.service plymouth-start.service systemd-user-sessions.service
+
+[Service]
+ExecStartPre=/usr/bin/sleep 5
+ExecStart=-/usr/bin/plymouth quit
+Type=oneshot
+RemainAfterExit=yes
+TimeoutSec=20

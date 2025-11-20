@@ -84,24 +84,37 @@ Pane {
         height: parent.height
         width: parent.width
 
-        Rectangle {
-            id: formBackground
+        ShaderEffectSource {
+            id: formBackgroundBlur
             anchors.fill: form
-            anchors.centerIn: form
-            color: colors.background
-            opacity: config.PartialBlur == "true" ? 0.3 : 0.85
+            sourceItem: backgroundImage
+            sourceRect: Qt.rect(form.x, form.y, form.width, form.height)
+            z: 0
+        }
+
+        FastBlur {
+            anchors.fill: form
+            source: formBackgroundBlur
+            radius: 64  // Adjust blur amount
             z: 1
         }
 
+        Rectangle {
+            id: formBackground
+            anchors.fill: form
+            color: colors.background
+            opacity: 0.40  // Lower opacity for glassmorphism
+            z: 1
+        }
         // SpectrumOS Logo
         SpectrumLogo {
             id: spectrumLogo
             width: 350
             height: 350
             anchors.horizontalCenter: formBackground.horizontalCenter
-            anchors.horizontalCenterOffset: parent.width * 0.05
+            anchors.horizontalCenterOffset: parent.width * 0.033
             anchors.top: parent.top
-            anchors.topMargin: 30
+            anchors.topMargin: 20
             anchors.bottomMargin: 20
             z: 10
             
