@@ -1,0 +1,10 @@
+[Unit]
+Description=SpectrumOS Limine Wallpaper Sync
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/spectrumos-limine-sync.sh
+
+[Install]
+WantedBy=multi-user.target

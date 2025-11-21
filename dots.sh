@@ -29,6 +29,23 @@ function install_hyprland_config(){
     cp -rv ~/SpectrumOS/config/hypr/* $HOME/.config/hypr/
 }
 
+# Install Limine Sync Files
+function install_limine_sync(){
+    # Copy script
+    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/spectrumos-limine-sync.sh
+
+    # Copy Systemd Service and Path
+    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.service /etc/systemd/system/
+    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.path /etc/systemd/system/
+
+    # Enable path Watcher
+    sudo systemctl daemon-reload
+    sudo systemctl enable spectrumos-limine-sync.path
+    sudo systemctl start spectrumos-limine-sync.path
+}
+
+
 function install_plymouth(){
     # Install Plymouth
     yay -S plymouth --noconfirm
@@ -129,10 +146,15 @@ function install_waybar_config(){
     cp -rv ~/SpectrumOS/config/waybar/* $HOME/.config/waybar/
 }
 
+# Install ZSH config
+function install_zsh_config(){
+    cp -rv ~/SpectrumOS/config/zsh/.zshrc $HOME/
+}
+
 
 # Function to display usage information
 function usage() {
-    echo "Usage: $0 [--bin] [--create-local] [--hypr] [--plymouth] [--rofi] [--sddm] [--wal-templates] [--waybar]"
+    echo "Usage: $0 [--bin] [--create-local] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--wal-templates] [--waybar][--zsh]"
     exit 1
 }
 
@@ -152,6 +174,9 @@ for arg in "$@"; do
         --hypr)
             install_hyprland_config
             ;;
+        --limine)
+            install_limine_sync
+            ;;
         --plymouth)
             install_plymouth
             ;;
@@ -166,6 +191,9 @@ for arg in "$@"; do
             ;;
         --waybar)
             install_waybar_config
+            ;;
+        --zsh)
+            install_zsh_config
             ;;
     esac
 done

@@ -1,0 +1,34 @@
+timeout: 5
+default_entry: 1
+interface_branding: SpectrumOS
+interface_branding_color: 2
+hash_mismatch_panic: no
+
+# Background colors (RRGGBB format, no 0x or #)
+term_background: 0d1e1e
+backdrop: 0d1e1e
+
+# Wallpaper
+wallpaper: boot():/spectrumos-wallpaper.jpg
+wallpaper_style: centered
+
+# Terminal colors palette (will be updated by pywal)
+term_palette: 0d1e1e;9C886B;c2c6c6;8C9092;9C886B;c2c6c6;8C9092;c2c6c6
+term_palette_bright: 0d1e1e;9C886B;c2c6c6;8C9092;9C886B;c2c6c6;8C9092;c2c6c6
+
+# Text colors
+term_foreground: c2c6c6
+term_foreground_bright: c2c6c6
+term_background_bright: 0d1e1e
+
+/SpectrumOS
+    protocol: linux
+    path: boot():/vmlinuz-linux-zen
+    cmdline: root=UUID=57736533-84a6-42a3-a18a-5428fe927e18 zswap.enabled=0 rw rootfstype=ext4 quiet splash
+    module_path: boot():/initramfs-linux-zen.img
+
+/SpectrumOS (Fallback)
+    protocol: linux
+    path: boot():/vmlinuz-linux-zen
+    cmdline: root=UUID=57736533-84a6-42a3-a18a-5428fe927e18 zswap.enabled=0 rw rootfstype=ext4 quiet splash
+    module_path: boot():/initramfs-linux-zen-fallback.img

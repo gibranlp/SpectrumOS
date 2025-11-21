@@ -47,7 +47,8 @@ yay -S --needed --noconfirm \
     xdg-desktop-portal-hyprland \
     xdg-desktop-portal-gtk \
     qt5-wayland \
-    qt6-wayland
+    qt6-wayland \
+    limine-mkinitcpio-hook
 
 echo ""
 echo -e "${BLUE}Installing Waybar and dependencies...${NC}"
@@ -58,7 +59,9 @@ yay -S --needed --noconfirm \
     ttf-firacode-nerd \
     noto-fonts \
     noto-fonts-emoji \
-    poddl
+    poddl \
+    cmus \
+    cmus-notify
 
 echo ""
 echo -e "${BLUE}Installing terminal and launcher...${NC}"
@@ -75,7 +78,12 @@ yay -S --needed --noconfirm \
     imagemagick \
     swww \
     wpaperd \
-    python-pywalfox
+    python-pywalfox \
+    colorz \
+    python-colorthief \
+    python-haishoku \
+    python-modern-colorthief \
+    gowall
 
 echo ""
 echo -e "${BLUE}Installing utilities...${NC}"
@@ -193,6 +201,10 @@ yay -S --needed --noconfirm \
     rsync \
     wget \
     curl
+
+function install_pip(){
+    pip install -r pip_dependencies.txt --break-system-packages --ignore-requires-python
+}
 
 # Enable services
 echo ""

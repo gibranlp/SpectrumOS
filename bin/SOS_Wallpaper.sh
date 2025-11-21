@@ -42,11 +42,11 @@ swww img "$WALLPAPER" --transition-type random --transition-duration 2
 wal -i "$WALLPAPER"
 
 #Copy Wallpaper for SDDM
-rm /usr/local/spectrumos/current.jpg
-rm /usr/local/spectrumos/colors.conf 
-cp -v "$WALLPAPER" /usr/local/spectrumos/current.jpg
+rm /var/lib/spectrumos/current.jpg
+rm /var/lib/spectrumos/colors.conf 
+cp -v "$WALLPAPER" /var/lib/spectrumos/current.jpg
 # Copy Colors generated for sddm
-cp $HOME/.cache/wal/sddm-colors.conf /usr/local/spectrumos/colors.conf
+cp $HOME/.cache/wal/sddm-colors.conf /var/lib/spectrumos/colors.conf
 
 # Restart waybar to apply colors
 killall waybar

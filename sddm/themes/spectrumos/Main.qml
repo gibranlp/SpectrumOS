@@ -26,17 +26,17 @@ Pane {
             return defaultVal;
         }
         
-            property string background: readColor("/usr/local/spectrumos/colors.conf", "background", "#0d1e1e")
-            property string foreground: readColor("/usr/local/spectrumos/colors.conf", "foreground", "#c2c6c6")
-            property string color1: readColor("/usr/local/spectrumos/colors.conf", "color1", "#9C886B")
-            property string color2: readColor("/usr/local/spectrumos/colors.conf", "color2", "#FF0000")
-            property string color3: readColor("/usr/local/spectrumos/colors.conf", "color3", "#00FF00")
-            property string color4: readColor("/usr/local/spectrumos/colors.conf", "color4", "#8C9092")
-            property string color5: readColor("/usr/local/spectrumos/colors.conf", "color5", "#0000FF")
-            property string color6: readColor("/usr/local/spectrumos/colors.conf", "color6", "#FF00FF")
-            property string color7: readColor("/usr/local/spectrumos/colors.conf", "color7", "#00FFFF")
-            property string color8: readColor("/usr/local/spectrumos/colors.conf", "color8", "#FFFF00")
-            property string color9: readColor("/usr/local/spectrumos/colors.conf", "color9", "#FFFFFF")
+            property string background: readColor("/var/lib/spectrumos/colors.conf", "background", "#0d1e1e")
+            property string foreground: readColor("/var/lib/spectrumos/colors.conf", "foreground", "#c2c6c6")
+            property string color1: readColor("/var/lib/spectrumos/colors.conf", "color1", "#9C886B")
+            property string color2: readColor("/var/lib/spectrumos/colors.conf", "color2", "#FF0000")
+            property string color3: readColor("/var/lib/spectrumos/colors.conf", "color3", "#00FF00")
+            property string color4: readColor("/var/lib/spectrumos/colors.conf", "color4", "#8C9092")
+            property string color5: readColor("/var/lib/spectrumos/colors.conf", "color5", "#0000FF")
+            property string color6: readColor("/var/lib/spectrumos/colors.conf", "color6", "#FF00FF")
+            property string color7: readColor("/var/lib/spectrumos/colors.conf", "color7", "#00FFFF")
+            property string color8: readColor("/var/lib/spectrumos/colors.conf", "color8", "#FFFF00")
+            property string color9: readColor("/var/lib/spectrumos/colors.conf", "color9", "#FFFFFF")
         }
 
 
