@@ -5,30 +5,39 @@ interface_branding_color: 2
 hash_mismatch_panic: no
 
 # Background colors (RRGGBB format, no 0x or #)
-term_background: 0d1e1e
-backdrop: 0d1e1e
+term_background: 66130915
+backdrop: 130915
 
 # Wallpaper
 wallpaper: boot():/spectrumos-wallpaper.jpg
-wallpaper_style: centered
+wallpaper_style: stretched
 
 # Terminal colors palette (will be updated by pywal)
-term_palette: 0d1e1e;9C886B;c2c6c6;8C9092;9C886B;c2c6c6;8C9092;c2c6c6
-term_palette_bright: 0d1e1e;9C886B;c2c6c6;8C9092;9C886B;c2c6c6;8C9092;c2c6c6
+term_palette: 130915;6B3744;8E2D35;AB3838;D24D3C;AB4040;E86045;c4c1c4
+term_palette_bright: 130915;6B3744;8E2D35;AB3838;D24D3C;AB4040;E86045;c4c1c4
 
 # Text colors
-term_foreground: c2c6c6
-term_foreground_bright: c2c6c6
-term_background_bright: 0d1e1e
+term_foreground: c4c1c4
+term_foreground_bright: 6B3744
+term_background_bright: 6B3744
 
 /SpectrumOS
+    comment: SpectrumOS Feel the Power of the Color Spectrum!
     protocol: linux
     path: boot():/vmlinuz-linux-zen
     cmdline: root=UUID=57736533-84a6-42a3-a18a-5428fe927e18 zswap.enabled=0 rw rootfstype=ext4 quiet splash
     module_path: boot():/initramfs-linux-zen.img
 
 /SpectrumOS (Fallback)
+    comment: SpectrumOS Feel the Power of the Color Spectrum!
     protocol: linux
     path: boot():/vmlinuz-linux-zen
     cmdline: root=UUID=57736533-84a6-42a3-a18a-5428fe927e18 zswap.enabled=0 rw rootfstype=ext4 quiet splash
     module_path: boot():/initramfs-linux-zen-fallback.img
+
+/EFI fallback
+comment: Default EFI loader
+comment: order-priority=10 
+protocol: efi
+path: boot():/EFI/BOOT/BOOTX64.EFI
+

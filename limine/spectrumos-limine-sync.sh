@@ -30,11 +30,11 @@ if [ -f "$COLORS_SOURCE" ]; then
     c7=$(echo "$color7" | sed 's/#//')
     
     # Update colors in Limine config (66 prefix for transparency on background)
-    sed -i "s/^term_background:.*/term_background: 66$bg/" "$LIMINE_CONF"
+    sed -i "s/^term_background:.*/term_background: 88$bg/" "$LIMINE_CONF"
     sed -i "s/^backdrop:.*/backdrop: $bg/" "$LIMINE_CONF"
     sed -i "s/^term_foreground:.*/term_foreground: $fg/" "$LIMINE_CONF"
     sed -i "s/^term_foreground_bright:.*/term_foreground_bright: $fg/" "$LIMINE_CONF"
-    sed -i "s/^term_background_bright:.*/term_background_bright: 66$bg/" "$LIMINE_CONF"
+    sed -i "s/^term_background_bright:.*/term_background_bright: $bg/" "$LIMINE_CONF"
     
     # Update palette with pywal colors
     sed -i "s/^term_palette:.*/term_palette: $bg;$c1;$c2;$c3;$c4;$c5;$c6;$c7/" "$LIMINE_CONF"

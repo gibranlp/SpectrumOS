@@ -6,7 +6,7 @@ import "Components"
 
 Pane {
     id: root
-
+    
     // Read pywal colors
     QtObject {
         id: colors

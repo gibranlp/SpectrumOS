@@ -112,7 +112,8 @@ yay -S --needed --noconfirm \
     file-roller \
     ranger \
     yazi \
-    ntfs-3g
+    ntfs-3g \
+    tumbler
 
 echo ""
 echo -e "${BLUE}Installing development tools...${NC}"
