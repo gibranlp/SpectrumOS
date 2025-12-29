@@ -1,0 +1,161 @@
+/* Import pywal colors */
+@import "/home/gibranlp/.cache/wal/colors-waybar.css";
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "Fira Code Medium";
+    font-size: 15px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: @background;
+}
+
+#workspaces {
+    background: @color1;
+    margin: 0px;
+    padding: 3px;
+}
+
+#workspaces button {
+    padding: 0px 8px;
+    color: @color0;
+    font-size: 18px;
+}
+
+#workspaces button.active {
+    background: @color4;
+    color: @color0;
+}
+
+#workspaces button:hover {
+    background: @color0;
+    color: @color7;
+}
+
+#window {
+    background: @color2;
+    margin: 0px;
+    padding: 3px 10px;
+    color: @color0;
+}
+
+#clock,
+#battery,
+#cpu,
+#memory,
+#temperature,
+#network,
+#pulseaudio,
+#pulseaudio.microphone,
+#bluetooth,
+#disk,
+#backlight,
+#idle_inhibitor,
+#custom-media,
+#custom-weather,
+#tray {
+    background: @background;
+    padding: 3px 10px;
+    margin: 0px;
+}
+
+#clock {
+    color: @color6;
+    font-weight: bold;
+    background: @color0;
+}
+
+#battery {
+    color: @color2;
+}
+
+#battery.charging {
+    color: @color3;
+}
+
+#battery.warning:not(.charging) {
+    color: @color5;
+}
+
+#battery.critical:not(.charging) {
+    background: @color1;
+    color: @color0;
+}
+
+#cpu {
+    color: @color4;
+}
+
+#memory {
+    color: @color5;
+}
+
+#temperature {
+    color: @color3;
+}
+
+#temperature.critical {
+    background: @color1;
+    color: @color0;
+}
+
+#network {
+    color: @color6;
+}
+
+#network.disconnected {
+    background: @color1;
+    color: @color0;
+}
+
+#pulseaudio {
+    color: @color7;
+}
+
+#pulseaudio.muted {
+    color: @foreground;
+}
+
+#pulseaudio.microphone {
+    color: @color5;
+}
+
+#bluetooth {
+    color: @color4;
+}
+
+#bluetooth.off {
+    color: @foreground;
+}
+
+#disk {
+    color: @color3;
+}
+
+#backlight {
+    color: @color2;
+}
+
+#idle_inhibitor {
+    color: @color6;
+}
+
+#idle_inhibitor.activated {
+    background: @color1;
+    color: @color0;
+}
+
+#custom-media {
+    color: @color5;
+}
+
+#custom-weather {
+    color: @color6;
+}
+
+#tray {
+    padding: 3px 5px;
+}

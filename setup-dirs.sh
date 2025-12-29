@@ -6,7 +6,8 @@ echo "Creating SpectrumOS directory structure..."
 
 # Create system directories
 sudo mkdir -p /etc/spectrumos
-sudo mkdir -p /usr/share/spectrumos/{wallpapers,themes,scripts}
+sudo chown -R $USER:$USER /etc/spectrumos
+sudo chmod 755 /etc/spectrumos
 sudo mkdir -p /var/lib/spectrumos
 
 # Create user config directory
@@ -17,9 +18,6 @@ echo "Setting permissions..."
 # /var/lib/spectrumos should be writable by user (for wallpaper/color updates)
 sudo chown -R $USER:$USER /var/lib/spectrumos
 sudo chmod 755 /var/lib/spectrumos
-
-# /etc/spectrumos readable by all, writable by root
-sudo chmod 755 /etc/spectrumos
 
 # /usr/share/spectrumos readable by all
 sudo chmod -R 755 /usr/share/spectrumos

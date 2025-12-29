@@ -9,53 +9,41 @@
 # MIT licence 
 #
 [global]
-    ### Display ###
-
     monitor = 0
     follow = none
-
-    ### Geometry ###
     width = (0, 450)
-    height = (50, 150)
+    height = (50, 200)
     origin = top-right
     offset = (10, 10)
-
     scale = 0
     notification_limit = 5
-
-    ### Progress bar ###
+    
+    # Progress bar configuration
     progress_bar = true
-    progress_bar_height = 6
-    progress_bar_frame_width = 1
-    progress_bar_min_width = 60
-    progress_bar_max_width = 300
-
+    progress_bar_height = 8
+    progress_bar_frame_width = 2
+    progress_bar_min_width = 100
+    progress_bar_max_width = 400
+    progress_bar_corner_radius = 2
+    
     indicate_hidden = yes
-
     transparency = 0
     separator_height = 0
-
-    padding = 5
-    horizontal_padding = 5
-    text_icon_padding = 0
-
+    padding = 8
+    horizontal_padding = 8
+    text_icon_padding = 5
     frame_width = 3
-
     frame_color = "{color0}"
-
     gap_size = 6
     separator_color = auto
-
     sort = yes
     idle_threshold = 120
-
-    ### Text ###
+    
+    # Font and text configuration
     font = Courier Prime Medium 14.5
-    line_height = 0
+    line_height = 2
     markup = full
-
-    format = " <b>%s</b>\n%b\n%p\n%n"
-
+    format = "🔔 <b>%s</b>\n%b\n%p"
     alignment = left
     vertical_alignment = center
     show_age_threshold = -1
@@ -64,172 +52,313 @@
     stack_duplicates = true
     hide_duplicate_count = true
     show_indicators = yes
-
-    ### Icons ###
+    
+    # Icon configuration
     icon_position = left
-    min_icon_size = 32
+    min_icon_size = 40
     max_icon_size = 150
     icon_path = /usr/share/icons/gnome/16x16/status/:/usr/share/icons/gnome/16x16/devices/
-
-    ### History ###
+    
+    # History and interaction
     sticky_history = yes
-    history_length = 20
-
-    ### Misc/Advanced ###
-    dmenu = /usr/bin/dmenu -p dunst:
+    history_length = 30
+    dmenu = /usr/bin/rofi -dmenu -p "Notifications:"
     browser = /usr/bin/xdg-open
     always_run_script = true
+    
+    # Window properties
     title = Dunst
     class = Dunst
-    corner_radius = 0
+    corner_radius = 8
     ignore_dbusclose = false
-
-    ### Wayland ###
     force_xwayland = false
-
-    ### Legacy ###
     force_xinerama = false
-
-    ### mouse ###
-    mouse_left_click = close_current
-    mouse_middle_click = do_action, close_current
+    
+    # Mouse actions
+    mouse_left_click = do_action, close_current
+    mouse_middle_click = close_current
     mouse_right_click = close_all
-
 
 [experimental]
     per_monitor_dpi = true
-
 
 [urgency_low]
     background = "{color1}"
     foreground = "{color0}"
     frame_color = "{color0}"
     timeout = 6
-    format = " <b>%s</b>\n%b\n%p\n%n"
-
+    format = "🔔 <b>%s</b>\n%b"
+    default_icon = /usr/share/icons/hicolor/48x48/status/dialog-information.png
 
 [urgency_normal]
     background = "{color3}"
     foreground = "{color0}"
     frame_color = "{color0}"
     timeout = 10
-    format = "󰂞 <b>%a\n%s</b>\n%b\n%p\n%n"
+    format = "🔔 <b>%a\n%s</b>\n%b"
     highlight = "{color0}"
-
+    default_icon = /usr/share/icons/hicolor/48x48/status/dialog-information.png
 
 [urgency_critical]
-    background = "#ff0000"
+    background = "{color1}"
+    foreground = "{color15}"
+    frame_color = "{color9}"
+    timeout = 0
+    format = "🚨 <b>%s</b>\n%b"
+    default_icon = /usr/share/icons/hicolor/48x48/status/dialog-warning.png
+
+# ===============================================
+# APPLICATION-SPECIFIC RULES WITH ACTIONS
+# ===============================================
+
+[SpectrumOS]
+    appname = "󰣇 SpectrumOS"
+    background = "{color4}"
     foreground = "{color0}"
     frame_color = "{color0}"
-    timeout = 20
-    format = "󰵙 <b>%s</b>\n%b\n%p\n%n"
-
+    format = "<b>%s</b>\n%b"
+    timeout = 10
+    script = ~/.config/dunst/scripts/spectrum_actions.sh
 
 [Slack]
     appname = Slack
-    format = "<b> Slack</b>\n%s\n%b"
-    new_icon = Slack
+    format = "<b>💬 Slack</b>\n%s\n%b\n<i>Click to open Slack</i>"
+    new_icon = slack
+    background = "{color5}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/open_slack.sh
 
 [Discord]
-    appname = Discord Canary
-    format = "<b> Discord</b>\n%s\n%b"
-    new_icon = Discord
-
-[ImageMagick]
-    appname = ImageMagick
-    format = "System Notification\n%s\n%b"
+    appname = Discord
+    format = "<b>🎮 Discord</b>\n%s\n%b\n<i>Click to open Discord</i>"
+    new_icon = discord
+    background = "{color6}"
+    foreground = "{color0}"
     timeout = 10
-
-[Mozilla Firefox]
-    appname = Firefox
-    format = "󰈹 Firefox\n%s\n%b"
-    new_icon = Mozilla Firefox
-    timeout = 10
-
-[ncspot]
-    appname = ncspot
-    format = "<b> Now Playing</b>\n%s\n%b"
-    timeout = 10
-
-[Spotify]
-    appname = Spotify
-    format = "<b> Now Playing</b>\n%s\n%b"
-    timeout = 10
-
-[Transmission]
-    appname = Transmission
-    format = "<b> Transmission\n%s\n%b"
-    new_icon = Transmission
-    timeout = 10
+    script = ~/.config/dunst/scripts/open_discord.sh
 
 [Telegram]
     appname = TelegramDesktop
-    format = "<b> New Message\n%s\n%b"
-    new_icon = Transmission
+    format = "<b>📨 Telegram</b>\n%s\n%b\n<i>Click to open</i>"
+    new_icon = telegram
+    background = "{color4}"
+    foreground = "{color0}"
     timeout = 10
-
-[Pamixer]
-    appname = Volume
-    format = "<b> Volume</b>\n%s\n%b"
-    timeout = 5
-    set_stack_tag = "volume"
-
-[Blueman]
-    appname = blueman
-    format = "<b>󰂱 Bluetooth</b>\n%s\n%b"
-    timeout = 10
-
-[Calendar]
-    appname = Calendar
-    format = "<b> Calendar</b>\n%s\n%b"
-    timeout = 10
-
-[Farge]
-    appname = Farge
-    format = "<b>󰴱 Color</b>\n%s\n%b"
-    timeout = 10
-
-[Flameshot]
-    appname = flameshot
-    format = "<b> Screenshot</b>\n%s\n%b"
-    timeout = 10
-
-[Calculator]
-    appname = Calculator
-    format = "<b>󰪚 Calculator</b>\n%s %b"
-    timeout = 10
-
-[Thunar]
-    appname = thunar
-    format = "<b> Thunar</b>\n%s %b"
-    timeout = 10
-
-[Chrome]
-    appname = google-chrome
-    format = "<b> Google Chrome</b>\n%s %b"
-    timeout = 10
-
-[notify-send]
-    appname = notify-send
-    format = "<b> SpectrumOS</b>\n%s %b"
-    timeout = 10
-
-[Pomodoro]
-    appname = pomodoro
-    format = "<b> Pomodoro</b>\n%s %b"
-    timeout = 10
+    script = ~/.config/dunst/scripts/open_telegram.sh
 
 [Whatsdesk]
     appname = whatsdesk
-    format = "<b> Whatsdesk</b>\n%s %b"
+    format = "<b>💬 WhatsApp</b>\n%s\n%b\n<i>Click to open</i>"
+    background = "{color2}"
+    foreground = "{color0}"
     timeout = 10
+    script = ~/.config/dunst/scripts/open_whatsapp.sh
 
-[evolution-mail-notification]
-    appname = evolution-mail-notification
-    format = "<b>󰺻 Evolution</b>\n%s %b"
+[Firefox]
+    appname = Firefox
+    format = "🌐 <b>Firefox</b>\n%s\n%b\n<i>Click to focus</i>"
+    new_icon = firefox
+    background = "{color1}"
+    foreground = "{color0}"
     timeout = 10
+    script = ~/.config/dunst/scripts/focus_firefox.sh
+
+[Chrome]
+    appname = google-chrome
+    format = "🌐 <b>Google Chrome</b>\n%s\n%b\n<i>Click to focus</i>"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/focus_chrome.sh
+
+[Spotify]
+    appname = Spotify
+    format = "<b>🎧 Now Playing</b>\n%s\n%b\n<i>Click for controls</i>"
+    background = "{color2}"
+    foreground = "{color0}"
+    timeout = 8
+    script = ~/.config/dunst/scripts/spotify_controls.sh
+
+[ncspot]
+    appname = ncspot
+    format = "<b>🎵 Now Playing</b>\n%s\n%b\n<i>Click to open ncspot</i>"
+    background = "{color2}"
+    foreground = "{color0}"
+    timeout = 8
+    script = ~/.config/dunst/scripts/open_ncspot.sh
+
+[Transmission]
+    appname = Transmission
+    format = "<b>📥 Transmission</b>\n%s\n%b\n<i>Click to open</i>"
+    new_icon = transmission
+    background = "{color1}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/open_transmission.sh
+
+[Evolution]
+    appname = evolution-mail-notification
+    format = "<b>📧 New Email</b>\n%s\n%b\n<i>Click to read</i>"
+    background = "{color4}"
+    foreground = "{color0}"
+    timeout = 15
+    script = ~/.config/dunst/scripts/open_evolution.sh
+
+# ===============================================
+# SYSTEM NOTIFICATIONS
+# ===============================================
+
+[Volume]
+    appname = Volume
+    format = "<b>🎚️ Volume</b>\n%b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 3
+    set_stack_tag = "volume"
+    progress_bar = true
+
+[Brightness]
+    appname = Brightness
+    format = "<b>☀️ Brightness</b>\n%b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 3
+    set_stack_tag = "brightness"
+    progress_bar = true
+
+[Battery]
+    appname = Battery
+    format = "<b>🔋 Battery</b>\n%s\n%b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 10
+    urgency = normal
+    script = ~/.config/dunst/scripts/battery_action.sh
+
+[Battery-Critical]
+    summary = "*Battery*"
+    urgency = critical
+    background = "{color1}"
+    foreground = "{color15}"
+    frame_color = "{color9}"
+    format = "<b>🔋 BATTERY CRITICAL</b>\n%b\n<i>Click to see power options</i>"
+    timeout = 0
+    script = ~/.config/dunst/scripts/power_menu.sh
+
+[Blueman]
+    appname = blueman
+    format = "<b>🔵 Bluetooth</b>\n%s\n%b\n<i>Click to open settings</i>"
+    background = "{color4}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/open_bluetooth.sh
+
+[WiFi]
+    appname = WiFi
+    format = "<b>📶 Wi-Fi</b>\n%s\n%b\n<i>Click to manage</i>"
+    background = "{color4}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/wifi_menu.sh
+
+# ===============================================
+# PRODUCTIVITY & TOOLS
+# ===============================================
+
+[Screenshot]
+    appname = Screenshot
+    format = "<b>📸 Screenshot</b>\n%b\n<i>Click to open</i>"
+    background = "{color5}"
+    foreground = "{color0}"
+    timeout = 5
+    script = ~/.config/dunst/scripts/open_screenshot.sh
+
+[Flameshot]
+    appname = flameshot
+    format = "<b>📸 Screenshot</b>\n%b\n<i>Click to open</i>"
+    background = "{color5}"
+    foreground = "{color0}"
+    timeout = 5
+    script = ~/.config/dunst/scripts/open_screenshot.sh
+
+[Pomodoro]
+    appname = pomodoro
+    format = "<b>⏳ Pomodoro</b>\n%s\n%b\n<i>Click for timer controls</i>"
+    background = "{color1}"
+    foreground = "{color0}"
+    timeout = 0
+    script = ~/.config/dunst/scripts/pomodoro_controls.sh
+
+[Calendar]
+    appname = Calendar
+    format = "<b>📅 Calendar</b>\n%s\n%b\n<i>Click to open</i>"
+    background = "{color6}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/open_calendar.sh
+
+[Calculator]
+    appname = Calculator
+    format = "<b>🧮 Calculator</b>\n%s %b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 8
 
 [Notes]
     appname = notes
-    format = "<b>󱓵 Notes</b>\n%s %b"
+    format = "<b>📝 Notes</b>\n%s\n%b\n<i>Click to open</i>"
+    background = "{color3}"
+    foreground = "{color0}"
     timeout = 10
+    script = ~/.config/dunst/scripts/open_notes.sh
+
+[Farge]
+    appname = Farge
+    format = "<b>🎨 Color Picked</b>\n%b\n<i>Copied to clipboard</i>"
+    background = "{color5}"
+    foreground = "{color0}"
+    timeout = 5
+
+[Thunar]
+    appname = thunar
+    format = "<b>📁 File Manager</b>\n%s %b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 8
+
+[ImageMagick]
+    appname = ImageMagick
+    format = "🖼️ <b>Image Processed</b>\n%s\n%b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 8
+
+# ===============================================
+# DOWNLOADS & UPDATES
+# ===============================================
+
+[Download-Complete]
+    summary = "*Download*"
+    format = "<b>📥 Download Complete</b>\n%s\n%b\n<i>Click to open folder</i>"
+    background = "{color2}"
+    foreground = "{color0}"
+    timeout = 10
+    script = ~/.config/dunst/scripts/open_downloads.sh
+
+[System-Update]
+    summary = "*Update*"
+    format = "<b>📦 System Update</b>\n%s\n%b"
+    background = "{color4}"
+    foreground = "{color0}"
+    timeout = 15
+    progress_bar = true
+
+[Pamixer]
+    appname = Pamixer
+    format = "<b>🎚️ Volume</b>\n%b"
+    background = "{color3}"
+    foreground = "{color0}"
+    timeout = 3
+    set_stack_tag = "volume"
+    progress_bar = true

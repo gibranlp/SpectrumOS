@@ -1,9 +1,13 @@
-#!/usr/bin/env bash
-# _____                           _                _ 
-#|  _  |___ ___ ___ ___ ___ _ _ _| |_ ___ ___ ___| |
-#|     | -_| .'|  _| -_|_ -| | | . | .'|   | . | . |
-#|__|__|___|__,|_| |___|___|_  |___|__,|_|_|_  |___|
-#                          |___|           |___|    
+#!/bin/bash
+# _____             _                 _____ _____ 
+#|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
+#|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
+#|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
+#      |_|   
+# SpectrumOS - Embrace the Chromatic Symphony!
+# By: gibranlp <thisdoesnotwork@gibranlp.dev>
+# MIT licence 
+#                         |___|           |___|    
 # SpectrumOS - Password Generator Widget
 
 # Password Parameters
@@ -15,9 +19,9 @@ generate_pw() {
   echo
 }
 
-ROFI_THEME="${ROFI_THEME:-$HOME/.config/rofi/SOS_Password.rasi}"
+ROFI_THEME="${ROFI_THEME:-$HOME/.config/rofi/SOS_Right.rasi}"
 
-menu="rofi -dmenu -theme $ROFI_THEME -p 󰟵PasswordGen  PassGen -i"
+menu="rofi -dmenu -theme $ROFI_THEME -p 🔑  PassGen -i"
 actions="Regenerate"
 
 pw=$(generate_pw)

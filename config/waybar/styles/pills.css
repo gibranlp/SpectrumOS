@@ -1,0 +1,192 @@
+/* Import pywal colors */
+@import "/home/gibranlp/.cache/wal/colors-waybar.css";
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "Fira Code Medium";
+    font-size: 15px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: transparent;
+}
+
+#workspaces {
+    background: @color1;
+    margin: 5px;
+    padding: 8px;
+    border-radius: 25px;
+}
+
+#workspaces button {
+    padding: 2px 8px;
+    color: @color0;
+    border-radius: 20px;
+    font-size: 18px;
+}
+
+#workspaces button.active {
+    background: @color4;
+    color: @color0;
+    padding: 2px 12px;
+}
+
+#workspaces button:hover {
+    background: @color0;
+    color: @color7;
+}
+
+#window {
+    background: @color2;
+    margin: 5px;
+    padding: 5px 20px;
+    border-radius: 25px;
+    color: @color0;
+}
+
+#clock,
+#battery,
+#cpu,
+#memory,
+#temperature,
+#network,
+#pulseaudio,
+#pulseaudio.microphone,
+#bluetooth,
+#disk,
+#backlight,
+#idle_inhibitor,
+#custom-media,
+#custom-weather,
+#tray {
+    background: @background;
+    padding: 5px 15px;
+    margin: 5px 2px;
+    border-radius: 25px;
+}
+
+#clock {
+    color: @color6;
+    font-weight: bold;
+    background: @color6;
+    color: @color0;
+    padding: 5px 20px;
+}
+
+#battery {
+    background: @color2;
+    color: @color0;
+}
+
+#battery.charging {
+    background: @color3;
+    color: @color0;
+}
+
+#battery.warning:not(.charging) {
+    background: @color5;
+    color: @color0;
+}
+
+#battery.critical:not(.charging) {
+    background: @color1;
+    color: @color0;
+    animation: blink-pill 0.5s linear infinite;
+}
+
+#cpu {
+    background: @color4;
+    color: @color0;
+}
+
+#memory {
+    background: @color5;
+    color: @color0;
+}
+
+#temperature {
+    background: @color3;
+    color: @color0;
+}
+
+#temperature.critical {
+    background: @color1;
+    color: @color0;
+}
+
+#network {
+    background: @color6;
+    color: @color0;
+}
+
+#network.disconnected {
+    background: @color1;
+    color: @color0;
+}
+
+#pulseaudio {
+    background: @color7;
+    color: @color0;
+}
+
+#pulseaudio.muted {
+    background: @foreground;
+    color: @background;
+}
+
+#pulseaudio.microphone {
+    background: @color5;
+    color: @color0;
+}
+
+#bluetooth {
+    background: @color4;
+    color: @color0;
+}
+
+#bluetooth.off {
+    background: @foreground;
+    color: @background;
+}
+
+#disk {
+    background: @color3;
+    color: @color0;
+}
+
+#backlight {
+    background: @color2;
+    color: @color0;
+}
+
+#idle_inhibitor {
+    background: @color6;
+    color: @color0;
+}
+
+#idle_inhibitor.activated {
+    background: @color1;
+    color: @color0;
+}
+
+#custom-media {
+    background: @color5;
+    color: @color0;
+}
+
+#custom-weather {
+    background: @color6;
+    color: @color0;
+}
+
+#tray {
+    padding: 5px 10px;
+}
+
+@keyframes blink-pill {
+    50% {
+        background: @color5;
+    }
+}

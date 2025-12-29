@@ -10,7 +10,7 @@
 └── scripts/                  # System scripts
 
 /var/lib/spectrumos/          # Runtime state
-├── current.jpg               # Current wallpaper (for SDDM/Limine)
+├── current.png               # Current wallpaper (for SDDM/Limine)
 └── colors.conf               # Current colors
 
 ~/.config/spectrumos/         # User overrides

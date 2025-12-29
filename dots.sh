@@ -12,15 +12,28 @@
 
 # Install Bin files
 function install_bin(){
-    mkdir -p $HOME/.local/bin
-    cp -rv ~/SpectrumOS/bin/* $HOME/.local/bin/
-    chmod +x $HOME/.local/bin/*
+    sudo mkdir -p /usr/share/spectrumos/scripts/
+    cd /usr/share/spectrumos/scripts/
+    sudo rm /usr/share/spectrumos/scripts/*
+    sudo cp -rv ~/SpectrumOS/bin/* /usr/share/spectrumos/scripts/
+    sudo chmod +x /usr/share/spectrumos/scripts/*
 }
+
+# Install Cava config
+function install_cava_config(){
+    mkdir -p $HOME/.config/cava/
+} 
 
 # Install variables
 function create_local_files(){
     sudo mkdir -pv /usr/local/spectrumos
     sudo chown -R $USER:$USER /usr/local/spectrumos
+}
+
+# Install GOWall config
+function install_gowall_config(){
+    mkdir -p $HOME/.config/gowall/
+    cp -rv ~/SpectrumOS/config/gowall/* $HOME/.config/gowall/
 }
 
 # Install hyprland configs
@@ -38,6 +51,12 @@ function install_limine_sync(){
     # Copy Systemd Service and Path
     sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.service /etc/systemd/system/
     sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.path /etc/systemd/system/
+
+    #Pacman Hooks
+    sudo mkdir -p /etc/pacman.d/hooks
+    sudo cp ~/SpectrumOS/etc/pacman.d/hooks/95-spectrumos-limine.hook /etc/pacman.d/hooks/
+    sudo mkdir -p /etc/kernel
+    sudo cp ~/SpectrumOS/etc/kernel/install.conf /etc/kernel/
 
     # Enable path Watcher
     sudo systemctl daemon-reload
@@ -134,6 +153,42 @@ function install_sddm_theme(){
     sudo cp -rv ~/SpectrumOS/sddm/themes/spectrumos/* /usr/share/sddm/themes/spectrumos/
 }
 
+# Install Spectrum Config Files
+function install_spectrum_config(){
+    sudo mkdir -p /etc/spectrumos
+    sudo chown -R $USER:$USER /etc/spectrumos
+    sudo chmod 777 /etc/spectrumos
+    cp -rv ~/SpectrumOS/etc/spectrumos/* /etc/spectrumos/
+}
+
+# Install Swappy config
+function install_swappy_config(){
+    mkdir -p $HOME/.config/swappy
+    cp -rv ~/SpectrumOS/config/swappy/* $HOME/.config/swappy/
+}
+
+# Install TLP
+function install_tlp(){
+    sudo cp -v ~/SpectrumOS/etc/tlp.conf /etc/tlp.conf
+
+    # Enable TLP
+    sudo systemctl enable tlp.service
+    sudo systemctl start tlp.service
+
+    # Enable TLP's Bluetooth, WiFi, and WWAN soft blocking
+    sudo systemctl enable NetworkManager-dispatcher.service
+    sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
+
+    # Enable thermald
+    sudo systemctl enable thermald.service
+    sudo systemctl start thermald.service
+}
+
+# Install Variables file
+function install_variables(){
+    cp ~/SpectrumOS/etc/spectrumos/spectrumos.conf /etc/spectrumos/
+}
+
 # Install Wal Templates
 function install_wal_templates(){
     mkdir -p $HOME/.config/wal/templates
@@ -146,6 +201,12 @@ function install_waybar_config(){
     cp -rv ~/SpectrumOS/config/waybar/* $HOME/.config/waybar/
 }
 
+# Install Wofi configs
+function install_wofi_config(){
+    mkdir -p $HOME/.config/wofi
+    cp -rv ~/SpectrumOS/config/wofi/* $HOME/.config/wofi/
+}
+
 # Install ZSH config
 function install_zsh_config(){
     cp -rv ~/SpectrumOS/config/zsh/.zshrc $HOME/
@@ -154,7 +215,7 @@ function install_zsh_config(){
 
 # Function to display usage information
 function usage() {
-    echo "Usage: $0 [--bin] [--create-local] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--wal-templates] [--waybar][--zsh]"
+    echo "Usage: $0 [--bin] [--cava] [--create-local] [--gowall] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--swappy] [--wal-templates] [--waybar] [--wofi] [--zsh]"
     exit 1
 }
 
@@ -168,8 +229,14 @@ for arg in "$@"; do
         --bin)
             install_bin
             ;;
+        --cava)
+            install_cava_config
+            ;;
         --create-local)
             create_local_files
+            ;;
+        --gowall)
+            install_gowall_config
             ;;
         --hypr)
             install_hyprland_config
@@ -186,11 +253,17 @@ for arg in "$@"; do
         --sddm)
             install_sddm_theme
             ;;
+        --swappy)
+            install_swappy_config
+            ;;
         --wal-templates)
             install_wal_templates
             ;;
         --waybar)
             install_waybar_config
+            ;;
+        --wofi)
+            install_wofi_config
             ;;
         --zsh)
             install_zsh_config

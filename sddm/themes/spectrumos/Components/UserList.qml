@@ -65,18 +65,37 @@ Item {
             }
         }
 
-        indicator: Button {
+        indicator: Item {
                 id: usernameIcon
                 width: selectUser.height * 0.8
                 height: parent.height
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: selectUser.height * 0.125
-                icon.height: parent.height * 0.25
-                icon.width: parent.height * 0.25
-                enabled: false
-                icon.color: root.palette.text
-                icon.source: Qt.resolvedUrl("../Assets/User.svgz")
+
+                Image {
+                    id: userAvatar
+                    width: parent.height * 0.7
+                    height: parent.height * 0.7
+                    anchors.centerIn: parent
+                    source: userModel.data(userModel.index(selectUser.currentIndex, 0), Qt.UserRole + 4) || Qt.resolvedUrl("../Assets/User.svgz")
+                    sourceSize: Qt.size(width, height)
+                    fillMode: Image.PreserveAspectCrop
+
+                    layer.enabled: true
+                    layer.effect: OpacityMask {
+                        maskSource: Item {
+                            width: userAvatar.width
+                            height: userAvatar.height
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: userAvatar.width
+                                height: userAvatar.height
+                                radius: width / 2
+                            }
+                        }
+                    }
+                }
         }
 
         background: Rectangle {
@@ -124,24 +143,24 @@ Item {
                 name: "pressed"
                 when: selectUser.down
                 PropertyChanges {
-                    target: usernameIcon
-                    icon.color: Qt.lighter(root.palette.highlight, 1.1)
+                    target: userAvatar
+                    opacity: 0.8
                 }
             },
             State {
                 name: "hovered"
                 when: selectUser.hovered
                 PropertyChanges {
-                    target: usernameIcon
-                    icon.color: Qt.lighter(root.palette.highlight, 1.2)
+                    target: userAvatar
+                    opacity: 0.9
                 }
             },
             State {
                 name: "focused"
                 when: selectUser.visualFocus
                 PropertyChanges {
-                    target: usernameIcon
-                    icon.color: root.palette.highlight
+                    target: userAvatar
+                    opacity: 1.0
                 }
             }
         ]
@@ -149,7 +168,7 @@ Item {
         transitions: [
             Transition {
                 PropertyAnimation {
-                    properties: "color, border.color, icon.color"
+                    properties: "opacity"
                     duration: 150
                 }
             }

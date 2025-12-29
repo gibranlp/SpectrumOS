@@ -1,0 +1,152 @@
+[Default Applications]
+# Images
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/jpg=imv.desktop
+image/gif=imv.desktop
+image/bmp=imv.desktop
+image/webp=imv.desktop
+image/tiff=imv.desktop
+image/svg+xml=imv.desktop
+image/x-icon=imv.desktop
+image/vnd.microsoft.icon=imv.desktop
+
+# Web/Internet
+text/html=firefox.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+x-scheme-handler/ftp=firefox.desktop
+x-scheme-handler/chrome=firefox.desktop
+application/x-extension-htm=firefox.desktop
+application/x-extension-html=firefox.desktop
+application/x-extension-shtml=firefox.desktop
+application/xhtml+xml=firefox.desktop
+application/x-extension-xhtml=firefox.desktop
+application/x-extension-xht=firefox.desktop
+
+# Videos
+video/mp4=vlc.desktop
+video/x-matroska=vlc.desktop
+video/webm=vlc.desktop
+video/mpeg=vlc.desktop
+video/x-msvideo=vlc.desktop
+video/quicktime=vlc.desktop
+video/x-flv=vlc.desktop
+video/3gpp=vlc.desktop
+video/ogg=vlc.desktop
+video/x-m4v=vlc.desktop
+
+# Audio
+audio/mpeg=vlc.desktop
+audio/mp3=vlc.desktop
+audio/x-mp3=vlc.desktop
+audio/flac=vlc.desktop
+audio/x-flac=vlc.desktop
+audio/ogg=vlc.desktop
+audio/x-vorbis+ogg=vlc.desktop
+audio/wav=vlc.desktop
+audio/x-wav=vlc.desktop
+audio/aac=vlc.desktop
+audio/m4a=vlc.desktop
+audio/x-m4a=vlc.desktop
+
+# Documents - LibreOffice Writer
+application/vnd.oasis.opendocument.text=libreoffice-writer.desktop
+application/msword=libreoffice-writer.desktop
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=libreoffice-writer.desktop
+application/rtf=libreoffice-writer.desktop
+text/rtf=libreoffice-writer.desktop
+
+# Spreadsheets - LibreOffice Calc
+application/vnd.oasis.opendocument.spreadsheet=libreoffice-calc.desktop
+application/vnd.ms-excel=libreoffice-calc.desktop
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=libreoffice-calc.desktop
+text/csv=libreoffice-calc.desktop
+
+# Presentations - LibreOffice Impress
+application/vnd.oasis.opendocument.presentation=libreoffice-impress.desktop
+application/vnd.ms-powerpoint=libreoffice-impress.desktop
+application/vnd.openxmlformats-officedocument.presentationml.presentation=libreoffice-impress.desktop
+
+# PDFs
+application/pdf=org.pwmt.zathura.desktop
+
+# Programming & Text Files - VSCode
+text/plain=code.desktop
+text/x-python=code.desktop
+text/x-python3=code.desktop
+application/x-python=code.desktop
+text/x-sh=code.desktop
+application/x-shellscript=code.desktop
+text/x-csrc=code.desktop
+text/x-c++src=code.desktop
+text/x-chdr=code.desktop
+text/x-c++hdr=code.desktop
+text/x-java=code.desktop
+application/javascript=code.desktop
+application/x-javascript=code.desktop
+text/javascript=code.desktop
+application/json=code.desktop
+application/x-json=code.desktop
+text/x-markdown=code.desktop
+text/markdown=code.desktop
+text/x-tex=code.desktop
+application/x-yaml=code.desktop
+text/x-yaml=code.desktop
+application/xml=code.desktop
+text/xml=code.desktop
+text/css=code.desktop
+text/x-sass=code.desktop
+text/x-scss=code.desktop
+application/x-php=code.desktop
+text/x-php=code.desktop
+text/x-ruby=code.desktop
+application/x-ruby=code.desktop
+text/x-go=code.desktop
+text/x-rust=code.desktop
+text/x-lua=code.desktop
+application/x-perl=code.desktop
+text/x-perl=code.desktop
+text/x-sql=code.desktop
+application/toml=code.desktop
+text/x-ini=code.desktop
+text/x-log=code.desktop
+application/x-desktop=code.desktop
+
+# Archives
+application/zip=org.gnome.FileRoller.desktop
+application/x-tar=org.gnome.FileRoller.desktop
+application/x-compressed-tar=org.gnome.FileRoller.desktop
+application/x-bzip-compressed-tar=org.gnome.FileRoller.desktop
+application/x-xz-compressed-tar=org.gnome.FileRoller.desktop
+application/x-7z-compressed=org.gnome.FileRoller.desktop
+application/x-rar=org.gnome.FileRoller.desktop
+application/gzip=org.gnome.FileRoller.desktop
+application/x-gzip=org.gnome.FileRoller.desktop
+
+[Added Associations]
+# Images
+image/png=imv.desktop;
+image/jpeg=imv.desktop;
+image/gif=imv.desktop;
+image/webp=imv.desktop;
+
+# Web
+text/html=firefox.desktop;
+x-scheme-handler/http=firefox.desktop;
+x-scheme-handler/https=firefox.desktop;
+
+# Videos
+video/mp4=vlc.desktop;
+video/x-matroska=vlc.desktop;
+video/webm=vlc.desktop;
+
+# Programming
+text/plain=code.desktop;
+text/x-python=code.desktop;
+text/x-sh=code.desktop;
+application/json=code.desktop;
+text/css=code.desktop;
+text/html=code.desktop;firefox.desktop;
+
+[Removed Associations]

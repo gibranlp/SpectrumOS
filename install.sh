@@ -48,7 +48,25 @@ yay -S --needed --noconfirm \
     xdg-desktop-portal-gtk \
     qt5-wayland \
     qt6-wayland \
-    limine-mkinitcpio-hook
+    limine \
+    limine-mkinitcpio-hook \
+    tlp \
+    tlp-rdw \
+    powertop \
+    acpi \
+    acpi_call \
+    intel-ucode \
+    thermald \
+    cpupower  \
+    ffmpeg \
+    vlc \
+    lame \
+    libmad \
+    x264 \
+    x265 \
+    gvfs-smb \
+    gvfs-mtp \
+    gvfs-nfs
 
 echo ""
 echo -e "${BLUE}Installing Waybar and dependencies...${NC}"
@@ -61,7 +79,14 @@ yay -S --needed --noconfirm \
     noto-fonts-emoji \
     poddl \
     cmus \
-    cmus-notify
+    cmus-notify \ 
+    locate \
+    ail-cli \
+    themix-full-git \
+    hyprpicker \
+    python-pillow \
+    python-cairosvg
+
 
 echo ""
 echo -e "${BLUE}Installing terminal and launcher...${NC}"
@@ -83,7 +108,9 @@ yay -S --needed --noconfirm \
     python-colorthief \
     python-haishoku \
     python-modern-colorthief \
-    gowall
+    gowall \
+    nwg-display \
+    plymouth
 
 echo ""
 echo -e "${BLUE}Installing utilities...${NC}"
@@ -99,12 +126,14 @@ yay -S --needed --noconfirm \
     btop \
     htop \
     neofetch \
-    walogram
+    walogram \
+    google-chrome \
+    
 
 echo ""
 echo -e "${BLUE}Installing file managers...${NC}"
 yay -S --needed --noconfirm \
-    thunar \
+    thunar-extended \
     thunar-volman \
     thunar-archive-plugin \
     gvfs \
@@ -133,7 +162,9 @@ echo -e "${BLUE}Installing communication apps...${NC}"
 yay -S --needed --noconfirm \
     telegram-desktop \
     discord \
-    whatsapp-for-linux
+    whatsapp-for-linux \
+    insect \ 
+
 
 echo ""
 echo -e "${BLUE}Installing productivity apps...${NC}"
@@ -166,7 +197,9 @@ yay -S --needed --noconfirm \
     pipewire-pulse \
     pipewire-alsa \
     pipewire-jack \
-    wireplumber
+    wireplumber \
+    pipewire-pulse \ 
+    libldac
 
 echo ""
 echo -e "${BLUE}Installing SDDM and themes...${NC}"
@@ -201,7 +234,13 @@ yay -S --needed --noconfirm \
     p7zip \
     rsync \
     wget \
-    curl
+    curl \
+    grimblast \ 
+    swappy \
+    qt5ct \
+    qt6ct \
+    kvantum
+
 
 function install_pip(){
     pip install -r pip_dependencies.txt --break-system-packages --ignore-requires-python

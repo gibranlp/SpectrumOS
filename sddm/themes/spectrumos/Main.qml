@@ -103,7 +103,7 @@ Pane {
             id: formBackground
             anchors.fill: form
             color: colors.background
-            opacity: 0.40  // Lower opacity for glassmorphism
+            opacity: 0.50 
             z: 1
         }
         // SpectrumOS Logo
