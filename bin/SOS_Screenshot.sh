@@ -16,14 +16,14 @@ SCREENSHOT_DIR="$HOME/Pictures"
 mkdir -p "$SCREENSHOT_DIR"
 
 # Screenshot options
-OPTIONS=" Area\n Screen\n Window\n 5s Screen"
+OPTIONS=" 📐 Area\n 🖥️ Screen\n 🪟 Window\n ⏲️ 5s Screen"
 
 # Show rofi menu
 CHOICE=$(echo -e "$OPTIONS" | rofi -dmenu -theme "$ROFI_THEME" -p "  Screenshot: " -font "$FONT" -lines 4)
 
 # Handle user choice
 case "$CHOICE" in
-    " Area")
+    " 📐 Area")
         # Area screenshot with editing
         TIMESTAMP=$(date +%Y%m%d_%H%M%S)
         TEMP_FILE="/tmp/screenshot_$TIMESTAMP.png"
@@ -34,7 +34,7 @@ case "$CHOICE" in
         rm -f "$TEMP_FILE"
         ;;
         
-    " Screen")
+    " 🖥️ Screen")
         # Full screen screenshot
         TIMESTAMP=$(date +%Y%m%d_%H%M%S)
         sleep 0.5
@@ -43,7 +43,7 @@ case "$CHOICE" in
         notify-send -a 'Screenshot' "Screen screenshot saved!"
         ;;
         
-    " Window")
+    " 🪟 Window")
         # Window screenshot
         TIMESTAMP=$(date +%Y%m%d_%H%M%S)
         TEMP_FILE="/tmp/window_screenshot_$TIMESTAMP.png"

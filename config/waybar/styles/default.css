@@ -4,7 +4,7 @@
 * {
     border: none;
     border-radius: 0;
-    font-family: "Fira Code Medium";
+    font-family: "FiraCode Nerd Font";
     font-size: 15px;
     min-height: 0;
 }
@@ -17,13 +17,13 @@ window#waybar {
     background: @color1;
     margin: 5px;
     padding: 5px;
-    border-radius: 5px;
+    border-radius: 3px;
 }
 
 #workspaces button {
     padding: 0px 5px;
     color: @color0;
-    border-radius: 10px;
+    border-radius: 3px;
     font-size: 20px;
 }
 
@@ -34,14 +34,14 @@ window#waybar {
 
 #workspaces button:hover {
     background: @color0;
-    color: @color7;
+    color: @foreground;
 }
 
 #window {
     background: @color2;
     margin: 5px;
     padding: 5px;
-    border-radius: 5px;
+    border-radius: 3px;
     color: @color0;
 }
 
@@ -58,137 +58,176 @@ window#waybar {
 #backlight,
 #idle_inhibitor,
 #custom-media,
+#custom-media-prev,
+#custom-media-next,
 #custom-weather,
 #tray {
-    background: @background;
+    background: @color3;
     padding: 0px 10px;
     margin: 5px 0px;
-    border-radius: 10px;
+    border-radius: 3px;
+    color: @color0;
 }
 
 #clock {
-    color: @color6;
+    color: @color0;
     font-weight: bold;
 }
 
 /* Calendar tooltip styling */
 tooltip {
-    background: @background;
-    border: 1px solid @color1;
-    border-radius: 5px;
+    background: @color1;
+    border: 1px solid @color4;
+    border-radius: 3px;
 }
 
 tooltip label {
-    color: @foreground;
+    color: @color0;
 }
 
 calendar {
-    background: @background;
-    color: @foreground;
-}
-
-calendar:selected {
     background: @color1;
     color: @color0;
 }
 
+calendar:selected {
+    background: @color4;
+    color: @color0;
+}
+
 calendar.header {
-    color: @color1;
+    color: @color0;
     font-weight: bold;
 }
 
 calendar.button {
-    color: @color4;
+    color: @color0;
 }
 
 calendar.highlight {
-    color: @color5;
+    color: @color0;
     font-weight: bold;
 }
 
 #battery {
-    color: @color2;
+    color: @color0;
+    background: @color4;
 }
 
 #battery.charging {
-    color: @color3;
+    color: @color0;
+    background: @color5;
 }
 
 #battery.warning:not(.charging) {
-    color: @color5;
+    color: @color0;
+    background: @color6;
 }
 
 #battery.critical:not(.charging) {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
     animation: blink 0.5s linear infinite;
 }
 
 #cpu {
-    color: @color4;
+    color: @color0;
+    background: @color5;
 }
 
 #memory {
-    color: @color5;
+    color: @color0;
+    background: @color6;
 }
 
 #temperature {
-    color: @color3;
+    color: @color0;
+    background: @color2;
 }
 
 #temperature.critical {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
 }
 
 #network {
-    color: @color6;
+    color: @color0;
+    background: @color4;
 }
 
 #network.disconnected {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
 }
 
 #pulseaudio {
-    color: @color7;
+    color: @color0;
+    background: @color5;
 }
 
 #pulseaudio.muted {
-    color: @foreground;
+    color: @color0;
+    background: @color3;
 }
 
 #pulseaudio.microphone {
-    color: @color5;
+    color: @color0;
+    background: @color6;
 }
 
 #bluetooth {
-    color: @color4;
+    color: @color0;
+    background: @color4;
 }
 
 #bluetooth.off {
-    color: @foreground;
+    color: @color0;
+    background: @color3;
 }
 
 #disk {
-    color: @color3;
+    color: @color0;
+    background: @color2;
 }
 
 #backlight {
-    color: @color2;
+    color: @color0;
+    background: @color3;
 }
 
 #idle_inhibitor {
-    color: @color6;
+    color: @color0;
+    background: @color5;
 }
 
 #idle_inhibitor.activated {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
 }
 
 #custom-media {
-    color: @color5;
+    color: @color0;
+    background: @color6;
+    min-width: 100px;
+}
+
+#custom-media-prev,
+#custom-media-next {
+    color: @color0;
+    background: @color4;
+    min-width: 30px;
+    padding: 0px 5px;
+}
+
+#custom-media-prev:hover,
+#custom-media-next:hover {
+    color: @color0;
+    background: @color5;
 }
 
 #custom-weather {
-    color: @color6;
+    color: @color0;
+    background: @color7;
 }
 
 #tray {
@@ -198,6 +237,6 @@ calendar.highlight {
 @keyframes blink {
     to {
         background-color: @color1;
-        color: @background;
+        color: @foreground;
     }
 }

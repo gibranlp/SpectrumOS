@@ -4,49 +4,46 @@
 * {
     border: none;
     border-radius: 0;
-    font-family: "Fira Code Medium";
+    font-family: "FiraCode Nerd Font", "Font Awesome 6 Free", "Font Awesome 6 Brands";
     font-size: 15px;
+    font-weight: 600;
     min-height: 0;
 }
 
 window#waybar {
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.7);
 }
 
 #workspaces {
-    background: rgba(0, 0, 0, 0.4);
+    background: transparent;
     margin: 5px;
     padding: 5px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #workspaces button {
     padding: 0px 5px;
     color: @foreground;
-    border-radius: 10px;
     font-size: 20px;
     background: transparent;
 }
 
 #workspaces button.active {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
     color: @color4;
+    border-radius: 5px;
 }
 
 #workspaces button:hover {
     background: rgba(255, 255, 255, 0.1);
     color: @color6;
+    border-radius: 5px;
 }
 
 #window {
-    background: rgba(0, 0, 0, 0.4);
+    background: transparent;
     margin: 5px;
     padding: 5px;
-    border-radius: 8px;
     color: @foreground;
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #clock,
@@ -62,18 +59,19 @@ window#waybar {
 #backlight,
 #idle_inhibitor,
 #custom-media,
+#custom-media-prev,
+#custom-media-next,
 #custom-weather,
 #tray {
-    background: rgba(0, 0, 0, 0.4);
+    background: transparent;
     padding: 0px 10px;
     margin: 5px 0px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: @foreground;
 }
 
 #clock {
     color: @color6;
-    font-weight: bold;
+    font-weight: 700;
 }
 
 #battery {
@@ -155,6 +153,20 @@ window#waybar {
 
 #custom-media {
     color: @color5;
+    min-width: 100px;
+}
+
+#custom-media-prev,
+#custom-media-next {
+    color: @color4;
+    min-width: 30px;
+    padding: 0px 5px;
+}
+
+#custom-media-prev:hover,
+#custom-media-next:hover {
+    color: @color6;
+    background: rgba(255, 255, 255, 0.2);
 }
 
 #custom-weather {

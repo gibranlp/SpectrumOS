@@ -75,9 +75,6 @@ case $action in
         # Copy the result to the clipboard if "Copy" is selected
         echo -n $answer | awk '{$1=$1};1' | xsel -ib
         ;;
-    "")
-        # Do nothing if no option is selected
-        ;;
     *)
         # Pass the result and selected action as arguments if other options are selected
         $0 "$answer $action"

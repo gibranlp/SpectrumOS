@@ -42,6 +42,13 @@ function install_hyprland_config(){
     cp -rv ~/SpectrumOS/config/hypr/* $HOME/.config/hypr/
 }
 
+# Install Gromit config
+function install_gromit(){
+    mkdir -p $HOME/.config/gromit-mpx
+    cp -rv ~/SpectrumOS/config/gromit-mpx/* $HOME/.config/gromit-mpx/
+}
+
+
 # Install Limine Sync Files
 function install_limine_sync(){
     # Copy script
@@ -215,7 +222,7 @@ function install_zsh_config(){
 
 # Function to display usage information
 function usage() {
-    echo "Usage: $0 [--bin] [--cava] [--create-local] [--gowall] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--swappy] [--wal-templates] [--waybar] [--wofi] [--zsh]"
+    echo "Usage: $0 [--bin] [--cava] [--create-local] [--gowall] [--gromit] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--swappy] [--wal-templates] [--waybar] [--wofi] [--zsh]"
     exit 1
 }
 
@@ -238,6 +245,10 @@ for arg in "$@"; do
         --gowall)
             install_gowall_config
             ;;
+        --gromit)
+            install_gromit
+            ;;
+            
         --hypr)
             install_hyprland_config
             ;;

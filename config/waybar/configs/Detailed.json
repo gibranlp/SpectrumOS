@@ -5,7 +5,7 @@
     "spacing": 5,
     "modules-left": ["hyprland/workspaces", "hyprland/window"],
     "modules-center": ["clock"],
-    "modules-right": ["custom/weather", "disk", "cpu", "memory", "temperature", "network", "pulseaudio", "battery", "backlight", "idle_inhibitor", "tray"],
+    "modules-right": ["custom/weather", "disk", "cpu", "memory", "temperature", "network", "pulseaudio", "backlight", "battery", "idle_inhibitor", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "format-icons": {
@@ -35,18 +35,18 @@
     },
     "disk": {
         "interval": 30,
-        "format": " {percentage_used}%",
+        "format": "󰋊 {percentage_used}%",
         "path": "/"
     },
     "cpu": {
         "interval": 5,
-        "format": " {usage}%",
+        "format": "󰻠 {usage}%",
         "tooltip": true,
         "on-click": "kitty -e btop"
     },
     "memory": {
         "interval": 5,
-        "format": " {}%",
+        "format": "󰍛 {}%",
         "tooltip": true,
         "tooltip-format": "RAM: {used:0.1f}G / {total:0.1f}G\nSwap: {swapUsed:0.1f}G / {swapTotal:0.1f}G",
         "on-click": "kitty -e btop"
@@ -60,10 +60,10 @@
     },
     "network": {
         "interval": 5,
-        "format-wifi": " {signalStrength}%",
-        "format-ethernet": " {bandwidthDownBytes}",
-        "format-linked": " {ifname} (No IP)",
-        "format-disconnected": "⚠ Disconnected",
+        "format-wifi": "󰖩 {signalStrength}%",
+        "format-ethernet": "󰈀 {bandwidthDownBytes}",
+        "format-linked": "󰈀 {ifname} (No IP)",
+        "format-disconnected": "󰖪 Disconnected",
         "format-alt": "{ifname}: {ipaddr}/{cidr}",
         "tooltip-format": "{ifname} via {gwaddr}\n↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}",
         "on-click-right": "nm-connection-editor"
@@ -71,16 +71,16 @@
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "format-bluetooth": "{icon} {volume}%",
-        "format-bluetooth-muted": " {icon}",
-        "format-muted": " {volume}%",
+        "format-bluetooth-muted": "󰝟 {icon}",
+        "format-muted": "󰝟 {volume}%",
         "format-icons": {
-            "headphone": "",
-            "hands-free": "",
-            "headset": "",
-            "phone": "",
-            "portable": "",
-            "car": "",
-            "default": ["", "", ""]
+            "headphone": "󰋋",
+            "hands-free": "󰋎",
+            "headset": "󰋎",
+            "phone": "󰏲",
+            "portable": "󰏲",
+            "car": "󰄋",
+            "default": ["󰕿", "󰖀", "󰕾"]
         },
         "on-click": "pavucontrol"
     },
@@ -92,29 +92,29 @@
         },
         "interval": 10,
         "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": "󰚥 {capacity}%",
         "format-alt": "{icon} {time}",
-        "format-icons": ["", "", "", "", ""],
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
         "tooltip-format": "{timeTo}, {capacity}%\n{power}W"
     },
     "backlight": {
         "device": "intel_backlight",
         "format": "{icon} {percent}%",
-        "format-icons": ["", "", "", "", "", "", "", "", ""],
+        "format-icons": ["󰃞", "󰃟", "󰃠"],
         "on-scroll-up": "brightnessctl set 5%+",
         "on-scroll-down": "brightnessctl set 5%-"
     },
     "idle_inhibitor": {
         "format": "{icon}",
         "format-icons": {
-            "activated": "",
-            "deactivated": ""
+            "activated": "󰅶",
+            "deactivated": "󰾪"
         }
     },
     "clock": {
-        "format": "{:%H:%M}",
-        "format-alt": "{:%A, %B %d, %Y (%R)}",
+        "format": "󰥔 {:%H:%M}",
+        "format-alt": "󰃭 {:%A, %B %d, %Y (%R)}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "year",

@@ -4,7 +4,7 @@
     "height": 30,
     "spacing": 5,
     "modules-left": ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/media"],
+    "modules-center": ["custom/media-prev", "custom/media", "custom/media-next"],
     "modules-right": ["pulseaudio", "pulseaudio#microphone", "bluetooth", "battery", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
@@ -26,17 +26,28 @@
         "max-length": 50,
         "separate-outputs": true
     },
+    "custom/media-prev": {
+        "format": "",
+        "on-click": "playerctl previous",
+        "tooltip": false
+    },
     "custom/media": {
-        "format": "{icon} {}",
+        "format": "{}",
         "return-type": "json",
-        "max-length": 40,
-        "format-icons": {
-            "spotify": "",
-            "default": "🎜"
-        },
+        "max-length": 60,
         "escape": true,
         "exec": "$HOME/.config/waybar/scripts/mediaplayer.py 2> /dev/null",
-        "on-click": "playerctl play-pause"
+        "on-click": "playerctl play-pause",
+        "on-click-right": "playerctl stop",
+        "on-scroll-up": "playerctl next",
+        "on-scroll-down": "playerctl previous",
+        "smooth-scrolling-threshold": 1,
+        "interval": 2
+    },
+    "custom/media-next": {
+        "format": "",
+        "on-click": "playerctl next",
+        "tooltip": false
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",

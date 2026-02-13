@@ -33,7 +33,7 @@ while true; do
             pw=$(generate_pw)
             ;;
         "Copy"|"")
-            echo -n "$pw" | xsel -ib
+            echo -n "$pw" | wl-copy
             notify-send -a "󰟵 PassGen" "$pw copied"
             break
             ;;

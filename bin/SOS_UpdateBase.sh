@@ -7,7 +7,7 @@
 # SpectrumOS - Embrace the Chromatic Symphony!
 # By: gibranlp <thisdoesnotwork@gibranlp.dev>
 # MIT licence 
-
+ROFI_THEME="~/.config/rofi/SOS_Right.rasi"
 FONT="Courier Prime Medium 13"
 
 # Notification ID for persistent updates

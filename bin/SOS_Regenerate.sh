@@ -10,7 +10,9 @@
 # Regenerate GTK QT and icon themes
 
 /usr/share/spectrumos/scripts/SOS_PywalThemix.sh
+dunstify -a "SpectrumOS" -t 1000 "GTK, QT Regenerated"
+
 /usr/share/spectrumos/scripts/SOS_ReloadIcons.sh
 
 # Send notification with thumbnail
-dunstify -a "SpectrumOS" -t 1000 "GTK, QT, Icons Regenerated"
+dunstify -a "SpectrumOS" -t 1000 "Icons Regenerated"
