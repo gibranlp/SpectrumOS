@@ -1,12 +1,9 @@
 #!/bin/bash
 # SpectrumOS Installation Script
 # Installs all dependencies and software for SpectrumOS
+# Focused on AMD CPU/GPU and Gaming
 
 set -e
-
-echo "🌈 SpectrumOS Installation Script"
-echo "=================================="
-echo ""
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -14,11 +11,31 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+echo -e "${BLUE}🌈 SpectrumOS Installation Script${NC}"
+echo "=================================="
+echo ""
+
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then 
     echo -e "${RED}Please do not run as root${NC}"
     exit 1
 fi
+
+# Enable multilib
+if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
+    echo -e "${BLUE}Enabling multilib repository...${NC}"
+    sudo sed -i '/^#\[multilib\]/,+1 s/^#//' /etc/pacman.conf
+    sudo pacman -Sy
+    echo -e "${GREEN}✓ multilib enabled${NC}"
+else
+    echo -e "${GREEN}✓ multilib already enabled${NC}"
+fi
+
+# Install base-devel and git
+echo -e "${BLUE}Installing base-devel and git...${NC}"
+sudo pacman -S --needed --noconfirm base-devel git
 
 # Check if yay is installed
 if ! command -v yay &> /dev/null; then
@@ -37,236 +54,254 @@ echo ""
 echo -e "${BLUE}Updating system...${NC}"
 yay -Syu --noconfirm
 
-echo ""
-echo -e "${BLUE}Installing Hyprland ecosystem...${NC}"
-yay -S --needed --noconfirm \
-    hyprland \
-    hyprpaper \
-    hypridle \
-    hyprlock \
-    xdg-desktop-portal-hyprland \
-    xdg-desktop-portal-gtk \
-    qt5-wayland \
-    qt6-wayland \
-    limine \
-    limine-mkinitcpio-hook \
-    tlp \
-    tlp-rdw \
-    powertop \
-    acpi \
-    acpi_call \
-    intel-ucode \
-    thermald \
-    cpupower  \
-    ffmpeg \
-    vlc \
-    lame \
-    libmad \
-    x264 \
-    x265 \
-    gvfs-smb \
-    gvfs-mtp \
-    gvfs-nfs
-
-echo ""
-echo -e "${BLUE}Installing Waybar and dependencies...${NC}"
-yay -S --needed --noconfirm \
-    waybar \
-    otf-font-awesome \
-    ttf-jetbrains-mono-nerd \
-    ttf-firacode-nerd \
-    noto-fonts \
-    noto-fonts-emoji \
-    poddl \
-    cmus \
-    cmus-notify \ 
-    locate \
-    ail-cli \
-    themix-full-git \
-    hyprpicker \
-    python-pillow \
-    python-cairosvg
-
-
-echo ""
-echo -e "${BLUE}Installing terminal and launcher...${NC}"
-yay -S --needed --noconfirm \
-    kitty \
-    wofi \
-    mako \
-    dunst
-
-echo ""
-echo -e "${BLUE}Installing pywal and theming tools...${NC}"
-yay -S --needed --noconfirm \
-    python-pywal16 \
-    imagemagick \
-    swww \
-    wpaperd \
-    python-pywalfox \
-    colorz \
-    python-colorthief \
-    python-haishoku \
-    python-modern-colorthief \
-    gowall \
-    nwg-display \
-    plymouth
-
-echo ""
-echo -e "${BLUE}Installing utilities...${NC}"
-yay -S --needed --noconfirm \
-    grim \
-    slurp \
-    swappy \
-    wl-clipboard \
-    cliphist \
-    brightnessctl \
-    pamixer \
-    playerctl \
-    btop \
-    htop \
-    neofetch \
-    walogram \
-    google-chrome \
+# Package lists
+SYSTEM_PKGS=(
+    # Boot & Hardware
+    "amd-ucode"
+    "limine"
+    "limine-mkinitcpio-hook"
+    "plymouth"
+    "tlp"
+    "tlp-rdw"
+    "acpi"
+    "acpi_call"
+    "cpupower"
     
+    # AMD Graphics
+    "mesa"
+    "lib32-mesa"
+    "vulkan-radeon"
+    "lib32-vulkan-radeon"
+    "libva-mesa-driver"
+    "lib32-libva-mesa-driver"
+    "mesa-vdpau"
+    "lib32-mesa-vdpau"
+    "xf86-video-amdgpu"
+    
+    # Desktop Environment
+    "hyprland"
+    "hyprpaper"
+    "hypridle"
+    "hyprlock"
+    "hyprpicker"
+    "xdg-desktop-portal-hyprland"
+    "xdg-desktop-portal-gtk"
+    "qt5-wayland"
+    "qt6-wayland"
+    "qt5ct"
+    "qt6ct"
+    "kvantum"
+    "waybar"
+    "rofi-wayland"
+    "dunst"
+    "libnotify"
+    "swww"
+    "swappy"
+    "grim"
+    "slurp"
+    "wl-clipboard"
+    "cliphist"
+    "brightnessctl"
+    "pamixer"
+    "playerctl"
+    "nwg-display"
+    
+    # Shell & Terminal
+    "kitty"
+    "zsh"
+    "zsh-completions"
+    "zsh-syntax-highlighting"
+    "zsh-autosuggestions"
+    "starship"
+    "fzf"
+    "zoxide"
+    "eza"
+    "bat"
+    "fd"
+    "ripgrep"
+    "thefuck"
+    
+    # System Utilities
+    "networkmanager"
+    "network-manager-applet"
+    "bluez"
+    "bluez-utils"
+    "blueman"
+    "pavucontrol"
+    "pipewire"
+    "pipewire-pulse"
+    "pipewire-alsa"
+    "pipewire-jack"
+    "wireplumber"
+    "libldac"
+    "gvfs"
+    "gvfs-mtp"
+    "gvfs-smb"
+    "gvfs-nfs"
+    "tumbler"
+    "file-roller"
+    "unzip"
+    "unrar"
+    "p7zip"
+    "rsync"
+    "wget"
+    "curl"
+    "btop"
+    "htop"
+    "neofetch"
+    "locate"
+    "imagemagick"
+    
+    # File Manager
+    "thunar"
+    "thunar-volman"
+    "thunar-archive-plugin"
+    "yazi"
+    "ranger"
+    "ntfs-3g"
+    
+    # Display Manager
+    "sddm"
+    "qt5-graphicaleffects"
+    "qt5-quickcontrols2"
+    "qt5-svg"
+)
 
-echo ""
-echo -e "${BLUE}Installing file managers...${NC}"
-yay -S --needed --noconfirm \
-    thunar-extended \
-    thunar-volman \
-    thunar-archive-plugin \
-    gvfs \
-    gvfs-mtp \
-    file-roller \
-    ranger \
-    yazi \
-    ntfs-3g \
-    tumbler
+THEMING_PKGS=(
+    "python-pywal16"
+    "python-pywalfox"
+    "colorz"
+    "python-colorthief"
+    "python-haishoku"
+    "python-modern-colorthief"
+    "gowall"
+    "walogram"
+    "themix-full-git"
+    "python-pillow"
+    "python-cairosvg"
+    "papirus-icon-theme"
+    "breeze-gtk"
+    "breeze-icons"
+    "adwaita-qt5"
+    "adwaita-qt6"
+    "bibata-cursor-theme"
+)
 
-echo ""
-echo -e "${BLUE}Installing development tools...${NC}"
-yay -S --needed --noconfirm \
-    visual-studio-code-bin \
-    docker \
-    docker-compose \
-    nodejs \
-    npm \
-    python \
-    python-pip \
-    hugo \
-    xsel
+FONTS_PKGS=(
+    "otf-font-awesome"
+    "ttf-jetbrains-mono-nerd"
+    "ttf-firacode-nerd"
+    "noto-fonts"
+    "noto-fonts-emoji"
+)
 
-echo ""
-echo -e "${BLUE}Installing communication apps...${NC}"
-yay -S --needed --noconfirm \
-    telegram-desktop \
-    discord \
-    whatsapp-for-linux \
-    insect \ 
+GAMING_PKGS=(
+    "steam"
+    "lutris"
+    "wine-staging"
+    "winetricks"
+    "gamemode"
+    "lib32-gamemode"
+    "mangohud"
+    "lib32-mangohud"
+    "gamescope"
+    "vkbasalt"
+    "goverlay"
+    "proton-ge-custom"
+)
 
+APPS_PKGS=(
+    "firefox"
+    "google-chrome"
+    "visual-studio-code-bin"
+    "docker"
+    "docker-compose"
+    "nodejs"
+    "npm"
+    "python"
+    "python-pip"
+    "hugo"
+    "telegram-desktop"
+    "discord"
+    "whatsapp-for-linux"
+    "bitwarden"
+    "gimp"
+    "kdenlive"
+    "mpv"
+    "vlc"
+    "imv"
+    "feh"
+    "kdeconnect"
+    "yt-dlp"
+    "transmission-gtk"
+    "gemini-cli"
+    "claude-code"
+    "archiso"
+)
 
-echo ""
-echo -e "${BLUE}Installing productivity apps...${NC}"
-yay -S --needed --noconfirm \
-    bitwarden \
-    firefox
+echo -e "${BLUE}Installing System packages...${NC}"
+yay -S --needed --noconfirm "${SYSTEM_PKGS[@]}"
 
-echo ""
-echo -e "${BLUE}Installing media tools...${NC}"
-yay -S --needed --noconfirm \
-    gimp \
-    kdenlive \
-    transmission-cli \
-    yt-dlp \
-    mpv \
-    imv \
-    feh \ 
-    kdeconnect
+echo -e "${BLUE}Installing Theming packages...${NC}"
+yay -S --needed --noconfirm "${THEMING_PKGS[@]}"
 
-echo ""
-echo -e "${BLUE}Installing system tools...${NC}"
-yay -S --needed --noconfirm \
-    networkmanager \
-    network-manager-applet \
-    bluez \
-    bluez-utils \
-    blueman \
-    pavucontrol \
-    pipewire \
-    pipewire-pulse \
-    pipewire-alsa \
-    pipewire-jack \
-    wireplumber \
-    pipewire-pulse \ 
-    libldac
+echo -e "${BLUE}Installing Fonts...${NC}"
+yay -S --needed --noconfirm "${FONTS_PKGS[@]}"
 
-echo ""
-echo -e "${BLUE}Installing SDDM and themes...${NC}"
-yay -S --needed --noconfirm \
-    sddm \
-    qt5-graphicaleffects \
-    qt5-quickcontrols2 \
-    qt5-svg
+echo -e "${BLUE}Installing Gaming packages...${NC}"
+yay -S --needed --noconfirm "${GAMING_PKGS[@]}"
 
-echo ""
-echo -e "${BLUE}Installing fonts and themes...${NC}"
-yay -S --needed --noconfirm \
-    papirus-icon-theme \
-    breeze-gtk \
-    breeze-icons \
-    adwaita-qt5 \
-    adwaita-qt6
-
-echo ""
-echo -e "${BLUE}Installing additional utilities...${NC}"
-yay -S --needed --noconfirm \
-    ripgrep \
-    fd \
-    eza \
-    bat \
-    fzf \
-    zoxide \
-    starship \
-    thefuck \
-    unzip \
-    unrar \
-    p7zip \
-    rsync \
-    wget \
-    curl \
-    grimblast \ 
-    swappy \
-    qt5ct \
-    qt6ct \
-    kvantum
-
-
-function install_pip(){
-    pip install -r pip_dependencies.txt --break-system-packages --ignore-requires-python
-}
+echo -e "${BLUE}Installing Apps...${NC}"
+yay -S --needed --noconfirm "${APPS_PKGS[@]}"
 
 # Enable services
-echo ""
 echo -e "${BLUE}Enabling services...${NC}"
 sudo systemctl enable NetworkManager
 sudo systemctl enable bluetooth
 sudo systemctl enable sddm
+sudo systemctl enable tlp
+sudo systemctl enable docker
 
 # Docker setup
-echo ""
-echo -e "${BLUE}Setting up Docker...${NC}"
-sudo systemctl enable docker
 sudo usermod -aG docker $USER
 echo -e "${GREEN}✓ Added $USER to docker group${NC}"
 
+# Set ZSH as default shell
+if [ "$SHELL" != "/usr/bin/zsh" ]; then
+    echo -e "${BLUE}Setting ZSH as default shell...${NC}"
+    sudo chsh -s /usr/bin/zsh $USER
+fi
+
+# Install oh-my-zsh
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    echo -e "${BLUE}Installing oh-my-zsh...${NC}"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+fi
+
+# Install zsh plugins
+echo -e "${BLUE}Installing zsh plugins...${NC}"
+ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
+mkdir -p "$ZSH_CUSTOM/plugins"
+
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
+    git clone https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+fi
+
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+fi
+
+# Run setup scripts
+echo -e "${BLUE}Creating directory structure...${NC}"
+bash "$SCRIPT_DIR/setup-dirs.sh"
+
+echo -e "${BLUE}Deploying configurations...${NC}"
+bash "$SCRIPT_DIR/dots.sh" --all
+
 echo ""
 echo -e "${GREEN}=================================="
-echo "✓ Installation Complete!"
+echo "✓ SpectrumOS Installation Complete!"
 echo "==================================${NC}"
 echo ""
-echo "Next steps:"
-echo "1. Reboot your system"
-echo "2. Run ./setup-configs.sh to deploy SpectrumOS configs"
+echo "Please reboot your system to apply all changes."
 echo ""
-echo -e "${BLUE}Note: You may need to logout/login for docker group to take effect${NC}"

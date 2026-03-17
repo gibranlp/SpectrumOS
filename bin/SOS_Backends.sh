@@ -53,16 +53,8 @@ function set_wallpaper(){
     CONFIG_FILE="/etc/spectrumos/spectrumos.conf"
     [ ! -f "$CONFIG_FILE" ] && echo "Missing config" && exit 1
     source "$CONFIG_FILE"
-    
-    # Pywal
-    if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    else
-        wal -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    fi
 
-    # Apply wallpaper
-    swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+    GOWALL_OUTPUT="/var/lib/spectrumos/current.png"
 
     # Pywal
     if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
@@ -71,10 +63,14 @@ function set_wallpaper(){
         wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
     fi
 
+    # Apply wallpaper
+    swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+
     # Update configs
     python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py
     rm -f /var/lib/spectrumos/colors.conf
     cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
+...
 
     cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
     pkill dunst; dunst &

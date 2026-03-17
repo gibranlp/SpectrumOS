@@ -7,222 +7,216 @@
 # SpectrumOS - Embrace the Chromatic Symphony!
 # By: gibranlp <thisdoesnotwork@gibranlp.dev>
 # MIT licence 
-# 
-#
+
+# Get the directory where the script is located
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 # Install Bin files
 function install_bin(){
+    echo -e "${BLUE}Installing SpectrumOS scripts...${NC}"
     sudo mkdir -p /usr/share/spectrumos/scripts/
-    cd /usr/share/spectrumos/scripts/
-    sudo rm /usr/share/spectrumos/scripts/*
-    sudo cp -rv ~/SpectrumOS/bin/* /usr/share/spectrumos/scripts/
+    sudo cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
     sudo chmod +x /usr/share/spectrumos/scripts/*
+    echo -e "${GREEN}✓ Scripts installed to /usr/share/spectrumos/scripts/${NC}"
 }
 
-# Install Cava config
-function install_cava_config(){
-    mkdir -p $HOME/.config/cava/
-} 
-
-# Install variables
+# Create local files and directories
 function create_local_files(){
+    echo -e "${BLUE}Creating local directories...${NC}"
     sudo mkdir -pv /usr/local/spectrumos
     sudo chown -R $USER:$USER /usr/local/spectrumos
+
+    mkdir -p $HOME/.config/cava/
+    mkdir -p $HOME/.config/gowall/
+    mkdir -p $HOME/.config/hypr
+    mkdir -p $HOME/.config/gromit-mpx
+    mkdir -p $HOME/.config/rofi
+    mkdir -p $HOME/.config/swappy
+    mkdir -p $HOME/.config/wal/templates
+    mkdir -p $HOME/.config/waybar
+    mkdir -p $HOME/.config/kitty
+    mkdir -p $HOME/.config/nvim
 }
 
 # Install GOWall config
 function install_gowall_config(){
-    mkdir -p $HOME/.config/gowall/
-    cp -rv ~/SpectrumOS/config/gowall/* $HOME/.config/gowall/
+    echo -e "${BLUE}Installing GOWall config...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/gowall/* $HOME/.config/gowall/
 }
 
 # Install hyprland configs
 function install_hyprland_config(){
-    mkdir -p $HOME/.config/hypr
-    cp -rv ~/SpectrumOS/config/hypr/* $HOME/.config/hypr/
+    echo -e "${BLUE}Installing Hyprland configs...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/hypr/* $HOME/.config/hypr/
 }
 
 # Install Gromit config
 function install_gromit(){
-    mkdir -p $HOME/.config/gromit-mpx
-    cp -rv ~/SpectrumOS/config/gromit-mpx/* $HOME/.config/gromit-mpx/
+    echo -e "${BLUE}Installing Gromit-MPX config...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/gromit-mpx/* $HOME/.config/gromit-mpx/
 }
-
 
 # Install Limine Sync Files
 function install_limine_sync(){
+    echo -e "${BLUE}Installing Limine Sync...${NC}"
     # Copy script
-    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.sh /usr/local/bin/
+    sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.sh /usr/local/bin/
     sudo chmod +x /usr/local/bin/spectrumos-limine-sync.sh
 
     # Copy Systemd Service and Path
-    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.service /etc/systemd/system/
-    sudo cp -v ~/SpectrumOS/limine/spectrumos-limine-sync.path /etc/systemd/system/
+    sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.service /etc/systemd/system/
+    sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.path /etc/systemd/system/
 
-    #Pacman Hooks
+    # Pacman Hooks
     sudo mkdir -p /etc/pacman.d/hooks
-    sudo cp ~/SpectrumOS/etc/pacman.d/hooks/95-spectrumos-limine.hook /etc/pacman.d/hooks/
+    sudo cp "$SCRIPT_DIR"/etc/pacman.d/hooks/95-spectrumos-limine.hook /etc/pacman.d/hooks/
     sudo mkdir -p /etc/kernel
-    sudo cp ~/SpectrumOS/etc/kernel/install.conf /etc/kernel/
+    sudo cp "$SCRIPT_DIR"/etc/kernel/install.conf /etc/kernel/
 
     # Enable path Watcher
     sudo systemctl daemon-reload
     sudo systemctl enable spectrumos-limine-sync.path
     sudo systemctl start spectrumos-limine-sync.path
+    echo -e "${GREEN}✓ Limine sync installed and enabled${NC}"
 }
 
-
 function install_plymouth(){
-    # Install Plymouth
-    yay -S plymouth --noconfirm
-    
+    echo -e "${BLUE}Installing Plymouth theme...${NC}"
     # Copy theme to Plymouth themes directory
-    sudo cp -rv ~/SpectrumOS/plymouth/themes/spectrumos /usr/share/plymouth/themes/
-    
+    sudo mkdir -p /usr/share/plymouth/themes/
+    sudo cp -rv "$SCRIPT_DIR"/plymouth/themes/spectrumos /usr/share/plymouth/themes/
+
     # Set the default theme
     sudo plymouth-set-default-theme -R spectrumos
-    
+
     # Add Plymouth hook to mkinitcpio
-    # Backup original mkinitcpio.conf
-    sudo cp /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
-    
-    # Check if plymouth is already in HOOKS, if not add it
     if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
         sudo sed -i 's/HOOKS=(base udev/HOOKS=(base udev plymouth/' /etc/mkinitcpio.conf
         echo "Plymouth hook added to mkinitcpio.conf"
-    else
-        echo "Plymouth hook already present in mkinitcpio.conf"
     fi
-    
-    # Reload systemd daemon
-    sudo systemctl daemon-reload
-    
+
     sudo mkdir -p /etc/pacman.d/hooks
-    sudo cp ~/SpectrumOS/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/plymouth-quit-fix.hook
+    sudo cp "$SCRIPT_DIR"/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/plymouth-quit-fix.hook
 
     # Regenerate initramfs
     sudo mkinitcpio -P
-    
-    # Update GRUB configuration (if using GRUB)
-    if [ -f /etc/default/grub ]; then
-        sudo cp /etc/default/grub /etc/default/grub.backup
-        
-        # Add quiet splash to kernel parameters if not present
-        if ! grep -q "quiet splash" /etc/default/grub; then
-            sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash /' /etc/default/grub
-            echo "Added 'quiet splash' to GRUB parameters"
-        fi
-        
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
-        echo "GRUB configuration updated"
-    fi
-    
-    # If using systemd-boot instead
-    if [ -d /boot/loader/entries ]; then
-        if [ -d /boot/loader/entries ]; then
-            echo "Detected systemd-boot. Updating boot entries..."
-            
-            # Backup all entry files
-            sudo cp -r /boot/loader/entries /boot/loader/entries.backup
-            
-            # Add quiet splash to all entry files if not present
-            for entry in /boot/loader/entries/*.conf; do
-                if [ -f "$entry" ]; then
-                    # Check if quiet splash is already present
-                    if ! grep -q "quiet splash" "$entry"; then
-                        # Add quiet splash to the options line
-                        sudo sed -i '/^options/ s/$/ quiet splash/' "$entry"
-                        echo "Added 'quiet splash' to $(basename $entry)"
-                    else
-                        echo "'quiet splash' already present in $(basename $entry)"
-                    fi
-                fi
-            done
-            
-            echo "systemd-boot entries updated!"
-        fi
-    fi
-    
-    echo "Plymouth installation complete! Reboot to see the boot splash."
+    echo -e "${GREEN}✓ Plymouth theme installed and initramfs regenerated${NC}"
 }
 
 # Install ROFI themes
 function install_rofi_themes(){
-    mkdir -p $HOME/.config/rofi/
-    cp -rv ~/SpectrumOS/config/rofi/* $HOME/.config/rofi/
+    echo -e "${BLUE}Installing Rofi themes...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/rofi/* $HOME/.config/rofi/
 }
 
 # Install SDDM Theme
 function install_sddm_theme(){
-    sudo mkdir -p /usr/local/spectrumos
-    sudo chown -R $USER:$USER /usr/local/spectrumos
+    echo -e "${BLUE}Installing SDDM theme...${NC}"
     sudo mkdir -p /usr/share/sddm/themes/spectrumos
-    sudo cp -rv ~/SpectrumOS/sddm/themes/spectrumos/* /usr/share/sddm/themes/spectrumos/
+    sudo cp -rv "$SCRIPT_DIR"/sddm/themes/spectrumos/* /usr/share/sddm/themes/spectrumos/
+
+    # Configure SDDM to use the theme
+    if [ -f /etc/sddm.conf ]; then
+        sudo cp /etc/sddm.conf /etc/sddm.conf.bak
+    fi
+    sudo cp "$SCRIPT_DIR"/etc/sddm.conf /etc/sddm.conf
 }
 
 # Install Spectrum Config Files
 function install_spectrum_config(){
+    echo -e "${BLUE}Installing SpectrumOS system configs...${NC}"
     sudo mkdir -p /etc/spectrumos
-    sudo chown -R $USER:$USER /etc/spectrumos
-    sudo chmod 777 /etc/spectrumos
-    cp -rv ~/SpectrumOS/etc/spectrumos/* /etc/spectrumos/
+    sudo cp -rv "$SCRIPT_DIR"/etc/spectrumos/* /etc/spectrumos/
+    sudo chmod -R 777 /etc/spectrumos
 }
 
 # Install Swappy config
 function install_swappy_config(){
-    mkdir -p $HOME/.config/swappy
-    cp -rv ~/SpectrumOS/config/swappy/* $HOME/.config/swappy/
+    echo -e "${BLUE}Installing Swappy config...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/swappy/* $HOME/.config/swappy/
 }
 
 # Install TLP
 function install_tlp(){
-    sudo cp -v ~/SpectrumOS/etc/tlp.conf /etc/tlp.conf
-
-    # Enable TLP
+    echo -e "${BLUE}Installing TLP config...${NC}"
+    sudo cp -v "$SCRIPT_DIR"/etc/tlp.conf /etc/tlp.conf
     sudo systemctl enable tlp.service
     sudo systemctl start tlp.service
-
-    # Enable TLP's Bluetooth, WiFi, and WWAN soft blocking
-    sudo systemctl enable NetworkManager-dispatcher.service
-    sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
-
-    # Enable thermald
-    sudo systemctl enable thermald.service
-    sudo systemctl start thermald.service
-}
-
-# Install Variables file
-function install_variables(){
-    cp ~/SpectrumOS/etc/spectrumos/spectrumos.conf /etc/spectrumos/
 }
 
 # Install Wal Templates
 function install_wal_templates(){
-    mkdir -p $HOME/.config/wal/templates
-    cp -rv ~/SpectrumOS/config/wal/templates/* $HOME/.config/wal/templates/
+    echo -e "${BLUE}Installing Wal templates...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/wal/templates/* $HOME/.config/wal/templates/
 }
 
 # Install Waybar config
 function install_waybar_config(){
-    mkdir -p $HOME/.config/waybar
-    cp -rv ~/SpectrumOS/config/waybar/* $HOME/.config/waybar/
+    echo -e "${BLUE}Installing Waybar configs...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/waybar/* $HOME/.config/waybar/
 }
 
-# Install Wofi configs
-function install_wofi_config(){
-    mkdir -p $HOME/.config/wofi
-    cp -rv ~/SpectrumOS/config/wofi/* $HOME/.config/wofi/
+# Install Kitty config
+function install_kitty_config(){
+    echo -e "${BLUE}Installing Kitty config...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/kitty/* $HOME/.config/kitty/
+}
+
+# Install Neovim config
+function install_nvim_config(){
+    echo -e "${BLUE}Installing Neovim config...${NC}"
+    cp -rv "$SCRIPT_DIR"/config/nvim/* $HOME/.config/nvim/
 }
 
 # Install ZSH config
 function install_zsh_config(){
-    cp -rv ~/SpectrumOS/config/zsh/.zshrc $HOME/
+    echo -e "${BLUE}Installing ZSH config...${NC}"
+    cp -v "$SCRIPT_DIR"/config/zsh/.zshrc $HOME/
 }
 
+function install_all(){
+    create_local_files
+    install_bin
+    install_gowall_config
+    install_hyprland_config
+    install_gromit
+    install_limine_sync
+    install_plymouth
+    install_rofi_themes
+    install_sddm_theme
+    install_spectrum_config
+    install_swappy_config
+    install_tlp
+    install_wal_templates
+    install_waybar_config
+    install_kitty_config
+    install_nvim_config
+    install_zsh_config
+    echo -e "${GREEN}✓ All configurations deployed!${NC}"
+}
 
 # Function to display usage information
 function usage() {
-    echo "Usage: $0 [--bin] [--cava] [--create-local] [--gowall] [--gromit] [--hypr] [--limine][--plymouth] [--rofi] [--sddm] [--swappy] [--wal-templates] [--waybar] [--wofi] [--zsh]"
+    echo "Usage: $0 [OPTION]"
+    echo "Options:"
+    echo "  --all            Deploy all configurations"
+    echo "  --bin            Install scripts to /usr/share/spectrumos/scripts/"
+    echo "  --hypr           Install Hyprland configs"
+    echo "  --waybar         Install Waybar configs"
+    echo "  --rofi           Install Rofi themes"
+    echo "  --sddm           Install SDDM theme"
+    echo "  --plymouth       Install Plymouth theme"
+    echo "  --limine         Install Limine sync files"
+    echo "  --zsh            Install ZSH config"
+    echo "  --kitty          Install Kitty config"
+    echo "  --nvim           Install Neovim config"
+    echo "  --spectrum       Install SpectrumOS system configs"
     exit 1
 }
 
@@ -233,11 +227,11 @@ fi
 
 for arg in "$@"; do
     case $arg in
+        --all)
+            install_all
+            ;;
         --bin)
             install_bin
-            ;;
-        --cava)
-            install_cava_config
             ;;
         --create-local)
             create_local_files
@@ -248,7 +242,6 @@ for arg in "$@"; do
         --gromit)
             install_gromit
             ;;
-            
         --hypr)
             install_hyprland_config
             ;;
@@ -273,11 +266,20 @@ for arg in "$@"; do
         --waybar)
             install_waybar_config
             ;;
-        --wofi)
-            install_wofi_config
+        --kitty)
+            install_kitty_config
+            ;;
+        --nvim)
+            install_nvim_config
             ;;
         --zsh)
             install_zsh_config
+            ;;
+        --spectrum)
+            install_spectrum_config
+            ;;
+        *)
+            usage
             ;;
     esac
 done
