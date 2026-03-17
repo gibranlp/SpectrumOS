@@ -134,4 +134,8 @@ no_selection_tint=false
 EOF
 
 # Set as active theme
-kvantummanager --set Pywal 2>/dev/null || true
+if command -v kvantummanager &> /dev/null; then
+    kvantummanager --set Pywal 2>/dev/null || true
+else
+    echo "kvantummanager not found. Kvantum theme generated but not activated."
+fi

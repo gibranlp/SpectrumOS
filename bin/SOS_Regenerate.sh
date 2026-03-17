@@ -8,7 +8,8 @@
 # By: gibranlp <thisdoesnotwork@gibranlp.dev>
 # MIT licence 
 # Regenerate GTK QT and icon themes
-
+/usr/share/spectrumos/scripts/SOS_PywalGTK.sh
+/usr/share/spectrumos/scripts/SOS_PywalQT.sh
 /usr/share/spectrumos/scripts/SOS_PywalThemix.sh
 dunstify -a "SpectrumOS" -t 1000 "GTK, QT Regenerated"
 

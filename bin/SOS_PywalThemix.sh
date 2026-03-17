@@ -42,6 +42,12 @@ EOF
 echo "Generated oomox config:"
 cat "$HOME/.config/oomox/colors/pywal"
 
+# Check if oomox-cli is installed
+if ! command -v oomox-cli &> /dev/null; then
+    echo "oomox-cli (Themix) not found. Skipping full GTK theme generation."
+    exit 0
+fi
+
 # Generate the theme
 oomox-cli -o "$THEME_NAME" -m all "$HOME/.config/oomox/colors/pywal"
 

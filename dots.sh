@@ -76,7 +76,11 @@ function install_gromit() { deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME
 function install_rofi_themes() { deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"; }
 function install_swappy_config() { deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"; }
 function install_wal_templates() { deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"; }
-function install_waybar_config() { deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"; }
+function install_waybar_config() { 
+    deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
+    # Replace hardcoded home path in waybar CSS
+    find "$HOME/.config/waybar" -name "*.css" -exec sed -i "s|/home/gibranlp|$HOME|g" {} +
+}
 function install_kitty_config() { deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"; }
 function install_nvim_config() { deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"; }
 function install_zsh_config() { deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"; }
@@ -86,6 +90,12 @@ function install_mimeapps() { deploy_config "$SCRIPT_DIR/config/mimeapps.list" "
 # Install Limine Sync Files
 function install_limine_sync(){
     echo -e "${BLUE}Installing Limine Sync...${NC}"
+    # Check if /boot/limine.conf exists, if not, copy the example
+    if [ ! -f /boot/limine.conf ]; then
+        echo -e "${BLUE}No limine.conf found in /boot/, installing default...${NC}"
+        sudo cp -v "$SCRIPT_DIR"/limine/limine.conf.example /boot/limine.conf
+    fi
+
     # Copy script
     sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.sh /usr/local/bin/
     sudo chmod +x /usr/local/bin/spectrumos-limine-sync.sh
@@ -118,7 +128,7 @@ function install_plymouth(){
 
     # Add Plymouth hook to mkinitcpio
     if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
-        sudo sed -i 's/HOOKS=(base udev/HOOKS=(base udev plymouth/' /etc/mkinitcpio.conf
+        sudo sed -i 's/\(HOOKS=.*\)udev/\1udev plymouth/' /etc/mkinitcpio.conf
         echo "Plymouth hook added to mkinitcpio.conf"
     fi
 

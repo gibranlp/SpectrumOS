@@ -103,9 +103,9 @@ SYSTEM_PKGS=(
 )
 
 THEMING_PKGS=(
-    "aur/python-pywal16" "aur/python-pywalfox" "aur/colorz" "python-colorthief" "aur/python-haishoku" "aur/modern-colorthief" "aur/gowall" "aur/walogram-git" "python-pillow" "python-cairosvg" "papirus-icon-theme" "breeze-gtk" "breeze-icons" "aur/adwaita-qt5" "aur/adwaita-qt6" "aur/bibata-cursor-theme"
+    "aur/python-pywal16" "aur/python-pywalfox" "aur/colorz" "python-colorthief" "aur/python-haishoku" "aur/gowall" "aur/walogram-git" "python-pillow" "python-cairosvg" "papirus-icon-theme" "breeze-gtk" "breeze-icons" "aur/adwaita-qt5" "aur/adwaita-qt6" "aur/bibata-cursor-theme"
 )
-# Add themix only if space allows (it is massive)
+# Add themix only if space allows (it is massive, used for GTK/QT theme generation)
 if [ "$SKIP_HEAVY" = false ]; then
     THEMING_PKGS+=("aur/themix-full-git")
 fi
@@ -180,6 +180,27 @@ fi
 echo -e "${BLUE}Enabling services...${NC}"
 sudo systemctl enable NetworkManager bluetooth sddm tlp docker
 sudo usermod -aG docker $USER
+
+# Finalize Theming
+echo -e "${BLUE}Initializing SpectrumOS theme...${NC}"
+mkdir -p "$HOME/Pictures/Wallpapers"
+DEFAULT_WALLPAPER="$SCRIPT_DIR/sddm/themes/spectrumos/Previews/Mockup.jpg"
+if [ -f "$DEFAULT_WALLPAPER" ]; then
+    cp "$DEFAULT_WALLPAPER" "$HOME/Pictures/Wallpapers/SpectrumOS_Default.jpg"
+    sudo mkdir -p /var/lib/spectrumos
+    sudo chown -R $USER:$USER /var/lib/spectrumos
+    cp "$DEFAULT_WALLPAPER" /var/lib/spectrumos/current.png
+    
+    # Generate initial colors (skip setting wallpaper as no Wayland session yet)
+    echo -e "${BLUE}Generating initial color palette...${NC}"
+    wal -i /var/lib/spectrumos/current.png -n || echo "Warning: Initial Pywal generation failed, will retry on first boot."
+    
+    # Generate SpectrumOS Logo for hyprlock
+    if [ -f "$SCRIPT_DIR/bin/SOS_Gen_Logo.py" ]; then
+        echo -e "${BLUE}Generating SpectrumOS Logo...${NC}"
+        python "$SCRIPT_DIR/bin/SOS_Gen_Logo.py" || echo "Warning: Logo generation failed."
+    fi
+fi
 
 # Shell Setup
 [ "$SHELL" != "/usr/bin/zsh" ] && sudo chsh -s /usr/bin/zsh $USER

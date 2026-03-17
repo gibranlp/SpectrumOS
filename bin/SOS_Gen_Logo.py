@@ -7,6 +7,10 @@ from PIL import Image
 
 # Read pywal colors
 wal_file = os.path.expanduser("~/.cache/wal/colors.json")
+if not os.path.exists(wal_file):
+    print(f"Error: pywal colors not found at {wal_file}. Please run 'wal' first.")
+    exit(1)
+
 with open(wal_file, "r") as f:
     colors = json.load(f)
 

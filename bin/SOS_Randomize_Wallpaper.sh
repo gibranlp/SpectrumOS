@@ -15,10 +15,28 @@ CONFIG_FILE="/etc/spectrumos/spectrumos.conf"
 [ ! -f "$CONFIG_FILE" ] && echo "Missing config" && exit 1
 source "$CONFIG_FILE"
 
+# Ensure directories exist
+mkdir -p "$WALLPAPER_DIR"
+sudo mkdir -p "$(dirname "$GOWALL_OUTPUT")"
+sudo chown -R $USER:$USER "$(dirname "$GOWALL_OUTPUT")"
 
-# Random wallpaper
+# Random wallpaper selection with fallback
 SELECTED=$(find "$WALLPAPER_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -printf "%f\n" | shuf -n 1)
-WALLPAPER="$WALLPAPER_DIR/$SELECTED"
+
+if [ -z "$SELECTED" ]; then
+    echo "No wallpapers in $WALLPAPER_DIR, checking /usr/share/backgrounds"
+    SELECTED=$(find /usr/share/backgrounds -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -printf "%f\n" | shuf -n 1)
+    WALLPAPER_DIR="/usr/share/backgrounds"
+fi
+
+if [ -z "$SELECTED" ]; then
+    echo "Error: No wallpapers found in $WALLPAPER_DIR or /usr/share/backgrounds"
+    # Create a solid color fallback if no images found
+    WALLPAPER="/tmp/spectrumos_fallback.png"
+    convert -size 1920x1080 xc:"#130915" "$WALLPAPER"
+else
+    WALLPAPER="$WALLPAPER_DIR/$SELECTED"
+fi
 
 # Gowall Process Wallpaper
 GOWALL_OUTPUT="/var/lib/spectrumos/current.png"
