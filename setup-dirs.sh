@@ -21,14 +21,13 @@ sudo chmod 755 /etc/spectrumos
 echo -e "${BLUE}Setting up /var/lib/spectrumos...${NC}"
 sudo mkdir -p /var/lib/spectrumos
 sudo chown -R $USER:$USER /var/lib/spectrumos
-sudo chmod 755 /var/lib/spectrumos
+sudo chmod -R 755 /var/lib/spectrumos
 
 # 3. System Assets Directory (/usr/share/spectrumos)
-# Read-only for users, owned by root
+# Read-only for users, owned by root (scripts and wallpapers here)
 echo -e "${BLUE}Setting up /usr/share/spectrumos...${NC}"
-sudo mkdir -p /usr/share/spectrumos/wallpapers
-sudo mkdir -p /usr/share/spectrumos/themes
-sudo mkdir -p /usr/share/spectrumos/scripts
+sudo mkdir -p /usr/share/spectrumos/{wallpapers,themes,scripts}
+sudo chown -R $USER:$USER /usr/share/spectrumos
 sudo chmod -R 755 /usr/share/spectrumos
 
 # 4. User Config Directory (~/.config/spectrumos)

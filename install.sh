@@ -42,27 +42,6 @@ else
     SKIP_HEAVY=false
 fi
 
-# --- Helper Functions ---
-
-# Helper function to deploy configuration with backup
-function deploy_config() {
-    local src="$1"
-    local dest="$2"
-    
-    if [ -d "$dest" ] || [ -f "$dest" ]; then
-        echo -e "${BLUE}Backing up: $dest -> $dest.bak.$TIMESTAMP${NC}"
-        mv "$dest" "$dest.bak.$TIMESTAMP"
-    fi
-    
-    echo -e "${BLUE}Deploying: $src -> $dest${NC}"
-    mkdir -p "$(dirname "$dest")"
-    if [ -d "$src" ]; then
-        cp -rv "$src" "$dest"
-    else
-        cp -v "$src" "$dest"
-    fi
-}
-
 # --- System Preparation ---
 
 echo -e "${BLUE}Enabling multilib repository...${NC}"
@@ -184,65 +163,17 @@ paru -S --needed --noconfirm "${THEMING_PKGS[@]}" "${FONTS_PKGS[@]}"
 echo -e "${BLUE}Step 4: Gaming and Applications...${NC}"
 paru -S --needed --noconfirm "${GAMING_PKGS[@]}" "${APPS_PKGS[@]}"
 
-# --- Directory Structure ---
-
-echo -e "${BLUE}Creating SpectrumOS directory structure...${NC}"
-sudo mkdir -p /etc/spectrumos /var/lib/spectrumos /usr/share/spectrumos/{wallpapers,themes,scripts}
-sudo chown -R $USER:$USER /etc/spectrumos /var/lib/spectrumos
-sudo chmod -R 755 /etc/spectrumos /var/lib/spectrumos /usr/share/spectrumos
-mkdir -p ~/.config/spectrumos
-
 # --- Configuration Deployment ---
 
 echo -e "${BLUE}Deploying SpectrumOS configurations...${NC}"
 
-# Scripts
-sudo cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
-sudo chmod +x /usr/share/spectrumos/scripts/*
-
-# User Configs (with backups)
-deploy_config "$SCRIPT_DIR/config/gowall" "$HOME/.config/gowall"
-deploy_config "$SCRIPT_DIR/config/hypr" "$HOME/.config/hypr"
-deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME/.config/gromit-mpx"
-deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"
-deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"
-deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"
-deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
-deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"
-deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"
-deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"
-
-# System Configs
-sudo cp -rv "$SCRIPT_DIR"/etc/spectrumos/* /etc/spectrumos/
-sudo chown -R $USER:$USER /etc/spectrumos
-
-# Limine Sync
-sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.sh /usr/local/bin/
-sudo chmod +x /usr/local/bin/spectrumos-limine-sync.sh
-sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.{service,path} /etc/systemd/system/
-sudo mkdir -p /etc/pacman.d/hooks /etc/kernel
-sudo cp "$SCRIPT_DIR"/etc/pacman.d/hooks/95-spectrumos-limine.hook /etc/pacman.d/hooks/
-sudo cp "$SCRIPT_DIR"/etc/kernel/install.conf /etc/kernel/
-sudo systemctl daemon-reload
-sudo systemctl enable --now spectrumos-limine-sync.path
-
-# Plymouth
-sudo cp -rv "$SCRIPT_DIR"/plymouth/themes/spectrumos /usr/share/plymouth/themes/
-sudo plymouth-set-default-theme -R spectrumos
-if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
-    sudo sed -i 's/HOOKS=(base udev/HOOKS=(base udev plymouth/' /etc/mkinitcpio.conf
+# Use dots.sh for all configuration deployment to ensure consistency
+if [ -f "$SCRIPT_DIR/dots.sh" ]; then
+    bash "$SCRIPT_DIR/dots.sh" --all
+else
+    echo -e "${RED}Error: dots.sh not found in $SCRIPT_DIR${NC}"
+    exit 1
 fi
-sudo cp "$SCRIPT_DIR"/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/
-sudo mkinitcpio -P
-
-# SDDM
-sudo cp -rv "$SCRIPT_DIR"/sddm/themes/spectrumos /usr/share/sddm/themes/
-[ -f /etc/sddm.conf ] && sudo cp /etc/sddm.conf /etc/sddm.conf.bak.$TIMESTAMP
-sudo cp "$SCRIPT_DIR"/etc/sddm.conf /etc/sddm.conf
-
-# TLP
-[ -f /etc/tlp.conf ] && sudo cp /etc/tlp.conf /etc/tlp.conf.bak.$TIMESTAMP
-sudo cp -v "$SCRIPT_DIR"/etc/tlp.conf /etc/tlp.conf
 
 # --- Services & Finalization ---
 

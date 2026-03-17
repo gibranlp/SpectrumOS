@@ -51,8 +51,10 @@ function install_bin(){
 # Create local files and directories
 function create_local_files(){
     echo -e "${BLUE}Creating local directories...${NC}"
-    sudo mkdir -pv /usr/local/spectrumos
-    sudo chown -R $USER:$USER /usr/local/spectrumos
+    sudo mkdir -p /usr/share/spectrumos/{wallpapers,themes,scripts}
+    sudo mkdir -p /var/lib/spectrumos
+    sudo chown -R $USER:$USER /usr/share/spectrumos /var/lib/spectrumos
+    sudo chmod -R 755 /usr/share/spectrumos /var/lib/spectrumos
 
     mkdir -p $HOME/.config/cava/
     mkdir -p $HOME/.config/gowall/
@@ -64,6 +66,7 @@ function create_local_files(){
     mkdir -p $HOME/.config/waybar
     mkdir -p $HOME/.config/kitty
     mkdir -p $HOME/.config/nvim
+    mkdir -p $HOME/.config/xsettingsd
 }
 
 # Refactored individual install functions
@@ -77,6 +80,8 @@ function install_waybar_config() { deploy_config "$SCRIPT_DIR/config/waybar" "$H
 function install_kitty_config() { deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"; }
 function install_nvim_config() { deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"; }
 function install_zsh_config() { deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"; }
+function install_xsettingsd() { deploy_config "$SCRIPT_DIR/config/xsettingsd" "$HOME/.config/xsettingsd"; }
+function install_mimeapps() { deploy_config "$SCRIPT_DIR/config/mimeapps.list" "$HOME/.config/mimeapps.list"; }
 
 # Install Limine Sync Files
 function install_limine_sync(){
@@ -177,6 +182,8 @@ function install_all(){
     install_kitty_config
     install_nvim_config
     install_zsh_config
+    install_xsettingsd
+    install_mimeapps
     echo -e "${GREEN}✓ All configurations deployed!${NC}"
 }
 
@@ -196,6 +203,8 @@ function usage() {
     echo "  --kitty          Install Kitty config"
     echo "  --nvim           Install Neovim config"
     echo "  --spectrum       Install SpectrumOS system configs"
+    echo "  --xsettingsd     Install xsettingsd config"
+    echo "  --mimeapps       Install mimeapps.list"
     exit 1
 }
 
@@ -256,6 +265,12 @@ for arg in "$@"; do
             ;;
         --spectrum)
             install_spectrum_config
+            ;;
+        --xsettingsd)
+            install_xsettingsd
+            ;;
+        --mimeapps)
+            install_mimeapps
             ;;
         *)
             usage
