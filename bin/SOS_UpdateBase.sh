@@ -129,7 +129,7 @@ if [ "$AUR_HELPER" = "pacman" ]; then
     
     RESULT=$?
 else
-    # Using yay or paru
+    # Using paru or another AUR helper
     $AUR_HELPER -Syu --noconfirm 2>&1 | tee "$LOG_FILE" &
     AUR_PID=$!
     

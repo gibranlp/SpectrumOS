@@ -1,7 +1,11 @@
 #!/bin/bash
-# SpectrumOS Installation Script
-# Installs all dependencies and software for SpectrumOS
-# Focused on AMD CPU/GPU and Gaming
+# _____             _                 _____ _____ 
+#|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
+#|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
+#|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
+#      |_|   
+# SpectrumOS - Embrace the Chromatic Symphony!
+# Complete Installation & Configuration Script
 
 set -e
 
@@ -12,291 +16,250 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-echo -e "${BLUE}🌈 SpectrumOS Installation Script${NC}"
+echo -e "${BLUE}🌈 SpectrumOS Master Installer${NC}"
 echo "=================================="
 echo ""
 
-# Check if running as root
+# --- Initial Checks ---
+
 if [ "$EUID" -eq 0 ]; then 
     echo -e "${RED}Please do not run as root${NC}"
     exit 1
 fi
 
-# Enable multilib
+# Check Disk Space
+FREE_SPACE=$(df -m / | awk 'NR==2 {print $4}')
+echo -e "${BLUE}Free disk space: ${FREE_SPACE}MB${NC}"
+
+if [ "$FREE_SPACE" -lt 5000 ]; then
+    echo -e "${RED}⚠️ Low disk space detected!${NC}"
+    echo -e "${RED}SpectrumOS requires at least 10GB of free space for a full install.${NC}"
+    echo -e "${RED}We will try a 'Lite' installation by skipping heavy packages.${NC}"
+    SKIP_HEAVY=true
+else
+    SKIP_HEAVY=false
+fi
+
+# --- Helper Functions ---
+
+# Helper function to deploy configuration with backup
+function deploy_config() {
+    local src="$1"
+    local dest="$2"
+    
+    if [ -d "$dest" ] || [ -f "$dest" ]; then
+        echo -e "${BLUE}Backing up: $dest -> $dest.bak.$TIMESTAMP${NC}"
+        mv "$dest" "$dest.bak.$TIMESTAMP"
+    fi
+    
+    echo -e "${BLUE}Deploying: $src -> $dest${NC}"
+    mkdir -p "$(dirname "$dest")"
+    if [ -d "$src" ]; then
+        cp -rv "$src" "$dest"
+    else
+        cp -v "$src" "$dest"
+    fi
+}
+
+# --- System Preparation ---
+
+echo -e "${BLUE}Enabling multilib repository...${NC}"
 if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
-    echo -e "${BLUE}Enabling multilib repository...${NC}"
     sudo sed -i '/^#\[multilib\]/,+1 s/^#//' /etc/pacman.conf
     sudo pacman -Sy
-    echo -e "${GREEN}✓ multilib enabled${NC}"
-else
-    echo -e "${GREEN}✓ multilib already enabled${NC}"
 fi
 
-# Install base-devel and git
-echo -e "${BLUE}Installing base-devel and git...${NC}"
+echo -e "${BLUE}Installing base-devel, git and paru...${NC}"
 sudo pacman -S --needed --noconfirm base-devel git
 
-# Check if yay is installed
-if ! command -v yay &> /dev/null; then
-    echo -e "${BLUE}Installing yay (AUR helper)...${NC}"
+if ! command -v paru &> /dev/null; then
     cd /tmp
-    git clone https://aur.archlinux.org/yay.git
-    cd yay
+    git clone https://aur.archlinux.org/paru.git
+    cd paru
     makepkg -si --noconfirm
     cd ~
-    echo -e "${GREEN}✓ yay installed${NC}"
-else
-    echo -e "${GREEN}✓ yay already installed${NC}"
 fi
 
-echo ""
 echo -e "${BLUE}Updating system...${NC}"
-yay -Syu --noconfirm
+paru -Syu --noconfirm
 
-# Package lists
+# --- Hardware Detection ---
+
+echo -e "${BLUE}Detecting hardware...${NC}"
+CPU_VENDOR=$(grep -m 1 'vendor_id' /proc/cpuinfo | awk '{print $3}')
+UCODE_PKG=""
+if [[ "$CPU_VENDOR" == "AuthenticAMD" ]]; then
+    UCODE_PKG="amd-ucode"
+    echo -e "${GREEN}✓ AMD CPU detected${NC}"
+elif [[ "$CPU_VENDOR" == "GenuineIntel" ]]; then
+    UCODE_PKG="intel-ucode"
+    echo -e "${GREEN}✓ Intel CPU detected${NC}"
+fi
+
+GPU_PKGS=()
+if lspci | grep -i "vga" | grep -iq "nvidia"; then
+    echo -e "${GREEN}✓ NVIDIA GPU detected${NC}"
+    GPU_PKGS=("nvidia-dkms" "nvidia-utils" "lib32-nvidia-utils" "nvidia-settings")
+elif lspci | grep -i "vga" | grep -iq "amd"; then
+    echo -e "${GREEN}✓ AMD GPU detected${NC}"
+    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-radeon" "lib32-vulkan-radeon" "libva-mesa-driver" "lib32-libva-mesa-driver" "mesa-vdpau" "lib32-mesa-vdpau" "xf86-video-amdgpu")
+elif lspci | grep -i "vga" | grep -iq "intel"; then
+    echo -e "${GREEN}✓ Intel GPU detected${NC}"
+    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-intel" "lib32-vulkan-intel" "intel-media-driver" "libva-intel-driver" "lib32-libva-intel-driver")
+fi
+
+# --- Package Lists ---
+
 SYSTEM_PKGS=(
-    # Boot & Hardware
-    "amd-ucode"
-    "limine"
-    "limine-mkinitcpio-hook"
-    "plymouth"
-    "tlp"
-    "tlp-rdw"
-    "acpi"
-    "acpi_call"
-    "cpupower"
-    
-    # AMD Graphics
-    "mesa"
-    "lib32-mesa"
-    "vulkan-radeon"
-    "lib32-vulkan-radeon"
-    "libva-mesa-driver"
-    "lib32-libva-mesa-driver"
-    "mesa-vdpau"
-    "lib32-mesa-vdpau"
-    "xf86-video-amdgpu"
-    
-    # Desktop Environment
-    "hyprland"
-    "hyprpaper"
-    "hypridle"
-    "hyprlock"
-    "hyprpicker"
-    "xdg-desktop-portal-hyprland"
-    "xdg-desktop-portal-gtk"
-    "qt5-wayland"
-    "qt6-wayland"
-    "qt5ct"
-    "qt6ct"
-    "kvantum"
-    "waybar"
-    "rofi-wayland"
-    "dunst"
-    "libnotify"
-    "swww"
-    "swappy"
-    "grim"
-    "slurp"
-    "wl-clipboard"
-    "cliphist"
-    "brightnessctl"
-    "pamixer"
-    "playerctl"
-    "nwg-display"
-    
-    # Shell & Terminal
-    "kitty"
-    "zsh"
-    "zsh-completions"
-    "zsh-syntax-highlighting"
-    "zsh-autosuggestions"
-    "starship"
-    "fzf"
-    "zoxide"
-    "eza"
-    "bat"
-    "fd"
-    "ripgrep"
-    "thefuck"
-    
-    # System Utilities
-    "networkmanager"
-    "network-manager-applet"
-    "bluez"
-    "bluez-utils"
-    "blueman"
-    "pavucontrol"
-    "pipewire"
-    "pipewire-pulse"
-    "pipewire-alsa"
-    "pipewire-jack"
-    "wireplumber"
-    "libldac"
-    "gvfs"
-    "gvfs-mtp"
-    "gvfs-smb"
-    "gvfs-nfs"
-    "tumbler"
-    "file-roller"
-    "unzip"
-    "unrar"
-    "p7zip"
-    "rsync"
-    "wget"
-    "curl"
-    "btop"
-    "htop"
-    "neofetch"
-    "locate"
-    "imagemagick"
-    
-    # File Manager
-    "thunar"
-    "thunar-volman"
-    "thunar-archive-plugin"
-    "yazi"
-    "ranger"
-    "ntfs-3g"
-    
-    # Display Manager
-    "sddm"
-    "qt5-graphicaleffects"
-    "qt5-quickcontrols2"
-    "qt5-svg"
+    "$UCODE_PKG" "limine" "limine-mkinitcpio-hook" "plymouth" "tlp" "tlp-rdw" "acpi" "acpi_call" "cpupower"
+    "hyprland" "hyprpaper" "hypridle" "hyprlock" "hyprpicker" "xdg-desktop-portal-hyprland" "xdg-desktop-portal-gtk"
+    "qt5-wayland" "qt6-wayland" "qt5ct" "qt6ct" "kvantum" "waybar" "rofi-wayland" "dunst" "libnotify"
+    "swww" "swappy" "grim" "slurp" "wl-clipboard" "cliphist" "brightnessctl" "pamixer" "playerctl" "nwg-displays"
+    "kitty" "zsh" "zsh-completions" "zsh-syntax-highlighting" "zsh-autosuggestions" "starship" "fzf" "zoxide" "eza" "bat" "fd" "ripgrep" "thefuck"
+    "networkmanager" "network-manager-applet" "bluez" "bluez-utils" "blueman" "pavucontrol" "pipewire" "pipewire-pulse" "pipewire-alsa" "pipewire-jack" "wireplumber" "libldac" "gvfs" "gvfs-mtp" "gvfs-smb" "gvfs-nfs" "tumbler" "file-roller" "unzip" "unrar" "p7zip" "rsync" "wget" "curl" "btop" "htop" "aur/neofetch" "locate" "imagemagick"
+    "thunar" "thunar-volman" "thunar-archive-plugin" "yazi" "ranger" "ntfs-3g"
+    "sddm" "qt5-graphicaleffects" "qt5-quickcontrols2" "qt5-svg"
 )
 
 THEMING_PKGS=(
-    "python-pywal16"
-    "python-pywalfox"
-    "colorz"
-    "python-colorthief"
-    "python-haishoku"
-    "python-modern-colorthief"
-    "gowall"
-    "walogram"
-    "themix-full-git"
-    "python-pillow"
-    "python-cairosvg"
-    "papirus-icon-theme"
-    "breeze-gtk"
-    "breeze-icons"
-    "adwaita-qt5"
-    "adwaita-qt6"
-    "bibata-cursor-theme"
+    "aur/python-pywal16" "aur/python-pywalfox" "aur/colorz" "python-colorthief" "aur/python-haishoku" "aur/modern-colorthief" "aur/gowall" "aur/walogram-git" "python-pillow" "python-cairosvg" "papirus-icon-theme" "breeze-gtk" "breeze-icons" "aur/adwaita-qt5" "aur/adwaita-qt6" "aur/bibata-cursor-theme"
 )
-
-FONTS_PKGS=(
-    "otf-font-awesome"
-    "ttf-jetbrains-mono-nerd"
-    "ttf-firacode-nerd"
-    "noto-fonts"
-    "noto-fonts-emoji"
-)
-
-GAMING_PKGS=(
-    "steam"
-    "lutris"
-    "wine-staging"
-    "winetricks"
-    "gamemode"
-    "lib32-gamemode"
-    "mangohud"
-    "lib32-mangohud"
-    "gamescope"
-    "vkbasalt"
-    "goverlay"
-    "proton-ge-custom"
-)
-
-APPS_PKGS=(
-    "firefox"
-    "google-chrome"
-    "visual-studio-code-bin"
-    "docker"
-    "docker-compose"
-    "nodejs"
-    "npm"
-    "python"
-    "python-pip"
-    "hugo"
-    "telegram-desktop"
-    "discord"
-    "whatsapp-for-linux"
-    "bitwarden"
-    "gimp"
-    "kdenlive"
-    "mpv"
-    "vlc"
-    "imv"
-    "feh"
-    "kdeconnect"
-    "yt-dlp"
-    "transmission-gtk"
-    "gemini-cli"
-    "claude-code"
-    "archiso"
-)
-
-echo -e "${BLUE}Installing System packages...${NC}"
-yay -S --needed --noconfirm "${SYSTEM_PKGS[@]}"
-
-echo -e "${BLUE}Installing Theming packages...${NC}"
-yay -S --needed --noconfirm "${THEMING_PKGS[@]}"
-
-echo -e "${BLUE}Installing Fonts...${NC}"
-yay -S --needed --noconfirm "${FONTS_PKGS[@]}"
-
-echo -e "${BLUE}Installing Gaming packages...${NC}"
-yay -S --needed --noconfirm "${GAMING_PKGS[@]}"
-
-echo -e "${BLUE}Installing Apps...${NC}"
-yay -S --needed --noconfirm "${APPS_PKGS[@]}"
-
-# Enable services
-echo -e "${BLUE}Enabling services...${NC}"
-sudo systemctl enable NetworkManager
-sudo systemctl enable bluetooth
-sudo systemctl enable sddm
-sudo systemctl enable tlp
-sudo systemctl enable docker
-
-# Docker setup
-sudo usermod -aG docker $USER
-echo -e "${GREEN}✓ Added $USER to docker group${NC}"
-
-# Set ZSH as default shell
-if [ "$SHELL" != "/usr/bin/zsh" ]; then
-    echo -e "${BLUE}Setting ZSH as default shell...${NC}"
-    sudo chsh -s /usr/bin/zsh $USER
+# Add themix only if space allows (it is massive)
+if [ "$SKIP_HEAVY" = false ]; then
+    THEMING_PKGS+=("aur/themix-full-git")
 fi
 
-# Install oh-my-zsh
+FONTS_PKGS=(
+    "otf-font-awesome" "ttf-jetbrains-mono-nerd" "ttf-firacode-nerd" "noto-fonts" "noto-fonts-emoji"
+)
+
+GAMING_PKGS=()
+if [ "$SKIP_HEAVY" = false ]; then
+    GAMING_PKGS=(
+        "steam" "lutris" "wine-staging" "winetricks" "gamemode" "lib32-gamemode" "mangohud" "lib32-mangohud" "gamescope" "vkbasalt" "goverlay" "proton-ge-custom"
+    )
+fi
+
+APPS_PKGS=(
+    "firefox" "docker" "docker-compose" "jdk-openjdk" "nodejs" "npm" "python" "python-pip" "hugo" "telegram-desktop" "discord" "aur/zapzap" "extra/bitwarden" "gimp" "kdenlive" "mpv" "vlc" "imv" "feh" "kdeconnect" "yt-dlp" "transmission-gtk" "extra/gemini-cli" "aur/claude-code" "archiso"
+)
+# Skip some very large apps if space is tight
+if [ "$SKIP_HEAVY" = false ]; then
+    APPS_PKGS+=("aur/google-chrome" "aur/visual-studio-code-bin")
+fi
+
+# --- Package Installation ---
+
+echo -e "${BLUE}Cleaning caches to maximize space...${NC}"
+sudo pacman -Scc --noconfirm || true
+rm -rf ~/.cache/paru/* || true
+# The "Hammer" approach: Force remove jack2/lib32-jack2 ignoring dependencies
+# This is safe because we are immediately replacing them with pipewire-jack
+if pacman -Qi jack2 &> /dev/null; then
+    echo -e "${BLUE}Force removing jack2...${NC}"
+    sudo pacman -Rdd --noconfirm jack2 || true
+fi
+if pacman -Qi lib32-jack2 &> /dev/null; then
+    echo -e "${BLUE}Force removing lib32-jack2...${NC}"
+    sudo pacman -Rdd --noconfirm lib32-jack2 || true
+fi
+
+# Preemptively install pipewire replacements
+echo -e "${BLUE}Installing Pipewire-JACK replacements...${NC}"
+sudo pacman -S --needed --noconfirm pipewire-jack lib32-pipewire-jack
+
+echo -e "${BLUE}Installing all packages...${NC}"
+# We install drivers and microcode first to satisfy dependencies and avoid provider prompts
+echo -e "${BLUE}Step 1: Drivers and Hardware Support...${NC}"
+paru -S --needed --noconfirm "${GPU_PKGS[@]}" "$UCODE_PKG"
+
+echo -e "${BLUE}Step 2: System and Desktop Environment...${NC}"
+paru -S --needed --noconfirm "${SYSTEM_PKGS[@]}"
+
+echo -e "${BLUE}Step 3: Theming and Fonts...${NC}"
+paru -S --needed --noconfirm "${THEMING_PKGS[@]}" "${FONTS_PKGS[@]}"
+
+echo -e "${BLUE}Step 4: Gaming and Applications...${NC}"
+paru -S --needed --noconfirm "${GAMING_PKGS[@]}" "${APPS_PKGS[@]}"
+
+# --- Directory Structure ---
+
+echo -e "${BLUE}Creating SpectrumOS directory structure...${NC}"
+sudo mkdir -p /etc/spectrumos /var/lib/spectrumos /usr/share/spectrumos/{wallpapers,themes,scripts}
+sudo chown -R $USER:$USER /etc/spectrumos /var/lib/spectrumos
+sudo chmod -R 755 /etc/spectrumos /var/lib/spectrumos /usr/share/spectrumos
+mkdir -p ~/.config/spectrumos
+
+# --- Configuration Deployment ---
+
+echo -e "${BLUE}Deploying SpectrumOS configurations...${NC}"
+
+# Scripts
+sudo cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
+sudo chmod +x /usr/share/spectrumos/scripts/*
+
+# User Configs (with backups)
+deploy_config "$SCRIPT_DIR/config/gowall" "$HOME/.config/gowall"
+deploy_config "$SCRIPT_DIR/config/hypr" "$HOME/.config/hypr"
+deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME/.config/gromit-mpx"
+deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"
+deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"
+deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"
+deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
+deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"
+deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"
+deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"
+
+# System Configs
+sudo cp -rv "$SCRIPT_DIR"/etc/spectrumos/* /etc/spectrumos/
+sudo chown -R $USER:$USER /etc/spectrumos
+
+# Limine Sync
+sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.sh /usr/local/bin/
+sudo chmod +x /usr/local/bin/spectrumos-limine-sync.sh
+sudo cp -v "$SCRIPT_DIR"/limine/spectrumos-limine-sync.{service,path} /etc/systemd/system/
+sudo mkdir -p /etc/pacman.d/hooks /etc/kernel
+sudo cp "$SCRIPT_DIR"/etc/pacman.d/hooks/95-spectrumos-limine.hook /etc/pacman.d/hooks/
+sudo cp "$SCRIPT_DIR"/etc/kernel/install.conf /etc/kernel/
+sudo systemctl daemon-reload
+sudo systemctl enable --now spectrumos-limine-sync.path
+
+# Plymouth
+sudo cp -rv "$SCRIPT_DIR"/plymouth/themes/spectrumos /usr/share/plymouth/themes/
+sudo plymouth-set-default-theme -R spectrumos
+if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
+    sudo sed -i 's/HOOKS=(base udev/HOOKS=(base udev plymouth/' /etc/mkinitcpio.conf
+fi
+sudo cp "$SCRIPT_DIR"/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/
+sudo mkinitcpio -P
+
+# SDDM
+sudo cp -rv "$SCRIPT_DIR"/sddm/themes/spectrumos /usr/share/sddm/themes/
+[ -f /etc/sddm.conf ] && sudo cp /etc/sddm.conf /etc/sddm.conf.bak.$TIMESTAMP
+sudo cp "$SCRIPT_DIR"/etc/sddm.conf /etc/sddm.conf
+
+# TLP
+[ -f /etc/tlp.conf ] && sudo cp /etc/tlp.conf /etc/tlp.conf.bak.$TIMESTAMP
+sudo cp -v "$SCRIPT_DIR"/etc/tlp.conf /etc/tlp.conf
+
+# --- Services & Finalization ---
+
+echo -e "${BLUE}Enabling services...${NC}"
+sudo systemctl enable NetworkManager bluetooth sddm tlp docker
+sudo usermod -aG docker $USER
+
+# Shell Setup
+[ "$SHELL" != "/usr/bin/zsh" ] && sudo chsh -s /usr/bin/zsh $USER
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    echo -e "${BLUE}Installing oh-my-zsh...${NC}"
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
 
-# Install zsh plugins
-echo -e "${BLUE}Installing zsh plugins...${NC}"
 ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
 mkdir -p "$ZSH_CUSTOM/plugins"
-
-if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
-    git clone https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-fi
-
-if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-fi
-
-# Run setup scripts
-echo -e "${BLUE}Creating directory structure...${NC}"
-bash "$SCRIPT_DIR/setup-dirs.sh"
-
-echo -e "${BLUE}Deploying configurations...${NC}"
-bash "$SCRIPT_DIR/dots.sh" --all
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 
 echo ""
 echo -e "${GREEN}=================================="

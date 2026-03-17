@@ -17,6 +17,28 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Helper function to deploy configuration with backup
+# Usage: deploy_config <source_dir> <target_dir>
+function deploy_config() {
+    local src="$1"
+    local dest="$2"
+    
+    if [ -d "$dest" ] || [ -f "$dest" ]; then
+        echo -e "${BLUE}Backing up existing config: $dest -> $dest.bak.$TIMESTAMP${NC}"
+        mv "$dest" "$dest.bak.$TIMESTAMP"
+    fi
+    
+    echo -e "${BLUE}Deploying: $src -> $dest${NC}"
+    mkdir -p "$(dirname "$dest")"
+    if [ -d "$src" ]; then
+        cp -rv "$src" "$dest"
+    else
+        cp -v "$src" "$dest"
+    fi
+}
+
 # Install Bin files
 function install_bin(){
     echo -e "${BLUE}Installing SpectrumOS scripts...${NC}"
@@ -44,23 +66,17 @@ function create_local_files(){
     mkdir -p $HOME/.config/nvim
 }
 
-# Install GOWall config
-function install_gowall_config(){
-    echo -e "${BLUE}Installing GOWall config...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/gowall/* $HOME/.config/gowall/
-}
-
-# Install hyprland configs
-function install_hyprland_config(){
-    echo -e "${BLUE}Installing Hyprland configs...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/hypr/* $HOME/.config/hypr/
-}
-
-# Install Gromit config
-function install_gromit(){
-    echo -e "${BLUE}Installing Gromit-MPX config...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/gromit-mpx/* $HOME/.config/gromit-mpx/
-}
+# Refactored individual install functions
+function install_gowall_config() { deploy_config "$SCRIPT_DIR/config/gowall" "$HOME/.config/gowall"; }
+function install_hyprland_config() { deploy_config "$SCRIPT_DIR/config/hypr" "$HOME/.config/hypr"; }
+function install_gromit() { deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME/.config/gromit-mpx"; }
+function install_rofi_themes() { deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"; }
+function install_swappy_config() { deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"; }
+function install_wal_templates() { deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"; }
+function install_waybar_config() { deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"; }
+function install_kitty_config() { deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"; }
+function install_nvim_config() { deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"; }
+function install_zsh_config() { deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"; }
 
 # Install Limine Sync Files
 function install_limine_sync(){
@@ -109,12 +125,6 @@ function install_plymouth(){
     echo -e "${GREEN}✓ Plymouth theme installed and initramfs regenerated${NC}"
 }
 
-# Install ROFI themes
-function install_rofi_themes(){
-    echo -e "${BLUE}Installing Rofi themes...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/rofi/* $HOME/.config/rofi/
-}
-
 # Install SDDM Theme
 function install_sddm_theme(){
     echo -e "${BLUE}Installing SDDM theme...${NC}"
@@ -123,7 +133,7 @@ function install_sddm_theme(){
 
     # Configure SDDM to use the theme
     if [ -f /etc/sddm.conf ]; then
-        sudo cp /etc/sddm.conf /etc/sddm.conf.bak
+        sudo cp /etc/sddm.conf /etc/sddm.conf.bak.$TIMESTAMP
     fi
     sudo cp "$SCRIPT_DIR"/etc/sddm.conf /etc/sddm.conf
 }
@@ -133,51 +143,20 @@ function install_spectrum_config(){
     echo -e "${BLUE}Installing SpectrumOS system configs...${NC}"
     sudo mkdir -p /etc/spectrumos
     sudo cp -rv "$SCRIPT_DIR"/etc/spectrumos/* /etc/spectrumos/
-    sudo chmod -R 777 /etc/spectrumos
-}
-
-# Install Swappy config
-function install_swappy_config(){
-    echo -e "${BLUE}Installing Swappy config...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/swappy/* $HOME/.config/swappy/
+    # Refined permissions: current user owns it so scripts can update it
+    sudo chown -R $USER:$USER /etc/spectrumos
+    sudo chmod -R 755 /etc/spectrumos
 }
 
 # Install TLP
 function install_tlp(){
     echo -e "${BLUE}Installing TLP config...${NC}"
+    if [ -f /etc/tlp.conf ]; then
+        sudo cp /etc/tlp.conf /etc/tlp.conf.bak.$TIMESTAMP
+    fi
     sudo cp -v "$SCRIPT_DIR"/etc/tlp.conf /etc/tlp.conf
     sudo systemctl enable tlp.service
     sudo systemctl start tlp.service
-}
-
-# Install Wal Templates
-function install_wal_templates(){
-    echo -e "${BLUE}Installing Wal templates...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/wal/templates/* $HOME/.config/wal/templates/
-}
-
-# Install Waybar config
-function install_waybar_config(){
-    echo -e "${BLUE}Installing Waybar configs...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/waybar/* $HOME/.config/waybar/
-}
-
-# Install Kitty config
-function install_kitty_config(){
-    echo -e "${BLUE}Installing Kitty config...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/kitty/* $HOME/.config/kitty/
-}
-
-# Install Neovim config
-function install_nvim_config(){
-    echo -e "${BLUE}Installing Neovim config...${NC}"
-    cp -rv "$SCRIPT_DIR"/config/nvim/* $HOME/.config/nvim/
-}
-
-# Install ZSH config
-function install_zsh_config(){
-    echo -e "${BLUE}Installing ZSH config...${NC}"
-    cp -v "$SCRIPT_DIR"/config/zsh/.zshrc $HOME/
 }
 
 function install_all(){
