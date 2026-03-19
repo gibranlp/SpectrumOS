@@ -90,10 +90,20 @@ function install_mimeapps() { deploy_config "$SCRIPT_DIR/config/mimeapps.list" "
 # Install Limine Sync Files
 function install_limine_sync(){
     echo -e "${BLUE}Installing Limine Sync...${NC}"
-    # Check if /boot/limine.conf exists, if not, copy the example
-    if [ ! -f /boot/limine.conf ]; then
-        echo -e "${BLUE}No limine.conf found in /boot/, installing default...${NC}"
-        sudo cp -v "$SCRIPT_DIR"/limine/limine.conf.example /boot/limine.conf
+    
+    # Detect ESP Path
+    ESP=$(findmnt -no TARGET /boot || findmnt -no TARGET /efi || echo "/boot")
+    
+    # Create /etc/default/limine if it doesn't exist
+    if [ ! -f /etc/default/limine ]; then
+        echo "ESP_PATH=\"$ESP\"" | sudo tee /etc/default/limine > /dev/null
+        echo "✓ Created /etc/default/limine with ESP_PATH=\"$ESP\""
+    fi
+
+    # Check if limine.conf exists in ESP, if not, copy the example
+    if [ ! -f "$ESP/limine.conf" ]; then
+        echo -e "${BLUE}No limine.conf found in $ESP, installing default...${NC}"
+        sudo cp -v "$SCRIPT_DIR"/limine/limine.conf.example "$ESP/limine.conf"
     fi
 
     # Copy script
@@ -126,10 +136,59 @@ function install_plymouth(){
     # Set the default theme
     sudo plymouth-set-default-theme -R spectrumos
 
-    # Add Plymouth hook to mkinitcpio
-    if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
-        sudo sed -i 's/\(HOOKS=.*\)udev/\1udev plymouth/' /etc/mkinitcpio.conf
-        echo "Plymouth hook added to mkinitcpio.conf"
+    # Install Plymouth configuration
+    if [ -f "$SCRIPT_DIR/plymouth/plymouthd.defaults" ]; then
+        sudo mkdir -p /etc/plymouth
+        sudo cp -v "$SCRIPT_DIR/plymouth/plymouthd.defaults" /etc/plymouth/plymouthd.conf
+        echo "Plymouth configuration installed to /etc/plymouth/plymouthd.conf"
+    fi
+
+    # Detect GPU for early KMS
+    GPU_DRIVER=""
+    if lspci | grep -i "vga" | grep -iq "nvidia"; then
+        GPU_DRIVER="nvidia nvidia_modeset nvidia_uvm nvidia_drm"
+    elif lspci | grep -i "vga" | grep -iq "amd"; then
+        GPU_DRIVER="amdgpu"
+    elif lspci | grep -i "vga" | grep -iq "intel"; then
+        GPU_DRIVER="i915"
+    elif lspci | grep -i "vga" | grep -iq "virtio"; then
+        GPU_DRIVER="virtio_gpu"
+    elif lspci | grep -i "vga" | grep -iq "vmware"; then
+        GPU_DRIVER="vmwgfx"
+    elif lspci | grep -i "vga" | grep -iq "virtualbox"; then
+        GPU_DRIVER="vboxvideo"
+    fi
+
+    # Add GPU driver to MODULES in mkinitcpio.conf for early KMS
+    if [ -n "$GPU_DRIVER" ]; then
+        if ! grep -q "MODULES=(.*$GPU_DRIVER.*)" /etc/mkinitcpio.conf; then
+            # We assume MODULES is either empty or doesn't have the driver
+            sudo sed -i "s/MODULES=(/MODULES=($GPU_DRIVER /" /etc/mkinitcpio.conf
+            echo "Added $GPU_DRIVER to MODULES in mkinitcpio.conf"
+        fi
+    fi
+
+    # Add and reorder HOOKS in mkinitcpio.conf for early KMS and Plymouth
+    if grep -q "^HOOKS=" /etc/mkinitcpio.conf; then
+        # Ensure 'kms' is present and before 'plymouth'
+        CURRENT_HOOKS=$(grep "^HOOKS=" /etc/mkinitcpio.conf | sed 's/HOOKS=(//;s/)//')
+        
+        # Remove existing kms and plymouth to re-insert them correctly
+        NEW_HOOKS=$(echo "$CURRENT_HOOKS" | sed 's/\bkms\b//g;s/\bplymouth\b//g;s/  / /g;s/^ //;s/ $//')
+        
+        # Insert kms and plymouth after udev
+        if echo "$NEW_HOOKS" | grep -q "\budev\b"; then
+            FINAL_HOOKS=$(echo "$NEW_HOOKS" | sed 's/\budev\b/udev kms plymouth/')
+        else
+            # Fallback: just put them at the beginning
+            FINAL_HOOKS="base udev kms plymouth $NEW_HOOKS"
+        fi
+        
+        # Clean up double spaces
+        FINAL_HOOKS=$(echo "$FINAL_HOOKS" | tr -s ' ')
+        
+        sudo sed -i "s/^HOOKS=(.*/HOOKS=($FINAL_HOOKS)/" /etc/mkinitcpio.conf
+        echo "Updated HOOKS in mkinitcpio.conf: ($FINAL_HOOKS)"
     fi
 
     sudo mkdir -p /etc/pacman.d/hooks

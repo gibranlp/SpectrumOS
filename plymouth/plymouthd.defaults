@@ -1,6 +1,6 @@
 [Daemon]
 Theme=spectrumos
-ShowDelay=20
+ShowDelay=0
 DeviceTimeout=8
-DeviceScale=an-integer-scaling-factor
+DeviceScale=1
 UseFirmwareBackground=true

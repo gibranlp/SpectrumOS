@@ -160,6 +160,15 @@ paru -S --needed --noconfirm "${SYSTEM_PKGS[@]}"
 echo -e "${BLUE}Step 3: Theming and Fonts...${NC}"
 paru -S --needed --noconfirm "${THEMING_PKGS[@]}" "${FONTS_PKGS[@]}"
 
+# Install local fonts
+if [ -d "$SCRIPT_DIR/fonts" ]; then
+    echo -e "${BLUE}Installing local fonts from $SCRIPT_DIR/fonts...${NC}"
+    sudo mkdir -p /usr/local/share/fonts/SpectrumOS
+    sudo cp -v "$SCRIPT_DIR"/fonts/* /usr/local/share/fonts/SpectrumOS/
+    fc-cache -fv
+    echo -e "${GREEN}✓ Local fonts installed${NC}"
+fi
+
 echo -e "${BLUE}Step 4: Gaming and Applications...${NC}"
 paru -S --needed --noconfirm "${GAMING_PKGS[@]}" "${APPS_PKGS[@]}"
 
