@@ -233,6 +233,16 @@ function install_tlp(){
     sudo systemctl start tlp.service
 }
 
+function install_gaming_configs() {
+    echo -e "${BLUE}Installing gaming configs...${NC}"
+    mkdir -p "$HOME/.config/MangoHud"
+    mkdir -p "$HOME/.config/vkbasalt"
+    deploy_config "$SCRIPT_DIR/config/gamemode.ini" "$HOME/.config/gamemode.ini"
+    deploy_config "$SCRIPT_DIR/config/mangohud/MangoHud.conf" "$HOME/.config/MangoHud/MangoHud.conf"
+    deploy_config "$SCRIPT_DIR/config/vkbasalt/vkbasalt.conf" "$HOME/.config/vkbasalt/vkbasalt.conf"
+    echo -e "${GREEN}✓ Gaming configs installed${NC}"
+}
+
 function install_all(){
     create_local_files
     install_bin
@@ -253,6 +263,7 @@ function install_all(){
     install_zsh_config
     install_xsettingsd
     install_mimeapps
+    install_gaming_configs
     echo -e "${GREEN}✓ All configurations deployed!${NC}"
 }
 
@@ -274,6 +285,7 @@ function usage() {
     echo "  --spectrum       Install SpectrumOS system configs"
     echo "  --xsettingsd     Install xsettingsd config"
     echo "  --mimeapps       Install mimeapps.list"
+    echo "  --gaming         Install gaming configs (gamemode, mangohud, vkbasalt)"
     exit 1
 }
 
@@ -340,6 +352,9 @@ for arg in "$@"; do
             ;;
         --mimeapps)
             install_mimeapps
+            ;;
+        --gaming)
+            install_gaming_configs
             ;;
         *)
             usage
