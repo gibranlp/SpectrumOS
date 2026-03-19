@@ -27,7 +27,7 @@ SELECTED=$(rofi \
     -show filebrowser \
     -filebrowser-directory "$WALLPAPER_DIR" \
     -filebrowser-command "echo" \
-    -theme ~/.config/rofi/SOS_Wallpaper.rasi \
+    -theme "$HOME/.config/rofi/SOS_Wallpaper.rasi" \
     -filebrowser-sorting-method mtime \
     -selected-row 1 \
     -filebrowser-show-hidden false \
