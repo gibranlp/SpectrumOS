@@ -97,21 +97,14 @@ function set_wallpaper(){
         notify-send "No Theme Selected!"
     fi
     
-    # Pywal
-    if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    else
-        wal -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    fi
-
     # Apply wallpaper
     swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Pywal
     if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -l -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     else
-        wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     fi
 
     # Update configs
@@ -138,7 +131,7 @@ function set_wallpaper(){
     waybar &
 
     # Send notification with thumbnail
-    notify-send -t 1000"Theme Updated!"
+    notify-send -t 1000 "Theme Updated!"
 
     /usr/share/spectrumos/scripts/SOS_Regenerate.sh
 
