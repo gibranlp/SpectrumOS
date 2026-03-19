@@ -67,6 +67,8 @@ function set_wallpaper(){
     rm -f /var/lib/spectrumos/colors.conf
     cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
 
+    mkdir -p "$HOME/.config/dunst"
+    mkdir -p "$HOME/.config/cava"
     cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
     pkill dunst; dunst &
 
