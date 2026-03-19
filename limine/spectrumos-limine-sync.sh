@@ -283,6 +283,35 @@ else
     echo "⚠ Colors config not found at $COLORS_SOURCE"
 fi
 
+# Function to detect and preserve Windows boot entry
+ensure_windows_entry() {
+    local windows_efi="$ESP_PATH/EFI/Microsoft/Boot/bootmgfw.efi"
+
+    if [ ! -f "$windows_efi" ]; then
+        echo "No Windows EFI bootloader found, skipping Windows entry."
+        return 0
+    fi
+
+    echo "✓ Windows EFI bootloader detected at $windows_efi"
+
+    # Check if a Windows entry already exists in the config
+    if grep -q "^/Windows" "$LIMINE_CONF"; then
+        echo "✓ Windows entry already present in limine.conf, preserving it."
+        return 0
+    fi
+
+    # Append a Windows entry
+    echo "Adding Windows entry to limine.conf..."
+    cat >> "$LIMINE_CONF" << 'EOF'
+
+/Windows
+    comment: Windows Boot Manager
+    protocol: efi
+    path: boot():/EFI/Microsoft/Boot/bootmgfw.efi
+EOF
+    echo "✓ Windows entry added to limine.conf"
+}
+
 # Clean auto-generated entries and update kernel paths
 echo ""
 echo "Cleaning auto-generated Arch Linux entries..."
@@ -290,6 +319,9 @@ clean_limine_conf
 
 echo "Updating SpectrumOS kernel entries..."
 update_spectrumos_entries
+
+echo "Checking for Windows partition..."
+ensure_windows_entry
 
 echo ""
 echo "✓ Limine config synced successfully!"
