@@ -52,21 +52,14 @@ function set_wallpaper(){
     [ ! -f "$CONFIG_FILE" ] && echo "Missing config" && exit 1
     source "$CONFIG_FILE"
     
-    # Pywal
-    if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    else
-        wal -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    fi
-
     # Apply wallpaper
     swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Pywal
     if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -l -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     else
-        wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     fi
 
     # Update configs
