@@ -93,5 +93,11 @@ case $index in
     # Miscellaneous
     28) sleep 0.2 && COLOR=$(hyprpicker -r) && echo "$COLOR" | wl-copy && HEX="${COLOR#\#}" && BRIGHTNESS=$(( (16#${HEX:0:2} * 299 + 16#${HEX:2:2} * 587 + 16#${HEX:4:2} * 114) / 1000 )) && [ $BRIGHTNESS -gt 128 ] && FG="#000000" || FG="#FFFFFF" && notify-send "🖌️ " "$COLOR" -h string:bgcolor:"$COLOR" -h string:fgcolor:"$FG" -h string:frcolor:"$COLOR" -u normal ;;
     29) rofi -modi emoji -show emoji -theme '~/.config/rofi/SOS_Left.rasi' -emoji-format ;;
-    30) /usr/share/spectrumos/scripts/SOS_SessionMenu.sh ;;
+    # Monitor temperature
+    25) kitty -e btop ;;
+    # Screen Draw (gromit-mpx)
+    27) gromit-mpx ;;
+    30) /usr/share/spectrumos/scripts/SOS_Session.sh ;;
+    # Support SpectrumOS
+    31) xdg-open "https://github.com/gibranlp/SpectrumOS" ;;
 esac
