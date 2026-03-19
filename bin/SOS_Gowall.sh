@@ -69,7 +69,17 @@ set_default_wall_theme() {
     if [[ $exit_code -ne 0 ]] || [[ -z "$selected" ]]; then
         exit 0
     fi
-    
+
+    # Validate selection against known-good list
+    local valid=false
+    for t in "${wall_theme[@]}"; do
+        [[ "$selected" == "$t" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid theme selection" -u critical
+        exit 1
+    fi
+
     # Update config file
     sudo sed -i "s/^GOWALL_SCHEME=.*/GOWALL_SCHEME=\"$selected\"/" "$config_file"
     
