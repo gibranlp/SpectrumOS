@@ -49,7 +49,22 @@ set_waybar_style() {
     
     # Extract style name (before the dash)
     selected=$(echo "$selected" | awk '{print $1}')
-    
+
+    if [[ ! -f "$WAYBAR_STYLE_DIR/${selected}.css" ]]; then
+        notify-send -a "SpectrumOS" "Waybar style not found: ${selected}.css" -u critical
+        exit 1
+    fi
+
+    local valid_styles=("default" "transparent" "floating" "minimal" "pills")
+    local valid=false
+    for s in "${valid_styles[@]}"; do
+        [[ "$selected" == "$s" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid waybar style" -u critical
+        exit 1
+    fi
+
     # Update symlink
     ln -sf "$WAYBAR_STYLE_DIR/${selected}.css" "$WAYBAR_SYMLINK"
     

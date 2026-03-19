@@ -35,7 +35,17 @@ set_pywal_scheme() {
     if [[ $exit_code -ne 0 ]] || [[ -z "$selected" ]]; then
         exit 0
     fi
-    
+
+    # Validate selection against known-good list
+    local valid=false
+    for s in "${schemes[@]}"; do
+        [[ "$selected" == "$s" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid scheme selection" -u critical
+        exit 1
+    fi
+
     # Update config file
     sudo sed -i "s/^PYWAL_LIGHT_SCHEME=.*/PYWAL_LIGHT_SCHEME=\"$selected\"/" "$config_file"
     
