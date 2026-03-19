@@ -18,6 +18,11 @@ NC='\033[0m' # No Color
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# Log all output to file for debugging
+LOG_FILE="/tmp/spectrumos-install-${TIMESTAMP}.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Install log: $LOG_FILE"
+
 echo -e "${BLUE}🌈 SpectrumOS Master Installer${NC}"
 echo "=================================="
 echo ""
@@ -184,6 +189,17 @@ else
     exit 1
 fi
 
+# Auto-configure Nvidia env vars if Nvidia GPU detected
+if [[ "${GPU_PKGS[*]}" == *"nvidia"* ]]; then
+    echo -e "${BLUE}Nvidia GPU detected — enabling Hyprland Nvidia env vars...${NC}"
+    HYPR_ENV="$HOME/.config/hypr/env.conf"
+    sed -i 's/^# env = LIBVA_DRIVER_NAME,nvidia/env = LIBVA_DRIVER_NAME,nvidia/' "$HYPR_ENV"
+    sed -i 's/^# env = GBM_BACKEND,nvidia-drm/env = GBM_BACKEND,nvidia-drm/' "$HYPR_ENV"
+    sed -i 's/^# env = __GLX_VENDOR_LIBRARY_NAME,nvidia/env = __GLX_VENDOR_LIBRARY_NAME,nvidia/' "$HYPR_ENV"
+    sed -i 's/^# env = WLR_NO_HARDWARE_CURSORS,1/env = WLR_NO_HARDWARE_CURSORS,1/' "$HYPR_ENV"
+    echo -e "${GREEN}✓ Nvidia env vars configured${NC}"
+fi
+
 # --- Services & Finalization ---
 
 echo -e "${BLUE}Enabling services...${NC}"
@@ -203,7 +219,20 @@ if [ -f "$DEFAULT_WALLPAPER" ]; then
     # Generate initial colors (skip setting wallpaper as no Wayland session yet)
     echo -e "${BLUE}Generating initial color palette...${NC}"
     wal -i /var/lib/spectrumos/current.png -n || echo "Warning: Initial Pywal generation failed, will retry on first boot."
-    
+
+    # Copy Limine theme from dotfiles and apply generated colors
+    echo -e "${BLUE}Applying Limine theme from dotfiles...${NC}"
+    ESP=$(findmnt -no TARGET /boot || findmnt -no TARGET /efi || echo "/boot")
+    if [ -f "$SCRIPT_DIR/limine/limine.conf.example" ]; then
+        sudo cp -v "$SCRIPT_DIR/limine/limine.conf.example" "$ESP/limine.conf"
+        echo -e "${GREEN}✓ Limine theme copied to $ESP/limine.conf${NC}"
+        if [ -x /usr/local/bin/spectrumos-limine-sync.sh ]; then
+            sudo /usr/local/bin/spectrumos-limine-sync.sh || echo "Warning: Limine sync failed, will retry on first boot."
+        fi
+    else
+        echo "Warning: limine.conf.example not found in $SCRIPT_DIR/limine/"
+    fi
+
     # Generate SpectrumOS Logo for hyprlock
     if [ -f "$SCRIPT_DIR/bin/SOS_Gen_Logo.py" ]; then
         echo -e "${BLUE}Generating SpectrumOS Logo...${NC}"
