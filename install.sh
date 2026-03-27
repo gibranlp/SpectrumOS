@@ -7,12 +7,13 @@
 # SpectrumOS - Embrace the Chromatic Symphony!
 # Complete Installation & Configuration Script
 
-set -e
+set -eo pipefail
 
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
@@ -83,6 +84,7 @@ elif [[ "$CPU_VENDOR" == "GenuineIntel" ]]; then
 fi
 
 GPU_PKGS=()
+IS_VM=false
 if lspci | grep -i "vga" | grep -iq "nvidia"; then
     echo -e "${GREEN}✓ NVIDIA GPU detected${NC}"
     GPU_PKGS=("nvidia-dkms" "nvidia-utils" "lib32-nvidia-utils" "nvidia-settings")
@@ -92,12 +94,25 @@ elif lspci | grep -i "vga" | grep -iq "amd"; then
 elif lspci | grep -i "vga" | grep -iq "intel"; then
     echo -e "${GREEN}✓ Intel GPU detected${NC}"
     GPU_PKGS=("mesa" "lib32-mesa" "vulkan-intel" "lib32-vulkan-intel" "intel-media-driver" "libva-intel-driver" "lib32-libva-intel-driver")
+elif lspci | grep -i "vga" | grep -iqE "virtio|vmware|vmwgfx|virtualbox|vbox"; then
+    echo -e "${YELLOW}⚠ Virtual machine GPU detected — installing mesa only${NC}"
+    GPU_PKGS=("mesa" "lib32-mesa" "mesa-utils")
+    IS_VM=true
+else
+    echo -e "${YELLOW}⚠ GPU not recognized — installing generic mesa${NC}"
+    GPU_PKGS=("mesa" "lib32-mesa")
+fi
+
+# Skip heavy gaming packages in a VM unless explicitly overridden
+if [ "$IS_VM" = true ] && [ "$SKIP_HEAVY" = false ]; then
+    echo -e "${YELLOW}VM detected — skipping gaming packages (use FORCE_GAMING=true to override)${NC}"
+    [ "${FORCE_GAMING:-false}" = false ] && SKIP_HEAVY=true
 fi
 
 # --- Package Lists ---
 
 SYSTEM_PKGS=(
-    "$UCODE_PKG" "limine" "limine-mkinitcpio-hook" "plymouth" "tlp" "tlp-rdw" "acpi" "acpi_call" "cpupower"
+    "limine" "limine-mkinitcpio-hook" "plymouth" "tlp" "tlp-rdw" "acpi" "acpi_call" "cpupower"
     "hyprland" "hyprpaper" "hypridle" "hyprlock" "hyprpicker" "xdg-desktop-portal-hyprland" "xdg-desktop-portal-gtk"
     "qt5-wayland" "qt6-wayland" "qt5ct" "qt6ct" "kvantum" "waybar" "rofi-wayland" "dunst" "libnotify"
     "awww" "swappy" "grim" "slurp" "wl-clipboard" "cliphist" "brightnessctl" "pamixer" "playerctl" "nwg-displays"
@@ -157,7 +172,13 @@ sudo pacman -S --needed --noconfirm pipewire-jack lib32-pipewire-jack
 echo -e "${BLUE}Installing all packages...${NC}"
 # We install drivers and microcode first to satisfy dependencies and avoid provider prompts
 echo -e "${BLUE}Step 1: Drivers and Hardware Support...${NC}"
-paru -S --needed --noconfirm "${GPU_PKGS[@]}" "$UCODE_PKG"
+DRIVER_PKGS=("${GPU_PKGS[@]}")
+[ -n "$UCODE_PKG" ] && DRIVER_PKGS+=("$UCODE_PKG")
+if [ "${#DRIVER_PKGS[@]}" -gt 0 ]; then
+    paru -S --needed --noconfirm "${DRIVER_PKGS[@]}"
+else
+    echo -e "${YELLOW}No drivers to install — skipping Step 1${NC}"
+fi
 
 echo -e "${BLUE}Step 2: System and Desktop Environment...${NC}"
 paru -S --needed --noconfirm "${SYSTEM_PKGS[@]}"
@@ -243,13 +264,21 @@ fi
 # Shell Setup
 [ "$SHELL" != "/usr/bin/zsh" ] && sudo chsh -s /usr/bin/zsh $USER
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    # RUNZSH=no prevents oh-my-zsh from starting a new shell; KEEP_ZSHRC=yes
+    # prevents it from overwriting the .zshrc deployed by dots.sh above.
+    RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
 
 ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
 mkdir -p "$ZSH_CUSTOM/plugins"
 [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+
+# Redeploy ZSH config after oh-my-zsh (it may have overwritten .zshrc)
+if [ -f "$SCRIPT_DIR/config/zsh/.zshrc" ]; then
+    echo -e "${BLUE}Re-deploying .zshrc after oh-my-zsh installation...${NC}"
+    cp "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"
+fi
 
 echo ""
 echo -e "${GREEN}=================================="
