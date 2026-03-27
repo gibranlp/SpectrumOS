@@ -74,7 +74,7 @@ function set_wallpaper(){
     fi
 
     # Apply wallpaper
-    swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+    awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Update configs
     python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py

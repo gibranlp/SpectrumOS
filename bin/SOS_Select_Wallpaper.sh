@@ -56,8 +56,8 @@ else
     cp "$WALLPAPER" "$GOWALL_OUTPUT"
 fi
 
-# Set wallpaper with swww
-swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+# Set wallpaper with awww
+awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
 # Set Colors with pywal
 if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
