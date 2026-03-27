@@ -44,7 +44,8 @@ function install_bin(){
     echo -e "${BLUE}Installing SpectrumOS scripts...${NC}"
     sudo mkdir -p /usr/share/spectrumos/scripts/
     sudo cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
-    sudo chmod +x /usr/share/spectrumos/scripts/*
+    sudo find /usr/share/spectrumos/scripts/ -name "*.sh" -exec chmod +x {} +
+    sudo chmod +x /usr/share/spectrumos/scripts/*.py 2>/dev/null || true
     echo -e "${GREEN}✓ Scripts installed to /usr/share/spectrumos/scripts/${NC}"
 }
 
@@ -162,9 +163,15 @@ function install_plymouth(){
     # Add GPU driver to MODULES in mkinitcpio.conf for early KMS
     if [ -n "$GPU_DRIVER" ]; then
         if ! grep -q "MODULES=(.*$GPU_DRIVER.*)" /etc/mkinitcpio.conf; then
-            # We assume MODULES is either empty or doesn't have the driver
-            sudo sed -i "s/MODULES=(/MODULES=($GPU_DRIVER /" /etc/mkinitcpio.conf
-            echo "Added $GPU_DRIVER to MODULES in mkinitcpio.conf"
+            # Read current MODULES content, strip parens, prepend driver, collapse spaces
+            CURRENT_MODULES=$(grep "^MODULES=" /etc/mkinitcpio.conf | sed 's/MODULES=(//;s/)//' | xargs)
+            if [ -n "$CURRENT_MODULES" ]; then
+                NEW_MODULES="$GPU_DRIVER $CURRENT_MODULES"
+            else
+                NEW_MODULES="$GPU_DRIVER"
+            fi
+            sudo sed -i "s|^MODULES=.*|MODULES=($NEW_MODULES)|" /etc/mkinitcpio.conf
+            echo "Added $GPU_DRIVER to MODULES in mkinitcpio.conf: ($NEW_MODULES)"
         fi
     fi
 
