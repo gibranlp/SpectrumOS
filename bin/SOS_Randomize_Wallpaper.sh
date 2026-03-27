@@ -50,7 +50,7 @@ else
 fi
 
 # Apply wallpaper
-swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
 # Pywal
 if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
