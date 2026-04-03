@@ -113,13 +113,14 @@ fi
 
 SYSTEM_PKGS=(
     "limine" "limine-mkinitcpio-hook" "plymouth" "tlp" "tlp-rdw" "acpi" "acpi_call" "cpupower"
-    "hyprland" "hyprpaper" "hypridle" "hyprlock" "hyprpicker" "xdg-desktop-portal-hyprland" "xdg-desktop-portal-gtk"
+    "hyprland" "hyprpaper" "hypridle" "hyprlock" "hyprpicker" "xdg-desktop-portal-hyprland" "xdg-desktop-portal-gtk" "neovim"
     "qt5-wayland" "qt6-wayland" "qt5ct" "qt6ct" "kvantum" "waybar" "rofi-wayland" "dunst" "libnotify"
     "awww" "swappy" "grim" "slurp" "wl-clipboard" "cliphist" "brightnessctl" "pamixer" "playerctl" "nwg-displays"
     "kitty" "zsh" "zsh-completions" "zsh-syntax-highlighting" "zsh-autosuggestions" "starship" "fzf" "zoxide" "eza" "bat" "fd" "ripgrep" "thefuck"
     "networkmanager" "network-manager-applet" "bluez" "bluez-utils" "blueman" "pavucontrol" "pipewire" "pipewire-pulse" "pipewire-alsa" "pipewire-jack" "wireplumber" "libldac" "gvfs" "gvfs-mtp" "gvfs-smb" "gvfs-nfs" "tumbler" "file-roller" "unzip" "unrar" "p7zip" "rsync" "wget" "curl" "btop" "htop" "aur/neofetch" "locate" "imagemagick"
     "thunar" "thunar-volman" "thunar-archive-plugin" "yazi" "ranger" "ntfs-3g"
     "sddm" "qt5-graphicaleffects" "qt5-quickcontrols2" "qt5-svg"
+    "cava" "polkit-gnome" "gromit-mpx" "xsettingsd"
 )
 
 THEMING_PKGS=(
@@ -170,6 +171,11 @@ echo -e "${BLUE}Installing Pipewire-JACK replacements...${NC}"
 sudo pacman -S --needed --noconfirm pipewire-jack lib32-pipewire-jack
 
 echo -e "${BLUE}Installing all packages...${NC}"
+# Pre-install limine-mkinitcpio-hook separately: its .install script has an interactive
+# read prompt that --noconfirm does not suppress; piping yes answers it automatically.
+echo -e "${BLUE}Pre-installing limine and limine-mkinitcpio-hook...${NC}"
+yes | paru -S --needed limine limine-mkinitcpio-hook
+
 # We install drivers and microcode first to satisfy dependencies and avoid provider prompts
 echo -e "${BLUE}Step 1: Drivers and Hardware Support...${NC}"
 DRIVER_PKGS=("${GPU_PKGS[@]}")
@@ -235,11 +241,27 @@ if [ -f "$DEFAULT_WALLPAPER" ]; then
     cp "$DEFAULT_WALLPAPER" "$HOME/Pictures/Wallpapers/SpectrumOS_Default.jpg"
     sudo mkdir -p /var/lib/spectrumos
     sudo chown -R $USER:$USER /var/lib/spectrumos
-    cp "$DEFAULT_WALLPAPER" /var/lib/spectrumos/current.png
+    convert "$DEFAULT_WALLPAPER" /var/lib/spectrumos/current.png
     
     # Generate initial colors (skip setting wallpaper as no Wayland session yet)
     echo -e "${BLUE}Generating initial color palette...${NC}"
     wal -i /var/lib/spectrumos/current.png -n || echo "Warning: Initial Pywal generation failed, will retry on first boot."
+
+    # Copy pywal-generated configs to their target locations for first boot
+    if [ -f "$HOME/.cache/wal/dunstrc" ]; then
+        mkdir -p "$HOME/.config/dunst"
+        cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
+        echo -e "${GREEN}✓ Initial dunst config deployed${NC}"
+    fi
+    if [ -f "$HOME/.cache/wal/cava-config" ]; then
+        mkdir -p "$HOME/.config/cava"
+        cp "$HOME/.cache/wal/cava-config" "$HOME/.config/cava/config"
+        echo -e "${GREEN}✓ Initial cava config deployed${NC}"
+    fi
+    if [ -f "$HOME/.cache/wal/sddm-colors.conf" ]; then
+        cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
+        echo -e "${GREEN}✓ Initial SDDM colors deployed${NC}"
+    fi
 
     # Copy Limine theme from dotfiles and apply generated colors
     echo -e "${BLUE}Applying Limine theme from dotfiles...${NC}"

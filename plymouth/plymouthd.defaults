@@ -3,4 +3,4 @@ Theme=spectrumos
 ShowDelay=0
 DeviceTimeout=8
 DeviceScale=1
-UseFirmwareBackground=true
+UseFirmwareBackground=false

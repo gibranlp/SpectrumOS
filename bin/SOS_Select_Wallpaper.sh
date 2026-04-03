@@ -85,6 +85,8 @@ pkill -USR1 cava
 pywalfox update
 walogram -c
 
+/usr/share/spectrumos/scripts/SOS_PywalGTK.sh
+/usr/share/spectrumos/scripts/SOS_PywalQT.sh
 /usr/share/spectrumos/scripts/SOS_PywalThemix.sh
 /usr/share/spectrumos/scripts/SOS_ReloadIcons.sh
 
