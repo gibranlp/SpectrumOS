@@ -121,10 +121,26 @@ function install_limine_sync(){
         echo "✓ Created /etc/default/limine with ESP_PATH=\"$ESP\""
     fi
 
-    # Check if limine.conf exists in ESP, if not, copy the example
-    if [ ! -f "$ESP/limine.conf" ]; then
-        echo -e "${BLUE}No limine.conf found in $ESP, installing default...${NC}"
-        sudo cp -v "$SCRIPT_DIR"/limine/limine.conf.example "$ESP/limine.conf"
+    # Ensure /boot/limine/ directory exists and copy the example config if not present
+    sudo mkdir -p /boot/limine
+    if [ ! -f /boot/limine/limine.conf ]; then
+        echo -e "${BLUE}No limine.conf found at /boot/limine/limine.conf, installing default...${NC}"
+        sudo cp -v "$SCRIPT_DIR"/limine/limine.conf.example /boot/limine/limine.conf
+    fi
+
+    # Copy initial wallpaper to ESP root for Limine (boot():/spectrumos-wallpaper.jpg)
+    if [ ! -f "$ESP/spectrumos-wallpaper.jpg" ]; then
+        echo -e "${BLUE}Copying initial wallpaper for Limine boot screen...${NC}"
+        if [ -f /var/lib/spectrumos/current.png ]; then
+            if command -v convert &>/dev/null; then
+                sudo convert /var/lib/spectrumos/current.png "$ESP/spectrumos-wallpaper.jpg"
+            else
+                sudo cp /var/lib/spectrumos/current.png "$ESP/spectrumos-wallpaper.jpg"
+            fi
+            echo -e "${GREEN}✓ Wallpaper copied to $ESP/spectrumos-wallpaper.jpg${NC}"
+        else
+            echo -e "${YELLOW}No wallpaper at /var/lib/spectrumos/current.png yet — will be set on first wallpaper change${NC}"
+        fi
     fi
 
     # Copy script

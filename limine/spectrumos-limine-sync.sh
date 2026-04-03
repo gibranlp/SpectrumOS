@@ -13,8 +13,8 @@ fi
 WALLPAPER_SOURCE="/var/lib/spectrumos/current.png"
 WALLPAPER_DEST="$ESP_PATH/spectrumos-wallpaper.jpg"
 COLORS_SOURCE="/var/lib/spectrumos/colors.conf"
-LIMINE_CONF="$ESP_PATH/limine.conf"
-LIMINE_CONF_BACKUP="$ESP_PATH/limine.conf.spectrumos.backup"
+LIMINE_CONF="/boot/limine/limine.conf"
+LIMINE_CONF_BACKUP="/boot/limine/limine.conf.spectrumos.backup"
 
 # Function to read INI-style config (skips [General] header)
 read_color_value() {
