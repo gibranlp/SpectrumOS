@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# _____             _                 _____ _____ 
+# _____             _                 _____ _____
 #|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
 #|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
 #|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
-#      |_|   
+#      |_|
 # SpectrumOS - Embrace the Chromatic Symphony!
 # By: gibranlp <thisdoesnotwork@gibranlp.dev>
-# MIT licence 
+# MIT licence
+
+set -eo pipefail
 
 # Get the directory where the script is located
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
@@ -15,6 +17,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -42,10 +45,20 @@ function deploy_config() {
 # Install Bin files
 function install_bin(){
     echo -e "${BLUE}Installing SpectrumOS scripts...${NC}"
+    # Create the directory as root (it lives under /usr/share), then immediately
+    # hand ownership to the current user so all further operations need no sudo
+    # and the user can update scripts in-place without sudo in the future.
     sudo mkdir -p /usr/share/spectrumos/scripts/
-    sudo cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
-    sudo find /usr/share/spectrumos/scripts/ -name "*.sh" -exec chmod +x {} +
-    sudo chmod +x /usr/share/spectrumos/scripts/*.py 2>/dev/null || true
+    sudo chown -R "$(id -u):$(id -g)" /usr/share/spectrumos/
+    cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
+    find /usr/share/spectrumos/scripts/ -name "*.sh" -exec chmod +x {} +
+    find /usr/share/spectrumos/scripts/ -name "*.py" -exec chmod +x {} +
+    chmod 755 /usr/share/spectrumos/scripts/
+    chmod +x /usr/share/spectrumos/scripts/*
+    # Create extension-less symlinks so scripts are callable without .sh suffix
+    find /usr/share/spectrumos/scripts/ -maxdepth 1 -name "*.sh" | while read f; do
+        ln -sf "$f" "${f%.sh}"
+    done
     echo -e "${GREEN}✓ Scripts installed to /usr/share/spectrumos/scripts/${NC}"
 }
 
@@ -77,10 +90,13 @@ function install_gromit() { deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME
 function install_rofi_themes() { deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"; }
 function install_swappy_config() { deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"; }
 function install_wal_templates() { deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"; }
-function install_waybar_config() { 
+function install_waybar_config() {
     deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
     # Replace hardcoded home path in waybar CSS
     find "$HOME/.config/waybar" -name "*.css" -exec sed -i "s|/home/gibranlp|$HOME|g" {} +
+    # Create initial config and style symlinks so waybar starts with the SpectrumOS layout
+    ln -sf "$HOME/.config/waybar/configs/Productivity.json" "$HOME/.config/waybar/config"
+    ln -sf "$HOME/.config/waybar/styles/default.css" "$HOME/.config/waybar/style.css"
 }
 function install_kitty_config() { deploy_config "$SCRIPT_DIR/config/kitty" "$HOME/.config/kitty"; }
 function install_nvim_config() { deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/.config/nvim"; }
@@ -90,8 +106,12 @@ function install_mimeapps() { deploy_config "$SCRIPT_DIR/config/mimeapps.list" "
 
 # Install Limine Sync Files
 function install_limine_sync(){
+    if ! command -v limine &>/dev/null; then
+        echo -e "${YELLOW}Limine not installed — skipping${NC}"
+        return 0
+    fi
     echo -e "${BLUE}Installing Limine Sync...${NC}"
-    
+
     # Detect ESP Path
     ESP=$(findmnt -no TARGET /boot || findmnt -no TARGET /efi || echo "/boot")
     
@@ -124,20 +144,28 @@ function install_limine_sync(){
     # Enable path Watcher
     sudo systemctl daemon-reload
     sudo systemctl enable spectrumos-limine-sync.path
-    sudo systemctl start spectrumos-limine-sync.path
-    echo -e "${GREEN}✓ Limine sync installed and enabled${NC}"
+    sudo systemctl restart spectrumos-limine-sync.path
+    echo -e "${GREEN}✓ Limine sync installed and enabled (watching colors.conf)${NC}"
+
+    # Run sync immediately so the wallpaper and colors are applied right now,
+    # not only on the next kernel upgrade or colors.conf change.
+    if [ -x /usr/local/bin/spectrumos-limine-sync.sh ]; then
+        echo -e "${BLUE}Running initial Limine sync...${NC}"
+        sudo /usr/local/bin/spectrumos-limine-sync.sh || echo "Warning: Initial Limine sync failed"
+    fi
 }
 
 function install_plymouth(){
+    if ! command -v plymouth &>/dev/null; then
+        echo -e "${YELLOW}Plymouth not installed — skipping${NC}"
+        return 0
+    fi
     echo -e "${BLUE}Installing Plymouth theme...${NC}"
     # Copy theme to Plymouth themes directory
     sudo mkdir -p /usr/share/plymouth/themes/
     sudo cp -rv "$SCRIPT_DIR"/plymouth/themes/spectrumos /usr/share/plymouth/themes/
 
-    # Set the default theme
-    sudo plymouth-set-default-theme -R spectrumos
-
-    # Install Plymouth configuration
+    # Install Plymouth configuration first (before setting default theme)
     if [ -f "$SCRIPT_DIR/plymouth/plymouthd.defaults" ]; then
         sudo mkdir -p /etc/plymouth
         sudo cp -v "$SCRIPT_DIR/plymouth/plymouthd.defaults" /etc/plymouth/plymouthd.conf
@@ -154,10 +182,14 @@ function install_plymouth(){
         GPU_DRIVER="i915"
     elif lspci | grep -i "vga" | grep -iq "virtio"; then
         GPU_DRIVER="virtio_gpu"
+    elif lspci | grep -i "vga" | grep -iq "qxl"; then
+        GPU_DRIVER="qxl"
     elif lspci | grep -i "vga" | grep -iq "vmware"; then
         GPU_DRIVER="vmwgfx"
     elif lspci | grep -i "vga" | grep -iq "virtualbox"; then
         GPU_DRIVER="vboxvideo"
+    elif lspci | grep -i "vga" | grep -iq "bochs"; then
+        GPU_DRIVER="bochs"
     fi
 
     # Add GPU driver to MODULES in mkinitcpio.conf for early KMS
@@ -177,37 +209,64 @@ function install_plymouth(){
 
     # Add and reorder HOOKS in mkinitcpio.conf for early KMS and Plymouth
     if grep -q "^HOOKS=" /etc/mkinitcpio.conf; then
-        # Ensure 'kms' is present and before 'plymouth'
+        # plymouth goes right after udev; kms goes after modconf (Arch wiki order)
         CURRENT_HOOKS=$(grep "^HOOKS=" /etc/mkinitcpio.conf | sed 's/HOOKS=(//;s/)//')
-        
+
         # Remove existing kms and plymouth to re-insert them correctly
         NEW_HOOKS=$(echo "$CURRENT_HOOKS" | sed 's/\bkms\b//g;s/\bplymouth\b//g;s/  / /g;s/^ //;s/ $//')
-        
-        # Insert kms and plymouth after udev
+
+        # Insert plymouth right after udev (Arch wiki requirement)
         if echo "$NEW_HOOKS" | grep -q "\budev\b"; then
-            FINAL_HOOKS=$(echo "$NEW_HOOKS" | sed 's/\budev\b/udev kms plymouth/')
+            FINAL_HOOKS=$(echo "$NEW_HOOKS" | sed 's/\budev\b/udev plymouth/')
         else
             # Fallback: just put them at the beginning
-            FINAL_HOOKS="base udev kms plymouth $NEW_HOOKS"
+            FINAL_HOOKS="base udev plymouth $NEW_HOOKS"
         fi
-        
+
+        # Insert kms after modconf (or before block as fallback) for early KMS
+        if echo "$FINAL_HOOKS" | grep -q "\bmodconf\b"; then
+            FINAL_HOOKS=$(echo "$FINAL_HOOKS" | sed 's/\bmodconf\b/modconf kms/')
+        elif echo "$FINAL_HOOKS" | grep -q "\bblock\b"; then
+            FINAL_HOOKS=$(echo "$FINAL_HOOKS" | sed 's/\bblock\b/kms block/')
+        else
+            FINAL_HOOKS="$FINAL_HOOKS kms"
+        fi
+
         # Clean up double spaces
         FINAL_HOOKS=$(echo "$FINAL_HOOKS" | tr -s ' ')
-        
+
         sudo sed -i "s/^HOOKS=(.*/HOOKS=($FINAL_HOOKS)/" /etc/mkinitcpio.conf
         echo "Updated HOOKS in mkinitcpio.conf: ($FINAL_HOOKS)"
     fi
 
+    # Set the default theme (no -R here; mkinitcpio runs once at the end with correct config)
+    sudo plymouth-set-default-theme spectrumos
+
     sudo mkdir -p /etc/pacman.d/hooks
     sudo cp "$SCRIPT_DIR"/plymouth/plymouth-quit-fix.hook /etc/pacman.d/hooks/plymouth-quit-fix.hook
 
-    # Regenerate initramfs
+    # Apply Plymouth quit delay override now (the pacman hook only fires on future upgrades,
+    # not on the initial install that already ran before this script was deployed)
+    sudo mkdir -p /etc/systemd/system/plymouth-quit.service.d
+    printf '[Service]\nExecStartPre=/usr/bin/sleep 5\n' | sudo tee /etc/systemd/system/plymouth-quit.service.d/override.conf > /dev/null
+
+    # Ensure SDDM waits for Plymouth to finish before starting
+    sudo mkdir -p /etc/systemd/system/sddm.service.d
+    printf '[Unit]\nAfter=plymouth-quit.service\nWants=plymouth-quit.service\n' | sudo tee /etc/systemd/system/sddm.service.d/plymouth.conf > /dev/null
+
+    sudo systemctl daemon-reload
+
+    # Regenerate initramfs once with all config changes applied
     sudo mkinitcpio -P
     echo -e "${GREEN}✓ Plymouth theme installed and initramfs regenerated${NC}"
 }
 
 # Install SDDM Theme
 function install_sddm_theme(){
+    if ! command -v sddm &>/dev/null; then
+        echo -e "${YELLOW}SDDM not installed — skipping${NC}"
+        return 0
+    fi
     echo -e "${BLUE}Installing SDDM theme...${NC}"
     sudo mkdir -p /usr/share/sddm/themes/spectrumos
     sudo cp -rv "$SCRIPT_DIR"/sddm/themes/spectrumos/* /usr/share/sddm/themes/spectrumos/
@@ -231,6 +290,10 @@ function install_spectrum_config(){
 
 # Install TLP
 function install_tlp(){
+    if ! command -v tlp &>/dev/null; then
+        echo -e "${YELLOW}TLP not installed — skipping${NC}"
+        return 0
+    fi
     echo -e "${BLUE}Installing TLP config...${NC}"
     if [ -f /etc/tlp.conf ]; then
         sudo cp /etc/tlp.conf /etc/tlp.conf.bak.$TIMESTAMP
@@ -251,26 +314,51 @@ function install_gaming_configs() {
 }
 
 function install_all(){
+    # 1. System foundations — create dirs and hand /usr/share/spectrumos to $USER
     create_local_files
-    install_bin
-    install_gowall_config
-    install_hyprland_config
-    install_gromit
-    install_limine_sync
-    install_plymouth
-    install_rofi_themes
-    install_sddm_theme
+
+    # 2. SpectrumOS system config — /etc/spectrumos must exist before bin scripts
+    #    reference it and before Limine sync reads it
     install_spectrum_config
-    install_swappy_config
-    install_tlp
+
+    # 3. Bin scripts — installed and made executable before any config that calls them
+    #    (Hyprland keybindings/autostart reference these paths)
+    install_bin
+
+    # 4. Pywal templates — must be in place before Hyprland/Waybar configs are copied
+    #    so that template paths resolve correctly on first wal run
     install_wal_templates
+
+    # 5. Hyprland config — depends on bin scripts (step 3) and wal templates (step 4)
+    install_hyprland_config
+
+    # 6. Remaining user dotfiles — order within this block does not matter
     install_waybar_config
+    install_rofi_themes
+    install_gowall_config
+    install_gromit
+    install_swappy_config
     install_kitty_config
     install_nvim_config
     install_zsh_config
     install_xsettingsd
     install_mimeapps
     install_gaming_configs
+
+    # 7. Display manager — reads pywal sddm-colors.conf written by wal templates
+    install_sddm_theme
+
+    # 8. TLP — fast, independent of everything above
+    install_tlp
+
+    # 9. Limine sync — installs the path watcher; must come before Plymouth so any
+    #    future mkinitcpio.conf changes from Limine are present when initramfs is built
+    install_limine_sync
+
+    # 10. Plymouth last — mkinitcpio -P rebuilds initramfs and must run after ALL
+    #     MODULES/HOOKS changes (GPU driver, plymouth hook) are finalized
+    install_plymouth
+
     echo -e "${GREEN}✓ All configurations deployed!${NC}"
 }
 
@@ -278,7 +366,7 @@ function install_all(){
 function usage() {
     echo "Usage: $0 [OPTION]"
     echo "Options:"
-    echo "  --all            Deploy all configurations"
+    echo "  --all, --al      Deploy all configurations"
     echo "  --bin            Install scripts to /usr/share/spectrumos/scripts/"
     echo "  --hypr           Install Hyprland configs"
     echo "  --waybar         Install Waybar configs"
@@ -303,7 +391,7 @@ fi
 
 for arg in "$@"; do
     case $arg in
-        --all)
+        --all|--al)
             install_all
             ;;
         --bin)
