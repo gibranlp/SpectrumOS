@@ -41,7 +41,7 @@ done
 
 # Perform action based on index
 case "$index" in
-    0)  ;; 
+    0) hyprlock ;;
     1) systemctl suspend ;;
     2) exit ;;
     3) systemctl reboot ;;

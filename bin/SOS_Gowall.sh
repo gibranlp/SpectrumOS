@@ -69,7 +69,17 @@ set_default_wall_theme() {
     if [[ $exit_code -ne 0 ]] || [[ -z "$selected" ]]; then
         exit 0
     fi
-    
+
+    # Validate selection against known-good list
+    local valid=false
+    for t in "${wall_theme[@]}"; do
+        [[ "$selected" == "$t" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid theme selection" -u critical
+        exit 1
+    fi
+
     # Update config file
     sudo sed -i "s/^GOWALL_SCHEME=.*/GOWALL_SCHEME=\"$selected\"/" "$config_file"
     
@@ -97,21 +107,14 @@ function set_wallpaper(){
         notify-send "No Theme Selected!"
     fi
     
-    # Pywal
-    if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    else
-        wal -i /var/lib/spectrumos/current.png --backend "$PYWAL_BACKEND"
-    fi
-
     # Apply wallpaper
-    swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+    awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Pywal
     if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-        wal -l -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -l -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     else
-        wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
+        wal -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     fi
 
     # Update configs
@@ -119,6 +122,8 @@ function set_wallpaper(){
     rm -f /var/lib/spectrumos/colors.conf
     cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
 
+    mkdir -p "$HOME/.config/dunst"
+    mkdir -p "$HOME/.config/cava"
     cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
     pkill dunst; dunst &
 
@@ -138,7 +143,7 @@ function set_wallpaper(){
     waybar &
 
     # Send notification with thumbnail
-    notify-send -t 1000"Theme Updated!"
+    notify-send -t 1000 "Theme Updated!"
 
     /usr/share/spectrumos/scripts/SOS_Regenerate.sh
 
