@@ -49,7 +49,23 @@ set_waybar_theme() {
     
     # Extract theme name (before the dash)
     selected=$(echo "$selected" | awk '{print $2}')
-    
+
+    if [[ ! -f "$WAYBAR_CONFIG_DIR/${selected}.json" ]]; then
+        notify-send -a "SpectrumOS" "Waybar config not found: ${selected}.json" -u critical
+        exit 1
+    fi
+
+    # Validate against known themes
+    local valid_themes=("Minimal" "Multimedia" "Productivity" "Detailed" "Gaming")
+    local valid=false
+    for t in "${valid_themes[@]}"; do
+        [[ "$selected" == "$t" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid waybar theme" -u critical
+        exit 1
+    fi
+
     # Update symlink
     ln -sf "$WAYBAR_CONFIG_DIR/${selected}.json" "$WAYBAR_SYMLINK"
     

@@ -14,6 +14,9 @@ sudo pacman -Scc --noconfirm
 
 notify-send -a 'SpectrumOS' "System Cache Clean!"
 
-sudo pacman -Rns $(pacman -Qtdq) --noconfirm
+ORPHANS=$(pacman -Qtdq 2>/dev/null)
+if [ -n "$ORPHANS" ]; then
+    sudo pacman -Rns $ORPHANS --noconfirm
+fi
 
 notify-send -a 'SpectrumOS' "Removed Unused Packages!"

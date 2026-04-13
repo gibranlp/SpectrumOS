@@ -37,7 +37,17 @@ set_pywal_backend() {
     if [[ $exit_code -ne 0 ]] || [[ -z "$selected" ]]; then
         exit 0
     fi
-    
+
+    # Validate selection against known-good list
+    local valid=false
+    for b in "${backends[@]}"; do
+        [[ "$selected" == "$b" ]] && valid=true && break
+    done
+    if [[ "$valid" != true ]]; then
+        notify-send -a "SpectrumOS" "Invalid backend selection" -u critical
+        exit 1
+    fi
+
     # Update config file
     sudo sed -i "s/^PYWAL_BACKEND=.*/PYWAL_BACKEND=\"$selected\"/" "$config_file"
     
@@ -64,7 +74,7 @@ function set_wallpaper(){
     fi
 
     # Apply wallpaper
-    swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+    awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Update configs
     python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py

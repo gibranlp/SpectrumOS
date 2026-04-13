@@ -27,7 +27,7 @@ SELECTED=$(rofi \
     -show filebrowser \
     -filebrowser-directory "$WALLPAPER_DIR" \
     -filebrowser-command "echo" \
-    -theme ~/.config/rofi/SOS_Wallpaper.rasi \
+    -theme "$HOME/.config/rofi/SOS_Wallpaper.rasi" \
     -filebrowser-sorting-method mtime \
     -selected-row 1 \
     -filebrowser-show-hidden false \
@@ -56,8 +56,8 @@ else
     cp "$WALLPAPER" "$GOWALL_OUTPUT"
 fi
 
-# Set wallpaper with swww
-swww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+# Set wallpaper with awww
+awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
 # Set Colors with pywal
 if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
@@ -74,6 +74,8 @@ python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py
 rm -f /var/lib/spectrumos/colors.conf
 cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
 
+mkdir -p "$HOME/.config/dunst"
+mkdir -p "$HOME/.config/cava"
 cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
 pkill dunst; dunst &
 
@@ -83,6 +85,8 @@ pkill -USR1 cava
 pywalfox update
 walogram -c
 
+/usr/share/spectrumos/scripts/SOS_PywalGTK.sh
+/usr/share/spectrumos/scripts/SOS_PywalQT.sh
 /usr/share/spectrumos/scripts/SOS_PywalThemix.sh
 /usr/share/spectrumos/scripts/SOS_ReloadIcons.sh
 
