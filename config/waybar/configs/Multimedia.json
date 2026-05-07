@@ -2,39 +2,70 @@
     "layer": "bottom",
     "position": "top",
     "height": 30,
-    "spacing": 5,
-    "modules-left": ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/media-prev", "custom/media", "custom/media-next"],
-    "modules-right": ["pulseaudio", "pulseaudio#microphone", "bluetooth", "battery", "clock", "tray"],
-    "hyprland/workspaces": {
-        "format": "{icon}",
+    "spacing": 2,
+    "margin-left": 5,
+    "margin-right": 5,
+    "modules-left": ["pulseaudio", "bluetooth"],
+    "modules-center": ["custom/media-prev", "custom/media-play-pause", "custom/media", "custom/media-next", "custom/cava"],
+    "modules-right": ["backlight", "battery", "clock", "tray"],
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-bluetooth": "{icon} {volume}%",
+        "format-bluetooth-muted": "󰝟 {icon}",
+        "format-muted": "󰝟 {volume}%",
         "format-icons": {
-            "1": "󰫃",
-            "2": "󰫄",
-            "3": "󰫅",
-            "4": "󰫆",
-            "5": "󰫇",
-            "6": "󰫈",
-            "todoist": "",
-            "obsidian": "󱞁"
+            "headphone": "󰋋",
+            "hands-free": "󰋎",
+            "headset": "󰋎",
+            "phone": "󰏲",
+            "portable": "󰏲",
+            "car": "󰄋",
+            "default": ["󰕿", "󰖀", "󰕾"]
         },
-        "persistent-workspaces": {
-            "*": 6
-        }
+        "on-click": "/usr/share/spectrumos/scripts/SOS_Audio.sh",
+        "on-click-middle": "pavucontrol"
     },
-    "hyprland/window": {
-        "max-length": 50,
-        "separate-outputs": true
+    "bluetooth": {
+        "format": "󰂯 {status}",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "format-on": "󰂮",
+        "format-connected": "󰂱 {device_alias}",
+        "format-connected-battery": "󰂱 {device_alias} {device_battery_percentage}%",
+        "tooltip-format": "{controller_alias}\t{controller_address}\n\n{num_connections} connected",
+        "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{num_connections} connected\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+        "tooltip-format-enumerate-connected-battery": "{device_alias}\t{device_address}\t{device_battery_percentage}%",
+        "on-click": "blueman-manager"
     },
     "custom/media-prev": {
-        "format": "",
+        "format": "󰒮",
         "on-click": "playerctl previous",
         "tooltip": false
     },
-    "custom/media": {
-        "format": "{}",
+    "custom/media-play-pause": {
+        "format": "{icon}",
         "return-type": "json",
-        "max-length": 60,
+        "exec": "$HOME/.config/waybar/scripts/mediaplayer.py 2> /dev/null",
+        "on-click": "playerctl play-pause",
+        "format-icons": {
+            "Playing": "󰏤",
+            "Paused": "󰐊"
+        }
+    },
+    "custom/media-next": {
+        "format": "󰒭",
+        "on-click": "playerctl next",
+        "tooltip": false
+    },
+    "custom/media": {
+        "format": "{icon} {text}",
+        "return-type": "json",
+        "max-length": 40,
+        "format-icons": {
+            "spotify": "",
+            "default": "󰝚"
+        },
         "escape": true,
         "exec": "$HOME/.config/waybar/scripts/mediaplayer.py 2> /dev/null",
         "on-click": "playerctl play-pause",
@@ -44,53 +75,34 @@
         "smooth-scrolling-threshold": 1,
         "interval": 2
     },
-    "custom/media-next": {
-        "format": "",
-        "on-click": "playerctl next",
-        "tooltip": false
+    "custom/cava": {
+        "exec": "$HOME/.config/waybar/scripts/waybar-cava.sh",
+        "format": "{}"
     },
-    "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-bluetooth": "{icon} {volume}%",
-        "format-bluetooth-muted": " {icon}",
-        "format-muted": " {volume}%",
-        "format-icons": {
-            "headphone": "",
-            "hands-free": "",
-            "headset": "",
-            "phone": "",
-            "portable": "",
-            "car": "",
-            "default": ["", "", ""]
+    "backlight": {
+        "device": "intel_backlight",
+        "format": "{icon} {percent}%",
+        "format-icons": ["󰃞", "󰃟", "󰃠"],
+        "on-scroll-up": "brightnessctl set 5%+",
+        "on-scroll-down": "brightnessctl set 5%-"
+    },
+    "battery": {
+        "states": {
+            "good": 80,
+            "warning": 30,
+            "critical": 15
         },
-        "on-click": "pavucontrol",
-        "on-scroll-up": "pactl set-sink-volume @DEFAULT_SINK@ +5%",
-        "on-scroll-down": "pactl set-sink-volume @DEFAULT_SINK@ -5%"
-    },
-    "pulseaudio#microphone": {
-        "format": "{format_source}",
-        "format-source": " {volume}%",
-        "format-source-muted": "",
-        "on-click": "pavucontrol -t 4",
-        "on-scroll-up": "pactl set-source-volume @DEFAULT_SOURCE@ +5%",
-        "on-scroll-down": "pactl set-source-volume @DEFAULT_SOURCE@ -5%"
-    },
-    "bluetooth": {
-        "format": " {status}",
-        "format-disabled": "",
-        "format-off": "",
-        "format-on": "",
-        "format-connected": " {device_alias}",
-        "format-connected-battery": " {device_alias} {device_battery_percentage}%",
-        "tooltip-format": "{controller_alias}\t{controller_address}\n\n{num_connections} connected",
-        "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{num_connections} connected\n\n{device_enumerate}",
-        "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
-        "tooltip-format-enumerate-connected-battery": "{device_alias}\t{device_address}\t{device_battery_percentage}%",
-        "on-click": "blueman-manager"
+        "interval": 10,
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": "󰚥 {capacity}%",
+        "format-alt": "{icon} {time}",
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+        "tooltip-format": "{timeTo}, {capacity}%\n{power}W"
     },
     "clock": {
-        "format": "{:%H:%M}",
-        "format-alt": "{:%A, %B %d, %Y (%R)}",
+        "format": "󰥔 {:%H:%M}",
+        "format-alt": "󰃭 {:%A, %B %d, %Y (%R)}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "year",
@@ -98,24 +110,13 @@
             "weeks-pos": "right",
             "on-scroll": 1,
             "format": {
-                "months": "<b>{}</b>",
-                "days": "<b>{}</b>",
-                "weeks": "<b>W{}</b>",
-                "weekdays": "<b>{}</b>",
-                "today": "<b><u>{}</u></b>"
+                "months": "<span color='#ffead3'><b>{}</b></span>",
+                "days": "<span color='#ecc6d9'><b>{}</b></span>",
+                "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+                "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
             }
         }
-    },
-    "battery": {
-        "states": {
-            "warning": 30,
-            "critical": 15
-        },
-        "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
-        "format-alt": "{icon} {time}",
-        "format-icons": ["", "", "", "", ""]
     },
     "tray": {
         "spacing": 10

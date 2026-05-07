@@ -11,6 +11,15 @@
 
 source "$HOME/.cache/wal/colors.sh"
 
+# Function to convert hex to RGB
+hex_to_rgb() {
+    local hex=$1
+    hex=${hex#\#}
+    printf "%d, %d, %d" 0x${hex:0:2} 0x${hex:2:2} 0x${hex:4:2}
+}
+
+rgb_back=$(hex_to_rgb "$background")
+
 KVANTUM_DIR="$HOME/.config/Kvantum/Pywal"
 mkdir -p "$KVANTUM_DIR"
 
@@ -53,9 +62,9 @@ progressbar_thickness=4
 menubar_mouse_tracking=true
 toolbutton_style=0
 double_click=false
-translucent_windows=false
-blurring=false
-popup_blurring=false
+translucent_windows=true
+blurring=true
+popup_blurring=true
 vertical_spin_indicators=false
 spin_button_width=16
 fill_rubberband=false
@@ -92,8 +101,8 @@ submenu_delay=250
 no_window_pattern=false
 
 [GeneralColors]
-window.color=${background}
-base.color=${color0}
+window.color=rgba(${rgb_back}, 200)
+base.color=rgba(${rgb_back}, 180)
 alt.base.color=${color8}
 button.color=${color1}
 light.color=${color7}
@@ -117,7 +126,7 @@ progress.indicator.text.color=${foreground}
 transparent_ktitle_label=true
 transparent_dolphin_view=true
 transparent_pcmanfm_sidepane=true
-blur_translucent=false
+blur_translucent=true
 transparent_menutitle=true
 respect_darkness=true
 kcapacitybar_as_progressbar=true
@@ -129,7 +138,7 @@ lxqtmainmenu_iconsize=22
 normal_default_pushbutton=true
 single_top_toolbar=true
 tint_on_mouseover=0
-transparent_pcmanfm_view=false
+transparent_pcmanfm_view=true
 no_selection_tint=false
 EOF
 

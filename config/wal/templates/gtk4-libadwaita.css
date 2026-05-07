@@ -1,0 +1,28 @@
+@define-color accent_bg_color {color1};
+@define-color accent_fg_color {color0};
+@define-color accent_color {color1};
+
+@define-color window_bg_color {color0};
+@define-color window_fg_color {color7};
+
+@define-color view_bg_color {color0};
+@define-color view_fg_color {color7};
+
+@define-color headerbar_bg_color {color0};
+@define-color headerbar_fg_color {color7};
+@define-color headerbar_border_color {color0};
+@define-color headerbar_backdrop_color @window_bg_color;
+@define-color headerbar_shade_color rgba(0, 0, 0, 0.07);
+
+@define-color card_bg_color rgba(255, 255, 255, 0.08);
+@define-color card_fg_color {color7};
+@define-color card_shade_color rgba(0, 0, 0, 0.07);
+
+@define-color dialog_bg_color {color0};
+@define-color dialog_fg_color {color7};
+
+@define-color popover_bg_color {color0};
+@define-color popover_fg_color {color7};
+
+@define-color shade_color rgba(0,0,0,0.07);
+@define-color scrollbar_outline_color rgba(0,0,0,0.1);

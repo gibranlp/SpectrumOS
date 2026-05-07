@@ -1,0 +1,23 @@
+{
+  "theme": {
+    "name": "SpectrumOS",
+    "author": "gibranlp",
+    "settings": {
+      "accentFromPage": false,
+      "accentOnWindow": true,
+      "borderRadius": "4",
+      "tabsAlpha": 1,
+      "blur": 0
+    },
+    "colors": {
+      "accentBg": "{color1}",
+      "accentFg": "{foreground}",
+      "bg": "{background}",
+      "fg": "{foreground}",
+      "highlight": "{color2}",
+      "border": "{color8}",
+      "btnBg": "{color0}",
+      "btnFg": "{foreground}"
+    }
+  }
+}

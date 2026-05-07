@@ -28,15 +28,10 @@ function deploy_config() {
     local src="$1"
     local dest="$2"
     
-    if [ -d "$dest" ] || [ -f "$dest" ]; then
-        echo -e "${BLUE}Backing up existing config: $dest -> $dest.bak.$TIMESTAMP${NC}"
-        mv "$dest" "$dest.bak.$TIMESTAMP"
-    fi
-    
     echo -e "${BLUE}Deploying: $src -> $dest${NC}"
-    mkdir -p "$(dirname "$dest")"
+    mkdir -p "$dest"
     if [ -d "$src" ]; then
-        cp -rv "$src" "$dest"
+        cp -rv "$src/." "$dest/"
     else
         cp -v "$src" "$dest"
     fi
@@ -50,6 +45,13 @@ function install_bin(){
     # and the user can update scripts in-place without sudo in the future.
     sudo mkdir -p /usr/share/spectrumos/scripts/
     sudo chown -R "$(id -u):$(id -g)" /usr/share/spectrumos/
+
+    # Remove scripts that were deleted from bin/ so they don't linger installed
+    local orphans=(SOS_PywalThemix SOS_PywalThemix.sh SOS_PywalGTK SOS_PywalGTK.sh SOS_Regenerate SOS_Regenerate.sh SOS_ReloadIcons SOS_ReloadIcons.sh)
+    for f in "${orphans[@]}"; do
+        rm -f "/usr/share/spectrumos/scripts/$f"
+    done
+
     cp -rv "$SCRIPT_DIR"/bin/* /usr/share/spectrumos/scripts/
     find /usr/share/spectrumos/scripts/ -name "*.sh" -exec chmod +x {} +
     find /usr/share/spectrumos/scripts/ -name "*.py" -exec chmod +x {} +
@@ -71,6 +73,7 @@ function create_local_files(){
     sudo chmod -R 755 /usr/share/spectrumos /var/lib/spectrumos
 
     mkdir -p $HOME/.config/cava/
+    mkdir -p $HOME/.config/cmus/
     mkdir -p $HOME/.config/gowall/
     mkdir -p $HOME/.config/hypr
     mkdir -p $HOME/.config/gromit-mpx
@@ -81,6 +84,12 @@ function create_local_files(){
     mkdir -p $HOME/.config/kitty
     mkdir -p $HOME/.config/nvim
     mkdir -p $HOME/.config/xsettingsd
+
+    # Cleanup legacy GTK overrides that conflict with wpgtk
+    rm -f $HOME/.config/gtk-3.0/gtk.css
+    # We keep gtk-4.0/gtk.css if it's managed by pywal, 
+    # but for fresh install we want it clean
+    rm -f $HOME/.config/gtk-4.0/gtk.css
 }
 
 # Refactored individual install functions
@@ -89,7 +98,12 @@ function install_hyprland_config() { deploy_config "$SCRIPT_DIR/config/hypr" "$H
 function install_gromit() { deploy_config "$SCRIPT_DIR/config/gromit-mpx" "$HOME/.config/gromit-mpx"; }
 function install_rofi_themes() { deploy_config "$SCRIPT_DIR/config/rofi" "$HOME/.config/rofi"; }
 function install_swappy_config() { deploy_config "$SCRIPT_DIR/config/swappy" "$HOME/.config/swappy"; }
-function install_wal_templates() { deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"; }
+function install_wal_templates() { 
+    deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"
+    # Remove legacy templates that conflict with wpgtk
+    rm -f "$HOME/.config/wal/templates/gtk.css"
+    rm -f "$HOME/.config/wal/templates/gtk3.css"
+}
 function install_waybar_config() {
     deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
     # Replace hardcoded home path in waybar CSS
@@ -103,6 +117,52 @@ function install_nvim_config() { deploy_config "$SCRIPT_DIR/config/nvim" "$HOME/
 function install_zsh_config() { deploy_config "$SCRIPT_DIR/config/zsh/.zshrc" "$HOME/.zshrc"; }
 function install_xsettingsd() { deploy_config "$SCRIPT_DIR/config/xsettingsd" "$HOME/.config/xsettingsd"; }
 function install_mimeapps() { deploy_config "$SCRIPT_DIR/config/mimeapps.list" "$HOME/.config/mimeapps.list"; }
+
+function install_wpgtk() {
+    if ! command -v wpg &>/dev/null; then
+        echo -e "${YELLOW}wpgtk not installed — skipping${NC}"
+        return 0
+    fi
+    echo -e "${BLUE}Initializing wpgtk templates...${NC}"
+    wpg-install.sh -gio
+
+    echo -e "${BLUE}Setting initial GTK configuration...${NC}"
+    mkdir -p "$HOME/.config/gtk-3.0"
+    cat > "$HOME/.config/gtk-3.0/settings.ini" << EOF
+[Settings]
+gtk-icon-theme-name = flattrcolor-dark
+gtk-theme-name = FlatColor
+gtk-font-name = Sans 10
+gtk-cursor-theme-name = Adwaita
+gtk-application-prefer-dark-theme = true
+EOF
+
+    mkdir -p "$HOME/.config/gtk-4.0"
+    cp "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"
+
+    # Ensure gtk-4.0/gtk.css is a real file if it exists as a symlink from previous attempts
+    [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+
+    if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
+        cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+    fi
+
+    echo -e "${GREEN}✓ wpgtk initialized and GTK settings configured${NC}"
+}
+
+function install_cmus_config() {
+    echo -e "${BLUE}Installing cmus theme...${NC}"
+    mkdir -p "$HOME/.config/cmus"
+    # Ensure the theme file is in place (it will be updated by pywal via the template)
+    if [ -f "$HOME/.cache/wal/cmus-theme" ]; then
+        cp "$HOME/.cache/wal/cmus-theme" "$HOME/.config/cmus/SpectrumOS.theme"
+    fi
+    # Create a basic cmus autosave to set the theme if it doesn't exist
+    if [ ! -f "$HOME/.config/cmus/autosave" ]; then
+        echo "set color_scheme=SpectrumOS" > "$HOME/.config/cmus/autosave"
+    fi
+    echo -e "${GREEN}✓ cmus theme installed${NC}"
+}
 
 # Install Limine Sync Files
 function install_limine_sync(){
@@ -359,6 +419,8 @@ function install_all(){
     install_zsh_config
     install_xsettingsd
     install_mimeapps
+    install_wpgtk
+    install_cmus_config
     install_gaming_configs
 
     # 7. Display manager — reads pywal sddm-colors.conf written by wal templates
@@ -375,6 +437,11 @@ function install_all(){
     #     MODULES/HOOKS changes (GPU driver, plymouth hook) are finalized
     install_plymouth
 
+    # Cleanup .bak files created during deployment
+    echo -e "${BLUE}Cleaning up backup files...${NC}"
+    find "$HOME/.config" -name "*.bak.*" -delete
+    find "$HOME/.config/wpg" -name "*.bak" -delete
+
     echo -e "${GREEN}✓ All configurations deployed!${NC}"
 }
 
@@ -384,6 +451,7 @@ function usage() {
     echo "Options:"
     echo "  --all, --al      Deploy all configurations"
     echo "  --bin            Install scripts to /usr/share/spectrumos/scripts/"
+    echo "  --wal-templates  Install pywal templates to ~/.config/wal/templates/"
     echo "  --hypr           Install Hyprland configs"
     echo "  --waybar         Install Waybar configs"
     echo "  --rofi           Install Rofi themes"
@@ -395,8 +463,13 @@ function usage() {
     echo "  --nvim           Install Neovim config"
     echo "  --spectrum       Install SpectrumOS system configs"
     echo "  --xsettingsd     Install xsettingsd config"
+    echo "  --cmus           Install cmus theme"
     echo "  --mimeapps       Install mimeapps.list"
+    echo "  --wpgtk          Initialize wpgtk templates"
     echo "  --gaming         Install gaming configs (gamemode, mangohud, vkbasalt)"
+    echo ""
+    echo "  Note: after --bin or --wal-templates, run a wallpaper script"
+    echo "  (SOS_Randomize_Wallpaper or SOS_Select_Wallpaper) to regenerate colors."
     exit 1
 }
 
@@ -412,6 +485,9 @@ for arg in "$@"; do
             ;;
         --bin)
             install_bin
+            ;;
+        --cmus)
+            install_cmus_config
             ;;
         --create-local)
             create_local_files
@@ -433,7 +509,7 @@ for arg in "$@"; do
             ;;
         --rofi)
             install_rofi_themes
-            ;;  
+            ;;
         --sddm)
             install_sddm_theme
             ;;
@@ -463,6 +539,9 @@ for arg in "$@"; do
             ;;
         --mimeapps)
             install_mimeapps
+            ;;
+        --wpgtk)
+            install_wpgtk
             ;;
         --gaming)
             install_gaming_configs

@@ -43,6 +43,12 @@ fi
 # Full path of selected file  
 WALLPAPER="$SELECTED"
 
+# Save selected wallpaper
+echo "$WALLPAPER" > "/var/lib/spectrumos/last_wallpaper"
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Output processed wallpaper for Gowall  
 GOWALL_OUTPUT="/var/lib/spectrumos/current.png"
 
@@ -57,19 +63,48 @@ else
 fi
 
 # Set wallpaper with awww
-awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+awww img "$GOWALL_OUTPUT" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
 # Set Colors with pywal
 if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
     wal -l -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
-    echo "PYWAL_BACKEND = '$PYWAL_BACKEND'"
 else
     wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
-    echo "PYWAL_BACKEND = '$PYWAL_BACKEND'"
 fi 
 
+# Set colors for GTK using wpgtk
+if command -v wpg &>/dev/null; then
+    wpg -a "$WALLPAPER"
+    wpg -s "$WALLPAPER"
+    gsettings set org.gnome.desktop.interface gtk-theme "FlatColor"
+    gsettings set org.gnome.desktop.interface icon-theme "flattrcolor-dark"
+    gsettings set org.gnome.desktop.wm.preferences theme "FlatColor"
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+
+    # Update GTK3 settings.ini
+    mkdir -p "$HOME/.config/gtk-3.0"
+    cat > "$HOME/.config/gtk-3.0/settings.ini" << EOF
+[Settings]
+gtk-icon-theme-name = flattrcolor-dark
+gtk-theme-name = FlatColor
+gtk-font-name = Sans 10
+gtk-cursor-theme-name = Adwaita
+gtk-application-prefer-dark-theme = true
+EOF
+
+    # Update GTK4/libadwaita (GTK4 doesn't support themes, only CSS overrides)
+    mkdir -p "$HOME/.config/gtk-4.0"
+    if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
+        [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+        cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+    fi
+fi
+
+# Update xsettingsd
+pkill -HUP xsettingsd
+
 # Update configs
-python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py
+python "$SCRIPT_DIR/SOS_Gen_Logo.py"
 
 rm -f /var/lib/spectrumos/colors.conf
 cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
@@ -82,22 +117,17 @@ pkill dunst; dunst &
 cp "$HOME/.cache/wal/cava-config" "$HOME/.config/cava/config"
 pkill -USR1 cava
 
-pywalfox update
-walogram -c
+[ -f "$HOME/.cache/wal/cmus-theme" ] && cp "$HOME/.cache/wal/cmus-theme" "$HOME/.config/cmus/SpectrumOS.theme"
 
-/usr/share/spectrumos/scripts/SOS_PywalGTK.sh
-/usr/share/spectrumos/scripts/SOS_PywalQT.sh
-/usr/share/spectrumos/scripts/SOS_PywalThemix.sh
-/usr/share/spectrumos/scripts/SOS_ReloadIcons.sh
-
-pkill xsettingsd
-xsettingsd &
-
-hyprctl reload
-
-# restart waybar last
-pkill waybar
-waybar &
+"$SCRIPT_DIR/SOS_PywalBrave.sh" &
+"$SCRIPT_DIR/SOS_PywalQT.sh" &
+"$SCRIPT_DIR/SOS_PywalVesktop.sh" &
+"$SCRIPT_DIR/SOS_PywalVSCode.sh" &
+"$SCRIPT_DIR/SOS_PywalVivaldi.sh" &
+pywalfox update &
+walogram -c &
+# Reload waybar
+killall -SIGUSR2 waybar 2>/dev/null || (killall waybar 2>/dev/null; sleep 0.5; waybar &)
 
 # Send notification with thumbnail
-notify-send -t 1000 "Wallpaper and colors updated!" -i "$WALLPAPER"
+notify-send -a "SpectrumOS" -t 2000 "Wallpaper changed!" -i "$WALLPAPER"

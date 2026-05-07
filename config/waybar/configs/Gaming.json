@@ -1,11 +1,13 @@
 {
     "layer": "bottom",
     "position": "top",
-    "height": 25,
-    "spacing": 5,
+    "height": 30,
+    "spacing": 2,
+    "margin-left": 5,
+    "margin-right": 5,
     "modules-left": ["hyprland/workspaces"],
-    "modules-center": [],
-    "modules-right": ["clock"],
+    "modules-center": ["hyprland/window", "cpu", "memory", "custom/gpu", "temperature", "custom/fps", "network"],
+    "modules-right": ["pulseaudio", "idle_inhibitor", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "format-icons": {
@@ -17,11 +19,100 @@
             "6": "󰫈"
         },
         "persistent-workspaces": {
-            "*": 6
+            "DP-1": [1, 2, 3, 4, 5],
+            "HDMI-A-1": [6]
+        }
+    },
+    "hyprland/window": {
+        "format": "󰊴 {}",
+        "max-length": 30,
+        "separate-outputs": true
+    },
+    "cpu": {
+        "interval": 2,
+        "format": "󰻠 {usage}%",
+        "tooltip": true,
+        "on-click": "kitty -e btop"
+    },
+    "memory": {
+        "interval": 2,
+        "format": "󰍛 {percentage}%",
+        "tooltip": true,
+        "tooltip-format": "RAM: {used:0.1f}G / {total:0.1f}G\nSwap: {swapUsed:0.1f}G / {swapTotal:0.1f}G",
+        "on-click": "kitty -e btop"
+    },
+    "custom/gpu": {
+        "exec": "$HOME/.config/waybar/scripts/gpu_usage.sh",
+        "return-type": "json",
+        "interval": 2,
+        "tooltip": true
+    },
+    "custom/fps": {
+        "exec": "$HOME/.config/waybar/scripts/fps_counter.sh",
+        "return-type": "json",
+        "interval": 1,
+        "tooltip": true
+    },
+    "temperature": {
+        "critical-threshold": 80,
+        "interval": 2,
+        "hwmon-path": "/sys/class/hwmon/hwmon3/temp1_input",
+        "format": "{icon} {temperatureC}°C",
+        "format-icons": ["", "", "", "", ""],
+        "tooltip": true
+    },
+    "network": {
+        "interval": 2,
+        "format-wifi": "󰖩 {bandwidthDownBits}",
+        "format-ethernet": "󰈀 {bandwidthDownBits}",
+        "format-linked": "󰈀 {ifname} (No IP)",
+        "format-disconnected": "󰖪 Disconnected",
+        "tooltip-format": "{ifname} via {gwaddr}\n↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}",
+        "on-click-right": "nm-connection-editor"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-bluetooth": "{icon} {volume}%",
+        "format-bluetooth-muted": "󰝟 {icon}",
+        "format-muted": "󰝟 {volume}%",
+        "format-icons": {
+            "headphone": "󰋋",
+            "hands-free": "󰋎",
+            "headset": "󰋎",
+            "phone": "󰏲",
+            "portable": "󰏲",
+            "car": "󰄋",
+            "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "on-click": "/usr/share/spectrumos/scripts/SOS_Audio.sh",
+        "on-click-middle": "pavucontrol"
+    },
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": "󰅶",
+            "deactivated": "󰾪"
         }
     },
     "clock": {
-        "format": "{:%H:%M}",
-        "tooltip": false
+        "format": "󰥔 {:%H:%M}",
+        "format-alt": "󰃭 {:%A, %B %d, %Y (%R)}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "year",
+            "mode-mon-col": 3,
+            "weeks-pos": "right",
+            "on-scroll": 1,
+            "format": {
+                "months": "<span color='#ffead3'><b>{}</b></span>",
+                "days": "<span color='#ecc6d9'><b>{}</b></span>",
+                "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+                "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
+            }
+        }
+    },
+    "tray": {
+        "spacing": 10
     }
 }

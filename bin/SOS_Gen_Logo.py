@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
-
+import sys
 import cairosvg
 from PIL import Image
 
@@ -86,6 +86,21 @@ for i, col in enumerate(palette):
     logo.paste(layer, (x, y), layer)
 
 # Save output
-out_file = os.path.expanduser("~/SpectrumOS.png")
+if len(sys.argv) > 1:
+    out_file = sys.argv[1]
+else:
+    out_file = os.path.expanduser("~/SpectrumOS.png")
+
 logo.save(out_file, "PNG")
 print(f"Generated {out_file}")
+
+# Also try to save to global location for Limine/SDDM if we have permissions
+global_logo = "/var/lib/spectrumos/logo.png"
+try:
+    os.makedirs(os.path.dirname(global_logo), exist_ok=True)
+    logo.save(global_logo, "PNG")
+    print(f"Generated {global_logo}")
+except PermissionError:
+    pass
+except Exception as e:
+    print(f"Note: Could not save global logo: {e}")

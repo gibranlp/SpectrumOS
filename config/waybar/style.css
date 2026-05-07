@@ -4,9 +4,11 @@
 * {
     border: none;
     border-radius: 0;
-    font-family: "Fira Code Medium";
-    font-size: 15px;
+    font-family: "FiraCode Nerd Font";
+    font-size: 16px;
+    font-weight: 500;
     min-height: 0;
+    background: transparent;
 }
 
 window#waybar {
@@ -15,15 +17,18 @@ window#waybar {
 
 #workspaces {
     background: @color1;
-    margin: 5px;
-    padding: 5px;
-    border-radius: 5px;
+    margin: 2px 3px;
+    padding: 0px 10px;
+    border-radius: 3px;
+    color: @color0;
 }
 
 #workspaces button {
-    padding: 0px 5px;
+    padding: 0px;
+    margin: 0px 2px;
+    min-width: 35px;
     color: @color0;
-    border-radius: 10px;
+    border-radius: 3px;
     font-size: 20px;
 }
 
@@ -37,13 +42,14 @@ window#waybar {
     color: @color7;
 }
 
-#window{
+#window {
     background: @color2;
-    margin: 5px;
-    padding: 5px;
-    border-radius: 5px;
+    margin: 2px 3px;
+    padding: 0px 10px;
+    border-radius: 3px;
     color: @color0;
 }
+
 #clock,
 #battery,
 #cpu,
@@ -51,74 +57,221 @@ window#waybar {
 #temperature,
 #network,
 #pulseaudio,
+#pulseaudio.microphone,
+#bluetooth,
+#disk,
+#backlight,
+#idle_inhibitor,
+#custom-media,
+#custom-media-prev,
+#custom-media-play-pause,
+#custom-media-next,
+#custom-cava,
+#custom-gpu,
+#custom-fps,
+#custom-pomodoro,
+#custom-weather,
 #tray {
-    background: @background;
+    background: @color3;
     padding: 0px 10px;
-    margin: 5px 0px;
-    border-radius: 10px;
+    margin: 2px 3px;
+    border-radius: 3px;
+    color: @color0;
+}
+
+#custom-pomodoro.running {
+    background: @color1;
+    color: @color7;
+}
+
+#custom-pomodoro.break {
+    background: @color2;
+    color: @color0;
+}
+
+#custom-pomodoro.paused, #custom-pomodoro.break_paused {
+    background: @color4;
+    color: @color0;
+}
+#tray {
+    background: @color3;
+    padding: 0px 5px;
+    margin: 2px 3px;
+    border-radius: 3px;
+}
+
+#custom-gpu {
+    background: @color2;
+}
+
+#custom-cava {
+    background: @color1;
+    color: @color7;
 }
 
 #clock {
-    color: @color6;
-    font-weight: bold;
+    color: @color0;
+}
+
+/* Calendar tooltip styling */
+tooltip {
+    background: @color1;
+    border: 1px solid @color4;
+    border-radius: 3px;
+}
+
+tooltip label {
+    color: @color0;
+}
+
+calendar {
+    background: @color1;
+    color: @color0;
+}
+
+calendar:selected {
+    background: @color4;
+    color: @color0;
+}
+
+calendar.header {
+    color: @color0;
+}
+
+calendar.button {
+    color: @color0;
+}
+
+calendar.highlight {
+    color: @color0;
 }
 
 #battery {
-    color: @color2;
+    color: @color0;
+    background: @color4;
 }
 
 #battery.charging {
-    color: @color3;
+    color: @color0;
+    background: @color5;
 }
 
 #battery.warning:not(.charging) {
-    color: @color5;
+    color: @color0;
+    background: @color6;
 }
 
 #battery.critical:not(.charging) {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
     animation: blink 0.5s linear infinite;
 }
 
 #cpu {
-    color: @color4;
+    color: @color0;
+    background: @color5;
 }
 
 #memory {
-    color: @color5;
+    color: @color0;
+    background: @color6;
 }
 
 #temperature {
-    color: @color3;
+    color: @color0;
+    background: @color2;
 }
 
 #temperature.critical {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
 }
 
 #network {
-    color: @color6;
+    color: @color0;
+    background: @color4;
 }
 
 #network.disconnected {
-    color: @color1;
+    color: @foreground;
+    background: @color1;
 }
 
 #pulseaudio {
-    color: @color7;
+    color: @color0;
+    background: @color5;
 }
 
 #pulseaudio.muted {
-    color: @foreground;
+    color: @color0;
+    background: @color3;
 }
 
-#tray {
+#pulseaudio.microphone {
+    color: @color0;
+    background: @color6;
+}
+
+#bluetooth {
+    color: @color0;
+    background: @color4;
+}
+
+#bluetooth.off {
+    color: @color0;
+    background: @color3;
+}
+
+#disk {
+    color: @color0;
+    background: @color2;
+}
+
+#backlight {
+    color: @color0;
+    background: @color3;
+}
+
+#idle_inhibitor {
+    color: @color0;
+    background: @color5;
+}
+
+#idle_inhibitor.activated {
+    color: @foreground;
+    background: @color1;
+}
+
+#custom-media {
+    color: @color0;
+    background: @color6;
+    min-width: 100px;
+}
+
+#custom-media-prev,
+#custom-media-play-pause,
+#custom-media-next {
+    color: @color0;
+    background: @color4;
+    min-width: 30px;
     padding: 0px 5px;
+}
+
+#custom-media-prev:hover,
+#custom-media-play-pause:hover,
+#custom-media-next:hover {
+    color: @color0;
+    background: @color7;
+}
+
+#custom-weather {
+    color: @color0;
+    background: @color7;
 }
 
 @keyframes blink {
     to {
         background-color: @color1;
-        color: @background;
+        color: @foreground;
     }
 }

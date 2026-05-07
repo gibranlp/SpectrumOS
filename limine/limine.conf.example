@@ -18,22 +18,24 @@ term_palette_bright: 130915;6B3744;8E2D35;AB3838;D24D3C;AB4040;E86045;c4c1c4
 
 # Text colors
 term_foreground: c4c1c4
-term_foreground_bright: 6B3744
+term_foreground_bright: ffffff
 term_background_bright: 6B3744
+
+# Menu colors
+menu_background: 66130915
+menu_foreground: c4c1c4
+menu_highlight_background: 6B3744
+menu_highlight_foreground: ffffff
+
+# Resolution for consistent logo/text size across displays
+graphics_resolution: 1920x1080
 
 /SpectrumOS
     comment: SpectrumOS Feel the Power of the Color Spectrum!
     protocol: linux
     path: boot():/vmlinuz-linux-zen
-    cmdline: root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX zswap.enabled=0 rw rootfstype=FSTYPE quiet splash
+    cmdline: root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=@ quiet splash
     module_path: boot():/initramfs-linux-zen.img
-
-/SpectrumOS (Fallback)
-    comment: SpectrumOS Feel the Power of the Color Spectrum!
-    protocol: linux
-    path: boot():/vmlinuz-linux-zen
-    cmdline: root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX zswap.enabled=0 rw rootfstype=FSTYPE quiet splash
-    module_path: boot():/initramfs-linux-zen-fallback.img
 
 /EFI fallback
     comment: Default EFI loader

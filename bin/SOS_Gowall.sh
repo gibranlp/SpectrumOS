@@ -29,7 +29,7 @@ set_default_wall_theme() {
     "kanagawa"
     "material"
     "melange-dark"
-    "melagne-light"
+    "melange-light"
     "monokai"
     "night-owl"
     "nord"
@@ -96,17 +96,27 @@ function set_wallpaper(){
     [ ! -f "$CONFIG_FILE" ] && echo "Missing config" && exit 1
     source "$CONFIG_FILE"
 
-    # Gowall Process Wallpaper
+    # Get script directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Read original (pre-gowall) wallpaper path
+    ORIGINAL_WALLPAPER=$(cat /var/lib/spectrumos/last_wallpaper 2>/dev/null)
+    if [ -z "$ORIGINAL_WALLPAPER" ] || [ ! -f "$ORIGINAL_WALLPAPER" ]; then
+        notify-send -a "SpectrumOS" "No wallpaper selected yet" -u critical
+        exit 1
+    fi
+
+    # Gowall Process Wallpaper (always from original to avoid filter stacking)
     if [ "$GOWALL_SCHEME" != "No Theme" ]; then
         if [ "$GOWALL_SCHEME" == "Inverted" ]; then
-            gowall invert /var/lib/spectrumos/current.png --output /var/lib/spectrumos/current.png 
+            gowall invert "$ORIGINAL_WALLPAPER" --output "$CURRENT_WALLPAPER"
         else
-            gowall convert /var/lib/spectrumos/current.png  -t "$GOWALL_SCHEME" --output /var/lib/spectrumos/current.png 
-        fi 
+            gowall convert "$ORIGINAL_WALLPAPER" -t "$GOWALL_SCHEME" --output "$CURRENT_WALLPAPER"
+        fi
     else
-        notify-send "No Theme Selected!"
+        cp "$ORIGINAL_WALLPAPER" "$CURRENT_WALLPAPER"
     fi
-    
+
     # Apply wallpaper
     awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
@@ -117,8 +127,39 @@ function set_wallpaper(){
         wal -i "$CURRENT_WALLPAPER" --backend "$PYWAL_BACKEND"
     fi
 
+    # Set colors for GTK using wpgtk
+    if command -v wpg &>/dev/null; then
+        wpg -a /var/lib/spectrumos/current.png
+        wpg -s /var/lib/spectrumos/current.png
+        gsettings set org.gnome.desktop.interface gtk-theme "FlatColor"
+        gsettings set org.gnome.desktop.interface icon-theme "flattrcolor-dark"
+        gsettings set org.gnome.desktop.wm.preferences theme "FlatColor"
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+
+        # Update GTK3 settings.ini
+        mkdir -p "$HOME/.config/gtk-3.0"
+        cat > "$HOME/.config/gtk-3.0/settings.ini" << EOF
+[Settings]
+gtk-icon-theme-name = flattrcolor-dark
+gtk-theme-name = FlatColor
+gtk-font-name = Sans 10
+gtk-cursor-theme-name = Adwaita
+gtk-application-prefer-dark-theme = true
+EOF
+
+        # Update GTK4/libadwaita
+        mkdir -p "$HOME/.config/gtk-4.0"
+        if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
+            [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+            cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+        fi
+    fi
+
+    # Update xsettingsd
+    pkill -HUP xsettingsd
+
     # Update configs
-    python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py
+    python "$SCRIPT_DIR/SOS_Gen_Logo.py"
     rm -f /var/lib/spectrumos/colors.conf
     cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
 
@@ -130,23 +171,22 @@ function set_wallpaper(){
     cp "$HOME/.cache/wal/cava-config" "$HOME/.config/cava/config"
     pkill -USR1 cava
 
-    pywalfox update
-    walogram -c
+    [ -f "$HOME/.cache/wal/cmus-theme" ] && cp "$HOME/.cache/wal/cmus-theme" "$HOME/.config/cmus/SpectrumOS.theme"
 
-    pkill xsettingsd
-    xsettingsd &
+    "$SCRIPT_DIR/SOS_PywalBrave.sh" &
+    "$SCRIPT_DIR/SOS_PywalQT.sh" &
+    "$SCRIPT_DIR/SOS_PywalVesktop.sh" &
+    "$SCRIPT_DIR/SOS_PywalVSCode.sh" &
+    "$SCRIPT_DIR/SOS_PywalVivaldi.sh" &
 
-    hyprctl reload
+    pywalfox update &
+    walogram -c &
 
-    # restart waybar last
-    pkill waybar
-    waybar &
+    # Reload waybar
+    killall -SIGUSR2 waybar 2>/dev/null || (killall waybar 2>/dev/null; sleep 0.5; waybar &)
 
-    # Send notification with thumbnail
-    notify-send -t 1000 "Theme Updated!"
-
-    /usr/share/spectrumos/scripts/SOS_Regenerate.sh
-
+    # Send notification
+    notify-send -a "SpectrumOS" -t 2000 "Theme Updated!"
 }
 
 # Run the function

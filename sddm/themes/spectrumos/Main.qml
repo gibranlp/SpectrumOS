@@ -54,8 +54,10 @@ Pane {
     palette.window: colors.background 
 
     font.family: config.Font
-    font.pointSize: config.FontSize !== "" ? config.FontSize : parseInt(height / 80)
+    font.pointSize: config.FontSize !== "" ? config.FontSize : Math.max(9, Math.round(height / 80))
     focus: true
+
+    property int logoSize: Math.min(width, height) * 0.25
 
     property bool leftleft: config.HaveFormBackground == "true" &&
                             config.PartialBlur == "false" &&
@@ -109,13 +111,13 @@ Pane {
         // SpectrumOS Logo
         SpectrumLogo {
             id: spectrumLogo
-            width: 350
-            height: 350
+            width: root.logoSize
+            height: root.logoSize
             anchors.horizontalCenter: formBackground.horizontalCenter
             anchors.horizontalCenterOffset: parent.width * 0.033
             anchors.top: parent.top
-            anchors.topMargin: 20
-            anchors.bottomMargin: 20
+            anchors.topMargin: parent.height * 0.05
+            anchors.bottomMargin: parent.height * 0.02
             z: 10
             
             // Pass pywal colors to logo
