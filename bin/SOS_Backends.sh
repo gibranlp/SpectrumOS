@@ -56,13 +56,15 @@ set_pywal_backend() {
                 "Pywal Backend: " \
                 " $selected"
 }
-
 # Set new colors with same wallpaper
 function set_wallpaper(){
     # Load configuration
     CONFIG_FILE="/etc/spectrumos/spectrumos.conf"
     [ ! -f "$CONFIG_FILE" ] && echo "Missing config" && exit 1
     source "$CONFIG_FILE"
+
+    # Get script directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     GOWALL_OUTPUT="/var/lib/spectrumos/current.png"
 
@@ -73,39 +75,73 @@ function set_wallpaper(){
         wal -i "$GOWALL_OUTPUT" --backend "$PYWAL_BACKEND"
     fi
 
-    # Apply wallpaper
+    # Set colors for GTK using wpgtk
+    if command -v wpg &>/dev/null; then
+        wpg -a "$GOWALL_OUTPUT"
+        wpg -s "$GOWALL_OUTPUT"
+        gsettings set org.gnome.desktop.interface gtk-theme "FlatColor"
+        gsettings set org.gnome.desktop.interface icon-theme "flattrcolor-dark"
+        gsettings set org.gnome.desktop.wm.preferences theme "FlatColor"
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+
+        # Update GTK3 settings.ini
+        mkdir -p "$HOME/.config/gtk-3.0"
+        cat > "$HOME/.config/gtk-3.0/settings.ini" << EOF
+[Settings]
+gtk-icon-theme-name = flattrcolor-dark
+gtk-theme-name = FlatColor
+gtk-font-name = Sans 10
+gtk-cursor-theme-name = Adwaita
+gtk-application-prefer-dark-theme = true
+EOF
+
+        # Update GTK4/libadwaita
+        mkdir -p "$HOME/.config/gtk-4.0"
+        if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
+            [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+            cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+        fi
+    fi
+
+    # Update xsettingsd
+    pkill -HUP xsettingsd
+
+    # Update configs
+
     awww img "$CURRENT_WALLPAPER" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
     # Update configs
-    python /usr/share/spectrumos/scripts/SOS_Gen_Logo.py
+    python "$SCRIPT_DIR/SOS_Gen_Logo.py"
     rm -f /var/lib/spectrumos/colors.conf
     cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf
-...
 
+    mkdir -p "$HOME/.config/dunst"
+    mkdir -p "$HOME/.config/cava"
     cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
     pkill dunst; dunst &
 
     cp "$HOME/.cache/wal/cava-config" "$HOME/.config/cava/config"
     pkill -USR1 cava
 
-    pywalfox update
-    walogram -c
+    [ -f "$HOME/.cache/wal/cmus-theme" ] && cp "$HOME/.cache/wal/cmus-theme" "$HOME/.config/cmus/SpectrumOS.theme"
 
-    pkill xsettingsd
-    xsettingsd &
+    "$SCRIPT_DIR/SOS_PywalBrave.sh" &
+    "$SCRIPT_DIR/SOS_PywalQT.sh" &
+    "$SCRIPT_DIR/SOS_PywalVesktop.sh" &
+    "$SCRIPT_DIR/SOS_PywalVSCode.sh" &
 
-    hyprctl reload
+    pywalfox update &
+    walogram -c &
 
-    # restart waybar last
+    # Reload waybar
+
     pkill waybar
     waybar &
 
     # Send notification with thumbnail
     notify-send -t 1000 "Color Scheme Updated!"
-
-    /usr/share/spectrumos/scripts/SOS_Regenerate.sh
-
 }
+
 
 # Run the function
 set_pywal_backend

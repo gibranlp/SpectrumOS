@@ -3,7 +3,8 @@ Description=Watch for SpectrumOS wallpaper changes
 After=local-fs.target
 
 [Path]
-PathModified=/var/lib/spectrumos/colors.conf
+PathChanged=/var/lib/spectrumos/colors.conf
+PathChanged=/var/lib/spectrumos/current.png
 Unit=spectrumos-limine-sync.service
 
 [Install]

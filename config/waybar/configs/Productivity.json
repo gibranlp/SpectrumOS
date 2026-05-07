@@ -2,10 +2,12 @@
     "layer": "bottom",
     "position": "top",
     "height": 30,
-    "spacing": 5,
+    "spacing": 2,
+    "margin-left": 5,
+    "margin-right": 5,
     "modules-left": ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["clock"],
-    "modules-right": ["pulseaudio", "network", "cpu", "memory", "temperature", "battery", "tray"],
+    "modules-center": ["custom/pomodoro"],
+    "modules-right": ["network", "pulseaudio", "battery", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "format-icons": {
@@ -14,21 +16,69 @@
             "3": "󰫅",
             "4": "󰫆",
             "5": "󰫇",
-            "6": "󰫈",
-            "todoist": "",
-            "obsidian": "󱞁"
+            "6": "󰫈"
         },
         "persistent-workspaces": {
-            "*": 6
+            "DP-1": [1, 2, 3, 4, 5],
+            "HDMI-A-1": [6]
         }
     },
     "hyprland/window": {
-        "max-length": 50,
+        "max-length": 30,
         "separate-outputs": true
     },
+    "custom/pomodoro": {
+        "exec": "$HOME/.config/waybar/scripts/pomodoro.py",
+        "return-type": "json",
+        "interval": 1,
+        "on-click": "$HOME/.config/waybar/scripts/pomodoro.py toggle",
+        "on-click-right": "$HOME/.config/waybar/scripts/pomodoro.py tasks",
+        "on-click-middle": "$HOME/.config/waybar/scripts/pomodoro.py reset"
+    },
+    "network": {
+        "interval": 5,
+        "format-wifi": "󰖩 {signalStrength}%",
+        "format-ethernet": "󰈀 {bandwidthDownBytes}",
+        "format-linked": "󰈀 {ifname} (No IP)",
+        "format-disconnected": "󰖪 Disconnected",
+        "format-alt": "{ifname}: {ipaddr}/{cidr}",
+        "tooltip-format": "{ifname} via {gwaddr}\n↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}",
+        "on-click-right": "nm-connection-editor"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-bluetooth": "{icon} {volume}%",
+        "format-bluetooth-muted": "󰝟 {icon}",
+        "format-muted": "󰝟 {volume}%",
+        "format-icons": {
+            "headphone": "󰋋",
+            "hands-free": "󰋎",
+            "headset": "󰋎",
+            "phone": "󰏲",
+            "portable": "󰏲",
+            "car": "󰄋",
+            "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "on-click": "/usr/share/spectrumos/scripts/SOS_Audio.sh",
+        "on-click-middle": "pavucontrol"
+    },
+    "battery": {
+        "states": {
+            "good": 80,
+            "warning": 30,
+            "critical": 15
+        },
+        "interval": 10,
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": "󰚥 {capacity}%",
+        "format-alt": "{icon} {time}",
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+        "tooltip-format": "{timeTo}, {capacity}%\n{power}W"
+    },
     "clock": {
-        "format": "{:%H:%M}",
-        "format-alt": "{:%A, %B %d, %Y (%R)}",
+        "format": "󰥔 {:%H:%M}",
+        "format-alt": "󰃭 {:%A, %B %d, %Y (%R)}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "year",
@@ -43,53 +93,6 @@
                 "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
             }
         }
-    },
-    "cpu": {
-        "format": " {usage}%",
-        "tooltip": false
-    },
-    "memory": {
-        "format": " {}%"
-    },
-    "temperature": {
-        "critical-threshold": 80,
-        "format": "{icon} {temperatureC}°C",
-        "format-icons": ["", "", ""]
-    },
-    "battery": {
-        "states": {
-            "warning": 30,
-            "critical": 15
-        },
-        "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
-        "format-alt": "{icon} {time}",
-        "format-icons": ["", "", "", "", ""]
-    },
-    "network": {
-        "format-wifi": " {essid}",
-        "format-ethernet": " wired",
-        "format-linked": " {ifname} (No IP)",
-        "format-disconnected": "⚠ Disconnected",
-        "format-alt": "{ifname}: {ipaddr}/{cidr}",
-        "tooltip-format": "{ifname} via {gwaddr}"
-    },
-    "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-bluetooth": "{icon} {volume}%",
-        "format-bluetooth-muted": " {icon}",
-        "format-muted": " {volume}%",
-        "format-icons": {
-            "headphone": "",
-            "hands-free": "",
-            "headset": "",
-            "phone": "",
-            "portable": "",
-            "car": "",
-            "default": ["", "", ""]
-        },
-        "on-click": "pavucontrol"
     },
     "tray": {
         "spacing": 10

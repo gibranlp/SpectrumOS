@@ -5,8 +5,10 @@
     border: none;
     border-radius: 0;
     font-family: "FiraCode Nerd Font";
-    font-size: 15px;
+    font-size: 16px;
+    font-weight: 500;
     min-height: 0;
+    background: transparent;
 }
 
 window#waybar {
@@ -15,13 +17,16 @@ window#waybar {
 
 #workspaces {
     background: @color1;
-    margin: 5px;
-    padding: 5px;
+    margin: 2px 3px;
+    padding: 0px 10px;
     border-radius: 3px;
+    color: @color0;
 }
 
 #workspaces button {
-    padding: 0px 5px;
+    padding: 0px;
+    margin: 0px 2px;
+    min-width: 35px;
     color: @color0;
     border-radius: 3px;
     font-size: 20px;
@@ -34,13 +39,13 @@ window#waybar {
 
 #workspaces button:hover {
     background: @color0;
-    color: @foreground;
+    color: @color7;
 }
 
 #window {
     background: @color2;
-    margin: 5px;
-    padding: 5px;
+    margin: 2px 3px;
+    padding: 0px 10px;
     border-radius: 3px;
     color: @color0;
 }
@@ -59,19 +64,52 @@ window#waybar {
 #idle_inhibitor,
 #custom-media,
 #custom-media-prev,
+#custom-media-play-pause,
 #custom-media-next,
+#custom-cava,
+#custom-gpu,
+#custom-pomodoro,
 #custom-weather,
 #tray {
     background: @color3;
     padding: 0px 10px;
-    margin: 5px 0px;
+    margin: 2px 3px;
     border-radius: 3px;
     color: @color0;
 }
 
+#custom-pomodoro.running {
+    background: @color1;
+    color: @color7;
+}
+
+#custom-pomodoro.break {
+    background: @color2;
+    color: @color0;
+}
+
+#custom-pomodoro.paused, #custom-pomodoro.break_paused {
+    background: @color4;
+    color: @color0;
+}
+#tray {
+    background: @color3;
+    padding: 0px 5px;
+    margin: 2px 3px;
+    border-radius: 3px;
+}
+
+#custom-gpu {
+    background: @color2;
+}
+
+#custom-cava {
+    background: @color1;
+    color: @color7;
+}
+
 #clock {
     color: @color0;
-    font-weight: bold;
 }
 
 /* Calendar tooltip styling */
@@ -97,7 +135,6 @@ calendar:selected {
 
 calendar.header {
     color: @color0;
-    font-weight: bold;
 }
 
 calendar.button {
@@ -106,7 +143,6 @@ calendar.button {
 
 calendar.highlight {
     color: @color0;
-    font-weight: bold;
 }
 
 #battery {
@@ -212,6 +248,7 @@ calendar.highlight {
 }
 
 #custom-media-prev,
+#custom-media-play-pause,
 #custom-media-next {
     color: @color0;
     background: @color4;
@@ -220,18 +257,15 @@ calendar.highlight {
 }
 
 #custom-media-prev:hover,
+#custom-media-play-pause:hover,
 #custom-media-next:hover {
     color: @color0;
-    background: @color5;
+    background: @color7;
 }
 
 #custom-weather {
     color: @color0;
     background: @color7;
-}
-
-#tray {
-    padding: 0px 5px;
 }
 
 @keyframes blink {

@@ -2,7 +2,9 @@
     "layer": "bottom",
     "position": "top",
     "height": 30,
-    "spacing": 5,
+    "spacing": 2,
+    "margin-left": 5,
+    "margin-right": 5,
     "modules-left": ["hyprland/workspaces"],
     "modules-center": ["clock"],
     "modules-right": ["tray"],
@@ -14,17 +16,16 @@
             "3": "󰫅",
             "4": "󰫆",
             "5": "󰫇",
-            "6": "󰫈",
-            "todoist": "",
-            "obsidian": "󱞁"
+            "6": "󰫈"
         },
         "persistent-workspaces": {
-            "*": 6
+            "DP-1": [1, 2, 3, 4, 5],
+            "HDMI-A-1": [6]
         }
     },
     "clock": {
-        "format": "{:%H:%M}",
-        "format-alt": "{:%A, %B %d, %Y (%R)}",
+        "format": "󰥔 {:%H:%M}",
+        "format-alt": "󰃭 {:%A, %B %d, %Y (%R)}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "year",

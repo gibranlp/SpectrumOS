@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "SpectrumOS-Brave",
+  "version": "1.0",
+  "theme": {
+    "colors": {
+      "frame": [{color0.rgb}],
+      "toolbar": [{color0.rgb}],
+      "tab_text": [{color7.rgb}],
+      "tab_background_text": [{color8.rgb}],
+      "bookmark_text": [{color7.rgb}],
+      "ntp_background": [{color0.rgb}],
+      "ntp_text": [{color7.rgb}],
+      "frame_inactive": [{color0.rgb}],
+      "button_background": [{color1.rgb}],
+      "toolbar_button_icon": [{color7.rgb}],
+      "toolbar_text": [{color7.rgb}],
+      "omnibox_background": [{color8.rgb}],
+      "omnibox_text": [{color7.rgb}]
+    }
+  }
+}

@@ -1,0 +1,786 @@
+/**
+ * @name SpectrumOS
+ * @description SpectrumOS Pywal Theme for Vesktop/Vencord
+ * @author gibranlp
+ * @version 3.0.0
+ * @website https://github.com/gibranlp/SpectrumOS
+ */
+
+/* ============================================================
+   PYWAL COLOR VARIABLES
+   ============================================================ */
+:root {
+  --pywal-background: {background};
+  --pywal-foreground: {foreground};
+  --pywal-color0:  {color0};
+  --pywal-color1:  {color1};
+  --pywal-color2:  {color2};
+  --pywal-color3:  {color3};
+  --pywal-color4:  {color4};
+  --pywal-color5:  {color5};
+  --pywal-color6:  {color6};
+  --pywal-color7:  {color7};
+  --pywal-color8:  {color8};
+  --pywal-color9:  {color9};
+  --pywal-color10: {color10};
+  --pywal-color11: {color11};
+  --pywal-color12: {color12};
+  --pywal-color13: {color13};
+  --pywal-color14: {color14};
+  --pywal-color15: {color15};
+
+  --pywal-bg-rgb:      {background.rgb};
+  --pywal-fg-rgb:      {foreground.rgb};
+  --pywal-color0-rgb:  {color0.rgb};
+  --pywal-color1-rgb:  {color1.rgb};
+  --pywal-color2-rgb:  {color2.rgb};
+  --pywal-color3-rgb:  {color3.rgb};
+  --pywal-color4-rgb:  {color4.rgb};
+  --pywal-color5-rgb:  {color5.rgb};
+  --pywal-color6-rgb:  {color6.rgb};
+  --pywal-color7-rgb:  {color7.rgb};
+  --pywal-color8-rgb:  {color8.rgb};
+  --pywal-color9-rgb:  {color9.rgb};
+  --pywal-color10-rgb: {color10.rgb};
+  --pywal-color11-rgb: {color11.rgb};
+  --pywal-color12-rgb: {color12.rgb};
+  --pywal-color13-rgb: {color13.rgb};
+  --pywal-color14-rgb: {color14.rgb};
+  --pywal-color15-rgb: {color15.rgb};
+}
+
+/* ============================================================
+   DISCORD SEMANTIC VARIABLE OVERRIDES  (legacy + new tokens)
+   ============================================================ */
+.theme-dark,
+.theme-light,
+:root {
+  /* Background – legacy */
+  --background-primary:          rgba(var(--pywal-bg-rgb), 0.75)  !important;
+  --background-secondary:        rgba(var(--pywal-color0-rgb), 0.85) !important;
+  --background-secondary-alt:    rgba(var(--pywal-color0-rgb), 0.90) !important;
+  --background-tertiary:         rgba(var(--pywal-bg-rgb), 0.90)  !important;
+  --background-accent:           var(--pywal-color1)              !important;
+  --background-floating:         rgba(var(--pywal-color0-rgb), 0.96) !important;
+  --background-mobile-primary:   rgba(var(--pywal-bg-rgb), 0.90)  !important;
+  --background-mobile-secondary: rgba(var(--pywal-color0-rgb), 0.90) !important;
+  --background-modifier-hover:    rgba(var(--pywal-color1-rgb), 0.10) !important;
+  --background-modifier-active:   rgba(var(--pywal-color1-rgb), 0.20) !important;
+  --background-modifier-selected: rgba(var(--pywal-color1-rgb), 0.25) !important;
+  --background-modifier-accent:   rgba(var(--pywal-color1-rgb), 0.15) !important;
+
+  /* Background – new design tokens */
+  --bg-base-primary:    rgba(var(--pywal-bg-rgb), 0.75)    !important;
+  --bg-base-secondary:  rgba(var(--pywal-color0-rgb), 0.85) !important;
+  --bg-base-tertiary:   rgba(var(--pywal-bg-rgb), 0.90)    !important;
+  --bg-surface-overlay: rgba(var(--pywal-color0-rgb), 0.94) !important;
+  --bg-surface-raised:  rgba(var(--pywal-color0-rgb), 0.88) !important;
+  --bg-surface-sunken:  rgba(var(--pywal-bg-rgb), 0.96)    !important;
+  --bg-overlay-1: rgba(var(--pywal-color0-rgb), 0.10) !important;
+  --bg-overlay-2: rgba(var(--pywal-color0-rgb), 0.20) !important;
+  --bg-overlay-3: rgba(var(--pywal-color0-rgb), 0.30) !important;
+  --bg-overlay-4: rgba(var(--pywal-color0-rgb), 0.40) !important;
+  --bg-overlay-5: rgba(var(--pywal-color0-rgb), 0.50) !important;
+  --bg-overlay-6: rgba(var(--pywal-color0-rgb), 0.60) !important;
+
+  /* Text */
+  --header-primary:    var(--pywal-foreground) !important;
+  --header-secondary:  var(--pywal-color7)     !important;
+  --text-normal:       var(--pywal-foreground) !important;
+  --text-muted:        var(--pywal-color8)     !important;
+  --text-link:         var(--pywal-color4)     !important;
+  --text-positive:     var(--pywal-color2)     !important;
+  --text-warning:      var(--pywal-color3)     !important;
+  --text-danger:       var(--pywal-color9)     !important;
+  --text-brand:        var(--pywal-color5)     !important;
+  --text-primary:      var(--pywal-foreground) !important;
+  --text-secondary:    var(--pywal-color7)     !important;
+  --text-tertiary:     var(--pywal-color8)     !important;
+  --text-placeholder:  rgba(var(--pywal-fg-rgb), 0.40) !important;
+
+  /* Interactive */
+  --interactive-normal:  var(--pywal-color7)     !important;
+  --interactive-hover:   var(--pywal-foreground) !important;
+  --interactive-active:  var(--pywal-foreground) !important;
+  --interactive-muted:   var(--pywal-color8)     !important;
+
+  /* Brand */
+  --brand-experiment:     var(--pywal-color1)                    !important;
+  --brand-experiment-100: rgba(var(--pywal-color1-rgb), 0.10)    !important;
+  --brand-experiment-200: rgba(var(--pywal-color1-rgb), 0.20)    !important;
+  --brand-experiment-300: rgba(var(--pywal-color1-rgb), 0.30)    !important;
+  --brand-experiment-400: rgba(var(--pywal-color1-rgb), 0.60)    !important;
+  --brand-experiment-500: var(--pywal-color1)                    !important;
+  --brand-experiment-530: var(--pywal-color9)                    !important;
+  --brand-experiment-560: var(--pywal-color9)                    !important;
+  --brand-experiment-600: var(--pywal-color9)                    !important;
+
+  /* Channel / Input */
+  --channel-icon:                   var(--pywal-color7)                     !important;
+  --channels-default:               var(--pywal-color7)                     !important;
+  --channel-text-area-placeholder:  rgba(var(--pywal-fg-rgb), 0.40)         !important;
+  --channeltextarea-background:     rgba(var(--pywal-color0-rgb), 0.50)     !important;
+  --input-background:               rgba(var(--pywal-color0-rgb), 0.60)     !important;
+  --input-placeholder-text:         rgba(var(--pywal-fg-rgb), 0.35)         !important;
+  --deprecated-text-input-bg:       rgba(var(--pywal-color0-rgb), 0.60)     !important;
+  --deprecated-text-input-border:   rgba(var(--pywal-color1-rgb), 0.30)     !important;
+
+  /* Scrollbar */
+  --scrollbar-thin-thumb:  rgba(var(--pywal-color1-rgb), 0.50) !important;
+  --scrollbar-thin-track:  transparent                         !important;
+  --scrollbar-auto-thumb:  rgba(var(--pywal-color1-rgb), 0.50) !important;
+  --scrollbar-auto-track:  transparent                         !important;
+
+  /* Misc */
+  --home-background:        rgba(var(--pywal-bg-rgb), 0.40)        !important;
+  --focus-primary:          var(--pywal-color1)                     !important;
+  --mention-background:     rgba(var(--pywal-color3-rgb), 0.10)     !important;
+  --mention-foreground:     var(--pywal-color3)                     !important;
+  --deprecated-card-bg:     rgba(var(--pywal-color0-rgb), 0.60)     !important;
+  --deprecated-store-bg:    rgba(var(--pywal-bg-rgb), 0.80)         !important;
+  --elevation-stroke:       rgba(var(--pywal-bg-rgb), 0.30)         !important;
+  --elevation-low:          rgba(var(--pywal-bg-rgb), 0.20)         !important;
+  --elevation-medium:       rgba(var(--pywal-bg-rgb), 0.40)         !important;
+  --elevation-high:         rgba(var(--pywal-bg-rgb), 0.60)         !important;
+
+  /* Status colors */
+  --status-online-background:    var(--pywal-color2) !important;
+  --status-idle-background:      var(--pywal-color3) !important;
+  --status-dnd-background:       var(--pywal-color9) !important;
+  --status-offline-background:   var(--pywal-color8) !important;
+  --status-streaming-background: var(--pywal-color5) !important;
+}
+
+/* ============================================================
+   DISCORD RAW COLOR SCALE  (--primary-* used by many elements)
+   Map dark-end entries to pywal bg, light-end to pywal fg
+   ============================================================ */
+.theme-dark, :root {
+  --primary-100: {color0}   !important;
+  --primary-200: {color0}   !important;
+  --primary-300: {color0}   !important;
+  --primary-360: {color0}   !important;
+  --primary-400: {background} !important;
+  --primary-430: {color8}   !important;
+  --primary-460: {color8}   !important;
+  --primary-500: {color8}   !important;
+  --primary-530: {color7}   !important;
+  --primary-560: {color7}   !important;
+  --primary-600: {color7}   !important;
+  --primary-630: {color7}   !important;
+  --primary-645: {foreground} !important;
+  --primary-660: {foreground} !important;
+  --primary-700: {foreground} !important;
+  --primary-730: {foreground} !important;
+  --primary-800: {foreground} !important;
+  --primary-900: {foreground} !important;
+}
+
+/* ============================================================
+   WALLPAPER  — set on html + body + root mount
+   ============================================================ */
+html,
+body {
+  background-image: url("file:///var/lib/spectrumos/current.png") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-color: var(--pywal-background) !important;
+}
+
+#app-mount {
+  background-image: url("file:///var/lib/spectrumos/current.png") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-color: var(--pywal-background) !important;
+}
+
+/* ============================================================
+   GLOBAL TRANSPARENCY RESET
+   Make layers transparent so wallpaper bleeds through;
+   explicit colours are added per-panel below.
+   ============================================================ */
+[class*="app_"],
+[class*="appAsidePanelWrapper_"],
+[class*="baseLayer_"],
+[class*="bg_"],
+[class*="base_"],
+[class*="content_"][class*="base_"],
+[class*="chat_"],
+[class*="chatContent_"],
+[class*="messagesWrapper_"],
+[class*="scroller_"],
+[class*="container_"][class*="base_"],
+[class*="layerContainer_"],
+[class*="layerContainer_"] > [class*="layer_"] {
+  background: transparent !important;
+}
+
+/* ============================================================
+   SERVER LIST  (far-left guild nav)
+   ============================================================ */
+nav[class*="guilds"],
+[class*="guilds_"],
+[class*="guildsList"],
+[class*="guildsError"] {
+  background: rgba(var(--pywal-bg-rgb), 0.88) !important;
+}
+
+/* ============================================================
+   TITLE BAR  (Vesktop custom window chrome)
+   ============================================================ */
+[class*="titleBar"],
+[class*="typeWindows"],
+[class*="withFrame"],
+[class*="wordmarkWindows"],
+[class*="frameless"],
+[class*="title-bar"],
+html[class*="platform-linux"] [class*="titleBar"],
+.platform-linux [class*="titleBar"] {
+  background: rgba(var(--pywal-bg-rgb), 0.96) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+/* ============================================================
+   SIDEBAR / CHANNEL LIST  (second column)
+   ============================================================ */
+[class*="sidebar_"],
+[class*="sidebar-"],
+[class*="privateChannels_"],
+[class*="privateChannels-"],
+[class*="channel-list"] {
+  background: rgba(var(--pywal-color0-rgb), 0.82) !important;
+}
+
+/* Category headers in channel list */
+[class*="categoryContainer"],
+[class*="containerDefault_"][class*="categoryContainer"],
+[class*="header_"][class*="categoryContainer"],
+[class*="category_"][class*="wrapper_"] {
+  color: var(--pywal-color7) !important;
+  opacity: 1 !important;
+}
+
+/* Channel items */
+[class*="containerDefault_"],
+[class*="containerUserOver_"] {
+  color: var(--pywal-color7) !important;
+}
+
+[class*="containerDefault_"]:hover,
+[class*="containerUserOver_"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.15) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="modeSelected_"],
+[class*="modeSelected_"] [class*="children_"] {
+  background: rgba(var(--pywal-color1-rgb), 0.25) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+/* Unread/mention badges */
+[class*="numberBadge"],
+[class*="lowerBadge"],
+[class*="upperBadge"] {
+  background: var(--pywal-color1) !important;
+  color: var(--pywal-background) !important;
+}
+
+[class*="unread_"][class*="pill_"],
+[class*="unreadImportantTop"],
+[class*="unreadImportantBottom"] {
+  background: var(--pywal-foreground) !important;
+}
+
+/* ============================================================
+   CHANNEL HEADER / TOOLBAR  (top of the chat area)
+   Catches both "toolbar_" and newer "upperContainer_" variants
+   ============================================================ */
+[class*="toolbar_"],
+[class*="toolbar-"],
+[class*="upperContainer"],
+[class*="chatHeader"],
+[class*="header_"][class*="chat_"],
+[class*="header_"][class*="privateChannel"],
+[class*="headerContent"],
+section[class*="chatHeader"] {
+  background: rgba(var(--pywal-bg-rgb), 0.88) !important;
+  border-bottom: 1px solid rgba(var(--pywal-color1-rgb), 0.18) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+/* Channel name text and topic inside the header */
+[class*="toolbar_"] [class*="title_"],
+[class*="toolbar_"] [class*="name_"],
+[class*="upperContainer"] [class*="title_"],
+[class*="upperContainer"] [class*="name_"],
+[class*="channelName"],
+[class*="titleWrapper"],
+[class*="topic_"] {
+  color: var(--pywal-foreground) !important;
+}
+
+/* ============================================================
+   MAIN CHAT / MESSAGES AREA
+   ============================================================ */
+[class*="chatContent_"],
+main[class*="chatContent_"],
+[class*="messagesWrapper_"] {
+  background: rgba(var(--pywal-bg-rgb), 0.45) !important;
+}
+
+/* Message hover */
+[class*="message_"]:hover,
+[class*="cozyMessage_"]:hover,
+[class*="groupStart_"]:hover {
+  background: rgba(var(--pywal-color0-rgb), 0.35) !important;
+}
+
+/* Mentioned message highlight */
+[class*="mentioned_"] {
+  background: rgba(var(--pywal-color3-rgb), 0.10) !important;
+  border-left: 2px solid var(--pywal-color3) !important;
+}
+
+/* System/notification bars inside chat */
+[class*="jumpToPresentBar"],
+[class*="newMessageBar"] {
+  background: rgba(var(--pywal-color1-rgb), 0.85) !important;
+  color: var(--pywal-background) !important;
+}
+
+/* ============================================================
+   MESSAGE INPUT BOX
+   ============================================================ */
+[class*="channelTextArea"],
+[class*="scrollableContainer"],
+[class*="textArea_"] {
+  background: rgba(var(--pywal-color0-rgb), 0.55) !important;
+}
+
+/* ============================================================
+   USER PANEL  (bottom-left: avatar, name, controls)
+   ============================================================ */
+[class*="panels_"],
+[class*="panel_"][class*="base_"],
+[class*="panels-"] {
+  background: rgba(var(--pywal-color0-rgb), 0.92) !important;
+}
+
+/* ============================================================
+   MEMBER LIST  (right column in servers)
+   ============================================================ */
+[class*="members_"],
+[class*="membersWrap_"],
+[class*="membersGroup_"],
+[class*="members-"] {
+  background: rgba(var(--pywal-color0-rgb), 0.78) !important;
+}
+
+[class*="member_"]:hover,
+[class*="memberInner_"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.15) !important;
+  border-radius: 4px !important;
+}
+
+/* Group headers (Online — N) inside member list */
+[class*="membersGroup_"] {
+  color: var(--pywal-color7) !important;
+}
+
+/* ============================================================
+   ACTIVE NOW PANEL  (right column in DMs)
+   Covers old "nowPlayingColumn" AND newer naming variants
+   ============================================================ */
+[class*="nowPlayingColumn"],
+[class*="activeNowPanel"],
+[class*="activityPanel"],
+[class*="activeNow"],
+[class*="nowPlaying"] {
+  background: rgba(var(--pywal-color0-rgb), 0.78) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+/* Header inside Active Now */
+[class*="nowPlayingColumn"] [class*="header"],
+[class*="activeNow"] [class*="header"],
+[class*="activityPanel"] [class*="header"] {
+  color: var(--pywal-foreground) !important;
+  background: rgba(var(--pywal-bg-rgb), 0.88) !important;
+  border-bottom: 1px solid rgba(var(--pywal-color1-rgb), 0.18) !important;
+}
+
+/* Friend cards inside Active Now */
+[class*="nowPlayingColumn"] [class*="item"],
+[class*="nowPlayingColumn"] [class*="user"],
+[class*="activeNow"] [class*="item"],
+[class*="activityPanel"] [class*="item"] {
+  background: rgba(var(--pywal-color0-rgb), 0.50) !important;
+  border-radius: 6px !important;
+}
+
+[class*="nowPlayingColumn"] [class*="item"]:hover,
+[class*="activeNow"] [class*="item"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.20) !important;
+}
+
+/* ============================================================
+   FRIENDS / PEOPLE LIST PAGE
+   ============================================================ */
+[class*="peopleList"],
+[class*="friendsTable"],
+[class*="friends_"],
+section[class*="peopleList"] {
+  background: transparent !important;
+}
+
+/* Friends page header row (Online, All, Pending, Blocked tabs) */
+[class*="privateChannelsHeaderContainer"],
+[class*="tabBar_"][class*="friends"],
+[class*="tabBar"][class*="top"] {
+  background: rgba(var(--pywal-color0-rgb), 0.78) !important;
+  border-bottom: 1px solid rgba(var(--pywal-color1-rgb), 0.20) !important;
+}
+
+/* Tab items */
+[class*="tab_"][class*="friends"],
+[class*="item_"][class*="tabBar"] {
+  color: var(--pywal-color7) !important;
+}
+
+[class*="tab_"][class*="friends"]:hover,
+[class*="item_"][class*="tabBar"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.15) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="selected_"][class*="tab"],
+[class*="tabSelected"],
+[class*="item_"][class*="selected_"] {
+  color: var(--pywal-foreground) !important;
+  border-bottom: 2px solid var(--pywal-color1) !important;
+}
+
+/* Friends list section label ("Online — N") */
+[class*="friendsSection"],
+[class*="friendsSectionTitle"],
+[class*="peopleSection"] {
+  color: var(--pywal-color7) !important;
+}
+
+/* Individual friend row */
+[class*="peopleListItem"],
+li[class*="peopleListItem"] {
+  background: rgba(var(--pywal-color0-rgb), 0.42) !important;
+  border-radius: 8px !important;
+}
+
+[class*="peopleListItem"]:hover,
+li[class*="peopleListItem"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.22) !important;
+}
+
+/* Friend name / discriminator text */
+[class*="peopleListItem"] [class*="username"],
+[class*="peopleListItem"] [class*="discriminator"],
+[class*="peopleListItem"] [class*="subText"],
+[class*="peopleListItem"] [class*="activity"] {
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="peopleListItem"] [class*="subText"],
+[class*="peopleListItem"] [class*="activity"] {
+  color: var(--pywal-color7) !important;
+}
+
+/* ============================================================
+   DM LIST  (sidebar items when Home is selected)
+   ============================================================ */
+[class*="channel_"][class*="privateChannels"],
+[class*="link_"][class*="channel_"] {
+  color: var(--pywal-color7) !important;
+  border-radius: 6px !important;
+}
+
+[class*="channel_"][class*="privateChannels"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.15) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="selected_"][class*="channel_"] {
+  background: rgba(var(--pywal-color1-rgb), 0.25) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+/* DM user name and status text */
+[class*="channel_"] [class*="name_"],
+[class*="channel_"] [class*="subText_"] {
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="channel_"] [class*="subText_"] {
+  color: var(--pywal-color7) !important;
+}
+
+/* ============================================================
+   USER PROFILE POPOUT / SIDEBAR PANEL
+   ============================================================ */
+aside[class*="profilePanel"],
+[class*="userProfileOuter"],
+[class*="userProfileInner"],
+[class*="userPanelOuter"],
+[class*="profileBody"],
+[class*="profileBannerSVGWrapper"] {
+  background: rgba(var(--pywal-color0-rgb), 0.90) !important;
+}
+
+[class*="userBio"],
+[class*="profileBio"],
+[class*="customStatus"] {
+  color: var(--pywal-color7) !important;
+}
+
+[class*="userProfileOuter"] [class*="username"],
+[class*="userProfileInner"] [class*="username"] {
+  color: var(--pywal-foreground) !important;
+}
+
+/* ============================================================
+   MODALS  (settings, image viewer, etc.)
+   ============================================================ */
+[class*="backdrop_"] {
+  background: rgba(var(--pywal-bg-rgb), 0.65) !important;
+}
+
+[class*="root_"][class*="modal_"],
+[class*="modal_"] > [class*="content_"],
+[class*="modalContent"],
+[class*="layerContainer"] [class*="root_"] {
+  background: rgba(var(--pywal-color0-rgb), 0.97) !important;
+}
+
+[class*="header_"][class*="modal_"],
+[class*="modalHeader"] {
+  background: rgba(var(--pywal-bg-rgb), 0.99) !important;
+  border-bottom: 1px solid rgba(var(--pywal-color1-rgb), 0.20) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="footer_"][class*="modal_"],
+[class*="modalFooter"] {
+  background: rgba(var(--pywal-bg-rgb), 0.99) !important;
+  border-top: 1px solid rgba(var(--pywal-color1-rgb), 0.20) !important;
+}
+
+/* ============================================================
+   SETTINGS  (sidebar + content region)
+   ============================================================ */
+[class*="sidebarRegion"],
+[class*="standardSidebarView"] > [class*="sidebar"],
+[class*="sidebar_"][class*="settings"],
+[class*="sidebar-"][class*="settings"] {
+  background: rgba(var(--pywal-bg-rgb), 0.94) !important;
+}
+
+[class*="item_"][class*="settings"],
+[class*="side_"][class*="item_"] {
+  color: var(--pywal-color7) !important;
+  border-radius: 4px !important;
+}
+
+[class*="item_"][class*="settings"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.15) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="selected_"][class*="item_"][class*="settings"],
+[class*="item_"][class*="settings"][class*="focused_"] {
+  background: rgba(var(--pywal-color1-rgb), 0.25) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="contentRegion"] {
+  background: rgba(var(--pywal-bg-rgb), 0.82) !important;
+}
+
+/* Settings section headings */
+[class*="labelRow"],
+[class*="sectionTitle"],
+[class*="h5_"],
+[class*="label_"][class*="title"] {
+  color: var(--pywal-color7) !important;
+}
+
+/* ============================================================
+   CONTEXT MENUS
+   ============================================================ */
+[class*="menu_"],
+[class*="contextMenu"],
+[role="menu"] {
+  background: rgba(var(--pywal-color0-rgb), 0.97) !important;
+  border: 1px solid rgba(var(--pywal-color1-rgb), 0.25) !important;
+  border-radius: 8px !important;
+}
+
+[class*="item_"][class*="menu_"],
+[class*="label_"][class*="menu_"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"] {
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="item_"][class*="menu_"]:hover,
+[class*="focused_"][class*="item_"][class*="menu_"],
+[role="menuitem"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.28) !important;
+}
+
+[class*="colorDefault_"][class*="menu_"] {
+  color: var(--pywal-foreground) !important;
+}
+[class*="colorDanger_"][class*="menu_"] {
+  color: var(--pywal-color9) !important;
+}
+[class*="separator_"][class*="menu_"] {
+  border-color: rgba(var(--pywal-color1-rgb), 0.20) !important;
+}
+
+/* ============================================================
+   REACTIONS
+   ============================================================ */
+[class*="reaction_"]:not([class*="reactionMe_"]) {
+  background: rgba(var(--pywal-color0-rgb), 0.55) !important;
+  border: 1px solid rgba(var(--pywal-color1-rgb), 0.25) !important;
+}
+
+[class*="reactionMe_"] {
+  background: rgba(var(--pywal-color1-rgb), 0.30) !important;
+  border: 1px solid var(--pywal-color1) !important;
+}
+
+/* ============================================================
+   VOICE / VIDEO CALLS
+   ============================================================ */
+[class*="callContainer"],
+[class*="rtcConnection"],
+[class*="videoContainer"] {
+  background: rgba(var(--pywal-bg-rgb), 0.82) !important;
+}
+
+/* ============================================================
+   SEARCH BAR + RESULTS
+   ============================================================ */
+[class*="searchBar_"],
+[class*="searchBox"] {
+  background: rgba(var(--pywal-color0-rgb), 0.55) !important;
+}
+
+[class*="resultsWrap"],
+[class*="searchResult"],
+[class*="resultsGroup"] {
+  background: rgba(var(--pywal-color0-rgb), 0.92) !important;
+}
+
+[class*="searchResult"]:hover {
+  background: rgba(var(--pywal-color1-rgb), 0.20) !important;
+}
+
+/* ============================================================
+   TOOLTIPS
+   ============================================================ */
+[class*="tooltip_"],
+[role="tooltip"] {
+  background: rgba(var(--pywal-color0-rgb), 0.97) !important;
+  color: var(--pywal-foreground) !important;
+  border: 1px solid rgba(var(--pywal-color1-rgb), 0.30) !important;
+}
+
+/* ============================================================
+   INPUT FIELDS
+   ============================================================ */
+[class*="input_"][class*="defaultInput_"],
+[class*="input_"][type="text"],
+[class*="input_"][type="email"],
+[class*="input_"][type="password"],
+textarea {
+  background: rgba(var(--pywal-color0-rgb), 0.65) !important;
+  border-color: rgba(var(--pywal-color1-rgb), 0.30) !important;
+  color: var(--pywal-foreground) !important;
+}
+
+[class*="input_"]:focus,
+textarea:focus {
+  border-color: var(--pywal-color1) !important;
+}
+
+/* ============================================================
+   TOGGLE SWITCHES
+   ============================================================ */
+[class*="slider_"][class*="checked_"],
+[class*="slider_"][aria-checked="true"] {
+  background: var(--pywal-color1) !important;
+}
+
+/* ============================================================
+   DIVIDERS
+   ============================================================ */
+[class*="divider_"],
+[class*="separator_"]:not([class*="menu_"]) {
+  border-color: rgba(var(--pywal-color1-rgb), 0.18) !important;
+}
+
+/* ============================================================
+   POPOUTS (pinned messages, emoji picker, gifs, stickers, etc.)
+   ============================================================ */
+[class*="popout_"],
+[class*="emojiPicker"],
+[class*="gifPicker"],
+[class*="stickerPicker"],
+[class*="expressionPicker"] {
+  background: rgba(var(--pywal-color0-rgb), 0.96) !important;
+  border: 1px solid rgba(var(--pywal-color1-rgb), 0.20) !important;
+  border-radius: 8px !important;
+}
+
+[class*="popout_"] [class*="header"],
+[class*="emojiPicker"] [class*="header"],
+[class*="expressionPicker"] [class*="header"] {
+  background: rgba(var(--pywal-bg-rgb), 0.98) !important;
+  border-bottom: 1px solid rgba(var(--pywal-color1-rgb), 0.18) !important;
+}
+
+/* ============================================================
+   NOTICE BARS  (top-of-screen banners)
+   ============================================================ */
+[class*="notice_"],
+[class*="topPill"],
+[class*="noticeInfo"] {
+  background: rgba(var(--pywal-color1-rgb), 0.88) !important;
+  color: var(--pywal-background) !important;
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--pywal-color1-rgb), 0.50) !important;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ============================================================
+   TEXT SELECTION
+   ============================================================ */
+::selection {
+  background: rgba(var(--pywal-color1-rgb), 0.42) !important;
+  color: var(--pywal-foreground) !important;
+}

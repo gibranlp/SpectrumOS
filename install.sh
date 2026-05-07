@@ -51,16 +51,20 @@ fi
 # --- System Preparation ---
 
 echo -e "${BLUE}Enabling multilib repository...${NC}"
+# Use a more robust check and sed to ensure multilib is enabled
 if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
     sudo sed -i '/^#\[multilib\]/,+1 s/^#//' /etc/pacman.conf
-    sudo pacman -Sy
+    # Also handle cases where there might be a space after the #
+    sudo sed -i '/^# \[multilib\]/,+1 s/^# //' /etc/pacman.conf || true
 fi
+sudo pacman -Sy --noconfirm
 
 echo -e "${BLUE}Installing base-devel, git and paru...${NC}"
 sudo pacman -S --needed --noconfirm base-devel git
 
 if ! command -v paru &> /dev/null; then
     cd /tmp
+    rm -rf paru # Clean up any previous failed attempts
     git clone https://aur.archlinux.org/paru.git
     cd paru
     makepkg -si --noconfirm
@@ -90,10 +94,11 @@ if lspci | grep -i "vga" | grep -iq "nvidia"; then
     GPU_PKGS=("nvidia-dkms" "nvidia-utils" "lib32-nvidia-utils" "nvidia-settings")
 elif lspci | grep -i "vga" | grep -iq "amd"; then
     echo -e "${GREEN}✓ AMD GPU detected${NC}"
-    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-radeon" "lib32-vulkan-radeon" "libva-mesa-driver" "lib32-libva-mesa-driver" "mesa-vdpau" "lib32-mesa-vdpau" "xf86-video-amdgpu")
+    # Removed mesa-vdpau and lib32-mesa-vdpau as they often cause provider conflicts and are legacy
+    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-radeon" "lib32-vulkan-radeon" "libva-mesa-driver" "lib32-libva-mesa-driver" "mesa-utils" "xf86-video-amdgpu")
 elif lspci | grep -i "vga" | grep -iq "intel"; then
     echo -e "${GREEN}✓ Intel GPU detected${NC}"
-    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-intel" "lib32-vulkan-intel" "intel-media-driver" "libva-intel-driver" "lib32-libva-intel-driver")
+    GPU_PKGS=("mesa" "lib32-mesa" "vulkan-intel" "lib32-vulkan-intel" "intel-media-driver" "libva-intel-driver" "lib32-libva-intel-driver" "mesa-utils")
 elif lspci | grep -i "vga" | grep -iqE "virtio|vmware|vmwgfx|virtualbox|vbox"; then
     echo -e "${YELLOW}⚠ Virtual machine GPU detected — installing mesa only${NC}"
     GPU_PKGS=("mesa" "lib32-mesa" "mesa-utils")
@@ -115,21 +120,18 @@ SYSTEM_PKGS=(
     "limine" "limine-mkinitcpio-hook" "plymouth" "tlp" "tlp-rdw" "acpi" "acpi_call" "cpupower"
     "hyprland" "hyprpaper" "hypridle" "hyprlock" "hyprpicker" "xdg-desktop-portal-hyprland" "xdg-desktop-portal-gtk" "neovim"
     "qt5-wayland" "qt6-wayland" "qt5ct" "qt6ct" "kvantum" "waybar" "rofi-wayland" "dunst" "libnotify"
+
     "awww" "swappy" "grim" "slurp" "wl-clipboard" "cliphist" "brightnessctl" "pamixer" "playerctl" "nwg-displays"
     "kitty" "zsh" "zsh-completions" "zsh-syntax-highlighting" "zsh-autosuggestions" "starship" "fzf" "zoxide" "eza" "bat" "fd" "ripgrep" "thefuck"
     "networkmanager" "network-manager-applet" "bluez" "bluez-utils" "blueman" "pavucontrol" "pipewire" "pipewire-pulse" "pipewire-alsa" "pipewire-jack" "wireplumber" "libldac" "gvfs" "gvfs-mtp" "gvfs-smb" "gvfs-nfs" "tumbler" "file-roller" "unzip" "unrar" "p7zip" "rsync" "wget" "curl" "btop" "htop" "aur/neofetch" "locate" "imagemagick"
-    "thunar" "thunar-volman" "thunar-archive-plugin" "yazi" "ranger" "ntfs-3g"
+    "thunar" "thunar-volman" "thunar-archive-plugin" "yazi" "ranger" "ntfs-3g" "cmus"
     "sddm" "qt5-graphicaleffects" "qt5-quickcontrols2" "qt5-svg"
-    "cava" "polkit-gnome" "gromit-mpx" "xsettingsd"
+    "cava" "polkit-gnome" "gromit-mpx" "xsettingsd" "evolution" "evolution-bogofilter" "vlc-plugins-all" "papirus-folders-git" "brave-bin"
 )
 
 THEMING_PKGS=(
-    "aur/python-pywal16" "aur/python-pywalfox" "aur/colorz" "python-colorthief" "aur/python-haishoku" "aur/gowall" "aur/walogram-git" "python-pillow" "python-cairosvg" "papirus-icon-theme" "breeze-gtk" "breeze-icons" "aur/adwaita-qt5" "aur/adwaita-qt6" "aur/bibata-cursor-theme"
+    "aur/python-pywal16" "aur/python-pywalfox" "aur/colorz" "python-colorthief" "aur/python-haishoku" "aur/gowall" "aur/walogram-git" "python-pillow" "python-cairosvg" "papirus-icon-theme" "aur/papirus-folders-git" "aur/bibata-cursor-theme" "aur/wpgtk"
 )
-# Add themix only if space allows (it is massive, used for GTK/QT theme generation)
-if [ "$SKIP_HEAVY" = false ]; then
-    THEMING_PKGS+=("aur/themix-full-git")
-fi
 
 FONTS_PKGS=(
     "otf-font-awesome" "ttf-jetbrains-mono-nerd" "ttf-firacode-nerd" "noto-fonts" "noto-fonts-emoji"
@@ -139,6 +141,7 @@ GAMING_PKGS=()
 if [ "$SKIP_HEAVY" = false ]; then
     GAMING_PKGS=(
         "steam" "lutris" "wine-staging" "winetricks" "gamemode" "lib32-gamemode" "mangohud" "lib32-mangohud" "gamescope" "vkbasalt" "goverlay" "proton-ge-custom"
+        "lib32-libcurl-gnutls" "lib32-libcurl-compat" "lib32-gnutls"
     )
 fi
 
@@ -171,17 +174,19 @@ echo -e "${BLUE}Installing Pipewire-JACK replacements...${NC}"
 sudo pacman -S --needed --noconfirm pipewire-jack lib32-pipewire-jack
 
 echo -e "${BLUE}Installing all packages...${NC}"
-# Pre-install limine-mkinitcpio-hook separately: its .install script has an interactive
-# read prompt that --noconfirm does not suppress; piping yes answers it automatically.
+# Pre-install limine-mkinitcpio-hook separately: we use --noconfirm to handle 
+# provider selections. The 'yes |' pipe was removed as it caused loops 
+# when a number (provider) was expected.
 echo -e "${BLUE}Pre-installing limine and limine-mkinitcpio-hook...${NC}"
-yes | paru -S --needed limine limine-mkinitcpio-hook
+paru -S --needed --noconfirm limine limine-mkinitcpio-hook
 
-# We install drivers and microcode first to satisfy dependencies and avoid provider prompts
+# We install drivers and microcode first to satisfy dependencies and avoid provider prompts.
+# Using sudo pacman here ensures we only use official repos for core drivers.
 echo -e "${BLUE}Step 1: Drivers and Hardware Support...${NC}"
 DRIVER_PKGS=("${GPU_PKGS[@]}")
 [ -n "$UCODE_PKG" ] && DRIVER_PKGS+=("$UCODE_PKG")
 if [ "${#DRIVER_PKGS[@]}" -gt 0 ]; then
-    paru -S --needed --noconfirm "${DRIVER_PKGS[@]}"
+    sudo pacman -S --needed --noconfirm "${DRIVER_PKGS[@]}"
 else
     echo -e "${YELLOW}No drivers to install — skipping Step 1${NC}"
 fi
@@ -247,11 +252,37 @@ if [ -f "$DEFAULT_WALLPAPER" ]; then
     echo -e "${BLUE}Generating initial color palette...${NC}"
     wal -i /var/lib/spectrumos/current.png -n || echo "Warning: Initial Pywal generation failed, will retry on first boot."
 
+    # Initialize wpgtk
+    if command -v wpg-install.sh &>/dev/null; then
+        echo -e "${BLUE}Initializing wpgtk templates...${NC}"
+        wpg-install.sh -gio
+    fi
+
+    # Set initial GTK settings for first boot
+    echo -e "${BLUE}Setting initial GTK configuration...${NC}"
+    mkdir -p "$HOME/.config/gtk-3.0"
+    cat > "$HOME/.config/gtk-3.0/settings.ini" << EOF
+[Settings]
+gtk-icon-theme-name = flattrcolor-dark
+gtk-theme-name = FlatColor
+gtk-font-name = Sans 10
+gtk-cursor-theme-name = Adwaita
+gtk-application-prefer-dark-theme = true
+EOF
+
+    mkdir -p "$HOME/.config/gtk-4.0"
+    cp "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"
+
     # Copy pywal-generated configs to their target locations for first boot
     if [ -f "$HOME/.cache/wal/dunstrc" ]; then
         mkdir -p "$HOME/.config/dunst"
         cp "$HOME/.cache/wal/dunstrc" "$HOME/.config/dunst/dunstrc"
         echo -e "${GREEN}✓ Initial dunst config deployed${NC}"
+    fi
+    if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
+        mkdir -p "$HOME/.config/gtk-4.0"
+        cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+        echo -e "${GREEN}✓ Initial GTK4 colors deployed${NC}"
     fi
     if [ -f "$HOME/.cache/wal/cava-config" ]; then
         mkdir -p "$HOME/.config/cava"

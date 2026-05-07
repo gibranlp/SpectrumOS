@@ -1,0 +1,63 @@
+# SpectrumOS cmus theme
+# Integrates with Pywal terminal colors
+# Forces color 0 (dark) for all active/selected text
+
+### standard colors
+################################################################################
+set color_win_bg=default
+set color_win_fg=default
+set color_win_attr=none
+
+# Main Selection (Song/Artist/Album selected)
+set color_win_sel_bg=1
+set color_win_sel_fg=0
+set color_win_sel_attr=bold
+
+# Inactive Selection (When you are in another window)
+set color_win_inactive_sel_bg=8
+set color_win_inactive_sel_fg=0
+set color_win_inactive_sel_attr=none
+
+# Currently playing track (When NOT selected)
+set color_win_cur=2
+set color_win_cur_attr=bold
+
+# Currently playing track (When selected)
+set color_win_cur_sel_bg=2
+set color_win_cur_sel_fg=0
+set color_win_cur_sel_attr=bold
+
+# Currently playing track (Selected but window inactive)
+set color_win_inactive_cur_sel_bg=2
+set color_win_inactive_cur_sel_fg=0
+set color_win_inactive_cur_sel_attr=none
+
+# Window titles (Library / Playlist / etc)
+set color_win_title_bg=3
+set color_win_title_fg=0
+set color_win_title_attr=bold
+
+set color_win_dir=4
+
+### topbar and statusline
+################################################################################
+# Topbar (Current Track Info at the very top)
+set color_titleline_bg=5
+set color_titleline_fg=0
+set color_titleline_attr=bold
+
+# Statusline (Bottom information bar)
+set color_statusline_bg=0
+set color_statusline_fg=7
+set color_statusline_attr=none
+
+set color_info=6
+set color_error=1
+
+### command line
+################################################################################
+set color_cmdline_bg=default
+set color_cmdline_fg=default
+set color_cmdline_attr=none
+
+set color_separator=8

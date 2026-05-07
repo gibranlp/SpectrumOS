@@ -16,17 +16,16 @@ WAYBAR_SYMLINK="$HOME/.config/waybar/style.css"
 # Set waybar style
 set_waybar_style() {
     local config_file="/etc/spectrumos/spectrumos.conf"
-    local styles=("default" "transparent" "floating" "minimal" "pills")
-    
+
     # Get current style from config
     local current_style
     current_style=$(grep "^WAYBAR_STYLE=" "$config_file" 2>/dev/null | cut -d'"' -f2)
-    
+
     # Default to default if not set
     if [[ -z "$current_style" ]]; then
         current_style="default"
     fi
-    
+
     # Build rofi options with descriptions
     local options=""
     options+="default - Rounded Solid Modules\n"
@@ -34,21 +33,21 @@ set_waybar_style() {
     options+="floating - Separated with Shadows\n"
     options+="minimal - Flat Sharp Corners\n"
     options+="pills - Extra Rounded Colorful"
-    
+
     # Show rofi menu
     local selected
     selected=$(echo -e "$options" | rofi -dmenu -theme "$ROFI_THEME" -p "🎨 Current 👉🏻 ${current_style^}" -i)
-    
+
     # Get exit code
     local exit_code=$?
-    
+
     # Check if user cancelled (ESC or closed)
     if [[ $exit_code -ne 0 ]] || [[ -z "$selected" ]]; then
         exit 0
     fi
-    
+
     # Extract style name (before the dash)
-    selected=$(echo "$selected" | awk '{print $1}')
+    selected=$(echo "$selected" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
 
     if [[ ! -f "$WAYBAR_STYLE_DIR/${selected}.css" ]]; then
         notify-send -a "SpectrumOS" "Waybar style not found: ${selected}.css" -u critical
@@ -65,20 +64,24 @@ set_waybar_style() {
         exit 1
     fi
 
+    # Fix hardcoded paths in the selected CSS file just in case
+    sed -i "s|/home/[^/]*\.cache|$HOME/.cache|g" "$WAYBAR_STYLE_DIR/${selected}.css"
+
     # Update symlink
     ln -sf "$WAYBAR_STYLE_DIR/${selected}.css" "$WAYBAR_SYMLINK"
-    
+
     # Update config file (create line if doesn't exist)
     if grep -q "^WAYBAR_STYLE=" "$config_file" 2>/dev/null; then
         sudo sed -i "s/^WAYBAR_STYLE=.*/WAYBAR_STYLE=\"$selected\"/" "$config_file"
     else
         echo "WAYBAR_STYLE=\"$selected\"" | sudo tee -a "$config_file" > /dev/null
     fi
-    
+
     # Restart waybar
-    pkill waybar
-    waybar &
-    
+    killall waybar 2>/dev/null
+    sleep 0.5
+    (waybar &) > /dev/null 2>&1
+
     # Send notification
     notify-send -a "󰣇 SpectrumOS" \
         "Waybar Style Changed" \

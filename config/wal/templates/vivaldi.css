@@ -1,0 +1,40 @@
+/* Vivaldi Pywal Theme - SpectrumOS */
+
+/* Force variables at the highest level */
+#browser {
+  --colorBg: {background} !important;
+  --colorFg: {foreground} !important;
+  --colorAccentBg: {color1} !important;
+  --colorAccentFg: {foreground} !important;
+  --colorHighlightBg: {color2} !important;
+  --colorBgDark: {color0} !important;
+  --colorBgLight: {color8} !important;
+}
+
+/* Apply background to every major UI container */
+#browser, 
+.toolbar-mainbar, 
+.addressfield, 
+.searchfield, 
+#panels, 
+.status-bar,
+#tabs-subcontainer,
+#header {
+  background-color: {background} !important;
+  color: {foreground} !important;
+}
+
+/* Tabs */
+#tabs-container {
+  background-color: {color0} !important;
+}
+
+.tab-position .tab.active {
+  background-color: {color1} !important;
+  color: {foreground} !important;
+}
+
+/* Force the "Accent Color" to be our color1 */
+.accent-bg {
+  background-color: {color1} !important;
+}
