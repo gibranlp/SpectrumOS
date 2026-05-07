@@ -86,9 +86,11 @@ function create_local_files(){
     mkdir -p $HOME/.config/xsettingsd
 
     # Cleanup legacy GTK overrides that conflict with wpgtk
+    # We remove them if they are files, but if they are symlinks we might be in a re-install scenario
+    [ -f "$HOME/.config/gtk-3.0/gtk.css" ] && [ ! -L "$HOME/.config/gtk-3.0/gtk.css" ] && rm "$HOME/.config/gtk-3.0/gtk.css"
+    [ -f "$HOME/.config/gtk-4.0/gtk.css" ] && [ ! -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+    # Ensure they are gone even if we don't know if they are symlinks but they are NOT pointing to where we want
     rm -f $HOME/.config/gtk-3.0/gtk.css
-    # We keep gtk-4.0/gtk.css if it's managed by pywal, 
-    # but for fresh install we want it clean
     rm -f $HOME/.config/gtk-4.0/gtk.css
 }
 
@@ -125,6 +127,24 @@ function install_wpgtk() {
     fi
     echo -e "${BLUE}Initializing wpgtk templates...${NC}"
     wpg-install.sh -gio
+
+    # Fix FlatColor index.theme (sometimes it has wrong name/metadata)
+    if [ -d "$HOME/.local/share/themes/FlatColor" ]; then
+        echo -e "${BLUE}Fixing FlatColor theme metadata...${NC}"
+        cat > "$HOME/.local/share/themes/FlatColor/index.theme" << EOF
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=FlatColor
+Comment=SpectrumOS Dynamic Theme
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=FlatColor
+MetacityTheme=FlatColor
+ButtonLayout=:minimize,maximize,close
+IconTheme=flattrcolor-dark
+EOF
+    fi
 
     echo -e "${BLUE}Setting initial GTK configuration...${NC}"
     mkdir -p "$HOME/.config/gtk-3.0"

@@ -256,6 +256,23 @@ if [ -f "$DEFAULT_WALLPAPER" ]; then
     if command -v wpg-install.sh &>/dev/null; then
         echo -e "${BLUE}Initializing wpgtk templates...${NC}"
         wpg-install.sh -gio
+
+        # Fix FlatColor index.theme
+        if [ -d "$HOME/.local/share/themes/FlatColor" ]; then
+            cat > "$HOME/.local/share/themes/FlatColor/index.theme" << EOF
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=FlatColor
+Comment=SpectrumOS Dynamic Theme
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=FlatColor
+MetacityTheme=FlatColor
+ButtonLayout=:minimize,maximize,close
+IconTheme=flattrcolor-dark
+EOF
+        fi
     fi
 
     # Set initial GTK settings for first boot
@@ -272,6 +289,12 @@ EOF
 
     mkdir -p "$HOME/.config/gtk-4.0"
     cp "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"
+
+    # Set initial xsettingsd config
+    if [ -f "$SCRIPT_DIR/config/xsettingsd/xsettingsd.conf" ]; then
+        mkdir -p "$HOME/.config/xsettingsd"
+        cp "$SCRIPT_DIR/config/xsettingsd/xsettingsd.conf" "$HOME/.config/xsettingsd/xsettingsd.conf"
+    fi
 
     # Copy pywal-generated configs to their target locations for first boot
     if [ -f "$HOME/.cache/wal/dunstrc" ]; then
