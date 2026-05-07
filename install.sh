@@ -252,6 +252,14 @@ if [ -f "$DEFAULT_WALLPAPER" ]; then
     echo -e "${BLUE}Generating initial color palette...${NC}"
     wal -i /var/lib/spectrumos/current.png -n || echo "Warning: Initial Pywal generation failed, will retry on first boot."
 
+    # Initialize stable color cache for Hyprland
+    mkdir -p "$HOME/.cache/spectrumos"
+    if [ -f "$HOME/.cache/wal/colors-hyprland.conf" ]; then
+        cp "$HOME/.cache/wal/colors-hyprland.conf" "$HOME/.cache/spectrumos/colors-hyprland.conf"
+    else
+        touch "$HOME/.cache/spectrumos/colors-hyprland.conf"
+    fi
+
     # Initialize wpgtk
     if command -v wpg-install.sh &>/dev/null; then
         echo -e "${BLUE}Initializing wpgtk templates...${NC}"
