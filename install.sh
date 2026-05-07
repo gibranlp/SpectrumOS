@@ -315,6 +315,11 @@ EOF
         cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
         echo -e "${GREEN}✓ Initial GTK4 colors deployed${NC}"
     fi
+    if [ -f "$HOME/.cache/wal/gtk3.css" ]; then
+        mkdir -p "$HOME/.config/gtk-3.0"
+        cp "$HOME/.cache/wal/gtk3.css" "$HOME/.config/gtk-3.0/gtk.css"
+        echo -e "${GREEN}✓ Initial GTK3 colors deployed${NC}"
+    fi
     if [ -f "$HOME/.cache/wal/cava-config" ]; then
         mkdir -p "$HOME/.config/cava"
         cp "$HOME/.cache/wal/cava-config" "$HOME/.config/cava/config"

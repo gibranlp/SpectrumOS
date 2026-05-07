@@ -104,7 +104,6 @@ function install_wal_templates() {
     deploy_config "$SCRIPT_DIR/config/wal/templates" "$HOME/.config/wal/templates"
     # Remove legacy templates that conflict with wpgtk
     rm -f "$HOME/.config/wal/templates/gtk.css"
-    rm -f "$HOME/.config/wal/templates/gtk3.css"
 }
 function install_waybar_config() {
     deploy_config "$SCRIPT_DIR/config/waybar" "$HOME/.config/waybar"
@@ -162,9 +161,14 @@ EOF
 
     # Ensure gtk-4.0/gtk.css is a real file if it exists as a symlink from previous attempts
     [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
+    [ -L "$HOME/.config/gtk-3.0/gtk.css" ] && rm "$HOME/.config/gtk-3.0/gtk.css"
 
     if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
         cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+    fi
+
+    if [ -f "$HOME/.cache/wal/gtk3.css" ]; then
+        cp "$HOME/.cache/wal/gtk3.css" "$HOME/.config/gtk-3.0/gtk.css"
     fi
 
     echo -e "${GREEN}✓ wpgtk initialized and GTK settings configured${NC}"

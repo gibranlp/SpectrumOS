@@ -31,6 +31,10 @@ fi
 if command -v wpg &>/dev/null && [ -n "$WALLPAPER" ]; then
     wpg -a "$WALLPAPER"
     wpg -s "$WALLPAPER"
+fi
+
+if [ -n "$WALLPAPER" ]; then
+    # Ensure GTK settings are applied
     gsettings set org.gnome.desktop.interface gtk-theme "FlatColor"
     gsettings set org.gnome.desktop.interface icon-theme "flattrcolor-dark"
     gsettings set org.gnome.desktop.wm.preferences theme "FlatColor"
@@ -47,16 +51,26 @@ gtk-cursor-theme-name = Adwaita
 gtk-application-prefer-dark-theme = true
 EOF
 
-    # Update GTK4/libadwaita
+    # Update GTK4 settings.ini
     mkdir -p "$HOME/.config/gtk-4.0"
+    cp "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"
+
+    # Update GTK4/libadwaita CSS
     if [ -f "$HOME/.cache/wal/gtk4-libadwaita.css" ]; then
         [ -L "$HOME/.config/gtk-4.0/gtk.css" ] && rm "$HOME/.config/gtk-4.0/gtk.css"
         cp "$HOME/.cache/wal/gtk4-libadwaita.css" "$HOME/.config/gtk-4.0/gtk.css"
+    fi
+
+    # Update GTK3 CSS
+    if [ -f "$HOME/.cache/wal/gtk3.css" ]; then
+        [ -L "$HOME/.config/gtk-3.0/gtk.css" ] && rm "$HOME/.config/gtk-3.0/gtk.css"
+        cp "$HOME/.cache/wal/gtk3.css" "$HOME/.config/gtk-3.0/gtk.css"
     fi
 fi
 
 # 3. System Components
 pkill -HUP xsettingsd
+pkill xdg-desktop-portal-gtk
 
 # Update SDDM colors
 cp "$HOME/.cache/wal/sddm-colors.conf" /var/lib/spectrumos/colors.conf 2>/dev/null || true
