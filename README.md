@@ -4,7 +4,7 @@ A beautiful, color-adaptive Arch Linux desktop environment powered by:
 - **Hyprland** - Wayland compositor
 - **Pywal** - Dynamic color theming
 - **Waybar** - Status bar
-- **Kitty** - Terminal
+- **Alacritty** - Terminal
 - **Rofi** - Application launcher
 
 ## Status

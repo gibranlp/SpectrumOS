@@ -122,7 +122,7 @@ SYSTEM_PKGS=(
     "qt5-wayland" "qt6-wayland" "qt5ct" "qt6ct" "kvantum" "waybar" "rofi-wayland" "dunst" "libnotify"
 
     "awww" "swappy" "grim" "slurp" "wl-clipboard" "cliphist" "brightnessctl" "pamixer" "playerctl" "nwg-displays"
-    "kitty" "zsh" "zsh-completions" "zsh-syntax-highlighting" "zsh-autosuggestions" "starship" "fzf" "zoxide" "eza" "bat" "fd" "ripgrep" "thefuck"
+    "alacritty" "zsh" "zsh-completions" "zsh-syntax-highlighting" "zsh-autosuggestions" "starship" "fzf" "zoxide" "eza" "bat" "fd" "ripgrep" "thefuck"
     "networkmanager" "network-manager-applet" "bluez" "bluez-utils" "blueman" "pavucontrol" "pipewire" "pipewire-pulse" "pipewire-alsa" "pipewire-jack" "wireplumber" "libldac" "gvfs" "gvfs-mtp" "gvfs-smb" "gvfs-nfs" "tumbler" "file-roller" "unzip" "unrar" "p7zip" "rsync" "wget" "curl" "btop" "htop" "aur/neofetch" "locate" "imagemagick"
     "thunar" "thunar-volman" "thunar-archive-plugin" "yazi" "ranger" "ntfs-3g" "cmus"
     "sddm" "qt5-graphicaleffects" "qt5-quickcontrols2" "qt5-svg"

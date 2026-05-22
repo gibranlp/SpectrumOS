@@ -32,7 +32,9 @@ set_waybar_style() {
     options+="transparent - Glass Effect with Blur\n"
     options+="floating - Separated with Shadows\n"
     options+="minimal - Flat Sharp Corners\n"
-    options+="pills - Extra Rounded Colorful"
+    options+="pills - Extra Rounded Colorful\n"
+    options+="dark - Dark Reversed (Color0 Background)\n"
+    options+="white - White Reversed (Color7 Background)"
 
     # Show rofi menu
     local selected
@@ -54,7 +56,7 @@ set_waybar_style() {
         exit 1
     fi
 
-    local valid_styles=("default" "transparent" "floating" "minimal" "pills")
+    local valid_styles=("default" "transparent" "floating" "minimal" "pills" "dark" "white")
     local valid=false
     for s in "${valid_styles[@]}"; do
         [[ "$selected" == "$s" ]] && valid=true && break

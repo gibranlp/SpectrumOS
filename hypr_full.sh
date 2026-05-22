@@ -4,7 +4,7 @@ set -e
 echo "==> Installing core system..."
 
 sudo pacman -S --needed --noconfirm \
-  hyprland kitty rofi \
+  hyprland alacritty rofi \
   swww python-pywal \
   wl-clipboard grim slurp \
   network-manager-applet \
@@ -67,7 +67,7 @@ animations {
 }
 
 # APPS
-bind = SUPER, RETURN, exec, kitty
+bind = SUPER, RETURN, exec, alacritty
 bind = SUPER, D, exec, rofi -show drun
 bind = SUPER, Q, killactive
 bind = SUPER, F, fullscreen

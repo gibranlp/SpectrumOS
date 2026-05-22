@@ -90,10 +90,10 @@ eval $(thefuck --alias)
 alias lzd="lazydocker"
 alias tsm="transmission-remote"
 alias sshelgen="ssh -i ~/.ssh/rsa_deploy itadmin@199.85.208.94"
-alias podacidez="poddl https://anchor.fm/s/a90d4be4/podcast/rss /media/Music/Podcasts/Acidez"
-alias podcreepy="poddl 'https://www.patreon.com/rss/creepyenespanol?auth=g6v8v5ael8aEJm3MtDOSyuJ_NDPjJgTw' /media/Music/Podcasts/Creepy"
-alias podwhy="poddl https://anchor.fm/s/89358408/podcast/rss /media/Music/Podcasts/WhyFiles"
-alias podcensura="poddl http://www.poderato.com/mesembriarecords/_feed/1 /media/Music/Podcasts/Radiocensura"
+alias podacidez="poddl 'https://anchor.fm/s/a90d4be4/podcast/rss' /media/Music/Podcasts/Acidez"
+alias podcreepy="poddl 'https://www.patreon.com/rss/creepyenespanol?auth=PkiF7LFEzbzUWDaGlDDI5h5FxOOQoyQR&show=873642' /media/Music/Podcasts/Creepy"
+alias podwhy="poddl 'https://anchor.fm/s/89358408/podcast/rss' /media/Music/Podcasts/WhyFiles"
+alias podcensura="poddl 'http://www.poderato.com/mesembriarecords/_feed/1' /media/Music/Podcasts/Radiocensura"
 export PATH=~/.local/bin:$PATH
 export PATH=/usr/share/spectrumos/scripts/:$PATH
 export PATH=~/cli-tools/:$PATH

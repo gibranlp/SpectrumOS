@@ -1,0 +1,14 @@
+# _____             _                 _____ _____ 
+#|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
+#|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
+#|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
+#      |_|   
+# SpectrumOS - Embrace the Chromatic Symphony!
+# To be able to configure the Keychron Keyboard, copy this file to:
+# /etc/udev/rules.d/50-keychron.rules
+# Then:
+# sudo udevadm control --reload-rules
+# sudo udevadm trigger
+
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", MODE="0666"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="3434", MODE="0666"

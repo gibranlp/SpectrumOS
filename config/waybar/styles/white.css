@@ -1,0 +1,261 @@
+/* 
+ * SpectrumOS - Waybar White Style (Reversed)
+ * Background: color7, Text: Colors
+ */
+
+@import "/home/gibranlp/.cache/wal/colors-waybar.css";
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "FiraCode Nerd Font";
+    font-size: 16px;
+    font-weight: 500;
+    min-height: 0;
+    background: transparent;
+}
+
+window#waybar {
+    background: transparent;
+}
+
+#workspaces {
+    background: @color7;
+    margin: 2px 3px;
+    padding: 0px 10px;
+    border-radius: 3px;
+    color: @color1;
+}
+
+#workspaces button {
+    padding: 0px;
+    margin: 0px 2px;
+    min-width: 35px;
+    color: @color1;
+    border-radius: 3px;
+    font-size: 20px;
+}
+
+#workspaces button.active {
+    background: @color1;
+    color: @color7;
+}
+
+#workspaces button:hover {
+    background: @color0;
+    color: @color7;
+}
+
+#window {
+    background: @color7;
+    margin: 2px 3px;
+    padding: 0px 10px;
+    border-radius: 3px;
+    color: @color2;
+}
+
+#clock,
+#battery,
+#cpu,
+#memory,
+#temperature,
+#network,
+#pulseaudio,
+#pulseaudio.microphone,
+#bluetooth,
+#disk,
+#backlight,
+#idle_inhibitor,
+#custom-media,
+#custom-media-prev,
+#custom-media-play-pause,
+#custom-media-next,
+#custom-cava,
+#custom-gpu,
+#custom-fps,
+#custom-pomodoro,
+#custom-weather,
+#tray {
+    background: @color7;
+    padding: 0px 10px;
+    margin: 2px 3px;
+    border-radius: 3px;
+    color: @color3;
+}
+
+#custom-pomodoro.running {
+    color: @color1;
+}
+
+#custom-pomodoro.break {
+    color: @color2;
+}
+
+#custom-pomodoro.paused, #custom-pomodoro.break_paused {
+    color: @color4;
+}
+
+#tray {
+    padding: 0px 5px;
+}
+
+#custom-gpu {
+    color: @color2;
+}
+
+#custom-cava {
+    color: @color1;
+}
+
+#clock {
+    color: @color6;
+}
+
+/* Calendar tooltip styling */
+tooltip {
+    background: @color7;
+    border: 1px solid @color1;
+    border-radius: 3px;
+}
+
+tooltip label {
+    color: @color0;
+}
+
+calendar {
+    background: @color7;
+    color: @color0;
+}
+
+calendar:selected {
+    background: @color1;
+    color: @color7;
+}
+
+calendar.header {
+    color: @color1;
+}
+
+calendar.button {
+    color: @color0;
+}
+
+calendar.highlight {
+    color: @color1;
+}
+
+#battery {
+    color: @color4;
+}
+
+#battery.charging {
+    color: @color5;
+}
+
+#battery.warning:not(.charging) {
+    color: @color6;
+}
+
+#battery.critical:not(.charging) {
+    background: @color1;
+    color: @color7;
+    animation: blink 0.5s linear infinite;
+}
+
+#cpu {
+    color: @color5;
+}
+
+#memory {
+    color: @color6;
+}
+
+#temperature {
+    color: @color2;
+}
+
+#temperature.critical {
+    background: @color1;
+    color: @color7;
+}
+
+#network {
+    color: @color4;
+}
+
+#network.disconnected {
+    color: @color1;
+}
+
+#pulseaudio {
+    color: @color5;
+}
+
+#pulseaudio.muted {
+    color: @color3;
+}
+
+#pulseaudio.microphone {
+    color: @color6;
+}
+
+#bluetooth {
+    color: @color4;
+}
+
+#bluetooth.off {
+    color: @color3;
+}
+
+#disk {
+    color: @color2;
+}
+
+#backlight {
+    color: @color3;
+}
+
+#idle_inhibitor {
+    color: @color5;
+}
+
+#idle_inhibitor.activated {
+    background: @color1;
+    color: @color7;
+}
+
+#custom-media {
+    color: @color6;
+    min-width: 100px;
+}
+
+#custom-media-prev,
+#custom-media-play-pause,
+#custom-media-next {
+    color: @color4;
+    min-width: 30px;
+    padding: 0px 5px;
+}
+
+#custom-media-prev:hover,
+#custom-media-play-pause:hover,
+#custom-media-next:hover {
+    background: @color0;
+    color: @color7;
+}
+
+#custom-weather {
+    color: @color7; /* color7 on color7 might be invisible? No, color7 is the background, we need an accent color. */
+}
+
+/* Fixing weather color for white theme */
+#custom-weather {
+    color: @color6;
+}
+
+@keyframes blink {
+    to {
+        background-color: @color1;
+        color: @color7;
+    }
+}

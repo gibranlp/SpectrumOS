@@ -8,7 +8,7 @@
 # By: gibranlp <thisdoesnotwork@gibranlp.dev>
 # MIT licence
 #
-# Smart launcher: opens apps via drun, URLs in Vivaldi
+# Smart launcher: opens apps via drun, URLs in the default browser
 
 SELF="$(readlink -f "$0")"
 
@@ -16,7 +16,7 @@ if [ "$1" = "--run" ]; then
     input="$2"
     if echo "$input" | grep -qiE '^(https?|ftp)://|^www\.|^[a-zA-Z0-9][a-zA-Z0-9-]*(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,6}(/.*)?$'; then
         [[ "$input" != *"://"* ]] && input="https://$input"
-        vivaldi "$input" &
+        xdg-open "$input" &
     else
         eval "$input" &
     fi

@@ -9,8 +9,8 @@
 # MIT licence 
 #
 [global]
-    monitor = 0
-    follow = none
+    monitor = 1
+    follow = mouse
     width = (0, 450)
     height = (50, 200)
     origin = top-right

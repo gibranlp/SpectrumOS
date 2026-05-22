@@ -86,7 +86,7 @@ case $index in
     21) /usr/share/spectrumos/scripts/SOS_Power.sh ;;
     22) /usr/share/spectrumos/scripts/SOS_UpdateBase.sh ;;
     23) /usr/share/spectrumos/scripts/SOS_CleanSystem.sh ;;
-    24) kitty -e btop ;; # Monitor temperature
+    24) alacritty -e btop ;; # Monitor temperature
     
     # Miscellaneous
     26) gromit-mpx ;; # Screen Draw
