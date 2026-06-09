@@ -2,29 +2,54 @@
 import json
 import os
 import sys
+import argparse
+import random
+import colorsys
 import cairosvg
 from PIL import Image
 
-# Read pywal colors
-wal_file = os.path.expanduser("~/.cache/wal/colors.json")
-if not os.path.exists(wal_file):
-    print(f"Error: pywal colors not found at {wal_file}. Please run 'wal' first.")
-    exit(1)
+# Parse arguments
+parser = argparse.ArgumentParser(description="Generate Spectrum Logo or Wallpaper")
+parser.add_argument("--output", help="Output path for the generated file")
+parser.add_argument("--wallpaper", action="store_true", help="Generate a full-size 4K wallpaper instead of just the logo")
+args = parser.parse_args()
 
-with open(wal_file, "r") as f:
-    colors = json.load(f)
+# Color list
+palette = []
 
-# Color list from pywal
-palette = [
-    colors["colors"]["color0"],
-    colors["colors"]["color1"],
-    colors["colors"]["color2"],
-    colors["colors"]["color3"],
-    colors["colors"]["color4"],
-    colors["colors"]["color5"],
-    colors["colors"]["color6"],
-    colors["colors"]["color7"],   # this one will be front-most
-]
+if args.wallpaper:
+    # Completely independent random colors for each layer
+    for i in range(8):
+        h = random.random()
+        s = random.uniform(0.7, 0.9)
+        v = random.uniform(0.8, 1.0)
+        rgb = colorsys.hsv_to_rgb(h, s, v)
+        hex_color = '#{:02x}{:02x}{:02x}'.format(int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
+        palette.append(hex_color)
+    
+    # User requirement: top layer always white
+    palette[7] = "#FFFFFF"
+else:
+    # Read pywal colors
+    wal_file = os.path.expanduser("~/.cache/wal/colors.json")
+    if not os.path.exists(wal_file):
+        print(f"Error: pywal colors not found at {wal_file}. Please run 'wal' first.")
+        exit(1)
+
+    with open(wal_file, "r") as f:
+        colors = json.load(f)
+
+    # Color list from pywal
+    palette = [
+        colors["colors"]["color0"],
+        colors["colors"]["color1"],
+        colors["colors"]["color2"],
+        colors["colors"]["color3"],
+        colors["colors"]["color4"],
+        colors["colors"]["color5"],
+        colors["colors"]["color6"],
+        colors["colors"]["color7"],   # this one will be front-most
+    ]
 
 # SVG path (unchanged)
 SVG_PATH = """
@@ -40,12 +65,17 @@ SVG_PATH = """
 </svg>
 """
 
-# Layer size from cairosvg output
-LAYER_W = 250
-LAYER_H = 250
+# Render scale factor
+render_scale = 2.5 if args.wallpaper else 1.0
 
-# X offsets (color7 is front at offset 0)
-offsets = [-28, -24, -20, -16, -12, -8, -4, 0]
+# Layer size from cairosvg output (scaled)
+base_layer_size = 250
+LAYER_W = int(base_layer_size * render_scale)
+LAYER_H = int(base_layer_size * render_scale)
+
+# X offsets (scaled)
+base_offsets = [-28, -24, -20, -16, -12, -8, -4, 0]
+offsets = [int(o * render_scale) for o in base_offsets]
 
 # Compute canvas width so the leftmost layer never gets clipped
 max_left = abs(min(offsets))
@@ -67,7 +97,7 @@ for i, col in enumerate(palette):
     with open(svg_file, "w") as f:
         f.write(svg_data)
 
-    # Convert SVG → PNG
+    # Convert SVG → PNG at target size
     cairosvg.svg2png(
         url=svg_file,
         write_to=png_file,
@@ -85,22 +115,46 @@ for i, col in enumerate(palette):
     # Paste onto final canvas
     logo.paste(layer, (x, y), layer)
 
-# Save output
-if len(sys.argv) > 1:
-    out_file = sys.argv[1]
+# Determine final output path
+if args.output:
+    out_file = args.output
+elif args.wallpaper:
+    wall_dir = os.path.expanduser("~/Pictures/Wallpapers")
+    os.makedirs(wall_dir, exist_ok=True)
+    out_file = os.path.join(wall_dir, "SpectrumOS_Wallpaper.png")
 else:
     out_file = os.path.expanduser("~/SpectrumOS.png")
 
-logo.save(out_file, "PNG")
-print(f"Generated {out_file}")
+# Generation logic
+if args.wallpaper:
+    # 4K dark grey canvas
+    wallpaper = Image.new("RGB", (3840, 2160), "#222222")
+    
+    # Center the logo (already at target size)
+    x = (3840 - logo.width) // 2
+    y = (2160 - logo.height) // 2
+    wallpaper.paste(logo, (x, y), logo)
+    wallpaper.save(out_file, "PNG")
+    print(f"Generated Wallpaper: {out_file}")
+else:
+    # Save just the logo and update system locations
+    logo.save(out_file, "PNG")
+    print(f"Generated Logo: {out_file}")
 
-# Also try to save to global location for Limine/SDDM if we have permissions
-global_logo = "/var/lib/spectrumos/logo.png"
-try:
-    os.makedirs(os.path.dirname(global_logo), exist_ok=True)
-    logo.save(global_logo, "PNG")
-    print(f"Generated {global_logo}")
-except PermissionError:
-    pass
-except Exception as e:
-    print(f"Note: Could not save global logo: {e}")
+    # Update the system logo for consistency (if not already the output)
+    default_logo = os.path.expanduser("~/SpectrumOS.png")
+    if out_file != default_logo:
+        logo.save(default_logo, "PNG")
+        print(f"Updated {default_logo}")
+
+    # Also try to save to global location for Limine/SDDM if we have permissions
+    global_logo = "/var/lib/spectrumos/logo.png"
+    if out_file != global_logo:
+        try:
+            os.makedirs(os.path.dirname(global_logo), exist_ok=True)
+            logo.save(global_logo, "PNG")
+            print(f"Updated {global_logo}")
+        except PermissionError:
+            pass
+        except Exception as e:
+            print(f"Note: Could not save global logo: {e}")

@@ -25,7 +25,16 @@ mainbox {
     spacing:                     0px;
     background-color:            transparent;
     orientation:                 vertical;
-    children:                    [ "inputbar", "listbox" ];
+    children:                    [ "icon-logo", "inputbar", "listbox" ];
+}
+
+icon-logo {
+    expand:                      false;
+    filename:                    "/var/lib/spectrumos/logo.png";
+    size:                        250px;
+    padding:                     20px;
+    background-color:            transparent;
+    horizontal-align:            0.5;
 }
 
 listbox {
