@@ -18,12 +18,20 @@ args = parser.parse_args()
 palette = []
 
 if args.wallpaper:
-    # Completely independent random colors for each layer
+    # Randomized spectrum colors (gradual progression)
+    h = random.random()
+    s = random.uniform(0.7, 0.9)
+    v = random.uniform(0.8, 1.0)
+    
+    h_step = -0.016
+    s_step = 0.015
+    v_step = -0.06
+    
     for i in range(8):
-        h = random.random()
-        s = random.uniform(0.7, 0.9)
-        v = random.uniform(0.8, 1.0)
-        rgb = colorsys.hsv_to_rgb(h, s, v)
+        curr_h = (h + (i * h_step)) % 1.0
+        curr_s = max(0, min(1, s + (i * s_step)))
+        curr_v = max(0, min(1, v + (i * v_step)))
+        rgb = colorsys.hsv_to_rgb(curr_h, curr_s, curr_v)
         hex_color = '#{:02x}{:02x}{:02x}'.format(int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
         palette.append(hex_color)
     
