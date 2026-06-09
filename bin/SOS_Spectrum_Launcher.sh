@@ -7,7 +7,7 @@ CONFIG_FILE="/etc/spectrumos/spectrumos.conf"
 source "$CONFIG_FILE"
 
 # Define options
-OPTIONS="󰄭 Spectrum Pills\n󰄭 Spectrum Rectangles\n󰄭 Spectrum Circles\n󰄭 Spectrum Triangles\n󰄭 Spectrum Logo"
+OPTIONS="󰄭 Spectrum Logo\n󰄭 Spectrum Pills\n󰄭 Spectrum Rectangles\n󰄭 Spectrum Circles\n󰄭 Spectrum Triangles"
 
 # Show Rofi menu
 CHOICE=$(echo -e "$OPTIONS" | rofi -dmenu -i -p "  Generate Wallpaper" -theme "$HOME/.config/rofi/SOS_Left.rasi")
