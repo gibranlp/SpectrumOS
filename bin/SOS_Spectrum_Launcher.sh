@@ -63,9 +63,6 @@ else
     cp "$WALLPAPER" "/var/lib/spectrumos/current.png"
 fi
 
-# Set wallpaper with awww
-awww img "/var/lib/spectrumos/current.png" --transition-type wave --transition-duration "$TRANSITION_DURATION"
-
 # Set Colors with pywal
 # If a palette source exists (from Logo generator), use it for extraction
 PALETTE_SOURCE="/tmp/spectrum_palette.png"
@@ -79,17 +76,21 @@ else
     WAL_SOURCE="/var/lib/spectrumos/current.png"
 fi
 
+# Pywal extraction (no wallpaper update -n)
 if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
     wal -l -i "$WAL_SOURCE" --backend "$PYWAL_BACKEND" -n
 else
     wal -i "$WAL_SOURCE" --backend "$PYWAL_BACKEND" -n
 fi 
 
+# Apply Colors and Update Configs (passed palette source for wpg)
+"$SCRIPT_DIR/SOS_Apply_Colors.sh" "$WALLPAPER" "$WAL_SOURCE"
+
+# Set wallpaper with awww (SINGLE UPDATE AT THE END)
+awww img "/var/lib/spectrumos/current.png" --transition-type wave --transition-duration "$TRANSITION_DURATION"
+
 # Cleanup palette source
 rm -f "$PALETTE_SOURCE"
-
-# Apply Colors and Update Configs
-"$SCRIPT_DIR/SOS_Apply_Colors.sh" "$WALLPAPER"
 
 # Send notification
 notify-send -a "SpectrumOS" "Wallpaper Generated!" "New $MODE spectrum wallpaper created and applied." -i "$WALLPAPER"

@@ -11,6 +11,7 @@
 # Ensures atomic updates for Hyprland to prevent reload errors.
 
 WALLPAPER="$1"
+PALETTE_SOURCE="${2:-$WALLPAPER}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CACHE_DIR="$HOME/.cache/spectrumos"
 HYPR_COLOR_FILE="$CACHE_DIR/colors-hyprland.conf"
@@ -28,9 +29,10 @@ elif [ ! -f "$HYPR_COLOR_FILE" ]; then
 fi
 
 # 2. GTK / wpgtk Integration
-if command -v wpg &>/dev/null && [ -n "$WALLPAPER" ]; then
-    wpg -a "$WALLPAPER"
-    wpg -s "$WALLPAPER"
+if command -v wpg &>/dev/null && [ -n "$PALETTE_SOURCE" ]; then
+    # We only add the palette source to wpg to extract colors for GTK
+    # We do NOT use wpg -s because it sets the wallpaper and causes blinks
+    wpg -a "$PALETTE_SOURCE"
 fi
 
 if [ -n "$WALLPAPER" ]; then
