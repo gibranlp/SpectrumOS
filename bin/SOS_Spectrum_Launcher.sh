@@ -67,11 +67,26 @@ fi
 awww img "/var/lib/spectrumos/current.png" --transition-type wave --transition-duration "$TRANSITION_DURATION"
 
 # Set Colors with pywal
-if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
-    wal -l -i "/var/lib/spectrumos/current.png" --backend "$PYWAL_BACKEND"
+# If a palette source exists (from Logo generator), use it for extraction
+PALETTE_SOURCE="/tmp/spectrum_palette.png"
+if [ -f "$PALETTE_SOURCE" ]; then
+    # Apply Gowall to the palette source too if active
+    if [ "$GOWALL_SCHEME" != "No Theme" ]; then
+        gowall convert "$PALETTE_SOURCE" -t "$GOWALL_SCHEME" --output "$PALETTE_SOURCE"
+    fi
+    WAL_SOURCE="$PALETTE_SOURCE"
 else
-    wal -i "/var/lib/spectrumos/current.png" --backend "$PYWAL_BACKEND"
+    WAL_SOURCE="/var/lib/spectrumos/current.png"
+fi
+
+if [ "$PYWAL_LIGHT_SCHEME" = "Light" ]; then
+    wal -l -i "$WAL_SOURCE" --backend "$PYWAL_BACKEND" -n
+else
+    wal -i "$WAL_SOURCE" --backend "$PYWAL_BACKEND" -n
 fi 
+
+# Cleanup palette source
+rm -f "$PALETTE_SOURCE"
 
 # Apply Colors and Update Configs
 "$SCRIPT_DIR/SOS_Apply_Colors.sh" "$WALLPAPER"

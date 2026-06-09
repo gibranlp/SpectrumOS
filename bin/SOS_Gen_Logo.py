@@ -136,6 +136,15 @@ if args.wallpaper:
     wallpaper.paste(logo, (x, y), logo)
     wallpaper.save(out_file, "PNG")
     print(f"Generated Wallpaper: {out_file}")
+
+    # Save a palette source for pywal (logo on dark background, but logo is dominant)
+    # This prevents pywal from failing to extract colors due to the large 4K dark background
+    palette_source = Image.new("RGB", (512, 512), "#222222")
+    p_scale = 400 / max(logo.width, logo.height)
+    p_w, p_h = int(logo.width * p_scale), int(logo.height * p_scale)
+    p_logo = logo.resize((p_w, p_h), Image.Resampling.LANCZOS)
+    palette_source.paste(p_logo, ((512 - p_w) // 2, (512 - p_h) // 2), p_logo)
+    palette_source.save("/tmp/spectrum_palette.png", "PNG")
 else:
     # Save just the logo and update system locations
     logo.save(out_file, "PNG")
