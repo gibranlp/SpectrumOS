@@ -37,16 +37,17 @@ options=(
 "    🔊 Audio Manager (💠 + A)" #19
 "    🔑 Password Generator (💠 + G)" #20
 "    📸 Screenshot (prtnsc)" #21
-"    ⚡ Power Profiles" #22
-"    🔄 Update Base System" #23
-"    🧽 System Cleaner" #24
-"    🌡️ Monitor Temperature (💠 + ⬆️ + O)" #25
-"📦 Miscellaneous" #26
-"    ✏️ Screen Draw" #27
-"    🎨 Pick Color" #28
-"    😀 Emojis (💠 + V)" #29
-"🔌 Session Menu (💠 + X)" #30
-"💖 Support SpectrumOS" #31
+"    📽️ Screen Recorder" #22
+"    ⚡ Power Profiles" #23
+"    🔄 Update Base System" #24
+"    🧽 System Cleaner" #25
+"    🌡️ Monitor Temperature (💠 + ⬆️ + O)" #26
+"📦 Miscellaneous" #27
+"    ✏️ Screen Draw" #28
+"    🎨 Pick Color" #29
+"    😀 Emojis (💠 + V)" #30
+"🔌 Session Menu (💠 + X)" #31
+"💖 Support SpectrumOS" #32
 )
 
 # Show menu
@@ -85,15 +86,16 @@ case $index in
     19) /usr/share/spectrumos/scripts/SOS_Audio.sh ;;
     20) /usr/share/spectrumos/scripts/SOS_Pass_Generator.sh ;;
     21) /usr/share/spectrumos/scripts/SOS_Screenshot.sh ;;
-    22) /usr/share/spectrumos/scripts/SOS_Power.sh ;;
-    23) /usr/share/spectrumos/scripts/SOS_UpdateBase.sh ;;
-    24) /usr/share/spectrumos/scripts/SOS_CleanSystem.sh ;;
-    25) alacritty -e btop ;; # Monitor temperature
+    22) "$HOME_DIR/bin/SOS_Recorder.sh" ;;
+    23) /usr/share/spectrumos/scripts/SOS_Power.sh ;;
+    24) /usr/share/spectrumos/scripts/SOS_UpdateBase.sh ;;
+    25) /usr/share/spectrumos/scripts/SOS_CleanSystem.sh ;;
+    26) alacritty -e btop ;; # Monitor temperature
     
     # Miscellaneous
-    27) gromit-mpx ;; # Screen Draw
-    28) sleep 0.2 && COLOR=$(hyprpicker -r) && echo "$COLOR" | wl-copy && HEX="${COLOR#\#}" && BRIGHTNESS=$(( (16#${HEX:0:2} * 299 + 16#${HEX:2:2} * 587 + 16#${HEX:4:2} * 114) / 1000 )) && [ $BRIGHTNESS -gt 128 ] && FG="#000000" || FG="#FFFFFF" && notify-send "🖌️ " "$COLOR" -h string:bgcolor:"$COLOR" -h string:fgcolor:"$FG" -h string:frcolor:"$COLOR" -u normal ;;
-    29) rofi -modi emoji -show emoji -theme '~/.config/rofi/SOS_Left.rasi' -emoji-format ;;
-    30) /usr/share/spectrumos/scripts/SOS_Session.sh ;;
-    31) xdg-open "https://github.com/gibranlp/SpectrumOS" ;;
+    28) gromit-mpx ;; # Screen Draw
+    29) sleep 0.2 && COLOR=$(hyprpicker -r) && echo "$COLOR" | wl-copy && HEX="${COLOR#\#}" && BRIGHTNESS=$(( (16#${HEX:0:2} * 299 + 16#${HEX:2:2} * 587 + 16#${HEX:4:2} * 114) / 1000 )) && [ $BRIGHTNESS -gt 128 ] && FG="#000000" || FG="#FFFFFF" && notify-send "🖌️ " "$COLOR" -h string:bgcolor:"$COLOR" -h string:fgcolor:"$FG" -h string:frcolor:"$COLOR" -u normal ;;
+    30) rofi -modi emoji -show emoji -theme '~/.config/rofi/SOS_Left.rasi' -emoji-format ;;
+    31) /usr/share/spectrumos/scripts/SOS_Session.sh ;;
+    32) xdg-open "https://github.com/gibranlp/SpectrumOS" ;;
 esac
