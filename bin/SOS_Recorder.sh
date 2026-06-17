@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# SpectrumOS Screen Recorder
+# _____             _                 _____ _____ 
+#|   __|___ ___ ___| |_ ___ _ _ _____|     |   __|
+#|__   | . | -_|  _|  _|  _| | |     |  |  |__   |
+#|_____|  _|___|___|_| |_| |___|_|_|_|_____|_____|
+#      |_|   
+# SpectrumOS - Embrace the Chromatic Symphony!
+# By: gibranlp <thisdoesnotwork@gibranlp.dev>
+# MIT licence 
 
 ROFI_THEME="$HOME/.config/rofi/SOS_Recorder.rasi"
 FONT="Courier Prime Medium 13"
@@ -24,13 +31,16 @@ ACTION=$(echo -e "$OPTIONS" | rofi -dmenu -theme "$ROFI_THEME" -p " Screen Recor
 
 case "$ACTION" in
     "🖥️ Record Monitor")
-        # Get monitors
-        MONITORS=$(hyprctl monitors -j | jq -r '.[] | .name')
-        MONITOR_CHOICE=$(echo -e "$MONITORS" | rofi -dmenu -theme "$ROFI_THEME" -p " Select Monitor " -font "$FONT")
+        # Get monitors with descriptions for better UI
+        # Format: "Name: Description"
+        MONITOR_LIST=$(hyprctl monitors -j | jq -r '.[] | "\(.name): \(.description)"')
+        SELECTED_LINE=$(echo -e "$MONITOR_LIST" | rofi -dmenu -theme "$ROFI_THEME" -p " Select Monitor " -font "$FONT")
         
-        if [ -n "$MONITOR_CHOICE" ]; then
-            notify-send -a 'Recorder' "Starting recording on $MONITOR_CHOICE..."
-            wf-recorder -a -o "$MONITOR_CHOICE" -f "$VIDEO_DIR/recording_$TIMESTAMP.mp4" &
+        if [ -n "$SELECTED_LINE" ]; then
+            # Extract name (everything before the first colon)
+            MONITOR_NAME=$(echo "$SELECTED_LINE" | cut -d':' -f1)
+            notify-send -a 'Recorder' "Starting recording on $MONITOR_NAME..."
+            wf-recorder -a -o "$MONITOR_NAME" -f "$VIDEO_DIR/recording_$TIMESTAMP.mp4" &
         fi
         ;;
         
