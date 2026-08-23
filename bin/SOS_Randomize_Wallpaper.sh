@@ -78,7 +78,7 @@ else
 fi
 
 # Apply Colors and Update Configs
-"$SCRIPT_DIR/SOS_Apply_Colors.sh" "$WALLPAPER"
+"$SCRIPT_DIR/SOS_Apply_Colors.sh" "$CURRENT_WALLPAPER"
 
 # Send notification with thumbnail
 dunstify -a "SpectrumOS" -t 2000 "Wallpaper changed!" -i "$WALLPAPER"

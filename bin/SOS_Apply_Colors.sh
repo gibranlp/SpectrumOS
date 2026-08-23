@@ -30,9 +30,10 @@ fi
 
 # 2. GTK / wpgtk Integration
 if command -v wpg &>/dev/null && [ -n "$PALETTE_SOURCE" ]; then
-    # We only add the palette source to wpg to extract colors for GTK
-    # We do NOT use wpg -s because it sets the wallpaper and causes blinks
-    wpg -a "$PALETTE_SOURCE"
+    # We add the palette source to wpg to extract colors for GTK
+    # We use wpg -s with -n to set the theme without setting the wallpaper (prevents blinks)
+    wpg -a "$PALETTE_SOURCE" &>/dev/null || true
+    wpg -s "$PALETTE_SOURCE" -n &>/dev/null || true
 fi
 
 if [ -n "$WALLPAPER" ]; then

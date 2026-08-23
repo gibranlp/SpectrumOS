@@ -128,7 +128,7 @@ function set_wallpaper(){
     fi
 
     # Apply Colors and Update Configs
-    "$SCRIPT_DIR/SOS_Apply_Colors.sh" "$ORIGINAL_WALLPAPER"
+    "$SCRIPT_DIR/SOS_Apply_Colors.sh" "$CURRENT_WALLPAPER"
 
     # Send notification
     notify-send -a "SpectrumOS" -t 2000 "Theme Updated!"
