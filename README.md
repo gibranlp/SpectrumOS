@@ -152,6 +152,83 @@ sudo pacman -Syu
 
 On supported Btrfs installations, the update workflow creates system restore points with matching boot backups, applies migrations, and checks health. Recovery restores system and boot together; home data stays outside system rollback. Heroes appreciate save points. They also keep separate backups of their actual work.
 
+## Make the terminal yours: aliases and custom commands
+
+A fresh SpectrumOS install has a deliberately small `~/.zshrc`. It loads the package-owned shell defaults and then your personal `.zsh` files. The short file is the entrance to the tavern, not the entire tavern.
+
+The defaults provide Oh My Zsh, the Spectrum prompt, plugins, and shared helpers. Your aliases, functions, and environment settings belong in your home directory:
+
+| Personal folder | Suggested contents |
+| --- | --- |
+| `~/.config/spectrumos-personal/aliases/` | Aliases and command shortcuts |
+| `~/.config/spectrumos-personal/zsh/` | Functions, environment variables, and other shell settings |
+| `~/.config/spectrumos-personal/work/` | Optional work-specific shell settings |
+
+### Add your aliases
+
+Create the folders, then open a personal alias file in your editor:
+
+```sh
+mkdir -p ~/.config/spectrumos-personal/{aliases,zsh,work}
+nano ~/.config/spectrumos-personal/aliases/my-aliases.zsh
+```
+
+For example, put these lines in that file:
+
+```zsh
+alias update='sudo pacman -Syu'
+alias projects='cd "$HOME/Projects"'
+alias ll='ls -lah'
+```
+
+The `projects` shortcut expects a `~/Projects` directory; change the destination to suit your own workspace. Save the file and open a new terminal. Your new aliases are ready for duty.
+
+### Add functions and environment settings
+
+Open another personal file:
+
+```sh
+nano ~/.config/spectrumos-personal/zsh/custom.zsh
+```
+
+For example:
+
+```zsh
+export EDITOR=nano
+
+mkcd() {
+    mkdir -p -- "$1" && cd -- "$1"
+}
+```
+
+In a new terminal, `mkcd my-next-campaign` creates a directory and enters it. Choose your preferred installed editor for `EDITOR`. Optional syntax checks, without running the files:
+
+```sh
+zsh -n ~/.config/spectrumos-personal/aliases/my-aliases.zsh
+zsh -n ~/.config/spectrumos-personal/zsh/custom.zsh
+```
+
+### How loading works
+
+The default entrypoint reads `/usr/share/spectrumos/zsh/defaults.zsh` first, then all files ending in **`.zsh`** from **aliases → zsh → work**, in filename order within each folder. Missing folders and empty folders are fine. Names such as `10-navigation.zsh` and `20-tools.zsh` can make the order explicit. A file named only `aliases` or ending in `.txt` will not load automatically.
+
+Personal files run after the distro defaults, so your later alias and function definitions can override earlier ones. These are ordinary executable Zsh configuration files; add settings and commands you want to run whenever an interactive terminal opens. Changes apply when you open a new terminal.
+
+**Keep personal customization out of `/usr/share/spectrumos/zsh/`.** Those files belong to packages and can be replaced by updates. Your files under `~/.config/spectrumos-personal/` are yours to maintain, back up, and carry between installations. You may edit `~/.zshrc` too, but the personal folders keep the entrypoint small and your changes easy to find.
+
+### Already have your own `.zshrc`?
+
+The development installer preserves an existing `~/.zshrc`. That is why a long-standing testing machine can look different from a fresh ISO installation. **An existing custom `.zshrc` does not automatically load these folders** unless it already includes the SpectrumOS loader or explicitly sources your files.
+
+You can keep your current setup and add these lines at the end of your existing `~/.zshrc`, after creating the example files:
+
+```zsh
+source "$HOME/.config/spectrumos-personal/aliases/my-aliases.zsh"
+source "$HOME/.config/spectrumos-personal/zsh/custom.zsh"
+```
+
+That loads those two files while preserving your existing setup. The fresh-install entrypoint already loads them automatically, so it needs no extra `source` lines. Keep private work settings and credentials out of public dotfile repositories. Your aliases may be legendary; your secrets should remain undiscovered.
+
 ## Repository map
 
 This is the canonical **SpectrumOS** source repository. The former SpectrumOS2 development tree has been consolidated here, retaining the original GitHub history. The distribution version remains **1.0.0**.
