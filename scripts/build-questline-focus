@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+questline_source=${1:?Usage: build-questline-focus /path/to/Questline-cli}
+build_dir=$(mktemp -d)
+trap 'rm -rf -- "$build_dir"' EXIT
+cp -a -- "$questline_source/src" "$questline_source/assets" "$questline_source/Cargo.toml" "$questline_source/Cargo.lock" "$build_dir/"
+mkdir -p "$build_dir/src/bin"
+cp -- "$project_root/integrations/questline/spectrum-focus.rs" "$build_dir/src/bin/spectrum-focus.rs"
+cargo test --offline --release --bin spectrum-focus --manifest-path "$build_dir/Cargo.toml"
+cargo build --offline --release --bin spectrum-focus --manifest-path "$build_dir/Cargo.toml"
+install -m 0755 "$build_dir/target/release/spectrum-focus" "$project_root/integrations/questline/spectrum-focus"

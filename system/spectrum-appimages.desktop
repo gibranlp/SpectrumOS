@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AppImage Manager
+Comment=Add, launch, replace and remove AppImages
+Exec=/usr/lib/spectrumos/spectrum-shell-open appimages
+Icon=application-x-executable
+Terminal=false
+Categories=Settings;PackageManager;
+Keywords=AppImage;Applications;Portable;Install;

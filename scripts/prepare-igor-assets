@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+import copy
+from pathlib import Path
+import re
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+SVG_NS = "http://www.w3.org/2000/svg"
+ET.register_namespace("", SVG_NS)
+ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+NUMBER = re.compile(r"[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?")
+
+
+def subpaths(path):
+    # Después de cerrar un trazo, el movimiento relativo parte de su inicio.
+    start_x = start_y = 0.0
+    result = []
+    for match in re.finditer(r"([Mm])([^Mm]*)", path.attrib["d"]):
+        numbers = list(NUMBER.finditer(match[2]))
+        x, y = (float(numbers[index][0]) for index in (0, 1))
+        if match[1] == "m":
+            x += start_x
+            y += start_y
+        start_x, start_y = x, y
+        child = copy.deepcopy(path)
+        child.set("d", f"M{x:g},{y:g}" + match[2][numbers[1].end():])
+        result.append(child)
+    return result
+
+
+def write_asset(name, paths, view_box="0 100 400 164", catchlights=False):
+    svg = ET.Element(f"{{{SVG_NS}}}svg", {"viewBox": view_box, "fill-rule": "evenodd", "clip-rule": "evenodd"})
+    if catchlights:
+        original = ET.parse(ROOT / "igor.svg").getroot()
+        svg.append(copy.deepcopy(next(original.iter(f"{{{SVG_NS}}}use"))))
+        svg.append(copy.deepcopy(next(original.iter(f"{{{SVG_NS}}}defs"))))
+    for path in paths:
+        svg.append(copy.deepcopy(path))
+    destination = ROOT / "configs/spectrum-shell/igor" / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    ET.ElementTree(svg).write(destination, encoding="utf-8", xml_declaration=True)
+
+
+def main():
+    paths = list(ET.parse(ROOT / "igor.svg").getroot().iter(f"{{{SVG_NS}}}path"))
+    if len(paths) != 14:
+        raise ValueError("Igor's illustration changed; review its animation layers before regenerating them.")
+    accents = subpaths(paths[0])
+    claws = subpaths(paths[9])
+    head = accents[:2] + [path for index, path in enumerate(paths) if index not in (0, 3, 6, 9)]
+    left_claws, right_claws = [], []
+    for claw in claws:
+        start_x = float(NUMBER.search(claw.attrib["d"])[0])
+        (left_claws if start_x < 200 else right_claws).append(claw)
+    # La barbilla se prolonga bajo el marco para cubrir el hueco al inclinar la cabeza.
+    chin = ET.Element(f"{{{SVG_NS}}}ellipse", {
+        "cx": "200", "cy": "250", "rx": "113", "ry": "90", "fill": "#0e0f11",
+    })
+    write_asset("chin.svg", [chin], "0 100 400 264")
+    write_asset("head.svg", head, catchlights=True)
+    write_asset("head-base.svg", [subpaths(paths[7])[0]])
+    base_path = ROOT / "configs/spectrum-shell/igor/head-base.svg"
+    base = ET.parse(base_path)
+    definitions = ET.SubElement(base.getroot(), f"{{{SVG_NS}}}defs")
+    clip = ET.SubElement(definitions, f"{{{SVG_NS}}}clipPath", {"id": "head-joints"})
+    # El respaldo cubre las uniones sin dejar las puntas de las orejas inmóviles.
+    for x, y, width, height in ((0, 175, 200, 89), (200, 190, 200, 74), (150, 100, 120, 164)):
+        ET.SubElement(clip, f"{{{SVG_NS}}}rect", {
+            "x": str(x), "y": str(y), "width": str(width), "height": str(height),
+        })
+    base.getroot().find(f"{{{SVG_NS}}}path").set("clip-path", "url(#head-joints)")
+    base.write(base_path, encoding="utf-8", xml_declaration=True)
+    write_asset("left-paw.svg", accents[2:4] + [paths[3]] + left_claws)
+    write_asset("right-paw.svg", accents[4:] + [paths[6]] + right_claws)
+    write_asset("face.svg", head, "70 100 260 160", catchlights=True)
+
+
+if __name__ == "__main__":
+    main()

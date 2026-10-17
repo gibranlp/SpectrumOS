@@ -1,0 +1,2 @@
+[general]
+import = ["/usr/share/spectrumos/terminal/alacritty-spectrum.toml"]

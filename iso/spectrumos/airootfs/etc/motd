@@ -1,0 +1,8 @@
+SpectrumOS installer and recovery environment
+
+Run spectrum-hardware-report to collect the laptop acceptance baseline.
+The repository payload is available at /usr/local/share/spectrumos/source.
+A compatibility link is available at /root/SpectrumOS2.
+Use spectrum-snapshot only after identifying the correct target devices.
+Choose Rescue system in the installer or press Super+R for a terminal with recovery instructions.
+Every new live terminal shows the same guide. Run spectrum-recovery for the interactive recovery menu.

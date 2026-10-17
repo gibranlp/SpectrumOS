@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case ${1:-} in
+    up|down) ;;
+    *) printf 'Usage: %s up|down\n' "$0" >&2; exit 2 ;;
+esac
+
+exec "$(dirname -- "$0")/brightness-adapter" "$@"

@@ -1,0 +1,24 @@
+schema_version = 1
+name = "spectrumos"
+architecture = "x86_64"
+default_channel = "edge"
+public_base_url = "https://spectrum.gibranlp.dev/repo"
+
+[channels.edge]
+publishable = true
+clean_build_required = false
+
+[channels.testing]
+publishable = true
+clean_build_required = true
+
+[channels.stable]
+publishable = true
+clean_build_required = true
+
+[signing]
+mode = "production"
+public_key = "repo/keys/spectrumos-production.asc"
+fingerprint_file = "repo/keys/spectrumos-production.fingerprint"
+signing_fingerprint_file = "repo/keys/spectrumos-production-signing.fingerprint"
+development_home = "repo/state/gnupg"

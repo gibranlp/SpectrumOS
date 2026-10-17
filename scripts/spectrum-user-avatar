@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (($# > 2)); then
+    printf 'Usage: %s [FACE_SVG [USER_PICTURE]]\n' "$0" >&2
+    exit 2
+fi
+
+face=${1:-/usr/share/spectrumos/spectrum-shell/igor/face.svg}
+user_picture=${2:-$HOME/$(id -un).png}
+if [[ -e $user_picture || -L $user_picture ]]; then
+    exit 0
+fi
+
+staging=$(mktemp --tmpdir="$(dirname -- "$user_picture")" .spectrum-avatar.XXXXXX.png)
+trap 'rm -f -- "$staging"' EXIT
+ffmpeg -hide_banner -loglevel error -y -i "$face" \
+    -vf 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000' \
+    -frames:v 1 "$staging"
+chmod 0644 "$staging"
+# Publica el archivo completo sin reemplazar una foto elegida durante la generación.
+if ! ln -- "$staging" "$user_picture"; then
+    [[ -e $user_picture || -L $user_picture ]] || exit 1
+fi

@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme_root=/usr/share/spectrumos/theme-engine
+wallpaper_dir=${SPECTRUM_WALLPAPER_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}/Wallpapers}
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/theme
+cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/spectrumos/theme
+converted_dir=$cache_dir/converted
+last_wallpaper_file=$state_dir/last-wallpaper
+last_rendered_file=$state_dir/last-rendered-wallpaper
+preferences_file=$state_dir/preferences
+random_only=false
+random_wallpaper_only=false
+previous_only=false
+apply_only=false
+requested_wallpaper=""
+requested_mode=""
+mode=spectrum
+variant=dark
+scheme=none
+gowall_bin=$(command -v gowall || true)
+
+load_preferences() {
+    local key value
+    [[ -f $preferences_file ]] || return 0
+    while IFS='=' read -r key value; do
+        case $key:$value in
+            mode:spectrum|mode:clustered|mode:median-cut|mode:weighted-regions) mode=$value ;;
+            variant:auto|variant:dark|variant:light) variant=$value ;;
+        esac
+        # scheme is an open-ended gowall theme name rather than a fixed set, so it can't
+        # join the case above; a nonexistent theme name still passes this shape check and
+        # is instead handled by render_wallpaper_for_scheme falling back to the original
+        # image if gowall itself rejects it.
+        if [[ $key == scheme && ($value == none || $value =~ ^[a-z0-9][a-z0-9-]*$) ]]; then
+            scheme=$value
+        fi
+    done < "$preferences_file"
+}
+
+write_preferences() {
+    local temporary
+    mkdir -p -- "$state_dir"
+    temporary=$(mktemp "$state_dir/.preferences.XXXXXX")
+    printf 'mode=%s\nvariant=%s\nscheme=%s\n' "$mode" "$variant" "$scheme" > "$temporary"
+    mv -f -- "$temporary" "$preferences_file"
+}
+
+# Recolors $1 (an original wallpaper) to the active gowall color scheme via `gowall
+# convert`, printing the path that should actually be shown/extracted from. Falls back to
+# the original image untouched -- printing it as-is -- when no scheme is selected, gowall
+# isn't installed, or the conversion itself fails, so a missing/broken gowall dependency
+# degrades the feature instead of breaking wallpaper application.
+#
+# Results are cached per (scheme, wallpaper) under $converted_dir and reused as long as
+# the source wallpaper hasn't changed since, since gowall's own conversion (CLUT
+# generation + application) is the slow part of the whole apply pipeline and every mode/
+# variant change re-runs this same wallpaper through it.
+render_wallpaper_for_scheme() {
+    local original=$1 chosen_scheme=$2 token converted staging
+    if [[ $chosen_scheme == none || -z $gowall_bin ]]; then
+        printf '%s\n' "$original"
+        return 0
+    fi
+    token=$(sha256sum <<< "$original" | cut -c1-16)
+    converted=$converted_dir/$chosen_scheme/$token.png
+    if [[ ! -f $converted || $original -nt $converted ]]; then
+        mkdir -p -- "${converted%/*}"
+        staging=$(mktemp --suffix=.png "${converted%/*}/.${token}.XXXXXX")
+        if "$gowall_bin" convert "$original" --theme "$chosen_scheme" --yes --preview false \
+            --output "$staging" >/dev/null 2>&1; then
+            mv -f -- "$staging" "$converted"
+        else
+            rm -f -- "$staging"
+            notify-send --app-name="SpectrumOS" --urgency=normal \
+                "Color scheme conversion failed" "Using the original wallpaper instead of $chosen_scheme"
+            printf '%s\n' "$original"
+            return 0
+        fi
+    fi
+    printf '%s\n' "$converted"
+}
+
+load_preferences
+case ${1:-} in
+    --random) random_only=true ;;
+    --random-wallpaper) random_wallpaper_only=true ;;
+    --previous) previous_only=true ;;
+    --apply)
+        (($# == 4)) || { printf 'Usage: %s --apply WALLPAPER MODE VARIANT\n' "$0" >&2; exit 2; }
+        apply_only=true
+        requested_wallpaper=$2
+        requested_mode=$3
+        variant=$4
+        ;;
+    "") ;;
+    *) printf 'Usage: %s [--random|--random-wallpaper|--previous|--apply WALLPAPER MODE VARIANT]\n' "$0" >&2; exit 2 ;;
+esac
+
+# Se marca como "actual" en cuanto se conoce el wallpaper, antes de correr el pipeline visual
+# completo (extracción, render, awww, hyprctl, waybar, dunst...) que tarda varios segundos. Si
+# se escribiera al final de `apply_generation` en su lugar, un cambio de backend de paleta hecho
+# mientras esa aplicación todavía está en vuelo (p. ej. justo después de pulsar "Apply" en un
+# wallpaper nuevo) leería el wallpaper *anterior* de `theme-adapter`'s `current_wallpaper()` y
+# volvería a aplicar la paleta sobre ese wallpaper viejo — visualmente "regresando" a él.
+mark_current_wallpaper() {
+    mkdir -p -- "$state_dir"
+    printf '%s\n' "$1" > "$last_wallpaper_file"
+}
+
+apply_generation() {
+    local wallpaper=$1 shell_response transition_pid
+    if command -v qs >/dev/null 2>&1 && systemctl --user is-active --quiet spectrum-shell.service; then
+        if ! shell_response=$(timeout 3 qs --path /usr/share/spectrumos/spectrum-shell ipc call spectrum-shell refreshTheme "$(cat -- "$cache_dir/current/palette.json")") \
+                || [[ $shell_response != true ]]; then
+            notify-send --app-name="SpectrumOS" --urgency=critical \
+                "Shell theme refresh failed" "The shell could not confirm the new colors"
+            return 1
+        fi
+    fi
+    awww img "$wallpaper" --transition-type fade --transition-duration 1 --transition-fps 60
+    # Awww regresa antes de terminar el fundido; los demás ajustes avanzan mientras esperamos.
+    sleep 1 &
+    transition_pid=$!
+    # Records whatever image was actually just shown -- original or gowall-converted --
+    # separately from $last_wallpaper_file (which always stays the original picked file, so
+    # the gallery's "current" badge and mode/variant re-apply keep matching a real file
+    # under $wallpaper_dir). wallpaper-restore reads this one at session start so login
+    # shows the same recolored image rather than reverting to the untouched original.
+    mkdir -p -- "$state_dir"
+    printf '%s\n' "$wallpaper" > "$last_rendered_file"
+    hyprctl reload
+    pkill -USR1 -x kitty 2>/dev/null || true
+    # A failure here (waybar didn't reappear in hyprctl layers within its own retry
+    # window, plausibly racing this same hyprctl reload) must not abort the rest of
+    # this pipeline under set -e -- appearance-stage, the dunst restart, and the final
+    # eww-refresh below all still need to run even if the bar itself needs a manual
+    # restart afterward.
+    if ! /usr/lib/spectrumos/waybar-menu --restart; then
+        notify-send --app-name="SpectrumOS" --urgency=normal \
+            "Waybar restart failed" "It may still show the previous theme until restarted manually"
+    fi
+    /usr/lib/spectrumos/appearance-sync --apply
+    if ! /usr/lib/spectrumos/appearance-stage "$wallpaper"; then
+        notify-send --app-name="SpectrumOS" --urgency=normal \
+            "Login and boot wallpaper pending" "Log out once to activate Spectrum appearance access"
+    fi
+    wait "$transition_pid"
+}
+
+restore_previous() {
+    local rollback_output wallpaper render_wallpaper
+    rollback_output=$(PYTHONPATH=$theme_root python -m spectrum_theme.cli rollback)
+    wallpaper=$(sed -n 's/^Wallpaper: //p' <<< "$rollback_output")
+    [[ -n $wallpaper ]] || exit 1
+    mark_current_wallpaper "$wallpaper"
+    # Through the same gowall recoloring the main apply path uses -- without this, an
+    # active color scheme means the desktop shows the plain original wallpaper instead
+    # of the recolored one that was actually on screen for that generation, and
+    # last-rendered-wallpaper (which wallpaper-restore reads at login) gets the
+    # unconverted original too.
+    render_wallpaper=$(render_wallpaper_for_scheme "$wallpaper" "$scheme")
+    apply_generation "$render_wallpaper"
+    notify-send --app-name="SpectrumOS" --expire-time=2000 "Previous theme restored" "${wallpaper##*/}"
+}
+
+if [[ $previous_only == true ]]; then
+    restore_previous
+    exit 0
+fi
+
+mapfile -t wallpapers < <(
+    find "$wallpaper_dir" -maxdepth 1 -type f \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+        -print 2>/dev/null | sort
+)
+
+if ((${#wallpapers[@]} == 0)); then
+    notify-send --app-name="SpectrumOS" --urgency=critical "No wallpapers found" "$wallpaper_dir"
+    exit 1
+fi
+
+modes=(spectrum clustered median-cut weighted-regions)
+
+if [[ $apply_only == true ]]; then
+    [[ " ${modes[*]} " == *" $requested_mode "* ]] || exit 2
+    [[ $variant == auto || $variant == dark || $variant == light ]] || exit 2
+    wallpaper=$(realpath -e -- "$requested_wallpaper") || exit 1
+    resolved_dir=$(realpath -e -- "$wallpaper_dir") || exit 1
+    [[ ${wallpaper%/*} == "$resolved_dir" ]] || exit 2
+    [[ $wallpaper == *.png || $wallpaper == *.jpg || $wallpaper == *.jpeg || $wallpaper == *.webp || $wallpaper == *.PNG || $wallpaper == *.JPG || $wallpaper == *.JPEG || $wallpaper == *.WEBP ]] || exit 2
+    mode=$requested_mode
+fi
+
+random_wallpaper() {
+    local queue_file=$state_dir/random-wallpaper-queue
+    local catalog_file=$state_dir/random-wallpaper-catalog
+    local lock_file=$state_dir/random-wallpaper.lock
+    local last_wallpaper="" selected temporary lock_fd
+    local -a queue=()
+
+    mkdir -p -- "$state_dir"
+    exec {lock_fd}> "$lock_file"
+    flock "$lock_fd"
+    [[ -f $last_wallpaper_file ]] && IFS= read -r last_wallpaper < "$last_wallpaper_file"
+
+    if [[ -f $queue_file && -f $catalog_file ]] &&
+            cmp -s "$catalog_file" <(printf '%s\n' "${wallpapers[@]}"); then
+        mapfile -t queue < "$queue_file"
+    fi
+    if ((${#queue[@]} == 0)); then
+        mapfile -t queue < <(printf '%s\n' "${wallpapers[@]}" | shuf)
+    fi
+
+    if ((${#queue[@]} > 1)) && [[ ${queue[0]} == "$last_wallpaper" ]]; then
+        selected=${queue[0]}
+        queue[0]=${queue[1]}
+        queue[1]=$selected
+    fi
+
+    if ((${#queue[@]} == 1 && ${#wallpapers[@]} > 1)) && [[ ${queue[0]} == "$last_wallpaper" ]]; then
+        local -a alternatives=()
+        local candidate
+        for candidate in "${wallpapers[@]}"; do
+            [[ $candidate != "$last_wallpaper" ]] && alternatives+=("$candidate")
+        done
+        selected=$(printf '%s\n' "${alternatives[@]}" | shuf -n 1)
+    else
+        selected=${queue[0]}
+        queue=("${queue[@]:1}")
+    fi
+    temporary=$(mktemp "$state_dir/.random-wallpaper-queue.XXXXXX")
+    if ((${#queue[@]} > 0)); then
+        printf '%s\n' "${queue[@]}" > "$temporary"
+    else
+        : > "$temporary"
+    fi
+    mv -f -- "$temporary" "$queue_file"
+    temporary=$(mktemp "$state_dir/.random-wallpaper-catalog.XXXXXX")
+    printf '%s\n' "${wallpapers[@]}" > "$temporary"
+    mv -f -- "$temporary" "$catalog_file"
+    exec {lock_fd}>&-
+    printf '%s\n' "$selected"
+}
+
+# "none" (the original, unfiltered image) is always in the pool alongside every real gowall
+# theme, so a surprise pick can still land on plain Spectrum extraction -- it isn't forced
+# into a gowall filter every time, just as likely to land on one as any other choice.
+random_scheme() {
+    local -a choices=(none)
+    if [[ -n $gowall_bin ]]; then
+        local name
+        while IFS= read -r name; do
+            [[ -n $name ]] && choices+=("$name")
+        done < <("$gowall_bin" list 2>/dev/null)
+    fi
+    printf '%s\n' "${choices[@]}" | shuf -n 1
+}
+
+if [[ $apply_only == true ]]; then
+    :
+elif [[ $random_only == true ]]; then
+    # "Surprise me": random wallpaper, random extraction backend, random color scheme, and
+    # the variant left as auto so it follows the *new* wallpaper's own light/dark balance
+    # instead of whatever variant happened to be set before - "random light or dark" only
+    # makes sense per-wallpaper, picking it blind could easily land a dark palette on a
+    # bright wallpaper or vice versa.
+    wallpaper=$(random_wallpaper)
+    mode=$(printf '%s\n' "${modes[@]}" | shuf -n 1)
+    variant=auto
+    scheme=$(random_scheme)
+elif [[ $random_wallpaper_only == true ]]; then
+    # Super+R: only the wallpaper is random. mode/variant/scheme stay exactly as
+    # load_preferences already set them above -- the currently selected palette backend,
+    # dark/light choice, and gowall filter all keep applying to whatever new wallpaper comes
+    # up, rather than "Surprise me"'s own full reroll of every axis at once.
+    wallpaper=$(random_wallpaper)
+else
+    mode_label=$(printf '%s\n' \
+        'Previous theme' \
+        'Random mode (Super+R)' \
+        'Random Dark (Super+R opens automatic)' \
+        'Random Light (Super+R opens automatic)' \
+        'Spectrum — expressive color' \
+        'Clustered — curated harmony' \
+        'Median Cut — natural source colors' \
+        'Weighted Regions — cinematic composition' | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Palette mode')
+    case $mode_label in
+        'Previous theme')
+            restore_previous
+            exit 0
+            ;;
+        'Random mode'*) mode=$(printf '%s\n' "${modes[@]}" | shuf -n 1) ;;
+        'Random Dark'*)
+            mode=$(printf '%s\n' "${modes[@]}" | shuf -n 1)
+            wallpaper=$(random_wallpaper)
+            variant=dark
+            ;;
+        'Random Light'*)
+            mode=$(printf '%s\n' "${modes[@]}" | shuf -n 1)
+            wallpaper=$(random_wallpaper)
+            variant=light
+            ;;
+        'Spectrum — expressive color') mode=spectrum ;;
+        'Clustered — curated harmony') mode=clustered ;;
+        'Median Cut — natural source colors') mode=median-cut ;;
+        'Weighted Regions — cinematic composition') mode=weighted-regions ;;
+        '') exit 0 ;;
+        *) exit 1 ;;
+    esac
+
+    if [[ $mode_label != 'Random Dark'* && $mode_label != 'Random Light'* ]]; then
+        variant_label=$(printf '%s\n' 'Automatic' 'Dark' 'Light' | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Theme variant')
+        case $variant_label in
+            Automatic) variant=auto ;;
+            Dark) variant=dark ;;
+            Light) variant=light ;;
+            '') exit 0 ;;
+            *) exit 1 ;;
+        esac
+
+    wallpaper_label=$(
+        {
+            printf '%s\n' 'Random wallpaper'
+            for candidate in "${wallpapers[@]}"; do
+                printf '%s\n' "${candidate##*/}"
+            done
+        } | /usr/lib/spectrumos/spectrum-shell-picker wallpaper --dmenu --prompt 'Wallpaper'
+    )
+    if [[ $wallpaper_label == 'Random wallpaper' ]]; then
+        wallpaper=$(random_wallpaper)
+    elif [[ -n $wallpaper_label ]]; then
+        wallpaper=$wallpaper_dir/$wallpaper_label
+        [[ -f $wallpaper ]] || exit 1
+    else
+        exit 0
+    fi
+    fi
+fi
+
+write_preferences
+previous_wallpaper=$(cat -- "$last_wallpaper_file" 2>/dev/null || true)
+mark_current_wallpaper "$wallpaper"
+
+palette=$(mktemp --tmpdir spectrum-palette.XXXXXX.toml)
+trap 'rm -f -- "$palette"' EXIT
+
+# The gowall-converted image (when a scheme is active) is what actually gets shown and
+# extracted from; $wallpaper itself keeps meaning "the original file the user picked" for
+# --wallpaper below, since that metadata feeds rollback and must stay a real file under
+# $wallpaper_dir for a later `--apply` to accept it back.
+render_wallpaper=$(render_wallpaper_for_scheme "$wallpaper" "$scheme")
+
+# extract/render can fail on a corrupt image or a palette that can't meet the strict
+# contrast requirements. mark_current_wallpaper above already ran -- deliberately, see
+# its own comment -- so if generation fails here and apply_generation below never runs,
+# the desktop keeps showing the old theme while last-wallpaper points at one that was
+# never actually applied; put it back so the gallery's "current" badge stays honest.
+if ! PYTHONPATH=$theme_root python -m spectrum_theme.cli extract native "$render_wallpaper" --mode "$mode" --variant "$variant" --output "$palette" \
+        || ! PYTHONPATH=$theme_root python -m spectrum_theme.cli render --strict --palette "$palette" --wallpaper "$wallpaper"; then
+    [[ -n $previous_wallpaper ]] && mark_current_wallpaper "$previous_wallpaper"
+    notify-send --app-name="SpectrumOS" --urgency=critical "Theme failed to apply" "Kept the previous theme active"
+    exit 1
+fi
+apply_generation "$render_wallpaper"
+if [[ $scheme == none ]]; then
+    notify-send --app-name="SpectrumOS" --expire-time=2000 "Theme applied" "$variant · $mode · ${wallpaper##*/}"
+else
+    notify-send --app-name="SpectrumOS" --expire-time=2000 "Theme applied" "$variant · $mode · $scheme · ${wallpaper##*/}"
+fi

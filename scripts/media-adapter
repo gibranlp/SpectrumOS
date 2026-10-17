@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+
+def playerctl(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["playerctl", *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+
+def active_player() -> tuple[str, str] | None:
+    players = playerctl("--list-all")
+    if players.returncode != 0:
+        return None
+    paused = None
+    for name in players.stdout.splitlines():
+        if not name:
+            continue
+        status = playerctl("--player", name, "status")
+        state = status.stdout.strip()
+        if status.returncode != 0:
+            continue
+        if state == "Playing":
+            return name, state
+        if state == "Paused" and paused is None:
+            paused = name, state
+    return paused
+
+
+def media_state() -> dict:
+    selected = active_player()
+    if selected is None:
+        return {"available": False, "playing": False, "title": "Nothing playing", "artist": "", "album": ""}
+    name, status = selected
+    metadata = playerctl("--player", name, "metadata", "--format", "{{title}}\n{{artist}}\n{{album}}")
+    fields = (metadata.stdout.rstrip("\n").split("\n") + ["", "", ""])[:3]
+    title = fields[0]
+    if not title:
+        source = playerctl("--player", name, "metadata", "--format", "{{xesam:url}}")
+        if source.returncode == 0:
+            title = unquote(Path(urlparse(source.stdout.strip()).path).name)
+    return {
+        "available": True,
+        "playing": status == "Playing",
+        "title": title or "Unknown title",
+        "artist": fields[1] or "Unknown artist",
+        "album": fields[2],
+    }
+
+
+def main() -> int:
+    action = sys.argv[1] if len(sys.argv) == 2 else ""
+    if action == "--json":
+        print(json.dumps(media_state(), ensure_ascii=False, separators=(",", ":")))
+        return 0
+    commands = {"previous": "previous", "toggle": "play-pause", "next": "next", "stop": "stop"}
+    if action not in commands:
+        return 2
+    selected = active_player()
+    if selected is None:
+        return 1
+    return 0 if playerctl("--player", selected[0], commands[action]).returncode == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

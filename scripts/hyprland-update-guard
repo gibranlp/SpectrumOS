@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import subprocess
+import sys
+import time
+
+STATE_DIR = Path('/run/spectrumos/hyprland-update')
+STATE = STATE_DIR / 'state.json'
+RUNTIME = Path('/run/user')
+
+
+def invoke(session, *arguments):
+    user = pwd.getpwuid(session['uid'])
+    return subprocess.run(
+        ['runuser', '-u', user.pw_name, '--', 'env',
+         f"XDG_RUNTIME_DIR=/run/user/{session['uid']}",
+         'hyprctl', '-i', session['instance'], *arguments],
+        capture_output=True, text=True, timeout=8, check=False,
+    )
+
+
+def sessions():
+    for socket in RUNTIME.glob('*/hypr/*/.socket.sock'):
+        instance = socket.parent.name
+        if re.fullmatch(r'[a-zA-Z0-9_]+', instance):
+            yield {'uid': socket.parents[2].stat().st_uid, 'instance': instance}
+
+
+def process_identity(pid):
+    try:
+        fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
+        return fields[19]
+    except (OSError, IndexError):
+        return None
+
+
+def transaction_process():
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            command = Path(f'/proc/{pid}/comm').read_text().strip()
+            if command == 'pacman':
+                return {'pid': pid, 'started': process_identity(pid)}
+            fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
+            pid = int(fields[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return None
+
+
+def set_paused(session, paused):
+    value = 'true' if paused else 'false'
+    result = invoke(session, 'eval', 'hl.config({ misc = { disable_autoreload = ' + value + ' } })')
+    if result.returncode or result.stdout.strip() != 'ok':
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or 'Hyprland did not accept the reload setting')
+
+
+def restore(records):
+    failed = []
+    live = {(s['uid'], s['instance']) for s in sessions()}
+    for session in records:
+        if (session['uid'], session['instance']) not in live:
+            continue
+        try:
+            result = invoke(session, 'reload')
+            if result.returncode or result.stdout.strip() != 'ok':
+                raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+            set_paused(session, session['disabled'])
+        except (OSError, subprocess.TimeoutExpired, RuntimeError) as error:
+            print(f"Hyprland update recovery: {error}", file=sys.stderr)
+            failed.append(session)
+    return failed
+
+
+def finish():
+    if not STATE.exists():
+        return
+    state = json.loads(STATE.read_text())
+    state['sessions'] = restore(state['sessions'])
+    if state['sessions']:
+        STATE.write_text(json.dumps(state))
+        raise RuntimeError('Some Hyprland sessions still need update recovery')
+    STATE.unlink()
+
+
+def pause():
+    if STATE.exists():
+        state = json.loads(STATE.read_text())
+        owner = state.get('transaction')
+        if owner and process_identity(owner['pid']) == owner['started']:
+            return
+        finish()
+    records = []
+    state = {'sessions': records, 'transaction': transaction_process()}
+    try:
+        for session in sessions():
+            result = invoke(session, '-j', 'getoption', 'misc:disable_autoreload')
+            if result.returncode:
+                continue
+            option = json.loads(result.stdout)
+            session['disabled'] = option.get('bool', option.get('int', 0)) is True or option.get('int', 0) == 1
+            records.append(session)
+            STATE.write_text(json.dumps(state))
+            set_paused(session, True)
+        if records and state['transaction']:
+            result = subprocess.run(
+                ['systemd-run', '--quiet', '--collect', f"--unit=spectrumos-hyprland-update-recovery-{state['transaction']['pid']}",
+                 '/usr/lib/spectrumos/hyprland-update-guard', 'recover'],
+                capture_output=True, text=True, timeout=8, check=False,
+            )
+            if result.returncode:
+                raise RuntimeError(result.stderr.strip() or 'Could not start update recovery')
+    except Exception:
+        if STATE.exists():
+            finish()
+        raise
+    if not records:
+        STATE.unlink(missing_ok=True)
+
+
+def recover():
+    while STATE.exists():
+        with (STATE_DIR / 'lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if not STATE.exists():
+                return
+            state = json.loads(STATE.read_text())
+            owner = state.get('transaction')
+            if not owner or process_identity(owner['pid']) != owner['started']:
+                finish()
+                return
+        time.sleep(2)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Pause Hyprland automatic reloads while package defaults are replaced')
+    parser.add_argument('action', choices=('pause', 'finish', 'recover'))
+    arguments = parser.parse_args()
+    if os.geteuid() != 0:
+        parser.error('This package update helper must run as root')
+    STATE_DIR.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if arguments.action == 'recover':
+        recover()
+    else:
+        with (STATE_DIR / 'lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            (pause if arguments.action == 'pause' else finish)()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, subprocess.TimeoutExpired, RuntimeError) as error:
+        print(f'Hyprland update safeguard: {error}', file=sys.stderr)
+        sys.exit(1)

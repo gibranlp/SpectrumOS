@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+choose() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | /usr/lib/spectrumos/spectrum-shell-picker network --dmenu --prompt "$prompt" || true
+}
+
+notice() {
+    notify-send --app-name="SpectrumOS" --expire-time=3500 "$1" "${2:-}"
+}
+
+require_backend() {
+    if ! command -v nmcli >/dev/null || ! systemctl is-active --quiet NetworkManager.service; then
+        notice "Network controls unavailable" "NetworkManager is not active."
+        exit 1
+    fi
+}
+
+show_output() {
+    local prompt=$1
+    shift
+    "$@" 2>&1 | /usr/lib/spectrumos/spectrum-shell-picker network --dmenu --prompt "$prompt" || true
+}
+
+wifi_rows() {
+    nmcli --mode multiline --terse --escape no --fields IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan yes | \
+        awk '
+            /^IN-USE:/ { in_use=substr($0, 8); next }
+            /^SSID:/ { ssid=substr($0, 6); next }
+            /^SIGNAL:/ { signal=substr($0, 8); next }
+            /^SECURITY:/ {
+                security=substr($0, 10)
+                if (ssid != "") {
+                    mark=(in_use == "*" ? "●" : " ")
+                    printf "%s %s  ·  %s%%  ·  %s\n", mark, ssid, signal, security
+                }
+            }
+        '
+}
+
+wifi_connect() {
+    local rows selected ssid security password failure
+    nmcli radio wifi on
+    rows=$(wifi_rows)
+    selected=$(printf '%s\n' "$rows" | \
+        /usr/lib/spectrumos/spectrum-shell-picker network --dmenu --prompt 'Wi-Fi networks' || true)
+    [[ -n $selected ]] || return 0
+    ssid=${selected#??}
+    ssid=${ssid%%  ·  *}
+    security=${selected##*  ·  }
+    if nmcli connection up id "$ssid" >/dev/null 2>&1; then
+        notice "Wi-Fi connected" "$ssid"
+        return 0
+    fi
+    if [[ $security == -- || $security == "" ]]; then
+        if ! failure=$(nmcli device wifi connect "$ssid" 2>&1); then
+            notice "Wi-Fi connection failed" "$failure"
+            return 1
+        fi
+    else
+        password=$(printf '\n' | /usr/lib/spectrumos/spectrum-shell-picker network --dmenu --password --prompt "Password · $ssid" || true)
+        [[ -n $password ]] || return 0
+        if ! failure=$(nmcli device wifi connect "$ssid" password "$password" 2>&1); then
+            notice "Wi-Fi connection failed" "$failure"
+            return 1
+        fi
+    fi
+    notice "Wi-Fi connected" "$ssid"
+}
+
+toggle_wifi() {
+    if [[ $(nmcli radio wifi) == enabled ]]; then
+        nmcli radio wifi off
+        notice "Wi-Fi disabled"
+    else
+        nmcli radio wifi on
+        notice "Wi-Fi enabled"
+    fi
+}
+
+connection_summary() {
+    local public_ip wifi_line device type name address
+    local -a summary=()
+    while IFS=: read -r name type device; do
+        [[ -n $device && $device != lo ]] || continue
+        summary+=("Connection · $name" "Interface · $device ($type)")
+        while IFS= read -r address; do
+            [[ -n $address ]] && summary+=("Local IPv4 · $address")
+        done < <(nmcli --get-values IP4.ADDRESS device show "$device")
+        while IFS= read -r address; do
+            [[ -n $address && $address != fe80:* ]] && summary+=("Local IPv6 · $address")
+        done < <(nmcli --get-values IP6.ADDRESS device show "$device")
+    done < <(nmcli --terse --escape no --fields NAME,TYPE,DEVICE connection show --active)
+
+    wifi_line=$(nmcli --mode multiline --terse --escape no --fields IN-USE,SSID,SIGNAL device wifi list --rescan no | awk '
+        /^IN-USE:/ { in_use=substr($0, 8); next }
+        /^SSID:/ { ssid=substr($0, 6); next }
+        /^SIGNAL:/ {
+            if (in_use == "*") {
+                print ssid " · " substr($0, 8) "%"
+                exit
+            }
+        }
+    ')
+    [[ -z $wifi_line ]] || summary+=("Wi-Fi · $wifi_line")
+
+    public_ip=$(curl --fail --silent --show-error --max-time 4 https://api.ipify.org 2>/dev/null || true)
+    [[ -n $public_ip ]] && summary+=("Public IP · $public_ip") || summary+=("Public IP · unavailable")
+    printf '%s\n' "${summary[@]}" | /usr/lib/spectrumos/spectrum-shell-picker network --dmenu --prompt 'Active connections' || true
+}
+
+main() {
+    local wifi_state connectivity choice
+    require_backend
+    wifi_state=$(nmcli radio wifi)
+    connectivity=$(nmcli --terse --fields CONNECTIVITY general)
+    choice=$(choose "Network · $connectivity" \
+        "Wi-Fi networks" \
+        "Toggle Wi-Fi · $wifi_state" \
+        "Active connections" \
+        "Addresses, routes and DNS" \
+        "DNS status" \
+        "Connection editor")
+    case $choice in
+        "Wi-Fi networks") wifi_connect ;;
+        "Toggle Wi-Fi"*) toggle_wifi ;;
+        "Active connections") connection_summary ;;
+        "Addresses, routes and DNS") show_output 'Network details' nmcli --colors no device show ;;
+        "DNS status") show_output 'DNS status' resolvectl status --no-pager ;;
+        "Connection editor") uwsm app -- nm-connection-editor ;;
+    esac
+}
+
+case ${1:-} in
+    '') main ;;
+    --active) require_backend; connection_summary ;;
+    *) printf 'Usage: %s [--active]\n' "$0" >&2; exit 2 ;;
+esac

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This is the "spectrum" account's actual login shell (see spectrum-live-user.conf),
+# not a /etc/profile.d fragment. It used to be installed as one, routed through a
+# plain `exec Hyprland` because `uwsm start -e -D Hyprland hyprland.desktop` broke
+# everything: uwsm's own environment preloader sources /etc/profile as part of
+# *its* startup, which cascades into every /etc/profile.d/*.sh -- including this
+# file, back when that's where it lived. That re-entered this script's own guards
+# and re-exec'd uwsm start from inside uwsm's own probe shell, breaking its
+# environment-capture handshake ("Env output mark ... not found in shell output!")
+# and leaving the compositor unit dead before Hyprland ever ran -- confirmed live
+# as the cause of a black screen on every boot. Installing this as the account's
+# login shell instead of a profile.d fragment means /etc/profile's own cascade
+# into profile.d never reaches this file again, so uwsm's preloader can safely do
+# its normal thing without ever re-triggering a second launch of itself.
+#
+# Still guarded, not unconditional: this is now the account's shell for *any*
+# way of getting a shell as spectrum (su, a hypothetical sshd login), not just
+# the tty1 autologin this is actually meant for, and none of those other paths
+# have a real seat to hand Hyprland/uwsm.
+[[ $(tty) == /dev/tty1 ]] || exec bash -l
+[[ -z ${WAYLAND_DISPLAY:-} ]] || exec bash -l
+
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=Hyprland
+export XDG_SESSION_DESKTOP=Hyprland
+export HYPRLAND_CONFIG=/etc/spectrumos/live-hyprland.lua
+exec uwsm start -e -D Hyprland hyprland.desktop

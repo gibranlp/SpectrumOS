@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_dir=${XDG_CONFIG_HOME:-$HOME/.config}/spectrumos
+state_file=$config_dir/hyprland-controls.state
+generated_file=$config_dir/hyprland-controls.lua
+
+blur=light
+gaps=balanced
+rounding=spectrum
+transparency=opaque
+layout=dwindle
+border=spectrum
+animations=balanced
+
+load_state() {
+    local key value
+    [[ -f $state_file ]] || return 0
+    while IFS='=' read -r key value; do
+        case $key in
+            blur) [[ $value =~ ^(off|light|spectrum|strong)$ ]] && blur=$value ;;
+            gaps) [[ $value =~ ^(none|compact|balanced|spacious)$ ]] && gaps=$value ;;
+            rounding) [[ $value =~ ^(square|subtle|spectrum|soft)$ ]] && rounding=$value ;;
+            transparency) [[ $value =~ ^(opaque|subtle|balanced|glass)$ ]] && transparency=$value ;;
+            layout) [[ $value =~ ^(dwindle|master|scrolling|monocle)$ ]] && layout=$value ;;
+            border) [[ $value =~ ^(none|thin|spectrum|thick)$ ]] && border=$value ;;
+            # "on"/"off" are the pre-existing two-state values from before Smooth/Balanced/
+            # Heavy existed -- "on" maps to "balanced" (the same speeds Spectrum always
+            # shipped with) so a state file saved before this change keeps behaving exactly
+            # as it did, rather than silently landing on a different intensity.
+            animations)
+                case $value in
+                    on) animations=balanced ;;
+                    off|smooth|balanced|heavy) animations=$value ;;
+                esac
+                ;;
+        esac
+    done < "$state_file"
+}
+
+write_state() {
+    local temporary
+    mkdir -p -- "$config_dir"
+    temporary=$(mktemp "$config_dir/.hyprland-controls.state.XXXXXX")
+    printf '%s\n' \
+        "blur=$blur" \
+        "gaps=$gaps" \
+        "rounding=$rounding" \
+        "transparency=$transparency" \
+        "layout=$layout" \
+        "border=$border" \
+        "animations=$animations" > "$temporary"
+    mv -f -- "$temporary" "$state_file"
+}
+
+write_config() {
+    local blur_config gaps_in gaps_out corner active_opacity inactive_opacity border_size temporary
+    local animations_enabled windows_speed in_speed out_speed fade_speed layers_speed workspaces_speed in_style out_style workspaces_style
+    case $blur in
+        off) blur_config='{ enabled = false, size = 1, passes = 1 }' ;;
+        light) blur_config='{ enabled = true, size = 3, passes = 1, new_optimizations = true, xray = true }' ;;
+        spectrum) blur_config='{ enabled = true, size = 5, passes = 2, new_optimizations = true, xray = true }' ;;
+        strong) blur_config='{ enabled = true, size = 8, passes = 3, new_optimizations = true, xray = true }' ;;
+    esac
+    case $gaps in
+        none) gaps_in=0; gaps_out=0 ;;
+        compact) gaps_in=3; gaps_out=3 ;;
+        balanced) gaps_in=5; gaps_out=5 ;;
+        spacious) gaps_in=10; gaps_out=14 ;;
+    esac
+    case $rounding in
+        square) corner=0 ;;
+        subtle) corner=6 ;;
+        spectrum) corner=10 ;;
+        soft) corner=16 ;;
+    esac
+    case $transparency in
+        opaque) active_opacity=1.0; inactive_opacity=1.0 ;;
+        subtle) active_opacity=0.97; inactive_opacity=0.92 ;;
+        balanced) active_opacity=0.93; inactive_opacity=0.86 ;;
+        glass) active_opacity=0.86; inactive_opacity=0.76 ;;
+    esac
+    case $border in
+        none) border_size=0 ;;
+        thin) border_size=1 ;;
+        spectrum) border_size=3 ;;
+        thick) border_size=6 ;;
+    esac
+    # Same two curves animations.lua already declares (spectrumEase/spectrumExit) for
+    # every tier -- only how long each leaf takes, and how pronounced the pop-in/slide
+    # styles are, changes between them. "Balanced" reproduces animations.lua's own
+    # defaults exactly, so anyone who never touches this setting sees no behavior change.
+    animations_enabled=true
+    case $animations in
+        off) animations_enabled=false; windows_speed=2.5; in_speed=2.5; out_speed=1.5; fade_speed=1.5; layers_speed=2; workspaces_speed=2; in_style='popin 94%'; out_style='popin 94%'; workspaces_style='slidefade 20%' ;;
+        smooth) windows_speed=1.5; in_speed=1.5; out_speed=1; fade_speed=1; layers_speed=1.2; workspaces_speed=1.2; in_style='popin 97%'; out_style='popin 97%'; workspaces_style='slidefade 10%' ;;
+        balanced) windows_speed=2.5; in_speed=2.5; out_speed=1.5; fade_speed=1.5; layers_speed=2; workspaces_speed=2; in_style='popin 94%'; out_style='popin 94%'; workspaces_style='slidefade 20%' ;;
+        heavy) windows_speed=4; in_speed=4; out_speed=2.5; fade_speed=2.5; layers_speed=3; workspaces_speed=3.5; in_style='popin 80%'; out_style='popin 80%'; workspaces_style='slidefade 40%' ;;
+    esac
+
+    mkdir -p -- "$config_dir"
+    temporary=$(mktemp "$config_dir/.hyprland-controls.lua.XXXXXX")
+    printf '%s\n' \
+        'hl.config({' \
+        '    general = {' \
+        "        gaps_in = $gaps_in," \
+        "        gaps_out = $gaps_out," \
+        "        layout = \"$layout\"," \
+        "        border_size = $border_size," \
+        '    },' \
+        '    decoration = {' \
+        "        rounding = $corner," \
+        "        active_opacity = $active_opacity," \
+        "        inactive_opacity = $inactive_opacity," \
+        "        blur = $blur_config," \
+        '    },' \
+        "    animations = { enabled = $animations_enabled }," \
+        '})' \
+        "hl.animation({ leaf = \"windows\", enabled = true, speed = $windows_speed, bezier = \"spectrumEase\" })" \
+        "hl.animation({ leaf = \"windowsIn\", enabled = true, speed = $in_speed, bezier = \"spectrumEase\", style = \"$in_style\" })" \
+        "hl.animation({ leaf = \"windowsOut\", enabled = true, speed = $out_speed, bezier = \"spectrumExit\", style = \"$out_style\" })" \
+        "hl.animation({ leaf = \"fade\", enabled = true, speed = $fade_speed, bezier = \"spectrumEase\" })" \
+        "hl.animation({ leaf = \"layers\", enabled = true, speed = $layers_speed, bezier = \"spectrumEase\" })" \
+        "hl.animation({ leaf = \"workspaces\", enabled = true, speed = $workspaces_speed, bezier = \"spectrumEase\", style = \"$workspaces_style\" })" > "$temporary"
+    mv -f -- "$temporary" "$generated_file"
+}
+
+choose() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt "$prompt" || true
+}
+
+apply_settings() {
+    write_state
+    write_config
+    if hyprctl reload config-only >/dev/null; then
+        notify-send --app-name="SpectrumOS" --expire-time=2500 \
+            "Hyprland updated" "$layout · $gaps gaps · $blur blur"
+    else
+        notify-send --app-name="SpectrumOS" --urgency=critical \
+            "Hyprland update failed" "The saved controls will be retried next session."
+        return 1
+    fi
+}
+
+select_blur() {
+    local selected
+    selected=$(choose "Blur · ${blur^}" Off Light Spectrum Strong)
+    [[ -n $selected ]] || return 0
+    blur=${selected,,}
+    apply_settings
+}
+
+select_gaps() {
+    local selected
+    selected=$(choose "Gaps · ${gaps^}" None Compact Balanced Spacious)
+    [[ -n $selected ]] || return 0
+    gaps=${selected,,}
+    apply_settings
+}
+
+select_rounding() {
+    local selected
+    selected=$(choose "Corners · ${rounding^}" Square Subtle Spectrum Soft)
+    [[ -n $selected ]] || return 0
+    rounding=${selected,,}
+    apply_settings
+}
+
+select_layout() {
+    local selected
+    selected=$(choose "Layout · ${layout^}" Dwindle Master Scrolling Monocle)
+    [[ -n $selected ]] || return 0
+    layout=${selected,,}
+    apply_settings
+}
+
+select_transparency() {
+    local selected
+    selected=$(choose "Transparency · ${transparency^}" Opaque Subtle Balanced Glass)
+    [[ -n $selected ]] || return 0
+    transparency=${selected,,}
+    apply_settings
+}
+
+select_border() {
+    local selected
+    selected=$(choose "Border · ${border^}" None Thin Spectrum Thick)
+    [[ -n $selected ]] || return 0
+    border=${selected,,}
+    apply_settings
+}
+
+select_animations() {
+    local selected
+    selected=$(choose "Animations · ${animations^}" Off Smooth Balanced Heavy)
+    [[ -n $selected ]] || return 0
+    animations=${selected,,}
+    apply_settings
+}
+
+main() {
+    local choice
+    load_state
+    choice=$(choose 'Hyprland settings' \
+        "Blur · ${blur^}" \
+        "Gaps · ${gaps^}" \
+        "Corners · ${rounding^}" \
+        "Transparency · ${transparency^}" \
+        "Layout · ${layout^}" \
+        "Border · ${border^}" \
+        "Animations · ${animations^}" \
+        "Reset to Spectrum defaults")
+    case $choice in
+        Blur*) select_blur ;;
+        Gaps*) select_gaps ;;
+        Corners*) select_rounding ;;
+        Transparency*) select_transparency ;;
+        Layout*) select_layout ;;
+        Border*) select_border ;;
+        Animations*) select_animations ;;
+        "Reset to Spectrum defaults")
+            blur=light
+            gaps=balanced
+            rounding=spectrum
+            transparency=opaque
+            layout=dwindle
+            border=spectrum
+            animations=balanced
+            apply_settings
+            ;;
+    esac
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    case ${1:-} in
+        --json)
+            load_state
+            printf '{"blur":"%s","gaps":"%s","rounding":"%s","transparency":"%s","layout":"%s","border":"%s","animations":"%s"}\n' \
+                "$blur" "$gaps" "$rounding" "$transparency" "$layout" "$border" "$animations"
+            ;;
+        --set)
+            load_state
+            field=${2:-}
+            value=${3:-}
+            case $field:$value in
+                blur:off|blur:light|blur:spectrum|blur:strong) blur=$value ;;
+                gaps:none|gaps:compact|gaps:balanced|gaps:spacious) gaps=$value ;;
+                rounding:square|rounding:subtle|rounding:spectrum|rounding:soft) rounding=$value ;;
+                transparency:opaque|transparency:subtle|transparency:balanced|transparency:glass) transparency=$value ;;
+                layout:dwindle|layout:master|layout:scrolling|layout:monocle) layout=$value ;;
+                border:none|border:thin|border:spectrum|border:thick) border=$value ;;
+                animations:off|animations:smooth|animations:balanced|animations:heavy) animations=$value ;;
+                *) exit 2 ;;
+            esac
+            apply_settings
+            ;;
+        '') main ;;
+        *) exit 2 ;;
+    esac
+fi

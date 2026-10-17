@@ -1,0 +1,39 @@
+pkgname=ukvm
+pkgver=0.1.0.r21
+pkgrel=1
+pkgdesc="Permissioned software KVM for Linux Wayland with interactive remote sessions, secure clipboard/files and structured management APIs"
+arch=(x86_64)
+url="https://github.com/gibranlp/UKVM"
+license=(MIT)
+depends=(gcc-libs glibc libei systemd-libs xdg-desktop-portal libpipewire libjpeg-turbo libxkbcommon wayland)
+makedepends=(cargo clang pkgconf)
+checkdepends=(dbus xdg-desktop-portal-gtk xdg-desktop-portal-hyprland)
+options=(!debug !lto)
+_revision=50e8298d528274fbcf7d121cb0e52faae17b9c23
+source=("ukvm-$pkgver-$_revision.tar.zst")
+sha256sums=('57ef6c2d73a4f942055941d6debd3c4d6481153036e2b63913f7a9c15c5a772f')
+prepare() {
+    cd "UKVM-$_revision"
+    cargo fetch --locked
+}
+build() {
+    cd "UKVM-$_revision"
+    cargo build --release --locked --offline --workspace
+}
+check() {
+    cd "UKVM-$_revision"
+    cargo test --locked --offline --workspace --no-fail-fast
+}
+package() {
+    cd "UKVM-$_revision"
+    "${CARGO_TARGET_DIR:-target}/release/ukvm" install --prefix /usr --destdir "$pkgdir"
+    install -Dm755 "${CARGO_TARGET_DIR:-target}/release/ukvm-portal-session" "$pkgdir/usr/lib/ukvm/ukvm-portal-session"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 docs/LINUX_PRODUCTION.md "$pkgdir/usr/share/doc/ukvm/LINUX_PRODUCTION.md"
+    install -Dm644 docs/PORTAL_PERSISTENCE.md "$pkgdir/usr/share/doc/ukvm/PORTAL_PERSISTENCE.md"
+    install -Dm644 docs/FRONTEND_CONTRACT.md "$pkgdir/usr/share/doc/ukvm/FRONTEND_CONTRACT.md"
+    install -Dm644 docs/FILE_TRANSFER.md "$pkgdir/usr/share/doc/ukvm/FILE_TRANSFER.md"
+    install -Dm644 docs/CLIPBOARD.md "$pkgdir/usr/share/doc/ukvm/CLIPBOARD.md"
+    install -Dm644 docs/REMOTE_SESSIONS.md "$pkgdir/usr/share/doc/ukvm/REMOTE_SESSIONS.md"
+    install -Dm644 docs/REMOTE_PERFORMANCE.md "$pkgdir/usr/share/doc/ukvm/REMOTE_PERFORMANCE.md"
+}

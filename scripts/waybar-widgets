@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
+
+WORK_SECONDS = 25 * 60
+BREAK_SECONDS = 5 * 60
+
+
+def xdg_path(variable: str, fallback: Path) -> Path:
+    value = os.environ.get(variable)
+    return Path(value) if value else fallback
+
+
+def print_widget(text: str, tooltip: str = "", css_class: str = "") -> None:
+    print(json.dumps({"text": text, "tooltip": tooltip, "class": css_class}))
+
+
+def gpu() -> None:
+    devices = sorted(Path("/sys/class/drm").glob("card*/device"))
+    for device in devices:
+        busy_path = device / "gpu_busy_percent"
+        if not busy_path.is_file():
+            continue
+        try:
+            busy = int(busy_path.read_text().strip())
+        except (OSError, ValueError):
+            continue
+        temperatures = sorted(device.glob("hwmon/hwmon*/temp1_input"))
+        temperature = None
+        if temperatures:
+            try:
+                temperature = int(temperatures[0].read_text().strip()) // 1000
+            except (OSError, ValueError):
+                pass
+        text = f"󰾲 {busy}%"
+        tooltip = f"GPU load: {busy}%"
+        if temperature is not None:
+            text += f"  󰔏 {temperature}°"
+            tooltip += f"\nGPU temperature: {temperature}°C"
+        print_widget(text, tooltip, "critical" if temperature is not None and temperature >= 85 else "")
+        return
+    print_widget("", "GPU telemetry unavailable", "unavailable")
+
+
+def refresh_rate() -> None:
+    try:
+        result = subprocess.run(
+            ("hyprctl", "monitors", "-j"), check=True, capture_output=True, text=True, timeout=2
+        )
+        monitors = json.loads(result.stdout)
+        monitor = next((item for item in monitors if item.get("focused")), monitors[0])
+        rate = round(float(monitor["refreshRate"]))
+        print_widget(f"󰐐 {rate} Hz", f"Current monitor refresh rate: {rate} Hz")
+    except (FileNotFoundError, IndexError, KeyError, ValueError, json.JSONDecodeError, subprocess.SubprocessError):
+        print_widget("", "Refresh rate unavailable", "unavailable")
+
+
+def cpu_temperature() -> None:
+    preferred = ("k10temp", "coretemp", "zenpower")
+    candidates: list[tuple[int, Path, str]] = []
+    for device in sorted(Path("/sys/class/hwmon").glob("hwmon*")):
+        try:
+            name = (device / "name").read_text().strip()
+        except OSError:
+            continue
+        priority = preferred.index(name) if name in preferred else len(preferred)
+        for input_path in sorted(device.glob("temp*_input")):
+            label_path = input_path.with_name(input_path.name.replace("_input", "_label"))
+            try:
+                label = label_path.read_text().strip()
+            except OSError:
+                label = name
+            candidates.append((priority, input_path, label))
+    for _, input_path, label in sorted(candidates, key=lambda item: (item[0], str(item[1]))):
+        try:
+            temperature = int(input_path.read_text().strip()) // 1000
+        except (OSError, ValueError):
+            continue
+        if -20 <= temperature <= 150:
+            print_widget(
+                f"󰔏 {temperature}°",
+                f"CPU temperature ({label}): {temperature}°C",
+                "critical" if temperature >= 85 else "",
+            )
+            return
+    print_widget("", "CPU temperature unavailable", "unavailable")
+
+
+def pomodoro_paths() -> tuple[Path, Path]:
+    root = xdg_path("XDG_STATE_HOME", Path.home() / ".local/state") / "spectrumos" / "pomodoro"
+    return root / "state.json", root / "tasks.txt"
+
+
+def default_pomodoro() -> dict:
+    return {"phase": "idle", "remaining": WORK_SECONDS, "updated": 0, "task": ""}
+
+
+def load_pomodoro() -> dict:
+    state_path, _ = pomodoro_paths()
+    try:
+        state = json.loads(state_path.read_text())
+        if state.get("phase") not in {"idle", "work", "paused", "break", "break-paused"}:
+            raise ValueError
+        return state
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return default_pomodoro()
+
+
+def save_pomodoro(state: dict) -> None:
+    state_path, tasks_path = pomodoro_paths()
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    tasks_path.touch(exist_ok=True)
+    temporary = state_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(state) + "\n")
+    temporary.replace(state_path)
+
+
+def advance_pomodoro(state: dict) -> dict:
+    if state["phase"] not in {"work", "break"}:
+        return state
+    now = int(time.time())
+    state["remaining"] -= max(0, now - int(state.get("updated", now)))
+    state["updated"] = now
+    if state["remaining"] > 0:
+        return state
+    if state["phase"] == "work":
+        state.update(phase="break", remaining=BREAK_SECONDS)
+        notify("Focus complete", "Take a five-minute break")
+    else:
+        state.update(phase="idle", remaining=WORK_SECONDS)
+        notify("Break complete", "Ready for another focus session")
+    return state
+
+
+def notify(title: str, message: str) -> None:
+    subprocess.run(("notify-send", "--app-name=SpectrumOS", title, message), check=False)
+
+
+def pomodoro_output() -> None:
+    state = advance_pomodoro(load_pomodoro())
+    save_pomodoro(state)
+    icons = {"idle": "󱎫", "work": "󰔟", "paused": "󰏤", "break": "󰓛", "break-paused": "󰏤"}
+    minutes, seconds = divmod(max(0, int(state["remaining"])), 60)
+    task = state.get("task") or "Focus"
+    print_widget(
+        f"{icons[state['phase']]} {minutes:02d}:{seconds:02d}  {task}",
+        f"{state['phase'].replace('-', ' ').title()} · {task}\nLeft click: start/pause · Right click: tasks · Middle click: reset",
+        state["phase"],
+    )
+
+
+def pomodoro_state_json() -> None:
+    state = load_pomodoro()
+    previous = state.copy()
+    state = advance_pomodoro(state)
+    if state != previous:
+        save_pomodoro(state)
+    _, tasks_path = pomodoro_paths()
+    try:
+        tasks = [line.strip() for line in tasks_path.read_text().splitlines() if line.strip()]
+    except OSError:
+        tasks = []
+    print(json.dumps({**state, "tasks": tasks}))
+
+
+def pomodoro_toggle() -> None:
+    state = advance_pomodoro(load_pomodoro())
+    phase = state["phase"]
+    if phase == "idle":
+        state.update(phase="work", remaining=WORK_SECONDS, updated=int(time.time()))
+    elif phase == "work":
+        state["phase"] = "paused"
+    elif phase == "paused":
+        state.update(phase="work", updated=int(time.time()))
+    elif phase == "break":
+        state["phase"] = "break-paused"
+    else:
+        state.update(phase="break", updated=int(time.time()))
+    save_pomodoro(state)
+
+
+def pomodoro_reset() -> None:
+    state = default_pomodoro()
+    state["task"] = load_pomodoro().get("task", "")
+    save_pomodoro(state)
+
+
+def pomodoro_tasks() -> None:
+    state_path, tasks_path = pomodoro_paths()
+    tasks_path.parent.mkdir(parents=True, exist_ok=True)
+    tasks_path.touch(exist_ok=True)
+    tasks = [line.strip() for line in tasks_path.read_text().splitlines() if line.strip()]
+    choices = ["＋ Add task", "✓ Complete current", *tasks]
+    result = subprocess.run(
+        ("/usr/lib/spectrumos/spectrum-shell-picker", "left", "--dmenu", "--prompt", "Focus task"),
+        input="\n".join(choices) + "\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    if not result:
+        return
+    state = load_pomodoro()
+    if result == "＋ Add task":
+        task = subprocess.run(
+            ("/usr/lib/spectrumos/spectrum-shell-picker", "left", "--dmenu", "--prompt", "New task"), capture_output=True, text=True, check=False
+        ).stdout.strip()
+        if task and task not in tasks:
+            tasks.append(task)
+            state["task"] = task
+    elif result == "✓ Complete current":
+        current = state.get("task", "")
+        tasks = [task for task in tasks if task != current]
+        state["task"] = tasks[0] if tasks else ""
+    elif result in tasks:
+        state["task"] = result
+    tasks_path.write_text("".join(f"{task}\n" for task in tasks))
+    save_pomodoro(state)
+
+
+def weather() -> None:
+    config_root = xdg_path("XDG_CONFIG_HOME", Path.home() / ".config") / "spectrumos"
+    location_path = config_root / "weather-location"
+    try:
+        location = location_path.read_text().strip()
+    except OSError:
+        print_widget("", f"Add a location to {location_path} to enable weather", "unavailable")
+        return
+    if not location:
+        print_widget("", "Weather location is empty", "unavailable")
+        return
+    cache_root = xdg_path("XDG_CACHE_HOME", Path.home() / ".cache") / "spectrumos" / "waybar"
+    cache_path = cache_root / "weather.json"
+    try:
+        if time.time() - cache_path.stat().st_mtime < 1800:
+            print(cache_path.read_text().strip())
+            return
+    except OSError:
+        pass
+    try:
+        request = Request(f"https://wttr.in/{quote(location)}?format=j1", headers={"User-Agent": "SpectrumOS2"})
+        with urlopen(request, timeout=5) as response:
+            data = json.load(response)
+        current = data["current_condition"][0]
+        description = current["weatherDesc"][0]["value"]
+        output = json.dumps(
+            {
+                "text": f"󰖐 {current['temp_C']}°",
+                "tooltip": f"{location}\n{description}, feels like {current['FeelsLikeC']}°C\nHumidity: {current['humidity']}% · Wind: {current['windspeedKmph']} km/h",
+                "class": "weather",
+            }
+        )
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(output + "\n")
+        print(output)
+    except (OSError, KeyError, IndexError, ValueError, json.JSONDecodeError):
+        try:
+            print(cache_path.read_text().strip())
+        except OSError:
+            print_widget("", "Weather unavailable", "unavailable")
+
+
+def main() -> int:
+    command = sys.argv[1] if len(sys.argv) > 1 else ""
+    actions = {
+        "gpu": gpu,
+        "refresh": refresh_rate,
+        "cpu-temp": cpu_temperature,
+        "pomodoro": pomodoro_output,
+        "pomodoro-state": pomodoro_state_json,
+        "pomodoro-toggle": pomodoro_toggle,
+        "pomodoro-reset": pomodoro_reset,
+        "pomodoro-tasks": pomodoro_tasks,
+        "weather": weather,
+    }
+    action = actions.get(command)
+    if action is None:
+        print(f"Unknown widget: {command}", file=sys.stderr)
+        return 2
+    action()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

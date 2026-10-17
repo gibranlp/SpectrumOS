@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install SpectrumOS
+Comment=Install SpectrumOS on this computer
+Exec=/usr/local/bin/spectrum-installer
+Icon=spectrum-installer
+Terminal=false
+Categories=System;
+StartupNotify=true

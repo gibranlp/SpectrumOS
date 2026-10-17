@@ -1,0 +1,127 @@
+#!/usr/bin/ash
+# SpectrumOS boot-time restore: promotes a Btrfs restore point to a new
+# writable @ before the real root is mounted, when spectrumos.restore= is on
+# the kernel command line. See the install file's help() for the full
+# contract. This is the initramfs counterpart to the offline
+# `spectrum-snapshot restore` command in scripts/snapshot: the same
+# operation, run at the one point in boot where the current @ is not yet
+# mounted as / and can safely be replaced.
+#
+# Known limitation: this reuses the already-loaded kernel/initramfs, so if
+# the kernel itself changed since the selected restore point, module lookups
+# for the restored root may not fully match on this boot. /boot is restored
+# to match before boot continues, so a second, ordinary reboot afterward
+# uses a fully matching kernel and root.
+
+# Prints the newest restore point id below $1 that has a read-only root
+# subvolume, a boot archive, and metadata -- the same completeness
+# spectrum-snapshot itself requires before it will operate on a restore
+# point -- or the specific id in $2 if it is not "latest" and is complete.
+# Prints nothing if none qualifies.
+spectrumos_select_restore_point() {
+    snapshots_root="$1"
+    requested="$2"
+
+    if [ -n "$requested" ] && [ "$requested" != "latest" ]; then
+        if [ -d "$snapshots_root/$requested/root" ] && \
+           [ -f "$snapshots_root/$requested/metadata.json" ] && \
+           [ -f "$snapshots_root/$requested/boot.tar" ]; then
+            echo "$requested"
+        fi
+        return 0
+    fi
+
+    for candidate in $(ls -1 "$snapshots_root" 2>/dev/null | sort -r); do
+        case "$candidate" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z*) ;;
+            *) continue ;;
+        esac
+        if [ -d "$snapshots_root/$candidate/root" ] && \
+           [ -f "$snapshots_root/$candidate/metadata.json" ] && \
+           [ -f "$snapshots_root/$candidate/boot.tar" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+}
+
+# Replaces the active @ subvolume below the mounted Btrfs top level $1 with
+# restore point $3, and -- if the EFI partition is mounted at $2 -- restores
+# its matching /boot archive there too. The previous @ and EFI contents are
+# preserved under @failed/spectrumos/<operation>, mirroring the offline
+# `spectrum-snapshot restore` contract this hook is a boot-time entry point
+# for. Returns non-zero if the root replacement itself did not complete;
+# a failed /boot restore is logged but does not fail the rescue, since an
+# unmatched EFI partition is recoverable from a normal boot afterward.
+spectrumos_perform_rescue() {
+    top="$1"
+    boot="$2"
+    id="$3"
+
+    snapshots_root="$top/@snapshots/spectrumos"
+    operation="$(date -u +%Y%m%dT%H%M%SZ)-rescue"
+    restored_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    failed="$top/@failed/spectrumos"
+
+    mkdir -p "$failed" || return 1
+    mv "$top/@" "$failed/$operation" || return 1
+    if ! btrfs subvolume snapshot "$snapshots_root/$id/root" "$top/@"; then
+        mv "$failed/$operation" "$top/@"
+        return 1
+    fi
+
+    if [ -d "$boot" ] && mountpoint -q "$boot" 2>/dev/null; then
+        tar --numeric-owner -cpf "$failed/$operation.boot.tar" -C "$boot" . 2>/dev/null
+        find "$boot" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
+        tar --numeric-owner -xpf "$snapshots_root/$id/boot.tar" -C "$boot" 2>/dev/null \
+            || echo "spectrumos-restore: could not restore /boot; reboot once the desktop is usable to fix it"
+    fi
+
+    mkdir -p "$top/@/var/lib/spectrumos"
+    printf '{\n  "schema": 1,\n  "restored_utc": "%s",\n  "restored_from": "%s",\n  "preserved_failed_root": "@failed/spectrumos/%s"\n}\n' \
+        "$restored_utc" "$id" "$operation" > "$top/@/var/lib/spectrumos/last-boot-restore.json"
+    return 0
+}
+
+run_hook() {
+    # getarg's real signature is (name, default, cache) -- it returns the value via
+    # stdout and always exits 0, it does not signal "not found" through its exit code.
+    # Every real hook on this system uses it this way (e.g. resume's
+    # `resume="$(getarg resume)"`); the previous `getarg spectrumos.restore=
+    # restore_target || return 0` never actually read the cmdline; it only appeared to
+    # work because the one Limine entry that loads this image always hardcodes
+    # spectrumos.restore=latest anyway.
+    restore_target=$(getarg spectrumos.restore)
+    [ -n "$restore_target" ] || return 0
+
+    top=/run/spectrumos-restore-top
+    boot=/run/spectrumos-restore-boot
+    mkdir -p "$top" "$boot"
+
+    if ! mount -o subvolid=5 "$root" "$top" 2>/dev/null; then
+        echo "spectrumos-restore: could not mount the Btrfs top level; continuing normal boot"
+        return 0
+    fi
+
+    id=$(spectrumos_select_restore_point "$top/@snapshots/spectrumos" "$restore_target")
+    if [ -z "$id" ]; then
+        echo "spectrumos-restore: no usable restore point was found; continuing normal boot"
+        umount "$top"
+        return 0
+    fi
+
+    espdevice=/dev/disk/by-label/SPECTRM_EFI
+    if [ -e "$espdevice" ]; then
+        mount "$espdevice" "$boot" 2>/dev/null \
+            || echo "spectrumos-restore: could not mount the EFI partition; root recovery will continue"
+    fi
+
+    if spectrumos_perform_rescue "$top" "$boot" "$id"; then
+        echo "spectrumos-restore: promoted restore point $id to the active root"
+    else
+        echo "spectrumos-restore: restore failed; the previous root was left in place"
+    fi
+
+    mountpoint -q "$boot" 2>/dev/null && umount "$boot"
+    umount "$top"
+}

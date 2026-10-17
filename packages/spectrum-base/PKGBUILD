@@ -1,0 +1,104 @@
+pkgname=spectrum-base
+pkgver=1.0.0
+pkgrel=3
+pkgdesc="Core identity and shared appearance handoff for SpectrumOS"
+arch=(any)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=(python ffmpeg limine btrfs-progs exfatprogs libarchive pacman neovim thefuck zram-generator zsh zsh-autosuggestions zsh-completions zsh-syntax-highlighting)
+install=spectrum-base.install
+options=(!strip !debug)
+_source_revision=70168ad0b8e7ec5d
+_source_root="spectrumos-source-$pkgver"
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
+sha256sums=('08ad8a259c9b1c1810dce95e00897d1fdba0163f85853e008f672a6e6ce044c2')
+
+check() {
+    local _project="$srcdir/$_source_root"
+    python -m unittest discover -s "$_project/tests" -p 'test_boot_appearance.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_snapshot.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_pre_upgrade_snapshot.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_hyprland_update_guard.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_spectrumos_restore_hook.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_limine_recovery_entry.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_mkinitcpio_register_hook.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_spectrumos_build_rescue_image.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_spectrum_info.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_spectrum_doctor.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_update_plan.py' -v
+}
+
+package() {
+    local _project="$srcdir/$_source_root"
+    install -d -m 0755 "$pkgdir/usr/lib/spectrumos" \
+        "$pkgdir/usr/bin" \
+        "$pkgdir/usr/lib/sysusers.d" "$pkgdir/usr/lib/tmpfiles.d" \
+        "$pkgdir/usr/lib/systemd/system" "$pkgdir/usr/lib/systemd/system-preset" \
+        "$pkgdir/usr/lib/systemd/zram-generator.conf.d" \
+        "$pkgdir/usr/lib/initcpio/install" "$pkgdir/usr/lib/initcpio/hooks" \
+        "$pkgdir/usr/share/libalpm/hooks" \
+        "$pkgdir/usr/share/licenses/$pkgname" \
+        "$pkgdir/usr/share/backgrounds/spectrumos" \
+        "$pkgdir/usr/share/spectrumos/migrations" \
+        "$pkgdir/usr/share/spectrumos/nvim/colors" \
+        "$pkgdir/usr/share/spectrumos/zsh/themes"
+    install -m 0644 "$_project/system/initcpio/install/spectrumos-restore" \
+        "$pkgdir/usr/lib/initcpio/install/spectrumos-restore"
+    install -m 0644 "$_project/system/initcpio/hooks/spectrumos-restore" \
+        "$pkgdir/usr/lib/initcpio/hooks/spectrumos-restore"
+    install -Dm 0644 "$_project/assets/branding/spectrum-wordmark.svg" \
+        "$pkgdir/usr/share/spectrumos/branding/spectrum-wordmark.svg"
+    install -m 0755 "$_project/scripts/appearance-stage" \
+        "$pkgdir/usr/lib/spectrumos/appearance-stage"
+    install -m 0755 "$_project/scripts/limine-appearance-sync" \
+        "$pkgdir/usr/lib/spectrumos/limine-appearance-sync"
+    install -m 0755 "$_project/scripts/uki-branding-sync" \
+        "$pkgdir/usr/lib/spectrumos/uki-branding-sync"
+    install -m 0755 "$_project/scripts/snapshot" \
+        "$pkgdir/usr/bin/spectrum-snapshot"
+    install -m 0755 "$_project/scripts/hyprland-update-guard" \
+        "$pkgdir/usr/lib/spectrumos/hyprland-update-guard"
+    install -m 0644 "$_project"/system/pacman-hooks/{10-spectrumos-hyprland-pause,99-spectrumos-hyprland-resume}.hook \
+        "$pkgdir/usr/share/libalpm/hooks/"
+    install -m 0755 "$_project/scripts/pre-upgrade-snapshot" \
+        "$pkgdir/usr/lib/spectrumos/pre-upgrade-snapshot"
+    install -m 0755 "$_project/scripts/limine-recovery-entry" \
+        "$pkgdir/usr/lib/spectrumos/limine-recovery-entry"
+    install -m 0755 "$_project/scripts/mkinitcpio-register-hook" \
+        "$pkgdir/usr/lib/spectrumos/mkinitcpio-register-hook"
+    install -m 0755 "$_project/scripts/spectrumos-build-rescue-image" \
+        "$pkgdir/usr/lib/spectrumos/spectrumos-build-rescue-image"
+    install -m 0755 "$_project/scripts/spectrum" \
+        "$pkgdir/usr/bin/spectrum"
+    install -m 0644 "$_project/system/release/release.toml" \
+        "$pkgdir/usr/share/spectrumos/release.toml"
+    install -m 0644 "$_project/migrations/manifest.toml" \
+        "$pkgdir/usr/share/spectrumos/migrations/manifest.toml"
+    install -m 0644 "$_project/configs/zsh/zshrc" \
+        "$pkgdir/usr/share/spectrumos/zsh/zshrc"
+    install -m 0644 "$_project/configs/zsh/defaults.zsh" \
+        "$pkgdir/usr/share/spectrumos/zsh/defaults.zsh"
+    install -m 0644 "$_project/configs/zsh/themes/spectrum.zsh-theme" \
+        "$pkgdir/usr/share/spectrumos/zsh/themes/spectrum.zsh-theme"
+    install -m 0644 "$_project"/configs/nvim/{init.lua,lazy-lock.json,lazyvim.json,stylua.toml} \
+        "$pkgdir/usr/share/spectrumos/nvim/"
+    install -m 0644 "$_project/configs/nvim/colors/spectrum.lua" \
+        "$pkgdir/usr/share/spectrumos/nvim/colors/spectrum.lua"
+    install -m 0644 "$_project"/assets/wallpapers/default/*.png \
+        "$pkgdir/usr/share/backgrounds/spectrumos/"
+    install -m 0644 "$_project/system/pacman-hooks/95-spectrumos-uki-branding.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/95-spectrumos-uki-branding.hook"
+    install -m 0644 "$_project/system/pacman-hooks/05-spectrumos-pre-upgrade-snapshot.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/05-spectrumos-pre-upgrade-snapshot.hook"
+    install -m 0644 "$_project/system/sysusers.d/spectrumos.conf" \
+        "$pkgdir/usr/lib/sysusers.d/spectrumos.conf"
+    install -m 0644 "$_project/system/tmpfiles.d/spectrumos-appearance.conf" \
+        "$pkgdir/usr/lib/tmpfiles.d/spectrumos-appearance.conf"
+    install -m 0644 "$_project/system/zram-generator.conf.d/60-spectrumos.conf" \
+        "$pkgdir/usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf"
+    install -m 0644 "$_project"/system/systemd/system/spectrumos-limine-appearance.* \
+        "$pkgdir/usr/lib/systemd/system/"
+    printf 'enable spectrumos-limine-appearance.path\n' > \
+        "$pkgdir/usr/lib/systemd/system-preset/60-spectrumos.preset"
+    install -m 0644 "$_project/packages/$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

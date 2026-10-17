@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=KDE Connect Indicator
+Comment=Access your phone and media controls from the SpectrumOS tray
+Exec=/usr/bin/kdeconnect-indicator
+TryExec=/usr/bin/kdeconnect-indicator
+Icon=kdeconnect
+NoDisplay=true
+Terminal=false

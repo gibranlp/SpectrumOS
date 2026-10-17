@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+import tomllib
+from urllib.parse import urlsplit
+
+ROOT = Path(__file__).resolve().parents[1]
+OWNED = {"spectrum-base", "spectrum-desktop", "spectrum-hyprland", "spectrum-plymouth", "spectrum-sddm", "spectrum-theme", "spectrumdrop"}
+
+
+def metadata(text):
+    values = {}
+    for line in text.splitlines():
+        key, separator, value = line.strip().partition(" = ")
+        if separator:
+            values.setdefault(key, []).append(value)
+    return values
+
+
+def check(artifacts=False):
+    repository = runpy.run_path(str(ROOT / "scripts/spectrum-repo"))
+    release = tomllib.loads((ROOT / "system/release/release.toml").read_text())["version"]
+    results = []
+    checksums = {}
+    for name in repository["PACKAGE_NAMES"]:
+        directory = ROOT / "packages" / name
+        errors = []
+        record = {"package": name, "errors": errors}
+        try:
+            subprocess.run(["bash", "-n", str(directory / "PKGBUILD")], check=True, capture_output=True, text=True)
+            result = subprocess.run(["makepkg", "--dir", str(directory), "--printsrcinfo"], check=True, capture_output=True, text=True)
+            info = metadata(result.stdout)
+            record["version"] = info["pkgver"][0] + "-" + info["pkgrel"][0]
+            if (directory / ".SRCINFO").read_text() != result.stdout:
+                errors.append(".SRCINFO does not match PKGBUILD")
+            if name in OWNED and info["pkgver"] != [release]:
+                errors.append("Package version differs from the product release")
+            sources = info.get("source", [])
+            expected = info.get("sha256sums", [])
+            if len(sources) != len(expected):
+                errors.append("Source/checksum count differs")
+            for source, checksum in zip(sources, expected):
+                filename = source.split("::", 1)[0] if "::" in source else Path(urlsplit(source).path).name
+                path = directory / filename
+                if checksum == "SKIP":
+                    errors.append("Unchecked source: " + filename)
+                    continue
+                status = path.stat()
+                identity = (status.st_dev, status.st_ino, status.st_size, status.st_mtime_ns)
+                if identity not in checksums:
+                    with path.open("rb") as stream:
+                        checksums[identity] = hashlib.file_digest(stream, "sha256").hexdigest()
+                if checksums[identity] != checksum:
+                    errors.append("Source checksum mismatch: " + filename)
+            if artifacts:
+                paths = subprocess.check_output(["makepkg", "--dir", str(directory), "--packagelist"], text=True).splitlines()
+                if len(paths) != 1:
+                    errors.append("Expected exactly one package artifact")
+                else:
+                    record["clean_build"] = repository["clean_build_evidence"](Path(paths[0]), name, directory / "PKGBUILD")
+        except (OSError, ValueError, KeyError, subprocess.SubprocessError, repository["RepoError"]) as error:
+            errors.append(str(error))
+        results.append(record)
+    engine = ROOT / "packages/spectrum-theme"
+    project_version = tomllib.loads((engine / "pyproject.toml").read_text())["project"]["version"]
+    runtime_version = runpy.run_path(str(engine / "src/spectrum_theme/__init__.py"))["__version__"]
+    errors = [] if project_version == runtime_version == release else ["Theme project/runtime versions differ from release"]
+    return {"release": release, "artifacts_checked": artifacts, "packages": results, "errors": errors,
+            "ok": not errors and all(not record["errors"] for record in results)}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Read-only release source/metadata validation; never builds or publishes packages or an ISO.")
+    parser.add_argument("--artifacts", action="store_true", help="Also require exact current artifacts with clean-chroot provenance")
+    arguments = parser.parse_args()
+    result = check(arguments.artifacts)
+    print(json.dumps(result, indent=2))
+    return 0 if result["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

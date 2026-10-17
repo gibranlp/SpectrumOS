@@ -1,0 +1,13 @@
+# Funciones opcionales elegidas por el usuario; el perfil base no las instala.
+gamescope
+smartmontools
+telegram-desktop
+hugo
+python-pip
+vlc-plugins-all
+broadcom-wl-dkms
+linux-headers
+linux-firmware-qcom
+
+# AUR (instala únicamente con paru; valida antes de habilitar el bootstrap)
+paru

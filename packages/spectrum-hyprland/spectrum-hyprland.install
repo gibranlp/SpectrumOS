@@ -1,0 +1,7 @@
+pre_upgrade() {
+    /usr/lib/spectrumos/hyprland-update-guard pause
+}
+
+post_upgrade() {
+    /usr/lib/spectrumos/hyprland-update-guard finish
+}

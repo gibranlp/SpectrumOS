@@ -1,0 +1,7 @@
+# Desktop applications built from reviewed AUR recipes through Paru.
+brave-bin
+google-chrome
+gowall-bin
+vesktop-bin
+whatsie
+zen-browser-bin

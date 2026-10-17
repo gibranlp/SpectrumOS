@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import pwd
+import shutil
+import subprocess
+
+
+def migrate_system():
+    if os.geteuid() != 0:
+        raise SystemExit('SpectrumDrop system migration requires root.')
+    old = Path('/etc/omdrop')
+    destination = Path('/etc/spectrumdrop')
+    if old.is_dir() and not old.is_symlink() and old.stat().st_uid == 0:
+        destination.mkdir(mode=0o755, exist_ok=True)
+        for source in old.iterdir():
+            target = destination / source.name
+            if source.is_file() and not source.is_symlink() and source.stat().st_uid == 0 and not target.exists():
+                shutil.copy2(source, target)
+    for user in pwd.getpwall():
+        runtime = Path('/run/user') / str(user.pw_uid)
+        if user.pw_uid < 1000 or not (runtime / 'bus').exists():
+            continue
+        command = ['runuser', '-u', user.pw_name, '--', 'env', 'XDG_RUNTIME_DIR=' + str(runtime),
+                   'DBUS_SESSION_BUS_ADDRESS=unix:path=' + str(runtime / 'bus')]
+        subprocess.run(command + ['systemctl', '--user', 'stop', 'airdrop-receiver.service', 'omdrop-window.timer'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=30)
+        subprocess.run(command + ['python3', str(Path(__file__).with_name('migrate.py'))], check=True, timeout=30)
+        subprocess.run(command + ['systemctl', '--user', 'daemon-reload'], check=True, timeout=15)
+    helper = Path(__file__).resolve().parent.parent / 'radio/spectrumdrop-radio'
+    subprocess.run([str(helper), 'cleanup-legacy'], check=True, timeout=45)
+
+
+if __name__ == '__main__':
+    migrate_system()

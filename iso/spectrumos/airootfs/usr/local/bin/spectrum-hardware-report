@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -u
+
+printf 'SpectrumOS hardware acceptance report\n'
+printf 'Generated: %s\n' "$(date --utc --iso-8601=seconds)"
+printf '\nSystem\n'
+uname -a
+printf '\nFirmware\n'
+[[ -d /sys/firmware/efi ]] && printf 'UEFI\n' || printf 'Legacy BIOS\n'
+printf '\nPlatform\n'
+inxi --system --machine --cpu --graphics --audio --network --bluetooth --battery --disk --memory --sensors --no-host
+printf '\nPCI devices and drivers\n'
+lspci -nnk
+printf '\nUSB devices\n'
+lsusb
+printf '\nPower supplies\n'
+for device in /sys/class/power_supply/*; do
+    [[ -e $device ]] || continue
+    printf '%s: ' "${device##*/}"
+    tr '\n' ' ' < "$device/uevent" 2>/dev/null
+    printf '\n'
+done
+printf '\nBacklights\n'
+brightnessctl --class=backlight --machine-readable info 2>/dev/null || printf 'No backlight interface detected\n'
+printf '\nVulkan\n'
+vulkaninfo --summary 2>&1

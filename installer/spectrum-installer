@@ -1,0 +1,596 @@
+#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+import threading
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+from gi.repository import GLib, Gtk
+
+
+DATA_DIR = Path(os.environ.get("SPECTRUM_INSTALLER_DATA", "/usr/share/spectrumos/installer"))
+BACKEND = os.environ.get(
+    "SPECTRUM_INSTALLER_BACKEND", "/usr/local/lib/spectrumos/spectrum-installer-backend"
+)
+
+# spectrum-installer-backend prints these instead of pulsing the bar blindly:
+# ##PROGRESS marks a coarse stage milestone (0-100), ##PACKAGES announces the
+# pacstrap package count plus the stage ceiling it's building toward, so the
+# bar can grow smoothly across pacman's own "installing"/"upgrading" lines
+# during pacstrap -- by far the slowest single step -- instead of sitting
+# still between the milestones either side of it.
+PROGRESS_RE = re.compile(r"^##PROGRESS (\d+)\s*$")
+PACKAGES_RE = re.compile(r"^##PACKAGES (\d+) (\d+)\s*$")
+PACMAN_STEP_RE = re.compile(r"^(?:installing|upgrading) \S+")
+# pacman's own dependency-resolution summary ("Packages (487) name-1.0-1 ...")
+# -- the ##PACKAGES count above is only the manifest's explicit package list,
+# not what pacman actually resolves once transitive dependencies are pulled
+# in (confirmed against a real build: ~100 explicit packages resolved to
+# 487). Without this override the bar would race through the pacstrap band
+# using the wrong (much smaller) denominator, then sit flat at its ceiling
+# for most of pacstrap's real duration once installed count overtook it.
+PACMAN_RESOLVED_RE = re.compile(r"^Packages \((\d+)\)")
+
+
+class SpectrumInstaller(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id="dev.spectrumos.Installer")
+        self.disks = []
+        self.connect("activate", self.on_activate)
+
+    def on_activate(self, _application):
+        css = Gtk.CssProvider()
+        css.load_from_path(str(DATA_DIR / "style.css"))
+        Gtk.StyleContext.add_provider_for_display(
+            self.get_active_window().get_display() if self.get_active_window() else self._display(),
+            css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+        self.window = Gtk.ApplicationWindow(application=self)
+        self.window.set_title("Install SpectrumOS")
+        self.window.set_default_size(760, 560)
+        self.window.set_size_request(480, 360)
+        self.window.set_decorated(False)
+
+        shell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        shell.add_css_class("installer-shell")
+        shell.append(self.hero())
+        rescue_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        rescue_description = Gtk.Label(
+            label="Recover an existing system without starting an installation.",
+            xalign=0, wrap=True, hexpand=True,
+        )
+        rescue_description.add_css_class("muted")
+        rescue_row.append(rescue_description)
+        rescue_button = Gtk.Button(label="Rescue system")
+        rescue_button.connect("clicked", self.open_rescue)
+        rescue_row.append(rescue_button)
+        shell.append(rescue_row)
+
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.stack.set_hexpand(True)
+        self.stack.set_vexpand(True)
+        self.setup_page = self.build_setup_page()
+        self.stack.add_named(self.setup_page, "setup")
+        confirm_scroll = Gtk.ScrolledWindow()
+        confirm_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        confirm_scroll.set_child(self.build_confirm_page())
+        self.stack.add_named(confirm_scroll, "confirm")
+        self.stack.add_named(self.build_progress_page(), "progress")
+        self.stack.add_named(self.build_done_page(), "done")
+        shell.append(self.stack)
+
+        self.window.set_child(shell)
+        self.window.present()
+
+    def open_rescue(self, _button):
+        try:
+            subprocess.Popen([
+                "uwsm", "app", "--", "foot", "--title=Rescue system", "-e",
+                "/usr/local/bin/spectrum-rescue-shell",
+            ])
+        except OSError as error:
+            Gtk.AlertDialog(
+                message="Could not open the rescue terminal", detail=str(error),
+            ).show(self.window)
+
+    @staticmethod
+    def _display():
+        from gi.repository import Gdk
+
+        return Gdk.Display.get_default()
+
+    def hero(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        logo = Gtk.Picture.new_for_filename(str(DATA_DIR / "logo.svg"))
+        logo.set_halign(Gtk.Align.CENTER)
+        box.append(logo)
+        title = Gtk.Label(label="SpectrumOS")
+        title.add_css_class("hero-title")
+        box.append(title)
+        version = Gtk.Label(label="Installer · erase-disk mode")
+        version.add_css_class("muted")
+        version.set_hexpand(True)
+        version.set_halign(Gtk.Align.END)
+        box.append(version)
+        return box
+
+    def field(self, box, title, widget):
+        label = Gtk.Label(label=title, xalign=0)
+        label.add_css_class("muted")
+        box.append(label)
+        box.append(widget)
+
+    def build_setup_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+        title = Gtk.Label(label="Install SpectrumOS", xalign=0)
+        title.add_css_class("step-title")
+        page.append(title)
+        subtitle = Gtk.Label(
+            label="Choose the destination and create your administrator account.", xalign=0
+        )
+        subtitle.set_wrap(True)
+        subtitle.add_css_class("muted")
+        page.append(subtitle)
+
+        network_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.network_status = Gtk.Label(xalign=0, hexpand=True)
+        self.network_status.add_css_class("muted")
+        network_row.append(self.network_status)
+        page.append(network_row)
+        self.refresh_network_status()
+        GLib.timeout_add_seconds(3, self.refresh_network_status)
+
+        self.load_disks()
+        labels = [self.disk_label(item) for item in self.disks] or ["No eligible disks found"]
+        self.disk_dropdown = Gtk.DropDown.new_from_strings(labels)
+        self.disk_dropdown.set_sensitive(bool(self.disks))
+        self.field(page, "Installation disk", self.disk_dropdown)
+
+        self.keyboard_names = [
+            "English (US)",
+            "English (US, international accents)",
+            "Spanish (Latin America)",
+            "Spanish (Spain)",
+            "English (US) + Spanish (Latin America)",
+            "US International + Spanish (Latin America)",
+            "US International + Spanish (Spain)",
+        ]
+        self.keyboard_profiles = ["us", "us-intl", "latam", "es", "us,latam", "us-intl,latam", "us-intl,es"]
+        self.keyboard = Gtk.DropDown.new_from_strings(self.keyboard_names)
+        self.keyboard.connect("notify::selected", self.keyboard_changed)
+        self.field(page, "Keyboard", self.keyboard)
+
+        self.username = Gtk.Entry(text="igor")
+        self.field(page, "Username", self.username)
+        self.hostname = Gtk.Entry(text="spectrum")
+        self.field(page, "Computer name", self.hostname)
+        self.password = Gtk.PasswordEntry(show_peek_icon=True, placeholder_text="Password")
+        self.field(page, "Password", self.password)
+        self.password_confirm = Gtk.PasswordEntry(
+            show_peek_icon=True, placeholder_text="Repeat password"
+        )
+        page.append(self.password_confirm)
+
+        self.timezones = ["America/Cancun", "America/Mexico_City", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Madrid", "UTC"]
+        self.timezone = Gtk.DropDown.new_from_strings(self.timezones)
+        self.field(page, "Timezone", self.timezone)
+
+        self.gpus = ["AMD", "Intel", "NVIDIA", "NVIDIA + Intel (hybrid)", "NVIDIA + AMD (hybrid)", "Virtual machine"]
+        self.gpu_profiles = ["amd", "intel", "nvidia", "nvidia-intel", "nvidia-amd", "vm"]
+        self.gpu = Gtk.DropDown.new_from_strings(self.gpus)
+        self.gpu.set_selected(self.detect_gpu())
+        self.field(page, "Graphics", self.gpu)
+
+        self.laptop = Gtk.CheckButton(label="This computer is a laptop")
+        page.append(self.laptop)
+        laptop_description = Gtk.Label(
+            label="Adds laptop power management, battery support, brightness controls, and portable hardware defaults.",
+            xalign=0,
+        )
+        laptop_description.set_wrap(True)
+        laptop_description.add_css_class("muted")
+        page.append(laptop_description)
+
+        self.lean = Gtk.CheckButton(label="Install lean SpectrumOS")
+        page.append(self.lean)
+        lean_description = Gtk.Label(
+            label="Keeps the Spectrum desktop and recovery tools; skips background transfers, printer discovery, phone integration, and other optional services.",
+            xalign=0,
+        )
+        lean_description.set_wrap(True)
+        lean_description.add_css_class("muted")
+        page.append(lean_description)
+
+        browsers_label = Gtk.Label(label="Optional browsers", xalign=0)
+        browsers_label.add_css_class("muted")
+        page.append(browsers_label)
+        browsers_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        self.browser_chrome = Gtk.CheckButton(label="Google Chrome")
+        self.browser_brave = Gtk.CheckButton(label="Brave")
+        self.browser_zen = Gtk.CheckButton(label="Zen Browser")
+        browsers_row.append(self.browser_chrome)
+        browsers_row.append(self.browser_brave)
+        browsers_row.append(self.browser_zen)
+        page.append(browsers_row)
+        browsers_description = Gtk.Label(
+            label="Each one is built from AUR after the base install; none are installed unless checked.",
+            xalign=0,
+        )
+        browsers_description.set_wrap(True)
+        browsers_description.add_css_class("muted")
+        page.append(browsers_description)
+
+        self.error = Gtk.Label(xalign=0)
+        self.error.add_css_class("warning")
+        self.error.set_visible(False)
+        page.append(self.error)
+
+        next_button = Gtk.Button(label="Review installation")
+        next_button.add_css_class("accent")
+        next_button.set_halign(Gtk.Align.END)
+        next_button.connect("clicked", self.review)
+        page.append(next_button)
+        session_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        quit_button = Gtk.Button(label="Exit installer")
+        quit_button.connect("clicked", lambda *_: self.quit())
+        restart_button = Gtk.Button(label="Restart")
+        restart_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
+        poweroff_button = Gtk.Button(label="Power off")
+        poweroff_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "poweroff"]))
+        session_buttons.append(quit_button)
+        session_buttons.append(restart_button)
+        session_buttons.append(poweroff_button)
+        page.append(session_buttons)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_child(page)
+        return scroll
+
+    def build_confirm_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        title = Gtk.Label(label="Ready to install", xalign=0)
+        title.add_css_class("step-title")
+        page.append(title)
+        warning = Gtk.Label(
+            label="Everything on the selected disk will be permanently erased. This cannot be undone.",
+            xalign=0,
+        )
+        warning.set_wrap(True)
+        warning.add_css_class("warning")
+        page.append(warning)
+        self.summary = Gtk.Label(xalign=0, yalign=0)
+        self.summary.set_wrap(True)
+        self.summary.set_selectable(True)
+        page.append(self.summary)
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        back = Gtk.Button(label="Back")
+        back.connect("clicked", lambda *_: self.stack.set_visible_child_name("setup"))
+        install = Gtk.Button(label="Erase disk and install")
+        install.add_css_class("install-button")
+        install.connect("clicked", self.start_install)
+        buttons.append(back)
+        buttons.append(install)
+        page.append(buttons)
+        return page
+
+    def build_progress_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        title = Gtk.Label(label="Installing SpectrumOS", xalign=0)
+        title.add_css_class("step-title")
+        page.append(title)
+        text = Gtk.Label(
+            label="Keep this computer connected to power and the internet. Packages are downloaded during installation.", xalign=0
+        )
+        text.set_wrap(True)
+        text.add_css_class("muted")
+        page.append(text)
+        self.progress = Gtk.ProgressBar()
+        self.progress.set_fraction(0)
+        page.append(self.progress)
+        self.log = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
+        self.log.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_child(self.log)
+        page.append(scroll)
+        return page
+
+    def build_done_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        title = Gtk.Label(label="SpectrumOS is ready", xalign=0)
+        title.add_css_class("step-title")
+        page.append(title)
+        message = Gtk.Label(
+            label="Installation finished successfully. Restart the computer and remove the USB drive.",
+            xalign=0,
+        )
+        message.set_wrap(True)
+        page.append(message)
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+        reboot = Gtk.Button(label="Restart now")
+        reboot.add_css_class("accent")
+        reboot.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
+        page.append(reboot)
+        return page
+
+    def load_disks(self):
+        try:
+            output = subprocess.check_output([BACKEND, "--list-disks", "--json"], text=True)
+            self.disks = json.loads(output)
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            self.disks = []
+
+    def connected(self):
+        try:
+            state = subprocess.check_output(
+                ["nmcli", "--terse", "--fields", "STATE", "general"],
+                text=True,
+                timeout=3,
+            ).strip().lower()
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return state.startswith("connected")
+
+    def refresh_network_status(self):
+        online = self.connected()
+        self.network_status.set_text(
+            "Network connected · internet is required" if online
+            else "Connect to Wi-Fi or Ethernet before installing"
+        )
+        return True
+
+    def keyboard_changed(self, _dropdown, _parameter):
+        profile = self.keyboard_profiles[self.keyboard.get_selected()]
+        if profile == "us-intl":
+            layouts, variants, options = "us", "intl", ""
+        elif profile == "us-intl,latam":
+            layouts, variants, options = "us,latam", "intl,", "grp:alt_shift_toggle"
+        elif profile == "us-intl,es":
+            layouts, variants, options = "us,es", "intl,", "grp:alt_shift_toggle"
+        else:
+            layouts, variants = profile, ""
+            options = "grp:alt_shift_toggle" if "," in profile else ""
+        for key, value in (
+            ("input:kb_layout", layouts),
+            ("input:kb_variant", variants),
+            ("input:kb_options", options),
+        ):
+            subprocess.run(["hyprctl", "keyword", key, value], check=False)
+
+    @staticmethod
+    def disk_label(item):
+        size = int(item.get("size") or 0) / (1024**3)
+        model = (item.get("model") or "Disk").strip()
+        transport = (item.get("tran") or "").upper()
+        return f"{model} · {size:.1f} GiB · {item['path']} {transport}".strip()
+
+    @staticmethod
+    def detect_gpu():
+        try:
+            output = subprocess.check_output(["lspci"], text=True).lower()
+        except (OSError, subprocess.SubprocessError):
+            return 1
+        controllers = "\n".join(
+            line for line in output.splitlines()
+            if any(kind in line for kind in ("vga compatible controller", "3d controller", "display controller"))
+        )
+        if any(name in controllers for name in ("virtio", "vmware", "virtualbox")):
+            return 5
+        has_nvidia = "nvidia" in controllers
+        has_intel = "intel" in controllers
+        has_amd = "amd" in controllers or "ati" in controllers
+        if has_nvidia and has_intel:
+            return 3
+        if has_nvidia and has_amd:
+            return 4
+        if has_nvidia:
+            return 2
+        if has_amd:
+            return 0
+        return 1
+
+    @staticmethod
+    def detect_cpu():
+        value = Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="ignore").lower()
+        return "amd" if "authenticamd" in value else "intel"
+
+    def selected_browsers(self):
+        return [
+            name for name, button in (
+                ("chrome", self.browser_chrome),
+                ("brave", self.browser_brave),
+                ("zen", self.browser_zen),
+            ) if button.get_active()
+        ]
+
+    def review(self, _button):
+        error = ""
+        if not self.disks:
+            error = "No eligible installation disk was found."
+        elif not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", self.username.get_text()):
+            error = "Enter a simple lowercase username."
+        elif not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}", self.hostname.get_text()):
+            error = "Enter a valid computer name."
+        elif len(self.password.get_text()) < 8:
+            error = "Use a password with at least 8 characters."
+        elif self.password.get_text() != self.password_confirm.get_text():
+            error = "The passwords do not match."
+        elif not self.connected():
+            error = "Connect to Wi-Fi or Ethernet. SpectrumOS downloads packages during installation."
+        if error:
+            self.error.set_text(error)
+            self.error.set_visible(True)
+            return
+        self.error.set_visible(False)
+        disk = self.disks[self.disk_dropdown.get_selected()]
+        browser_labels = {"chrome": "Google Chrome", "brave": "Brave", "zen": "Zen Browser"}
+        browsers = ", ".join(browser_labels[name] for name in self.selected_browsers()) or "None"
+        self.summary.set_text(
+            f"Disk\n{self.disk_label(disk)}\n\nAccount\n{self.username.get_text()} on {self.hostname.get_text()}\n\n"
+            f"Timezone\n{self.timezones[self.timezone.get_selected()]}\n\nGraphics\n{self.gpus[self.gpu.get_selected()]}\n\n"
+            f"Keyboard\n{self.keyboard_names[self.keyboard.get_selected()]}\n\n"
+            f"Installation\n{'Lean' if self.lean.get_active() else 'Full'}\n\n"
+            f"Optional browsers\n{browsers}\n\n"
+            "Filesystem\nBtrfs with separate home and snapshots subvolumes"
+        )
+        self.stack.set_visible_child_name("confirm")
+
+    def start_install(self, _button):
+        self.stack.set_visible_child_name("progress")
+        self.progress.set_fraction(0)
+        self.package_total = 0
+        self.package_seen = 0
+        self.package_floor = 0
+        self.package_ceiling = 0
+        self.awaiting_package_floor = False
+        thread = threading.Thread(target=self.install_worker, daemon=True)
+        thread.start()
+
+    def install_worker(self):
+        disk = self.disks[self.disk_dropdown.get_selected()]["path"]
+        gpu = self.gpu_profiles[self.gpu.get_selected()]
+        password_path = None
+        try:
+            descriptor, password_path = tempfile.mkstemp(prefix="spectrum-password-", dir="/tmp")
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(self.password.get_text() + "\n")
+            command = [
+                "pkexec", BACKEND, "--apply", "--disk", disk, "--confirm-erase", disk,
+                "--username", self.username.get_text(), "--hostname", self.hostname.get_text(),
+                "--timezone", self.timezones[self.timezone.get_selected()], "--password-file", password_path,
+                "--cpu", self.detect_cpu(), "--gpu", gpu,
+                "--keyboard", self.keyboard_profiles[self.keyboard.get_selected()],
+                "--form-factor", "laptop" if self.laptop.get_active() else "desktop",
+                "--browsers", ",".join(self.selected_browsers()),
+            ]
+            if self.lean.get_active():
+                command.append("--lean")
+            # errors="replace": paru/makepkg builds an AUR helper from source when
+            # optional browsers are requested, and cargo/rustc output isn't
+            # guaranteed clean UTF-8 on every line -- confirmed live, a decode
+            # error here raises UnicodeDecodeError from inside this loop, which
+            # `except OSError` below does not catch (it isn't an OSError), so
+            # this whole background thread died silently and the installer
+            # window never showed a finish or error page again.
+            process = subprocess.Popen(
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace",
+            )
+            assert process.stdout is not None
+            for line in process.stdout:
+                GLib.idle_add(self.handle_line, line)
+            result = process.wait()
+            GLib.idle_add(self.finish_install, result)
+        except OSError as error:
+            GLib.idle_add(self.append_log, f"Could not start installer: {error}\n")
+            GLib.idle_add(self.finish_install, 1)
+        finally:
+            if password_path:
+                try:
+                    Path(password_path).unlink()
+                except FileNotFoundError:
+                    pass
+
+    def append_log(self, line):
+        buffer = self.log.get_buffer()
+        buffer.insert(buffer.get_end_iter(), line)
+        # Without this the view stays wherever it was scrolled to (the top, on
+        # first open) as new lines keep landing below the visible area --
+        # confirmed live: the log never auto-followed the install, so watching
+        # progress meant repeatedly scrolling down by hand.
+        self.log.scroll_to_iter(buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
+        return False
+
+    def set_progress(self, percent):
+        self.progress.set_fraction(max(0.0, min(1.0, percent / 100)))
+        return False
+
+    def handle_line(self, raw_line):
+        # Building an optional browser's AUR package runs cargo/rustc, whose
+        # own carriage-return-heavy progress meter can otherwise land here as
+        # one multi-megabyte "line" (Python only splits stdout on '\n') --
+        # capped before anything else touches it so neither the regexes below
+        # nor the GTK text buffer ever have to deal with that.
+        line = raw_line if len(raw_line) <= 8000 else raw_line[:8000] + "... [truncated]\n"
+        try:
+            self._handle_line(line)
+        except Exception as error:
+            # Never let a parsing hiccup on one line take the whole installer
+            # down -- confirmed live, an unhandled exception raised from
+            # inside a GLib.idle_add callback aborts the entire GTK process
+            # with no error page and no message, mid-install.
+            try:
+                self.append_log(f"[installer] could not process a log line: {error}\n")
+            except Exception:
+                pass
+        return False
+
+    def _handle_line(self, line):
+        packages_match = PACKAGES_RE.match(line)
+        if packages_match:
+            self.package_total = int(packages_match.group(1))
+            self.package_ceiling = int(packages_match.group(2))
+            self.package_seen = 0
+            # The very next ##PROGRESS milestone is pacstrap's starting point
+            # (backend always emits it right before pacstrap runs); anchor
+            # the interpolation's floor to that instead of to whatever
+            # unrelated milestone happens to precede this marker.
+            self.awaiting_package_floor = True
+            return
+        progress_match = PROGRESS_RE.match(line)
+        if progress_match:
+            pct = int(progress_match.group(1))
+            self.set_progress(pct)
+            if self.awaiting_package_floor:
+                self.package_floor = pct
+                self.awaiting_package_floor = False
+            else:
+                # Any later milestone closes the pacstrap band, so pacman
+                # output from later steps (e.g. building optional AUR
+                # browsers) is never mistaken for more of it.
+                self.package_total = 0
+            return
+        self.append_log(line)
+        if self.package_total:
+            resolved_match = PACMAN_RESOLVED_RE.match(line.strip())
+            if resolved_match:
+                self.package_total = int(resolved_match.group(1))
+                self.package_seen = 0
+        # Between pacstrap's floor and ceiling milestones, grow the bar off
+        # pacman's own per-package output instead of leaving it stuck at the
+        # floor for however long pacstrap -- by far the slowest single step
+        # -- takes.
+        if self.package_total and PACMAN_STEP_RE.match(line.strip()):
+            self.package_seen = min(self.package_seen + 1, self.package_total)
+            span = self.package_ceiling - self.package_floor
+            estimate = self.package_floor + span * (self.package_seen / self.package_total)
+            self.set_progress(estimate)
+        return False
+
+    def finish_install(self, result):
+        if result == 0:
+            self.set_progress(100)
+            self.stack.set_visible_child_name("done")
+        else:
+            # Left wherever it stopped rather than reset to 0 -- that still
+            # shows how far the install got before failing.
+            self.append_log("\nInstallation stopped. Review the message above; no restart is required.\n")
+        return False
+
+
+if __name__ == "__main__":
+    raise SystemExit(SpectrumInstaller().run(None))

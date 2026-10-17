@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = spectrum-hyprland
+
+[Action]
+Description = Pausing Hyprland automatic reloads during the update...
+When = PreTransaction
+Exec = /usr/lib/spectrumos/hyprland-update-guard pause
+AbortOnFail

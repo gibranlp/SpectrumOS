@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+profile=$project_root/iso/spectrumos
+output=$project_root/artifacts/iso
+temporary_parent=$project_root/artifacts
+work=$temporary_parent/.iso-build.pending/archiso
+source_path=/usr/local/share/spectrumos/source
+action=plan
+
+if (($# > 1)); then
+    printf 'Usage: %s [--build]\n' "$0" >&2
+    exit 2
+fi
+if (($# == 1)); then
+    [[ $1 == --build ]] || { printf 'Unknown option: %s\n' "$1" >&2; exit 2; }
+    action=build
+fi
+
+for command in ffmpeg limine mkarchiso python tar xorriso; do
+    command -v "$command" >/dev/null || { printf 'Required command is missing: %s\n' "$command" >&2; exit 1; }
+done
+
+repository=$project_root/repo/output/edge/x86_64
+
+printf 'Profile: %s\nWork directory: %s\nOutput directory: %s\n' "$profile" "$work" "$output"
+if [[ $action == plan ]]; then
+    printf 'Dry-run only; use --build to create the ISO.\n'
+    exit 0
+fi
+if ((EUID != 0)); then
+    printf 'ISO creation must run as root because mkarchiso builds a root filesystem.\n' >&2
+    exit 1
+fi
+[[ -s $repository/spectrumos.db.tar.zst && -s $repository/spectrumos.db.tar.zst.sig ]] || {
+    printf 'A signed Edge repository is required; run scripts/spectrum-repo build --channel edge first.\n' >&2
+    exit 1
+}
+"$project_root/scripts/spectrum-repo" verify --channel edge
+bash "$project_root/scripts/check-bundled-apps" "$repository"
+python "$project_root/scripts/check-ukvm-packages" "$repository"
+bash "$project_root/scripts/check-lean-package" \
+    "$repository/spectrumos.db.tar.zst" \
+    "$project_root/bootstrap/packages/desktop-lean-exclude.txt"
+
+install -d -m 0755 "$temporary_parent"
+temporary_root=$(mktemp -d "$temporary_parent/.iso-build.XXXXXX")
+work=$temporary_root/archiso
+staging=$temporary_root/profile
+install -d -m 0755 "$staging"
+trap 'rm -rf -- "$temporary_root"' EXIT
+cp -a -- "$profile/." "$staging/"
+install -d -m 0755 "$staging/airootfs$source_path" "$staging/airootfs/usr/local/bin" "$output"
+install -d -m 0755 \
+    "$staging/airootfs/usr/local/lib/spectrumos" \
+    "$staging/airootfs/usr/share/spectrumos/installer" \
+    "$staging/airootfs/usr/share/applications" \
+    "$staging/airootfs/usr/share/icons/hicolor/scalable/apps" \
+    "$staging/airootfs/etc/flatpak/remotes.d" \
+    "$staging/airootfs/usr/lib/sysusers.d" \
+    "$staging/airootfs/usr/lib/tmpfiles.d" \
+    "$staging/airootfs/usr/lib/systemd/zram-generator.conf.d" \
+    "$staging/airootfs/etc/profile.d" \
+    "$staging/airootfs/etc/spectrumos" \
+    "$staging/airootfs/etc/polkit-1/rules.d" \
+    "$staging/airootfs/etc/sudoers.d" \
+    "$staging/airootfs/home/spectrum/.config/gtk-3.0" \
+    "$staging/airootfs/home/spectrum/Desktop"
+install -d -m 0755 "$staging/airootfs/var/lib/spectrumos/repository/edge/x86_64"
+cp -a -- "$repository/." "$staging/airootfs/var/lib/spectrumos/repository/edge/x86_64/"
+tar -C "$project_root" \
+    --exclude-vcs-ignores \
+    --exclude='./generated' \
+    --exclude='*.key' \
+    --exclude='*.pem' \
+    --exclude='./repo/state' \
+    --exclude='./state' \
+    --exclude='./personal' \
+    --exclude='./spectrumos-personal' \
+    --exclude='./secrets' \
+    --exclude='./.git' \
+    --exclude='./artifacts' \
+    --exclude='./iso' \
+    --exclude='./repo/sources' \
+    --exclude='./repo/work' \
+    --exclude='./repo/output' \
+    --exclude='./packages/*/spectrumos-source-*.tar.zst' \
+    --exclude='*.pkg.tar.*' \
+    --exclude='./packages/*/pkg' \
+    --exclude='./packages/*/src' \
+    -cf - . | tar -C "$staging/airootfs$source_path" -xf -
+chmod 0755 "$staging/airootfs$source_path/scripts/check-lean-package"
+install -d -m 0755 "$staging/airootfs$source_path/packages/spectrum-theme/src"
+install -d -m 0755 "$staging/airootfs$source_path/vendor"
+cp -a -- "$project_root/packages/spectrum-theme/src/." \
+    "$staging/airootfs$source_path/packages/spectrum-theme/src/"
+install -m 0755 "$(command -v paru)" "$staging/airootfs$source_path/vendor/paru"
+chmod 0755 "$staging/airootfs$source_path/install.sh"
+# ArchISO normaliza los archivos a 0644; registra los ejecutables del instalador.
+python - "$staging/airootfs$source_path" "$staging/profiledef.sh" "$source_path" <<'PY'
+from pathlib import Path
+import shlex
+import sys
+
+source, profile = map(Path, sys.argv[1:3])
+with profile.open("a") as output:
+    for path in sorted(source.rglob("*")):
+        if not path.is_symlink() and path.is_file() and path.stat().st_mode & 0o111:
+            target = sys.argv[3] + "/" + path.relative_to(source).as_posix()
+            output.write("\nfile_permissions[" + shlex.quote(target) + "]='0:0:755'\n")
+PY
+ln -s "$source_path" "$staging/airootfs/root/SpectrumOS2"
+install -m 0755 "$project_root/scripts/snapshot" "$staging/airootfs/usr/local/bin/spectrum-snapshot"
+install -m 0755 "$project_root/scripts/spectrum" "$staging/airootfs/usr/local/bin/spectrum"
+install -m 0755 "$project_root/installer/spectrum-installer" \
+    "$staging/airootfs/usr/local/bin/spectrum-installer"
+install -m 0755 "$project_root/installer/spectrum-recovery" \
+    "$staging/airootfs/usr/local/bin/spectrum-recovery"
+install -m 0755 "$project_root/installer/spectrum-rescue-shell" \
+    "$staging/airootfs/usr/local/bin/spectrum-rescue-shell"
+install -m 0755 "$project_root/installer/spectrum-installer-backend" \
+    "$staging/airootfs/usr/local/lib/spectrumos/spectrum-installer-backend"
+install -m 0755 "$project_root/installer/spectrum-live-session" \
+    "$staging/airootfs/usr/local/bin/spectrum-live-session"
+install -m 0755 "$project_root/installer/spectrum-live-network" \
+    "$staging/airootfs/usr/local/bin/spectrum-live-network"
+install -m 0755 "$project_root/scripts/network-adapter" \
+    "$staging/airootfs/usr/local/lib/spectrumos/network-adapter"
+install -d -m 0755 "$staging/airootfs/usr/share/spectrumos/installer/shell"
+install -m 0644 "$project_root/installer/live-shell.qml" \
+    "$staging/airootfs/usr/share/spectrumos/installer/shell/shell.qml"
+install -m 0644 "$project_root/installer/live-hyprland.lua" \
+    "$staging/airootfs/etc/spectrumos/live-hyprland.lua"
+palette=$(mktemp "$staging/default-palette.XXXXXX.toml")
+appearance=$(mktemp -d "$staging/default-appearance.XXXXXX")
+PYTHONPATH="$project_root/packages/spectrum-theme/src" python -m spectrum_theme.cli extract native \
+    "$project_root/assets/wallpapers/default/S30.png" \
+    --mode clustered --variant dark --output "$palette"
+palette_json=$(mktemp -d "$staging/default-theme.XXXXXX")
+PYTHONPATH="$project_root/packages/spectrum-theme/src" python -m spectrum_theme.cli render \
+    --strict --palette "$palette" --output "$palette_json" \
+    --wallpaper "$project_root/assets/wallpapers/default/S30.png"
+python "$project_root/installer/render-style" \
+    "$palette_json/current/palette.json" "$project_root/installer/style.css" \
+    "$staging/airootfs/usr/share/spectrumos/installer/style.css"
+chmod 0644 "$staging/airootfs/usr/share/spectrumos/installer/style.css"
+foreground=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["foreground"].lstrip("#"))' "$palette_json/current/palette.json")
+background=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["background"].lstrip("#"))' "$palette_json/current/palette.json")
+surface=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["surface"].lstrip("#"))' "$palette_json/current/palette.json")
+muted=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["muted"].lstrip("#"))' "$palette_json/current/palette.json")
+accent=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["accent"].lstrip("#"))' "$palette_json/current/palette.json")
+sed -e "s/__FOREGROUND__/$foreground/g" -e "s/__BACKGROUND__/$background/g" \
+        -e "s/__SURFACE__/$surface/g" -e "s/__MUTED__/$muted/g" -e "s/__ACCENT__/$accent/g" \
+        "$project_root/installer/live-foot.ini" > "$staging/airootfs/usr/share/spectrumos/installer/foot.ini"
+install -Dm 0644 "$staging/airootfs/usr/share/spectrumos/installer/foot.ini" \
+    "$staging/airootfs/etc/xdg/foot/foot.ini"
+install -m 0644 "$palette_json/current/palette.json" \
+    "$staging/airootfs/usr/share/spectrumos/installer/palette.json"
+SPECTRUM_APPEARANCE_DIR="$appearance" \
+SPECTRUM_PALETTE="$palette_json/current/palette.json" \
+    "$project_root/scripts/appearance-stage" \
+    "$project_root/assets/wallpapers/default/S30.png"
+sed 's/width="278" height="250"/width="16" height="14"/' "$appearance/logo.svg" \
+    > "$staging/airootfs/usr/share/spectrumos/installer/logo.svg"
+install -d -m 0755 "$staging/airootfs/etc/xdg/fastfetch"
+python - "$project_root/configs/fastfetch/config.jsonc" \
+    "$staging/airootfs/etc/xdg/fastfetch/config.jsonc" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text())
+config["logo"]["type"] = "sixel"
+Path(sys.argv[2]).write_text(json.dumps(config, indent=2) + "\n")
+PY
+install -Dm 0644 "$appearance/lock-branding.png" \
+    "$staging/airootfs/var/lib/spectrumos/appearance/lock-branding.png"
+chmod 0644 "$staging/airootfs/usr/share/spectrumos/installer/logo.svg"
+install -m 0644 "$appearance/logo.svg" \
+    "$staging/airootfs/usr/share/icons/hicolor/scalable/apps/spectrum-installer.svg"
+install -m 0644 "$palette_json/current/gtk-3.css" \
+    "$staging/airootfs/home/spectrum/.config/gtk-3.0/gtk.css"
+install -m 0644 "$project_root/installer/live-gtk-settings.ini" \
+    "$staging/airootfs/home/spectrum/.config/gtk-3.0/settings.ini"
+install -m 0644 "$project_root/assets/wallpapers/default/S30.png" \
+    "$staging/airootfs/usr/share/spectrumos/installer/wallpaper.png"
+install -m 0644 "$project_root/installer/spectrum-installer.desktop" \
+    "$staging/airootfs/usr/share/applications/spectrum-installer.desktop"
+install -m 0644 "$project_root/installer/spectrum-installer.desktop" \
+    "$staging/airootfs/home/spectrum/Desktop/Install SpectrumOS.desktop"
+install -m 0644 "$project_root/installer/spectrum-live-user.conf" \
+    "$staging/airootfs/usr/lib/sysusers.d/spectrum-live.conf"
+install -m 0644 "$project_root/installer/spectrum-live-home.conf" \
+    "$staging/airootfs/usr/lib/tmpfiles.d/spectrum-live.conf"
+install -m 0644 "$project_root/system/zram-generator.conf.d/60-spectrumos.conf" \
+    "$staging/airootfs/usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf"
+install -m 0644 "$project_root/system/flatpak-flathub.flatpakrepo" \
+    "$staging/airootfs/etc/flatpak/remotes.d/flathub.flatpakrepo"
+install -m 0644 "$project_root/installer/49-spectrum-installer.rules" \
+    "$staging/airootfs/etc/polkit-1/rules.d/49-spectrum-installer.rules"
+install -m 0440 "$project_root/installer/10-spectrum-live" \
+    "$staging/airootfs/etc/sudoers.d/10-spectrum-live"
+chown -R 1000:1000 "$staging/airootfs/home/spectrum"
+rm -f "$staging/airootfs/etc/systemd/system/multi-user.target.wants/systemd-networkd.service" \
+    "$staging/airootfs/etc/systemd/system/sockets.target.wants/systemd-networkd.socket" \
+    "$staging/airootfs/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service" \
+    "$staging/airootfs/etc/systemd/system/multi-user.target.wants/iwd.service" \
+    "$staging/airootfs/etc/systemd/system/dbus-org.freedesktop.network1.service"
+rm -rf "$staging/airootfs/etc/systemd/network" \
+    "$staging/airootfs/etc/systemd/networkd.conf.d" \
+    "$staging/airootfs/etc/systemd/system/systemd-networkd-wait-online.service.d"
+rm -rf "$staging/airootfs/etc/systemd/system/cloud-init.target.wants"
+rm -f "$staging/airootfs/etc/systemd/system/sysinit.target.wants/systemd-time-wait-sync.service"
+ln -s /usr/lib/systemd/system/NetworkManager.service \
+    "$staging/airootfs/etc/systemd/system/multi-user.target.wants/NetworkManager.service"
+mkarchiso -v -w "$work" -o "$output" "$staging"
+
+archiso_image=$(find "$output" -maxdepth 1 -type f -name 'spectrumos-*.iso' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)
+[[ -n $archiso_image ]] || { printf 'Could not find the generated SpectrumOS ISO.\n' >&2; exit 1; }
+archiso_volid=$(xorriso -indev "$archiso_image" -pvd_info 2>/dev/null | \
+    sed -n 's/^Volume Id[[:space:]]*:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]')
+[[ -n $archiso_volid ]] || { printf 'Could not read the SpectrumOS ISO volume id.\n' >&2; exit 1; }
+limine_root=$(mktemp -d "$output/.limine-root.XXXXXX")
+limine_image=$(mktemp "$output/.limine-image.XXXXXX.iso")
+xorriso -osirrox on -indev "$archiso_image" -extract / "$limine_root"
+install -d -m 0755 "$limine_root/boot/limine" "$limine_root/EFI/BOOT"
+install -m 0644 /usr/share/limine/limine-bios-cd.bin "$limine_root/boot/limine/"
+install -m 0644 /usr/share/limine/limine-uefi-cd.bin "$limine_root/boot/limine/"
+install -m 0644 /usr/share/limine/limine-bios.sys "$limine_root/boot/limine/"
+install -m 0644 /usr/share/limine/BOOTX64.EFI "$limine_root/EFI/BOOT/BOOTX64.EFI"
+install -m 0644 "$project_root/assets/wallpapers/default/S30.png" \
+    "$limine_root/spectrum-wallpaper.png"
+archiso_options=$(sed -n 's/^options[[:space:]]\+//p' \
+    "$limine_root/loader/entries/01-archiso-linux.conf" | head -n 1)
+# The repacked hybrid ISO gets a fresh volume creation timestamp, so the
+# original boot entry's archisosearchuuid (matched against that timestamp)
+# would never find the medium again. Search by volume label instead, which
+# survives the repack because we pin -V to the same label below.
+archiso_options=$(printf '%s\n' "$archiso_options" | \
+    sed -E "s/archisosearchuuid=[^ ]*/archisolabel=$archiso_volid/")
+# The archiso default entry never carries these; without them the branded
+# spectrumos Plymouth theme (now in HOOKS via airootfs/etc/mkinitcpio.conf.d/
+# archiso.conf) would build into the image but never actually be shown --
+# plymouthd only takes over the console when the kernel is quiet and told to
+# splash. Same append-if-missing rule as plymouth-boot-sync uses for the
+# installed system's own entries, so re-running this never doubles them up.
+for flag in quiet splash; do
+    [[ " $archiso_options " == *" $flag "* ]] || archiso_options="$archiso_options $flag"
+done
+accent=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["roles"]["accent"].lstrip("#"))' \
+    "$palette_json/current/palette.json")
+cat > "$limine_root/limine.conf" <<EOF
+timeout: 10
+interface_branding: SpectrumOS Installer
+interface_branding_colour: $accent
+wallpaper: boot():/spectrum-wallpaper.png
+wallpaper_style: stretched
+
+/Start SpectrumOS installer
+    protocol: linux
+    path: boot():/spectrum/boot/x86_64/vmlinuz-linux-zen
+    module_path: boot():/spectrum/boot/x86_64/initramfs-linux-zen.img
+    cmdline: $archiso_options
+EOF
+# -hfsplus -apm-block-size 2048 used to be here for Mac/APM boot support that
+# this project never actually ships (no HFS+ content, no -hfs-bless-by). It
+# made xorriso wrap the *entire* ISO9660 data area in a bogus MBR partition
+# (type 0xAF, starting well past sector 0, so its "start" didn't line up with
+# where the ISO9660 filesystem actually begins) alongside a matching stray
+# trailing partition. QEMU's `-cdrom`/`media=cdrom` boots this via the El
+# Torito catalog and never looks at the partition table, so it always booted
+# fine there -- but a real USB stick (or any raw-disk boot, confirmed with
+# `-drive format=raw` instead of `-cdrom`) is read through that same broken
+# partition table: archiso's `archisolabel=` search would land on that bogus
+# partition and fail with exactly "wrong fs type, bad option, bad superblock"
+# -- see tests/test_iso.py::test_repacked_hybrid_iso_has_no_bogus_partitions.
+xorriso -as mkisofs -R -r -J -V "$archiso_volid" \
+    -b boot/limine/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table \
+    --efi-boot boot/limine/limine-uefi-cd.bin \
+    -efi-boot-part --efi-boot-image --protective-msdos-label \
+    "$limine_root" -o "$limine_image"
+limine bios-install "$limine_image"
+mv -f "$limine_image" "$archiso_image"
+chmod 0644 "$archiso_image"
+checksum_name=$(basename -- "$archiso_image")
+(
+    cd -- "$output"
+    sha256sum "$checksum_name" > "$checksum_name.sha256"
+)
+rm -rf -- "$limine_root"
+printf 'Limine hybrid ISO: %s\n' "$archiso_image"

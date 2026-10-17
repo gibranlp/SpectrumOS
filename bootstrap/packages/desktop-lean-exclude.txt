@@ -1,0 +1,17 @@
+avahi
+cups
+cups-browsed
+cups-filters
+cups-pk-helper
+docker
+docker-compose
+ghostscript
+gutenprint
+gvfs-smb
+ipp-usb
+nss-mdns
+python-pysmbc
+samba
+system-config-printer
+transmission-cli
+tuned

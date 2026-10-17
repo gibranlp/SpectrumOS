@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+release_file=$project_root/system/release/release.toml
+output_dir=$project_root/repo/sources
+action=plan
+
+case ${1:-} in
+    '') ;;
+    --build) action=build ;;
+    -h|--help)
+        printf 'Usage: %s [--build]\n' "$0"
+        exit 0
+        ;;
+    *)
+        printf 'Unknown argument: %s\n' "$1" >&2
+        exit 2
+        ;;
+esac
+
+version=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' "$release_file")
+[[ -n $version ]] || { printf 'Could not read the SpectrumOS release version.\n' >&2; exit 1; }
+command -v git >/dev/null
+command -v sha256sum >/dev/null
+command -v tar >/dev/null
+command -v zstd >/dev/null
+
+printf 'Release: %s\n' "$version"
+printf 'Source root: spectrumos-source-%s/\n' "$version"
+printf 'Output directory: %s\n' "$output_dir"
+if [[ $action == plan ]]; then
+    printf 'Dry-run only; use --build to create and link the immutable archive.\n'
+    exit 0
+fi
+
+build_jobs=${SPECTRUM_BUILD_JOBS:-4}
+[[ $build_jobs =~ ^[1-9][0-9]*$ ]] && ((build_jobs <= 16)) || { printf 'SPECTRUM_BUILD_JOBS must be 1–16.\n' >&2; exit 2; }
+
+temporary=$(mktemp -d /tmp/spectrumos-source.XXXXXX)
+compressed_archive=
+trap 'rm -rf -- "$temporary"; [[ -z $compressed_archive ]] || rm -f -- "$compressed_archive"' EXIT
+manifest=$temporary/files.list
+canonical_tar=$temporary/source.tar
+
+while IFS= read -r -d '' path; do
+    case $path in
+        repo/sources/*|packages/*/PKGBUILD|packages/*/.SRCINFO|packages/*/*.tar.zst|packages/*/*.tar.gz|packages/*/pkg/*|packages/*/src/spectrumos-source-*/*|packages/*/questline-*-linux-*|packages/*/stash-*-linux-*) continue ;;
+    esac
+    [[ -f $project_root/$path || -L $project_root/$path ]] && printf '%s\0' "$path"
+done < <(git -C "$project_root" ls-files --cached --others --exclude-standard -z) \
+    | LC_ALL=C sort -z > "$manifest"
+
+[[ -s $manifest ]] || { printf 'The source manifest is empty.\n' >&2; exit 1; }
+tar --null --no-recursion --format=pax --pax-option=delete=atime,delete=ctime \
+    --mtime=@0 --owner=0 --group=0 --numeric-owner \
+    --transform="s|^|spectrumos-source-$version/|" \
+    -C "$project_root" --files-from="$manifest" \
+    -cf "$canonical_tar"
+
+content_sha256=$(sha256sum "$canonical_tar" | awk '{print $1}')
+revision=${content_sha256:0:16}
+archive_name=spectrumos-source-$version-$revision.tar.zst
+mkdir -p -- "$output_dir"
+compressed_archive=$(mktemp "$output_dir/.$archive_name.XXXXXX")
+zstd --quiet --threads="$build_jobs" -19 --force "$canonical_tar" -o "$compressed_archive"
+chmod 0644 "$compressed_archive"
+if ! ln -- "$compressed_archive" "$output_dir/$archive_name" 2>/dev/null; then
+    cmp -s -- "$compressed_archive" "$output_dir/$archive_name" || {
+        printf 'Refusing to overwrite a different immutable source archive: %s\n' "$archive_name" >&2
+        exit 1
+    }
+fi
+archive_sha256=$(sha256sum "$output_dir/$archive_name" | awk '{print $1}')
+
+for package in spectrum-base spectrum-desktop spectrum-hyprland spectrum-plymouth spectrum-sddm spectrum-theme spectrumdrop; do
+    ln -f -- "$output_dir/$archive_name" "$project_root/packages/$package/$archive_name"
+done
+
+printf 'Archive: %s\n' "$archive_name"
+printf 'Content revision: %s\n' "$revision"
+printf 'SHA-256: %s\n' "$archive_sha256"

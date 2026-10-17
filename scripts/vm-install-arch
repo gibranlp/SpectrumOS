@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+disk=/dev/vda
+mountpoint=/mnt
+hostname=spectrum-vm
+test_user=spectrum
+test_password=${SPECTRUM_VM_PASSWORD:-12345}
+
+[[ ${SPECTRUM_VM_INSTALL:-} == 1 ]] || {
+    printf 'Set SPECTRUM_VM_INSTALL=1 to install the disposable VM.\n' >&2
+    exit 1
+}
+[[ $(findmnt -no SOURCE /) == airootfs ]] || {
+    printf 'This installer must run from the Arch ISO environment.\n' >&2
+    exit 1
+}
+[[ -b $disk ]] || {
+    printf 'Expected disposable VM disk is missing: %s\n' "$disk" >&2
+    exit 1
+}
+disk_bytes=$(blockdev --getsize64 "$disk")
+((disk_bytes >= 20 * 1024 * 1024 * 1024 && disk_bytes <= 128 * 1024 * 1024 * 1024)) || {
+    printf 'Refusing unexpected VM disk size: %s bytes\n' "$disk_bytes" >&2
+    exit 1
+}
+if lsblk -nrpo MOUNTPOINT "$disk" | grep -qv '^$'; then
+    printf 'Refusing to repartition a mounted VM disk.\n' >&2
+    exit 1
+fi
+
+wipefs --all "$disk"
+sfdisk "$disk" <<'EOF'
+label: gpt
+size=1G, type=U
+type=L
+EOF
+partprobe "$disk"
+udevadm settle
+
+mkfs.fat -F 32 -n SPECTRM_EFI /dev/vda1
+mkfs.btrfs -f -L SPECTRUM_ROOT /dev/vda2
+mount /dev/vda2 "$mountpoint"
+for subvolume in @ @home @log @pkg; do
+    btrfs subvolume create "$mountpoint/$subvolume"
+done
+umount "$mountpoint"
+
+mount -o noatime,compress=zstd,subvol=@ /dev/vda2 "$mountpoint"
+mkdir -p "$mountpoint/home" "$mountpoint/var/log" "$mountpoint/var/cache/pacman/pkg" "$mountpoint/boot"
+mount -o noatime,compress=zstd,subvol=@home /dev/vda2 "$mountpoint/home"
+mount -o noatime,compress=zstd,subvol=@log /dev/vda2 "$mountpoint/var/log"
+mount -o noatime,compress=zstd,subvol=@pkg /dev/vda2 "$mountpoint/var/cache/pacman/pkg"
+mount /dev/vda1 "$mountpoint/boot"
+
+pacstrap -K "$mountpoint" \
+    base base-devel linux linux-firmware btrfs-progs git limine networkmanager openssh sudo
+genfstab -U "$mountpoint" > "$mountpoint/etc/fstab"
+
+root_uuid=$(blkid -s UUID -o value /dev/vda2)
+install -d -m 0755 "$mountpoint/boot/EFI/BOOT"
+install -m 0644 "$mountpoint/usr/share/limine/BOOTX64.EFI" "$mountpoint/boot/EFI/BOOT/BOOTX64.EFI"
+cat > "$mountpoint/boot/limine.conf" <<EOF
+timeout: 3
+
+/SpectrumOS2
+    protocol: linux
+    path: boot():/vmlinuz-linux
+    module_path: boot():/initramfs-linux.img
+    cmdline: root=UUID=$root_uuid rootflags=subvol=@ rw quiet splash
+EOF
+
+arch-chroot "$mountpoint" ln -sf /usr/share/zoneinfo/America/Cancun /etc/localtime
+arch-chroot "$mountpoint" hwclock --systohc
+sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' "$mountpoint/etc/locale.gen"
+arch-chroot "$mountpoint" locale-gen
+printf 'LANG=en_US.UTF-8\n' > "$mountpoint/etc/locale.conf"
+printf '%s\n' "$hostname" > "$mountpoint/etc/hostname"
+printf '127.0.0.1 localhost\n::1 localhost\n127.0.1.1 %s.localdomain %s\n' \
+    "$hostname" "$hostname" > "$mountpoint/etc/hosts"
+
+arch-chroot "$mountpoint" useradd -m -G wheel "$test_user"
+printf 'root:%s\n%s:%s\n' "$test_password" "$test_user" "$test_password" | arch-chroot "$mountpoint" chpasswd
+printf '%%wheel ALL=(ALL:ALL) ALL\n' > "$mountpoint/etc/sudoers.d/10-wheel"
+chmod 0440 "$mountpoint/etc/sudoers.d/10-wheel"
+arch-chroot "$mountpoint" systemctl enable NetworkManager.service sshd.service
+arch-chroot "$mountpoint" mkinitcpio -P
+
+printf 'Disposable Arch VM installation completed on %s.\n' "$disk"

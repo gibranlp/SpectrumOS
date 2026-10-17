@@ -1,0 +1,382 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import hashlib
+from html import escape
+import json
+import math
+import os
+from pathlib import Path
+from datetime import date, datetime
+import subprocess
+import sys
+import time
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "spectrumos"
+CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "spectrumos" / "weather"
+STATE_FILE = CONFIG_DIR / "weather.json"
+CACHE_FILE = CACHE_DIR / "forecast.json"
+WOFI = "/usr/lib/spectrumos/spectrum-shell-picker"
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
+IP_GEOLOCATION_URL = "https://ipapi.co/json/"
+CACHE_SECONDS = 900
+DEFAULT_LOCATION = {
+    "token": "cancun-mx",
+    "name": "Cancún",
+    "region": "Quintana Roo, Mexico",
+    "latitude": 21.1619,
+    "longitude": -86.8515,
+}
+
+
+def atomic_write(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def detect_location() -> dict[str, object] | None:
+    # Best-effort IP geolocation to seed the very first location on a fresh install,
+    # rather than always landing on a hardcoded city -- only ever attempted once, right
+    # when there's no state file yet to read; the result (or DEFAULT_LOCATION, if this
+    # fails) is persisted immediately by load_state so this never runs again afterward.
+    try:
+        request = Request(IP_GEOLOCATION_URL, headers={"User-Agent": "SpectrumOS-Weather/0.1"})
+        with urlopen(request, timeout=7) as response:
+            data = json.load(response)
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or data.get("error"):
+        return None
+    try:
+        latitude = float(data["latitude"])
+        longitude = float(data["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    name = str(data.get("city") or data.get("region") or "Current location")
+    region = ", ".join(part for part in (str(data.get("region", "")), str(data.get("country_name", ""))) if part)
+    token = hashlib.sha256(f"auto:{latitude}:{longitude}".encode()).hexdigest()[:16]
+    return {"token": token, "name": name, "region": region or "Detected from IP address", "latitude": latitude, "longitude": longitude}
+
+
+def load_state() -> dict[str, object]:
+    try:
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        initial = detect_location() or DEFAULT_LOCATION
+        state = {"active": initial["token"], "locations": [initial]}
+        atomic_write(STATE_FILE, state)
+    if not isinstance(state, dict):
+        state = {}
+    locations = state.get("locations", [])
+    if not isinstance(locations, list):
+        locations = []
+    valid = []
+    for location in locations:
+        if not isinstance(location, dict):
+            continue
+        if not all(key in location for key in ("token", "name", "region", "latitude", "longitude")):
+            continue
+        if not all(isinstance(location[key], str) for key in ("token", "name", "region")) or not location["token"]:
+            continue
+        try:
+            latitude, longitude = float(location["latitude"]), float(location["longitude"])
+        except (ValueError, TypeError):
+            continue
+        if not (math.isfinite(latitude) and math.isfinite(longitude) and -90 <= latitude <= 90 and -180 <= longitude <= 180):
+            continue
+        valid.append(location)
+    if not valid:
+        valid = [DEFAULT_LOCATION]
+    valid = valid[:8]
+    active = str(state.get("active", valid[0]["token"]))
+    if active not in {str(location["token"]) for location in valid}:
+        active = str(valid[0]["token"])
+    return {"active": active, "locations": valid[:8]}
+
+
+def request_json(url: str, parameters: dict[str, object]) -> object:
+    request = Request(f"{url}?{urlencode(parameters)}", headers={"User-Agent": "SpectrumOS-Weather/0.1"})
+    with urlopen(request, timeout=7) as response:
+        return json.load(response)
+
+
+def signature(state: dict[str, object]) -> str:
+    encoded = json.dumps(state["locations"], sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def description(code: int) -> tuple[str, str]:
+    if code == 0:
+        return "Clear", "󰖙"
+    if code in (1, 2):
+        return "Partly cloudy", "󰖕"
+    if code == 3:
+        return "Overcast", "󰖐"
+    if code in (45, 48):
+        return "Fog", "󰖑"
+    if code in (51, 53, 55, 56, 57):
+        return "Drizzle", "󰖗"
+    if code in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "Rain", "󰖖"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "Snow", "󰖘"
+    if code in (95, 96, 99):
+        return "Thunderstorm", "󰖓"
+    return "Variable", "󰖕"
+
+
+def unavailable(state: dict[str, object], message: str) -> dict[str, object]:
+    active = next(location for location in state["locations"] if location["token"] == state["active"])
+    return {
+        "available": False,
+        "stale": False,
+        "location": active["name"],
+        "region": active["region"],
+        "temperature": "—",
+        "condition": message,
+        "icon": "󰖪",
+        "apparent": "—",
+        "humidity": "—",
+        "wind": "—",
+        "updated": "Unavailable",
+        "locations": [{**location, "active": location["token"] == state["active"], "temperature": "—", "condition": "Unavailable", "icon": "󰖪"} for location in state["locations"]],
+        "days": [],
+        "provider": "Weather data by Open-Meteo",
+    }
+
+
+def normalize(state: dict[str, object], forecasts: object, generated: float, stale: bool = False) -> dict[str, object]:
+    rows = forecasts if isinstance(forecasts, list) else [forecasts]
+    locations = []
+    active_forecast = None
+    active_location = None
+    for location, forecast in zip(state["locations"], rows):
+        current = forecast.get("current", {}) if isinstance(forecast, dict) else {}
+        condition, icon = description(int(current.get("weather_code", -1)))
+        item = {
+            **location,
+            "active": location["token"] == state["active"],
+            "temperature": f'{round(float(current.get("temperature_2m", 0)))}°',
+            "condition": condition,
+            "icon": icon,
+        }
+        locations.append(item)
+        if item["active"]:
+            active_forecast = forecast
+            active_location = item
+    if active_forecast is None or active_location is None:
+        return unavailable(state, "Weather unavailable")
+    current = active_forecast.get("current", {})
+    daily = active_forecast.get("daily", {})
+    days = []
+    for day, code, high, low in zip(
+        daily.get("time", []),
+        daily.get("weather_code", []),
+        daily.get("temperature_2m_max", []),
+        daily.get("temperature_2m_min", []),
+    ):
+        condition, icon = description(int(code))
+        parsed = datetime.strptime(day, "%Y-%m-%d").date()
+        label = "Today" if parsed == date.today() else parsed.strftime("%a")
+        days.append({"date": label, "condition": condition, "icon": icon, "high": f"{round(float(high))}°", "low": f"{round(float(low))}°"})
+    condition, icon = description(int(current.get("weather_code", -1)))
+    return {
+        "available": True,
+        "stale": stale,
+        "location": active_location["name"],
+        "region": active_location["region"],
+        "temperature": active_location["temperature"],
+        "condition": condition,
+        "icon": icon,
+        "apparent": f'{round(float(current.get("apparent_temperature", 0)))}°',
+        "humidity": f'{round(float(current.get("relative_humidity_2m", 0)))}%',
+        "wind": f'{round(float(current.get("wind_speed_10m", 0)))} km/h',
+        "updated": time.strftime("%H:%M", time.localtime(generated)),
+        "locations": locations,
+        "days": days[:5],
+        "provider": "Weather data by Open-Meteo",
+    }
+
+
+def weather(refresh: bool = False) -> dict[str, object]:
+    state = load_state()
+    cached = None
+    try:
+        cached = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    now = time.time()
+    try:
+        generated = float(cached["generated"])
+        if cached.get("signature") != signature(state) or not math.isfinite(generated) or generated > now:
+            cached = None
+    except (KeyError, TypeError, ValueError, AttributeError):
+        cached = None
+    if not refresh and cached and now - generated < CACHE_SECONDS:
+        try:
+            return normalize(state, cached["forecasts"], generated)
+        except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
+            cached = None
+    coordinates = state["locations"]
+    parameters = {
+        "latitude": ",".join(str(location["latitude"]) for location in coordinates),
+        "longitude": ",".join(str(location["longitude"]) for location in coordinates),
+        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min",
+        "timezone": "auto",
+        "forecast_days": 5,
+    }
+    try:
+        forecasts = request_json(FORECAST_URL, parameters)
+        result = normalize(state, forecasts, now)
+        payload = {"signature": signature(state), "generated": now, "forecasts": forecasts}
+        atomic_write(CACHE_FILE, payload)
+        return result
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        if cached:
+            try:
+                return normalize(state, cached["forecasts"], generated, stale=True)
+            except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
+                pass
+        return unavailable(state, "Connect for weather")
+
+
+def lockscreen_weather() -> str:
+    # La pantalla bloqueada solo consulta el caché; no inicia solicitudes ni geolocalización.
+    try:
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        cached = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+        if cached.get("signature") != signature(state):
+            return ""
+        generated = float(cached["generated"])
+        age = time.time() - generated
+        if age < 0 or age > 86400:
+            return ""
+        result = normalize(state, cached["forecasts"], generated, stale=age >= CACHE_SECONDS)
+        if not result["available"]:
+            return ""
+        location = str(result["location"])
+        if len(location) > 24:
+            location = location[:23] + "…"
+        text = f'{result["icon"]}  {location}\n{result["temperature"]} · {result["condition"]}'
+        if result["stale"]:
+            text += f'\nUpdated {result["updated"]}'
+        return escape(text)
+    except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, StopIteration):
+        return ""
+
+
+def choose(prompt: str, options: list[str]) -> str:
+    result = subprocess.run(
+        (WOFI, "calculator", "--dmenu", "--prompt", prompt),
+        input="\n".join(options),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def launch_job(action: str, *arguments: str) -> bool:
+    unit = f"spectrum-weather-{action.removeprefix('_')}-{os.getpid()}"
+    result = subprocess.run(("systemd-run", "--user", "--collect", "--quiet", f"--unit={unit}", "--", __file__, action, *arguments), check=False)
+    return result.returncode == 0
+
+
+def select_location() -> None:
+    query = choose("Weather location · type a city or postal code", ["Cancún, Mexico", "Mexico City, Mexico", "Madrid, Spain", "London, United Kingdom", "New York, United States"])
+    if len(query) < 2:
+        return
+    try:
+        response = request_json(GEOCODING_URL, {"name": query, "count": 8, "language": "en", "format": "json"})
+        results = response.get("results", []) if isinstance(response, dict) else []
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        subprocess.run(("notify-send", "--app-name=SpectrumOS", "Weather search failed", "Check the internet connection and try again."), check=False)
+        return
+    choices = []
+    by_label = {}
+    for index, result in enumerate(results):
+        parts = [str(result.get("name", "")), str(result.get("admin1", "")), str(result.get("country", ""))]
+        label = f'{index + 1}. ' + ", ".join(part for part in parts if part)
+        choices.append(label)
+        by_label[label] = result
+    selected = choose("Choose weather location", choices)
+    if selected not in by_label:
+        return
+    result = by_label[selected]
+    token = hashlib.sha256(f'{result.get("id", "")}:{result.get("latitude")}:{result.get("longitude")}'.encode()).hexdigest()[:16]
+    state = load_state()
+    location = {
+        "token": token,
+        "name": str(result.get("name", "Location")),
+        "region": ", ".join(part for part in (str(result.get("admin1", "")), str(result.get("country", ""))) if part),
+        "latitude": float(result["latitude"]),
+        "longitude": float(result["longitude"]),
+    }
+    locations = [item for item in state["locations"] if item["token"] != token]
+    locations.append(location)
+    atomic_write(STATE_FILE, {"active": token, "locations": locations[-8:]})
+
+
+def use_location(token: str) -> None:
+    state = load_state()
+    if token not in {str(location["token"]) for location in state["locations"]}:
+        raise SystemExit("Unknown weather location")
+    state["active"] = token
+    atomic_write(STATE_FILE, state)
+
+
+def remove_location(token: str) -> None:
+    state = load_state()
+    if token not in {str(location["token"]) for location in state["locations"]}:
+        raise SystemExit("Unknown weather location")
+    if len(state["locations"]) == 1:
+        subprocess.run(("notify-send", "--app-name=SpectrumOS", "Keep one weather location", "Add another location before removing this one."), check=False)
+        return
+    locations = [location for location in state["locations"] if location["token"] != token]
+    active = state["active"] if state["active"] != token else locations[0]["token"]
+    atomic_write(STATE_FILE, {"active": active, "locations": locations})
+
+
+def main() -> None:
+    arguments = sys.argv[1:]
+    if not arguments or arguments == ["--json"]:
+        print(json.dumps(weather(), ensure_ascii=False, separators=(",", ":")))
+    elif arguments == ["--lockscreen"]:
+        print(lockscreen_weather())
+    elif arguments == ["--refresh"]:
+        launch_job("_refresh")
+    elif arguments == ["_refresh"]:
+        weather(refresh=True)
+    elif arguments == ["select"]:
+        launch_job("_select")
+    elif arguments == ["select-native"]:
+        launch_job("_select-native")
+    elif arguments == ["_select-native"]:
+        select_location()
+    elif arguments == ["_select"]:
+        time.sleep(0.35)
+        select_location()
+    elif len(arguments) == 2 and arguments[0] == "use":
+        launch_job("_use", arguments[1])
+    elif len(arguments) == 2 and arguments[0] == "_use":
+        use_location(arguments[1])
+    elif len(arguments) == 2 and arguments[0] == "remove":
+        launch_job("_remove", arguments[1])
+    elif len(arguments) == 2 and arguments[0] == "_remove":
+        remove_location(arguments[1])
+    elif arguments == ["provider"]:
+        subprocess.Popen(("xdg-open", "https://open-meteo.com/"), start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        raise SystemExit("Usage: weather-adapter [--json|--lockscreen|--refresh|select|select-native|use TOKEN|remove TOKEN|provider]")
+
+
+if __name__ == "__main__":
+    main()

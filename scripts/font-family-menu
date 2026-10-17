@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Slugs and their display labels are read from the shared registry (also read by
+# system-adapter) rather than hand-duplicated here -- see that file's own comment. Keys
+# must still match FONT_FAMILIES in packages/spectrum-theme/src/spectrum_theme/cli.py
+# exactly -- that dict is the single source of truth for which slug renders to which
+# actual (verified-installed) font family; this script only needs the slugs and labels.
+order=()
+declare -A labels=()
+registry=${SPECTRUM_FONT_FAMILIES_FILE:-/usr/share/spectrumos/font-families.conf}
+while IFS='=' read -r key label; do
+    [[ -n $key && $key != \#* ]] || continue
+    order+=("$key")
+    labels[$key]=$label
+done < "$registry"
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/typography
+state_file=$state_dir/font-family
+family=jetbrains-mono
+[[ -f $state_file ]] && IFS= read -r family < "$state_file"
+[[ -n ${labels[$family]+set} ]] || family=jetbrains-mono
+
+if [[ ${1:-} == --status ]]; then
+    python - "${labels[$family]}" <<'PY'
+import json
+import sys
+label = sys.argv[1]
+print(json.dumps({"text": "Aa", "tooltip": f"Monospace font: {label}\nClick to change"}))
+PY
+    exit 0
+fi
+
+if [[ ${1:-} == --list ]]; then
+    for key in "${order[@]}"; do
+        marker=" "
+        [[ $key == "$family" ]] && marker="*"
+        printf '%s\t%s\t%s\n' "$marker" "$key" "${labels[$key]}"
+    done
+    exit 0
+fi
+
+if [[ ${1:-} == --set ]]; then
+    selected=${2:-}
+else
+    selected_label=$(
+        for key in "${order[@]}"; do printf '%s\n' "${labels[$key]}"; done \
+            | /usr/lib/spectrumos/spectrum-shell-picker typography --dmenu --prompt 'Monospace font'
+    )
+    selected=""
+    for key in "${order[@]}"; do
+        [[ ${labels[$key]} == "$selected_label" ]] && selected=$key
+    done
+fi
+[[ -n ${labels[$selected]+set} ]] || exit 0
+[[ $selected != "$family" ]] || exit 0
+
+mkdir -p -- "$state_dir"
+temporary=$(mktemp "$state_dir/.font-family.XXXXXX")
+printf '%s\n' "$selected" > "$temporary"
+mv -f -- "$temporary" "$state_file"
+
+# Picking several families in quick succession (no wofi prompt in the way, since the Eww
+# grid calls --set directly) used to spawn one of these per click with nothing serializing
+# them: concurrent runs raced on the same hyprctl/waybar/eww steps below, and under `set -e`
+# one of them failing mid-pipeline could abort before ever reaching dunstctl reload --
+# landing a dunstrc that already says the newest family while the running dunst (and
+# everything else) was left stuck on whatever an earlier, still-finishing click had last
+# reloaded. The lock serializes full runs one at a time; the check right after it skips the
+# heavy steps entirely for a run whose family has already been superseded by a newer click,
+# since that newer click's own run (next in line for the lock) is the one that will
+# actually apply and reload -- redoing the same work for a stale family only adds flicker
+# and re-invites the race.
+lock_dir=${XDG_RUNTIME_DIR:-/tmp}/spectrumos
+install -d -m 0700 -- "$lock_dir"
+exec 9>"$lock_dir/font-family-menu.lock"
+flock 9
+current=jetbrains-mono
+[[ -f $state_file ]] && IFS= read -r current < "$state_file"
+[[ $current == "$selected" ]] || exit 0
+
+PYTHONPATH=/usr/share/spectrumos/theme-engine python -m spectrum_theme.cli rerender-current
+hyprctl reload config-only
+pkill -USR1 -x kitty 2>/dev/null || true
+# A bare `pkill -USR2` only asks a running waybar to reload in place; it doesn't guarantee
+# the process actually picks up the freshly-rendered CSS (confirmed live: a font-family
+# change left the running bar showing the previous font for good, unreloaded, with no
+# error). A full restart through the same path layout/style/theme changes already use
+# reliably reads the current file from a clean process instead of trusting an in-place
+# reload.
+if ! /usr/lib/spectrumos/waybar-menu --restart; then
+    notify-send --app-name="SpectrumOS" --urgency=normal \
+        "Waybar restart failed" "It may still show the previous theme until restarted manually"
+fi
+/usr/lib/spectrumos/appearance-sync --apply
+notify-send --app-name="SpectrumOS" --expire-time=2500 "Typography updated" "Monospace font · ${labels[$selected]}"

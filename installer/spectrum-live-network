@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec qs --path /usr/share/spectrumos/installer/shell ipc call spectrum-live toggleNetwork

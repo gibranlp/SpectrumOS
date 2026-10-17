@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import subprocess
+import tempfile
+
+
+RETIRED_APPS = ("eww", "wofi", "waybar", "dunst")
+RETIRED_UNITS = ("spectrum-eww.service", "spectrum-waybar.service", "dunst.service", "org.knopwob.dunst.service")
+
+
+def remove(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def mask(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    for unit in RETIRED_UNITS:
+        remove(directory / unit)
+        (directory / unit).symlink_to("/dev/null")
+
+
+def run(command: list[str]) -> None:
+    subprocess.run(command, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def migrate_kitty_defaults(home: Path) -> bool:
+    path = home / ".config/kitty/spectrum.conf"
+    if path.is_symlink() or not path.is_file():
+        return False
+    contents = path.read_text()
+    if "include /usr/share/spectrumos/terminal/kitty-spectrum.conf" in contents:
+        return False
+    if "include ~/.cache/spectrumos/theme/current/kitty.conf" not in contents:
+        return False
+    # Las instalaciones anteriores copiaban este archivo y no recibían los ajustes del paquete.
+    pattern = r"(?m)^[ \t]*remember_window_size[ \t]+[^\n]*$"
+    updated = re.sub(pattern, "remember_window_size no", contents)
+    if not re.search(pattern, contents):
+        updated = contents.rstrip("\n") + "\n\nremember_window_size no\n"
+    if updated == contents:
+        return False
+    metadata = path.stat()
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as temporary:
+        staged = Path(temporary.name)
+        try:
+            temporary.write(updated)
+            temporary.flush()
+            os.chmod(staged, metadata.st_mode & 0o777)
+            os.chown(staged, metadata.st_uid, metadata.st_gid)
+            os.replace(staged, path)
+        finally:
+            staged.unlink(missing_ok=True)
+    return True
+
+
+def cleanup(root: Path) -> None:
+    mask(root / "etc/systemd/user")
+    for app in RETIRED_APPS:
+        remove(root / "usr/share/spectrumos" / app)
+    for unit in RETIRED_UNITS[:2]:
+        remove(root / "usr/lib/systemd/user" / unit)
+    remove(root / "usr/lib/systemd/user/dunst.service.d/spectrumos-config.conf")
+    helpers = root / "usr/lib/spectrumos"
+    for path in (*helpers.glob("eww-*"), helpers / "wofi", helpers / "waybar", helpers / "dunst-reload"):
+        remove(path)
+
+    if root != Path("/"):
+        return
+    for user in pwd.getpwall():
+        if not 1000 <= user.pw_uid < 65534:
+            continue
+        home = Path(user.pw_dir)
+        if not home.is_dir():
+            continue
+        subprocess.run(["runuser", "-u", user.pw_name, "--", "/usr/lib/spectrumos/spectrum-terminal-config", "--home", str(home)], check=False)
+        runtime = Path(f"/run/user/{user.pw_uid}")
+        command = ["runuser", "-u", user.pw_name, "--", "env",
+                   f"XDG_RUNTIME_DIR={runtime}", f"DBUS_SESSION_BUS_ADDRESS=unix:path={runtime}/bus"]
+        live = (runtime / "bus").exists()
+        if live:
+            run([*command, "systemctl", "--user", "disable", "--now", *RETIRED_UNITS])
+            for app in RETIRED_APPS:
+                run(["pkill", "-u", str(user.pw_uid), "-x", app])
+        for app in RETIRED_APPS:
+            remove(home / ".config" / app)
+            remove(home / ".cache" / app)
+            remove(home / ".config/autostart" / f"{app}.desktop")
+        for unit in RETIRED_UNITS:
+            remove(home / ".config/systemd/user" / f"{unit}.d")
+        user_units = home / ".config/systemd/user"
+        mask(user_units)
+        for directory in (home / ".config", home / ".config/systemd", user_units):
+            os.chown(directory, user.pw_uid, user.pw_gid)
+        for unit in RETIRED_UNITS:
+            os.lchown(user_units / unit, user.pw_uid, user.pw_gid)
+        if live:
+            run([*command, "systemctl", "--user", "daemon-reload"])
+            run([*command, "systemctl", "--user", "try-restart", "spectrum-shell.service"])
+    print("Retired desktop widgets removed; SpectrumShell remains the desktop frontend.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Remove retired SpectrumOS widget assets and mask their services")
+    parser.add_argument("--root", type=Path, default=Path("/"))
+    cleanup(parser.parse_args().root.resolve())

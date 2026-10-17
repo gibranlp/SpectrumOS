@@ -1,0 +1,19 @@
+# Pathnames of valid login shells.
+# See shells(5) for details.
+
+/bin/sh
+/bin/bash
+/bin/rbash
+/usr/bin/sh
+/usr/bin/bash
+/usr/bin/rbash
+/usr/bin/systemd-home-fallback-shell
+/usr/bin/git-shell
+/bin/zsh
+/usr/bin/zsh
+# The "spectrum" live account's shell: pam_shells.so (required by
+# /etc/pam.d/system-login, which login's own PAM stack includes) refuses to
+# authenticate an account whose shell isn't listed here at all -- without this
+# line, the autologin on tty1 would fail authentication outright rather than
+# ever reaching Hyprland.
+/usr/local/bin/spectrum-live-session

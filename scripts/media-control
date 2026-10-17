@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+    toggle|next|previous|stop) ;;
+    *) exit 2 ;;
+esac
+[[ $# == 1 ]] || exit 2
+
+if command -v qs >/dev/null 2>&1; then
+    if response=$(qs --path /usr/share/spectrumos/spectrum-shell ipc call spectrum-shell mediaKey "$1" 2>&1) && [[ -z $response ]]; then
+        exit 0
+    fi
+fi
+exec "${BASH_SOURCE[0]%/*}/media-adapter" "$1"

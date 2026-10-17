@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+import json
+import html
+import hashlib
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import subprocess
+import sys
+import uuid
+from datetime import date
+
+
+def storage_path():
+    override = os.environ.get("QUESTLINE_STORAGE_DIR")
+    if override:
+        return Path(override) / "questline.db"
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "questline" / "questline.db"
+
+
+def rows(connection, query):
+    return [dict(row) for row in connection.execute(query)]
+
+
+def sidequests(connection):
+    tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "rituals" not in tables:
+        return []
+    items = rows(connection, "SELECT id, name AS title, description, frequency, reward_xp, daily_target FROM rituals ORDER BY name COLLATE NOCASE")
+    counts = {}
+    if "ritual_history" in tables:
+        counts = dict(connection.execute("SELECT ritual_id, completion_count FROM ritual_history WHERE completed_date = ?", (date.today().isoformat(),)))
+    for item in items:
+        item["completion_count"] = counts.get(item["id"], 0)
+    return items
+
+
+def hero_profile(connection):
+    tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "users" not in tables:
+        return None
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(users)")}
+    specialization = "specialization" if "specialization" in columns else "NULL AS specialization"
+    user = connection.execute(f"SELECT username, class, level, xp, created_at, {specialization} FROM users LIMIT 1").fetchone()
+    if not user:
+        return None
+    hero = dict(user)
+    if "streaks" in tables:
+        streak = connection.execute("SELECT current_streak, best_streak FROM streaks LIMIT 1").fetchone()
+        if streak:
+            hero.update(dict(streak))
+    if "tasks" in tables:
+        hero["tasks_completed"] = connection.execute("SELECT COUNT(*) FROM tasks WHERE completed = 1 AND parent_task_id IS NULL").fetchone()[0]
+    if "notes" in tables:
+        hero["scrolls_written"] = connection.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
+    return hero
+
+
+def enrich_hero(binary, hero):
+    try:
+        process = subprocess.run([binary, "shell-hero", json.dumps({"class": hero["class"], "level": hero["level"]})],
+                                 capture_output=True, text=True, timeout=2)
+        if process.returncode == 0:
+            metadata = json.loads(process.stdout)
+            if isinstance(metadata, dict):
+                hero.update(metadata)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return
+
+
+def account_balances(connection):
+    if not connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'treasury_accounts'").fetchone():
+        return []
+    accounts = rows(connection, """
+        SELECT a.id, a.campaign_id, a.name, a.kind, p.name AS campaign,
+               COALESCE(t.currency_code, 'USD') AS currency_code
+        FROM treasury_accounts a
+        JOIN projects p ON p.id = a.campaign_id
+        LEFT JOIN campaign_treasury t ON t.campaign_id = a.campaign_id
+        WHERE p.archived = 0 AND p.completed = 0
+        ORDER BY p.name COLLATE NOCASE, a.is_default DESC,
+                 CASE a.kind WHEN 'Spending' THEN 0 WHEN 'Savings' THEN 1 WHEN 'Cash' THEN 2 ELSE 3 END,
+                 a.name COLLATE NOCASE
+    """)
+    by_id = {account["id"]: account for account in accounts}
+    fallback = {}
+    for account in accounts:
+        account["balance_minor"] = 0
+        campaign_id = account["campaign_id"]
+        # Questline usa este UUID estable para los movimientos sin cuenta asignada.
+        digest = hashlib.sha256(b"treasury-account:" + uuid.UUID(campaign_id).bytes + b"Spending").digest()
+        fallback[campaign_id] = str(uuid.UUID(bytes=digest[:16], version=5))
+    for entry in rows(connection, """
+        SELECT campaign_id, account_id, transfer_account_id, entry_type, status, amount_minor
+        FROM ledger_entries WHERE status IN ('Approved', 'Paid')
+    """):
+        source = entry["account_id"] or fallback.get(entry["campaign_id"])
+        delta = 0
+        if entry["entry_type"] == "Income":
+            delta = entry["amount_minor"]
+        elif entry["status"] == "Paid" and entry["entry_type"] in ("Expense", "Transfer"):
+            delta = -entry["amount_minor"]
+        if source in by_id:
+            by_id[source]["balance_minor"] += delta
+        if entry["entry_type"] == "Transfer" and entry["status"] == "Paid" and entry["transfer_account_id"] in by_id:
+            by_id[entry["transfer_account_id"]]["balance_minor"] += entry["amount_minor"]
+    return accounts
+
+
+def snapshot(connection):
+    campaigns = rows(connection, """
+        SELECT id, name, is_shared FROM projects WHERE archived = 0 AND completed = 0
+        ORDER BY name COLLATE NOCASE
+    """)
+    scrolls = rows(connection, """
+        SELECT notes.id, notes.project_id, notes.title, notes.markdown_content,
+               COALESCE(projects.name, 'Unfiled') AS campaign
+        FROM notes LEFT JOIN projects ON projects.id = notes.project_id
+        ORDER BY notes.updated_at DESC
+    """)
+    tasks = rows(connection, """
+        SELECT tasks.id, tasks.project_id, tasks.title, tasks.description, tasks.priority,
+               substr(tasks.due_date, 1, 10) AS due_date,
+               COALESCE(projects.name, 'Unfiled') AS campaign
+        FROM tasks LEFT JOIN projects ON projects.id = tasks.project_id
+        WHERE tasks.completed = 0 AND tasks.parent_task_id IS NULL
+        ORDER BY tasks.due_date IS NULL, tasks.due_date, tasks.created_at DESC
+    """)
+    steps = rows(connection, """
+        SELECT id, parent_task_id, project_id, title, description, priority, completed,
+               substr(due_date, 1, 10) AS due_date
+        FROM tasks WHERE parent_task_id IS NOT NULL
+        ORDER BY completed, created_at
+    """)
+    finances = rows(connection, """
+        SELECT currency_code, entry_type, status, SUM(amount_minor) AS amount_minor
+        FROM ledger_entries WHERE status != 'Cancelled'
+        GROUP BY currency_code, entry_type, status
+        ORDER BY currency_code, entry_type, status
+    """)
+    entries = rows(connection, """
+        SELECT ledger_entries.id, ledger_entries.campaign_id, ledger_entries.title,
+               ledger_entries.entry_type, ledger_entries.status,
+               ledger_entries.amount_minor, ledger_entries.currency_code,
+               COALESCE(projects.name, 'Unfiled') AS campaign
+        FROM ledger_entries LEFT JOIN projects ON projects.id = ledger_entries.campaign_id
+        ORDER BY ledger_entries.created_at DESC
+    """)
+    tree_row = connection.execute("""
+        SELECT stage, growth, health, water_today, last_watered, total_waterings
+        FROM zen_tree LIMIT 1
+    """).fetchone()
+    tree = dict(tree_row) if tree_row else None
+    return {
+        "available": True,
+        "campaigns": campaigns,
+        "scrolls": scrolls,
+        "tasks": tasks,
+        "steps": steps,
+        "finances": finances,
+        "accounts": account_balances(connection),
+        "entries": entries,
+        "tree": tree,
+        "hero": hero_profile(connection),
+        "sidequests": sidequests(connection),
+    }
+
+
+def render_tree(binary, tree):
+    request = {
+        "rows": 25,
+        "cols": 60,
+        "seed": max(0, int(tree["growth"])),
+        "stage": int(tree["stage"]),
+        "health": int(tree["health"]),
+    }
+    try:
+        process = subprocess.run([binary, "shell-tree", json.dumps(request)], capture_output=True, text=True, timeout=3)
+        if process.returncode:
+            return
+        rows = json.loads(process.stdout)["rows"]
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError):
+        return
+    while rows and not any(span["text"].strip() for span in rows[0]):
+        rows.pop(0)
+    while rows and not any(span["text"].strip() for span in rows[-1]):
+        rows.pop()
+    lines = []
+    for row in rows:
+        parts = []
+        for span in row:
+            content = html.escape(span["text"])
+            color = span["color"]
+            parts.append(f'<span style="color:{color}">{content}</span>' if color else content)
+        lines.append("".join(parts))
+    tree["bonsai_html"] = '<pre style="margin:0">' + "\n".join(lines) + "</pre>"
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] != "--json":
+        print("Usage: questline-adapter --json", file=sys.stderr)
+        return 2
+    database_path = storage_path()
+    local_binary = Path.home() / ".local/bin/questline"
+    binary = str(local_binary) if local_binary.is_file() and os.access(local_binary, os.X_OK) else shutil.which("questline")
+    result = {"available": False, "installed": bool(binary), "needs_onboarding": False}
+    if binary:
+        try:
+            help_result = subprocess.run([binary, "--help"], capture_output=True, text=True, timeout=2)
+            result["actions_available"] = help_result.returncode == 0 and "shell-action" in help_result.stdout
+            result["tree_available"] = help_result.returncode == 0 and "shell-tree" in help_result.stdout
+            result["hero_available"] = help_result.returncode == 0 and "shell-hero" in help_result.stdout
+            result["sidequests_available"] = help_result.returncode == 0 and "including sidequests" in help_result.stdout
+        except (OSError, subprocess.TimeoutExpired):
+            result["actions_available"] = False
+    if database_path.is_file():
+        try:
+            connection = sqlite3.connect(database_path.as_uri() + "?mode=ro", uri=True, timeout=2)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA query_only = ON")
+            with connection:
+                if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+                    result.update(snapshot(connection))
+                else:
+                    result["needs_onboarding"] = result["installed"]
+            connection.close()
+            if result.get("tree") and result.get("tree_available"):
+                render_tree(binary, result["tree"])
+            if result.get("hero") and result.get("hero_available"):
+                enrich_hero(binary, result["hero"])
+        except sqlite3.Error as error:
+            result["error"] = str(error)
+    elif result["installed"]:
+        result["needs_onboarding"] = True
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

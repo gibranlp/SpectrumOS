@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+from PIL import Image, ImageDraw, ImageFont
+
+DEFAULTS = {"enabled": True, "timeout": 180, "effect": "matrix", "branding": "alternate"}
+EFFECTS = ("matrix", "rain", "constellation", "cycle")
+BRANDING = ("wordmark", "logo", "alternate")
+LOGO = Path('/var/lib/spectrumos/appearance/logo.png')
+
+
+def config_path():
+    return Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config') / 'spectrumos/screensaver.json'
+
+
+def read_settings():
+    path = config_path()
+    data = json.loads(path.read_text()) if path.exists() else {}
+    if not isinstance(data, dict):
+        raise ValueError('Invalid screensaver settings')
+    settings = DEFAULTS.copy()
+    if isinstance(data.get('enabled'), bool):
+        settings['enabled'] = data['enabled']
+    timeout = data.get('timeout')
+    if isinstance(timeout, int) and not isinstance(timeout, bool) and 30 <= timeout <= 540:
+        settings['timeout'] = timeout
+    for key, choices in [('effect', EFFECTS), ('branding', BRANDING)]:
+        if data.get(key) in choices:
+            settings[key] = data[key]
+    return data, settings
+
+
+def save(key, value):
+    if key == 'enabled' and value in ('on', 'off'):
+        value = value == 'on'
+    elif key == 'timeout' and value.isdecimal() and 30 <= int(value) <= 540:
+        value = int(value)
+    elif not ((key == 'effect' and value in EFFECTS) or (key == 'branding' and value in BRANDING)):
+        raise ValueError('Choose a valid screensaver setting; delay must be 30–540 seconds')
+    path = config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with (path.parent / 'screensaver.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data, settings = read_settings()
+        data[key] = value
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as temporary:
+                staged = Path(temporary.name)
+                json.dump(data, temporary, indent=2)
+                temporary.write('\n')
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            staged.replace(path)
+        finally:
+            if staged:
+                staged.unlink(missing_ok=True)
+        settings[key] = value
+        return settings
+
+
+def session_state():
+    result = subprocess.run(['loginctl', 'show-session', os.environ.get('XDG_SESSION_ID') or 'auto',
+                             '-p', 'LockedHint', '-p', 'Active', '-p', 'Type'],
+                            capture_output=True, text=True, timeout=3)
+    fields = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+    locker = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'hyprlock'],
+                            capture_output=True, timeout=3)
+    inhibitors = subprocess.run(['systemd-inhibit', '--list', '--json=short'],
+                                capture_output=True, text=True, timeout=3)
+    if result.returncode or inhibitors.returncode or locker.returncode not in (0, 1):
+        return {'allowed': False, 'error': 'Could not check the session idle state'}
+    entries = json.loads(inhibitors.stdout)
+    if not isinstance(entries, list):
+        raise ValueError('Invalid idle inhibitor state')
+    inhibited = any('idle' in str(entry.get('what', '')).split(':') and entry.get('mode') == 'block'
+                    for entry in entries)
+    locked = fields.get('LockedHint') != 'no' or locker.returncode == 0
+    return {'allowed': fields.get('Active') == 'yes' and fields.get('Type') == 'wayland'
+            and not locked and not inhibited, 'locked': locked, 'inhibited': inhibited}
+
+
+def points(image):
+    image = image.convert('RGBA')
+    alpha = image.getchannel('A')
+    found = [(x / (image.width - 1), y / (image.height - 1))
+             for y in range(1, image.height, 2) for x in range(1, image.width, 2)
+             if alpha.getpixel((x, y)) > 96]
+    stride = max(1, (len(found) + 699) // 700)
+    return {'points': found[::stride], 'aspect': image.width / image.height}
+
+
+def masks():
+    font_path = subprocess.run(['fc-match', '-f', '%{file}', 'sans-serif:style=Bold'],
+                               capture_output=True, text=True, timeout=3).stdout
+    font = ImageFont.truetype(font_path, 40) if Path(font_path).is_file() else ImageFont.load_default(size=40)
+    box = font.getbbox('SpectrumOS')
+    word = Image.new('RGBA', (box[2] - box[0] + 8, box[3] - box[1] + 8))
+    ImageDraw.Draw(word).text((4 - box[0], 4 - box[1]), 'SpectrumOS', font=font, fill='white')
+    word = word.resize((180, max(12, round(180 * word.height / word.width))))
+    logo = {'points': [], 'aspect': 1}
+    if LOGO.is_file():
+        with Image.open(LOGO) as image:
+            image = image.convert('RGBA')
+            box = image.getchannel('A').getbbox()
+            if box:
+                image = image.crop(box)
+                image.thumbnail((84, 76))
+                logo = points(image)
+    return {'wordmark': points(word), 'logo': logo}
+
+
+def main(args):
+    try:
+        if args == ['--json']:
+            response = read_settings()[1]
+        elif len(args) == 3 and args[0] == 'set':
+            response = save(args[1], args[2])
+        elif args == ['session']:
+            response = session_state()
+        elif args == ['masks']:
+            response = masks()
+        else:
+            raise ValueError('Usage: screensaver-adapter --json|set KEY VALUE|session|masks')
+        print(json.dumps(response, separators=(',', ':')))
+        return 0
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print(json.dumps({'error': str(error)}))
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main(sys.argv[1:]))

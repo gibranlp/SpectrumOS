@@ -1,0 +1,15 @@
+schema_version = 1
+id = "spectrumos"
+name = "SpectrumOS"
+version = "1.0.0"
+channel = "stable"
+stage = "release"
+arch_base = "rolling"
+support_status = "community"
+
+[compatibility]
+release_api = 1
+migration_api = 1
+theme_schema = 1
+snapshot_schema = 1
+

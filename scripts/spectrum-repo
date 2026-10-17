@@ -1,0 +1,574 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = ROOT / "repo" / "config.toml"
+PACKAGE_NAMES = (
+    "ukvm",
+    "spectrum-xdg-desktop-portal-hyprland",
+    "spectrumdrop",
+    "spectrum-theme",
+    "spectrum-hyprland",
+    "spectrum-base",
+    "spectrum-desktop",
+    "spectrum-plymouth",
+    "spectrum-sddm",
+)
+
+
+class RepoError(RuntimeError):
+    pass
+
+
+def run(command: list[str], *, env: dict[str, str] | None = None, cwd: Path | None = None) -> str:
+    result = subprocess.run(command, cwd=cwd, env=env, check=False, text=True, capture_output=True)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RepoError(f"Command failed ({' '.join(command)}): {detail}")
+    return result.stdout.strip()
+
+
+def load_config() -> dict:
+    with CONFIG_PATH.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def rooted(value: str) -> Path:
+    path = (ROOT / value).resolve()
+    if not path.is_relative_to(ROOT):
+        raise RepoError(f"Configured path leaves the project: {value}")
+    return path
+
+
+def require_commands(*names: str) -> None:
+    missing = [name for name in names if shutil.which(name) is None]
+    if missing:
+        raise RepoError(f"Missing required commands: {', '.join(missing)}")
+
+
+def fingerprint(config: dict) -> str:
+    path = rooted(config["signing"]["fingerprint_file"])
+    if not path.is_file():
+        raise RepoError("No repository signing fingerprint exists; run 'spectrum-repo key init-development'")
+    value = path.read_text(encoding="utf-8").strip().upper()
+    if len(value) != 40 or any(character not in "0123456789ABCDEF" for character in value):
+        raise RepoError(f"Invalid signing fingerprint in {path}")
+    return value
+
+
+def signing_fingerprint(config: dict) -> str:
+    configured = config["signing"].get("signing_fingerprint_file", config["signing"]["fingerprint_file"])
+    path = rooted(configured)
+    if not path.is_file():
+        raise RepoError(f"No repository signing fingerprint exists: {path}")
+    value = path.read_text(encoding="utf-8").strip().upper()
+    if len(value) != 40 or any(character not in "0123456789ABCDEF" for character in value):
+        raise RepoError(f"Invalid signing fingerprint in {path}")
+    return value
+
+
+def gpg_environment(config: dict) -> dict[str, str]:
+    environment = os.environ.copy()
+    configured_home = os.environ.get("SPECTRUM_REPO_GNUPGHOME")
+    if config["signing"].get("mode") == "production":
+        if not configured_home:
+            raise RepoError("Production signing requires SPECTRUM_REPO_GNUPGHOME")
+        signing_home = Path(configured_home).expanduser().resolve()
+        if signing_home.is_relative_to(ROOT):
+            raise RepoError("Production signing home must remain outside the repository checkout")
+        if not signing_home.is_dir():
+            raise RepoError(f"Production signing home does not exist: {signing_home}")
+        environment["GNUPGHOME"] = str(signing_home)
+    else:
+        environment["GNUPGHOME"] = configured_home or str(rooted(config["signing"]["development_home"]))
+    return environment
+
+
+def initialize_development_key(config: dict, force: bool) -> None:
+    if config["signing"].get("mode") != "development":
+        raise RepoError("Development-key initialization is disabled in production signing mode")
+    require_commands("gpg")
+    home = rooted(config["signing"]["development_home"])
+    public_key = rooted(config["signing"]["public_key"])
+    fingerprint_path = rooted(config["signing"]["fingerprint_file"])
+    if (home.exists() or fingerprint_path.exists()) and not force:
+        raise RepoError("Development signing state already exists; use --force only to rotate the development key")
+    if force:
+        if home.exists():
+            shutil.rmtree(home)
+        public_key.unlink(missing_ok=True)
+        fingerprint_path.unlink(missing_ok=True)
+    home.mkdir(parents=True, mode=0o700)
+    os.chmod(home, 0o700)
+    public_key.parent.mkdir(parents=True, exist_ok=True)
+    environment = gpg_environment(config)
+    identity = "SpectrumOS Development Repository <repository-dev@gibranlp.dev>"
+    run(
+        [
+            "gpg", "--batch", "--passphrase", "", "--quick-generate-key",
+            identity, "ed25519", "sign", "1y",
+        ],
+        env=environment,
+    )
+    listing = run(["gpg", "--batch", "--with-colons", "--list-secret-keys", identity], env=environment)
+    generated = next(
+        (line.split(":")[9].upper() for line in listing.splitlines() if line.startswith("fpr:")),
+        None,
+    )
+    if generated is None:
+        raise RepoError("GnuPG created a key but did not report its fingerprint")
+    exported = run(["gpg", "--batch", "--armor", "--export", generated], env=environment)
+    public_key.write_text(exported + "\n", encoding="utf-8")
+    fingerprint_path.write_text(generated + "\n", encoding="utf-8")
+    print(f"Development signing key: {generated}")
+    print(f"Public key: {public_key.relative_to(ROOT)}")
+    print(f"Private key home (ignored): {home.relative_to(ROOT)}")
+
+
+def validate_channel(config: dict, channel: str) -> dict:
+    try:
+        return config["channels"][channel]
+    except KeyError as error:
+        choices = ", ".join(config["channels"])
+        raise RepoError(f"Unknown channel '{channel}'; choose one of: {choices}") from error
+
+
+def verify_file_signature(path: Path, signature: Path, config: dict) -> None:
+    expected_primary = fingerprint(config)
+    expected_signer = signing_fingerprint(config)
+    public_key = rooted(config["signing"]["public_key"])
+    if not signature.is_file():
+        raise RepoError(f"Missing signature: {signature}")
+    if not public_key.is_file():
+        raise RepoError(f"Repository public key does not exist: {public_key}")
+    with tempfile.TemporaryDirectory(prefix="spectrum-repo-verify.") as temporary:
+        keyring = Path(temporary) / "trusted.gpg"
+        run(["gpg", "--batch", "--yes", "--dearmor", "--output", str(keyring), str(public_key)])
+        status = run(
+            ["gpgv", "--status-fd", "1", "--keyring", str(keyring), str(signature), str(path)],
+        )
+    valid = [line.split() for line in status.splitlines() if line.startswith("[GNUPG:] VALIDSIG ")]
+    signer = valid[0][2].upper() if valid else ""
+    primary = valid[0][-1].upper() if valid else ""
+    if signer != expected_signer or primary != expected_primary:
+        raise RepoError(
+            f"Signature does not match signer {expected_signer} under primary {expected_primary}: {path.name}"
+        )
+
+
+def verify_package_signatures(packages: list[Path], config: dict) -> None:
+    for package in packages:
+        verify_file_signature(package, Path(f"{package}.sig"), config)
+
+
+def audit_public_key(
+    config: dict,
+    public_key_argument: str | None,
+    primary_argument: str | None,
+    signer_argument: str | None,
+    require_separated_signer: bool,
+) -> None:
+    require_commands("gpg")
+    public_key = Path(public_key_argument).expanduser().resolve() if public_key_argument else rooted(config["signing"]["public_key"])
+    expected_primary = (primary_argument or fingerprint(config)).replace(" ", "").upper()
+    expected_signer = (signer_argument or signing_fingerprint(config)).replace(" ", "").upper()
+    for label, value in (("primary", expected_primary), ("signing", expected_signer)):
+        if len(value) != 40 or any(character not in "0123456789ABCDEF" for character in value):
+            raise RepoError(f"Invalid {label} fingerprint")
+    if not public_key.is_file():
+        raise RepoError(f"Public key does not exist: {public_key}")
+    listing = run(
+        ["gpg", "--batch", "--with-colons", "--with-fingerprint", "--with-subkey-fingerprint", "--show-keys", str(public_key)]
+    )
+    records = [line.split(":") for line in listing.splitlines()]
+    keys: dict[str, dict[str, str]] = {}
+    pending: dict[str, str] | None = None
+    for record in records:
+        if record[0] in {"pub", "sub"}:
+            pending = {
+                "kind": record[0],
+                "validity": record[1],
+                "algorithm": record[3],
+                "expires": record[6],
+                "capabilities": record[11],
+            }
+        elif record[0] == "fpr" and pending is not None:
+            keys[record[9].upper()] = pending
+            pending = None
+    primary = keys.get(expected_primary)
+    signer = keys.get(expected_signer)
+    if primary is None or primary["kind"] != "pub":
+        raise RepoError("Expected primary fingerprint is not the public key's primary key")
+    if signer is None:
+        raise RepoError("Expected signing fingerprint is not present in the public key")
+    if require_separated_signer and (expected_signer == expected_primary or signer["kind"] != "sub"):
+        raise RepoError("Production policy requires a signing subkey separate from the primary key")
+    if "c" not in primary["capabilities"].lower():
+        raise RepoError("Primary key does not have certification capability")
+    if "s" not in signer["capabilities"].lower():
+        raise RepoError("Signing key does not have signing capability")
+    now = int(dt.datetime.now(dt.timezone.utc).timestamp())
+    for label, record in (("primary", primary), ("signing", signer)):
+        if record["validity"] in {"d", "e", "i", "r"}:
+            raise RepoError(f"{label.capitalize()} key is disabled, expired, invalid, or revoked")
+        if record["algorithm"] != "22":
+            raise RepoError(f"{label.capitalize()} key is not Ed25519")
+        if require_separated_signer and not record["expires"]:
+            raise RepoError(f"Production {label} key must have an expiration date")
+        if record["expires"] and int(record["expires"]) <= now:
+            raise RepoError(f"{label.capitalize()} key has expired")
+    print(f"Verified public key: {public_key}")
+    print(f"Trusted primary fingerprint: {expected_primary}")
+    print(f"Package signing fingerprint: {expected_signer}")
+
+
+def package_files(directory: Path) -> list[Path]:
+    return sorted(
+        path for path in directory.glob("*.pkg.tar.*")
+        if not path.name.endswith(".sig")
+    )
+
+
+def parse_build_info(package: Path) -> dict[str, list[str]]:
+    content = run(["bsdtar", "-xOf", str(package), ".BUILDINFO"])
+    fields: dict[str, list[str]] = {}
+    for line in content.splitlines():
+        if " = " not in line:
+            continue
+        name, value = line.split(" = ", 1)
+        fields.setdefault(name, []).append(value)
+    return fields
+
+
+def clean_build_evidence(package: Path, package_name: str, recipe: Path) -> dict:
+    fields = parse_build_info(package)
+
+    def single(name: str) -> str:
+        values = fields.get(name, [])
+        if len(values) != 1:
+            raise RepoError(f"Clean build evidence has no unique {name}: {package.name}")
+        return values[0]
+
+    if single("pkgbase") != package_name:
+        raise RepoError(f"Clean artifact does not match {package_name}: {package.name}")
+    if single("buildtool") != "devtools" or single("startdir") != "/startdir" or single("builddir") != "/build":
+        raise RepoError(f"Artifact was not produced by an Arch devtools clean chroot: {package.name}")
+    recipe_checksum = hashlib.sha256(recipe.read_bytes()).hexdigest()
+    if single("pkgbuild_sha256sum") != recipe_checksum:
+        raise RepoError(f"Artifact was built from a different PKGBUILD: {package.name}")
+    return {
+        "package": package.name,
+        "pkgbase": package_name,
+        "pkgver": single("pkgver"),
+        "pkgbuild_sha256": recipe_checksum,
+        "buildtool": single("buildtool"),
+        "buildtool_version": single("buildtoolver"),
+    }
+
+
+def snapshot_manifest(
+    directory: Path,
+    channel: str,
+    build_kind: str,
+    signing_fingerprint: str,
+    primary_fingerprint: str,
+    build_evidence: list[dict] | None = None,
+) -> dict:
+    files = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file() or path.name in {"snapshot.json", "snapshot.json.sig"}:
+            continue
+        files.append({
+            "name": path.name,
+            "size": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        })
+    manifest = {
+        "schema_version": 1,
+        "repository": "spectrumos",
+        "channel": channel,
+        "architecture": load_config()["architecture"],
+        "build_kind": build_kind,
+        "created_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+        "signing_fingerprint": signing_fingerprint,
+        "trusted_primary_fingerprint": primary_fingerprint,
+        "files": files,
+    }
+    if build_evidence is not None:
+        manifest["build_evidence"] = build_evidence
+    return manifest
+
+
+def sign_file(path: Path, config: dict) -> None:
+    signature = Path(f"{path}.sig")
+    signature.unlink(missing_ok=True)
+    command = ["gpg", "--batch", "--yes", "--detach-sign", "--local-user", signing_fingerprint(config), str(path)]
+    result = subprocess.run(
+        command,
+        env=gpg_environment(config),
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RepoError(f"Command failed ({' '.join(command)}): GPG could not create the signature")
+
+
+def build_repository(config: dict, channel: str, skip_checks: bool) -> None:
+    policy = validate_channel(config, channel)
+    if policy["clean_build_required"]:
+        raise RepoError(
+            f"The {channel} channel requires clean-chroot builds. Current monorepo-local PKGBUILDs are allowed only in edge."
+        )
+    require_commands("gpg", "makepkg", "repo-add")
+    primary_fingerprint = fingerprint(config)
+    signing_key = signing_fingerprint(config)
+    environment = gpg_environment(config)
+    run(["gpg", "--batch", "--list-secret-keys", signing_key], env=environment)
+    output_root = ROOT / "repo" / "output" / channel
+    output_root.mkdir(parents=True, exist_ok=True)
+    work_root = ROOT / "repo" / "work"
+    work_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="spectrum-repo.", dir=work_root) as temporary:
+        staging = Path(temporary) / config["architecture"]
+        staging.mkdir(parents=True)
+        build_root = Path(temporary) / "build"
+        build_root.mkdir()
+        for name in PACKAGE_NAMES:
+            source = ROOT / "packages" / name
+            if not (source / "PKGBUILD").is_file():
+                raise RepoError(f"Missing PKGBUILD for {name}")
+            command = ["makepkg", "--dir", str(source), "--cleanbuild", "--clean", "--force", "--noconfirm", "--sign", "--key", signing_key]
+            if skip_checks:
+                command.append("--nocheck")
+            package_environment = environment.copy()
+            package_environment["PKGDEST"] = str(staging)
+            package_environment["BUILDDIR"] = str(build_root / name)
+            print(f"Building {name}...", flush=True)
+            run(command, env=package_environment, cwd=ROOT)
+        packages = package_files(staging)
+        if not packages:
+            raise RepoError("No package artifacts were built")
+        verify_package_signatures(packages, config)
+        database = staging / f"{config['name']}.db.tar.zst"
+        run(
+            ["repo-add", "--sign", "--key", signing_key, "--verify", "--include-sigs", str(database), *map(str, packages)],
+            env=environment,
+        )
+        sign_file(database, config) if not Path(f"{database}.sig").is_file() else None
+        manifest_path = staging / "snapshot.json"
+        manifest = snapshot_manifest(staging, channel, "host-development", signing_key, primary_fingerprint)
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        sign_file(manifest_path, config)
+        destination = output_root / config["architecture"]
+        previous = output_root / f".{config['architecture']}.previous"
+        if previous.exists():
+            shutil.rmtree(previous)
+        if destination.exists():
+            destination.rename(previous)
+        staging.rename(destination)
+        if previous.exists():
+            shutil.rmtree(previous)
+    print(f"Signed {channel} repository: {destination.relative_to(ROOT)}")
+
+
+def import_clean_repository(config: dict, channel: str) -> None:
+    validate_channel(config, channel)
+    if channel != "edge":
+        raise RepoError("Clean artifacts enter through edge and must be promoted to a release channel")
+    require_commands("bsdtar", "gpg", "makepkg", "repo-add")
+    primary_fingerprint = fingerprint(config)
+    signing_key = signing_fingerprint(config)
+    environment = gpg_environment(config)
+    run(["gpg", "--batch", "--list-secret-keys", signing_key], env=environment)
+    output_root = ROOT / "repo" / "output" / channel
+    output_root.mkdir(parents=True, exist_ok=True)
+    work_root = ROOT / "repo" / "work"
+    work_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="spectrum-repo-clean.", dir=work_root) as temporary:
+        staging = Path(temporary) / config["architecture"]
+        staging.mkdir(parents=True)
+        evidence = []
+        for name in PACKAGE_NAMES:
+            source = ROOT / "packages" / name
+            recipe = source / "PKGBUILD"
+            expected = run(["makepkg", "--dir", str(source), "--packagelist"], cwd=ROOT).splitlines()
+            if len(expected) != 1:
+                raise RepoError(f"Expected one package artifact for {name}, found {len(expected)}")
+            artifact = Path(expected[0])
+            if not artifact.is_file():
+                raise RepoError(f"Missing clean package artifact: {artifact}")
+            evidence.append(clean_build_evidence(artifact, name, recipe))
+            imported = staging / artifact.name
+            shutil.copy2(artifact, imported)
+            sign_file(imported, config)
+        packages = package_files(staging)
+        verify_package_signatures(packages, config)
+        database = staging / f"{config['name']}.db.tar.zst"
+        run(
+            ["repo-add", "--sign", "--key", signing_key, "--verify", "--include-sigs", str(database), *map(str, packages)],
+            env=environment,
+        )
+        sign_file(database, config) if not Path(f"{database}.sig").is_file() else None
+        manifest_path = staging / "snapshot.json"
+        manifest = snapshot_manifest(staging, channel, "clean-chroot", signing_key, primary_fingerprint, evidence)
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        sign_file(manifest_path, config)
+        destination = output_root / config["architecture"]
+        previous = output_root / f".{config['architecture']}.previous"
+        if previous.exists():
+            shutil.rmtree(previous)
+        if destination.exists():
+            destination.rename(previous)
+        staging.rename(destination)
+        if previous.exists():
+            shutil.rmtree(previous)
+    verify_snapshot(config, channel)
+    print(f"Imported clean-chroot {channel} repository: {destination.relative_to(ROOT)}")
+
+
+def verify_snapshot(config: dict, channel: str) -> Path:
+    validate_channel(config, channel)
+    require_commands("gpg", "gpgv")
+    directory = ROOT / "repo" / "output" / channel / config["architecture"]
+    manifest = directory / "snapshot.json"
+    if not manifest.is_file():
+        raise RepoError(f"No snapshot exists for channel '{channel}'")
+    verify_file_signature(manifest, Path(f"{manifest}.sig"), config)
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    if document["signing_fingerprint"] != signing_fingerprint(config):
+        raise RepoError("Snapshot signing fingerprint does not match the configured key")
+    if document.get("trusted_primary_fingerprint", fingerprint(config)) != fingerprint(config):
+        raise RepoError("Snapshot primary fingerprint does not match the configured trust root")
+    for entry in document["files"]:
+        path = directory / entry["name"]
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
+            raise RepoError(f"Snapshot file failed verification: {entry['name']}")
+    verify_package_signatures(package_files(directory), config)
+    database = directory / f"{config['name']}.db.tar.zst"
+    verify_file_signature(database, Path(f"{database}.sig"), config)
+    return directory
+
+
+def promote(config: dict, source_channel: str, destination_channel: str, approve_host_build: bool) -> None:
+    source_policy = validate_channel(config, source_channel)
+    destination_policy = validate_channel(config, destination_channel)
+    del source_policy
+    source = verify_snapshot(config, source_channel)
+    document = json.loads((source / "snapshot.json").read_text(encoding="utf-8"))
+    if destination_policy["clean_build_required"] and document["build_kind"] != "clean-chroot" and not approve_host_build:
+        raise RepoError(
+            f"Refusing to promote a {document['build_kind']} snapshot to {destination_channel}; clean-chroot evidence is required"
+        )
+    destination_root = ROOT / "repo" / "output" / destination_channel
+    destination_root.mkdir(parents=True, exist_ok=True)
+    destination = destination_root / config["architecture"]
+    temporary = destination_root / f".{config['architecture']}.incoming"
+    if temporary.exists():
+        shutil.rmtree(temporary)
+    shutil.copytree(source, temporary)
+    promoted = json.loads((temporary / "snapshot.json").read_text(encoding="utf-8"))
+    promoted["channel"] = destination_channel
+    promoted["promoted_from"] = source_channel
+    promoted["promoted_at"] = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    manifest_path = temporary / "snapshot.json"
+    manifest_path.write_text(json.dumps(promoted, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    sign_file(manifest_path, config)
+    previous = destination_root / f".{config['architecture']}.previous"
+    if previous.exists():
+        shutil.rmtree(previous)
+    if destination.exists():
+        destination.rename(previous)
+    temporary.rename(destination)
+    if previous.exists():
+        shutil.rmtree(previous)
+    verify_snapshot(config, destination_channel)
+    print(f"Promoted exact package set: {source_channel} -> {destination_channel}")
+
+
+def print_client_config(config: dict, channel: str, local: bool) -> None:
+    validate_channel(config, channel)
+    if local:
+        server = (ROOT / "repo" / "output" / channel).as_uri() + "/$arch"
+    else:
+        server = config["public_base_url"].rstrip("/") + f"/{channel}/$arch"
+    print("[spectrumos]")
+    print("SigLevel = Required DatabaseRequired TrustedOnly")
+    print(f"Server = {server}")
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description="Build, sign, verify, and promote SpectrumOS repositories")
+    commands = result.add_subparsers(dest="command", required=True)
+    key = commands.add_parser("key", help="Manage repository signing keys")
+    key_commands = key.add_subparsers(dest="key_command", required=True)
+    initialize = key_commands.add_parser("init-development", help="Create an ignored, development-only signing key")
+    initialize.add_argument("--force", action="store_true", help="Rotate and replace the current development key")
+    audit = key_commands.add_parser("audit-public", help="Validate a repository public key and its signing relationship")
+    audit.add_argument("--public-key")
+    audit.add_argument("--primary-fingerprint")
+    audit.add_argument("--signing-fingerprint")
+    audit.add_argument("--require-separated-signing-key", action="store_true")
+    build = commands.add_parser("build", help="Build and sign an edge repository snapshot")
+    build.add_argument("--channel", default="edge")
+    build.add_argument("--skip-checks", action="store_true")
+    clean_import = commands.add_parser("import-clean", help="Sign verified devtools artifacts as a clean edge snapshot")
+    clean_import.add_argument("--channel", choices=("edge",), default="edge")
+    verify = commands.add_parser("verify", help="Verify a signed repository snapshot")
+    verify.add_argument("--channel", default="edge")
+    promotion = commands.add_parser("promote", help="Promote the exact signed package set between channels")
+    promotion.add_argument("source", choices=("edge", "testing"))
+    promotion.add_argument("destination", choices=("testing", "stable"))
+    promotion.add_argument("--approve-host-build", action="store_true", help=argparse.SUPPRESS)
+    client = commands.add_parser("client-config", help="Print a strict pacman repository block")
+    client.add_argument("--channel", choices=("edge", "testing", "stable"), default="stable")
+    client.add_argument("--local", action="store_true")
+    return result
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    config = load_config()
+    try:
+        if arguments.command == "key":
+            if arguments.key_command == "init-development":
+                initialize_development_key(config, arguments.force)
+            elif arguments.key_command == "audit-public":
+                audit_public_key(
+                    config,
+                    arguments.public_key,
+                    arguments.primary_fingerprint,
+                    arguments.signing_fingerprint,
+                    arguments.require_separated_signing_key,
+                )
+        elif arguments.command == "build":
+            build_repository(config, arguments.channel, arguments.skip_checks)
+        elif arguments.command == "import-clean":
+            import_clean_repository(config, arguments.channel)
+        elif arguments.command == "verify":
+            directory = verify_snapshot(config, arguments.channel)
+            print(f"Verified repository snapshot: {directory.relative_to(ROOT)}")
+        elif arguments.command == "promote":
+            promote(config, arguments.source, arguments.destination, arguments.approve_host_build)
+        elif arguments.command == "client-config":
+            print_client_config(config, arguments.channel, arguments.local)
+    except RepoError as error:
+        print(f"spectrum-repo: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

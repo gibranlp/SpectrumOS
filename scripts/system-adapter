@@ -1,0 +1,286 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import platform
+import pwd
+import shutil
+import subprocess
+import sys
+
+
+def read_values(path: str) -> dict[str, int]:
+    values = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if ":" not in line:
+            continue
+        key, raw = line.split(":", 1)
+        try:
+            values[key] = int(raw.strip().split()[0])
+        except (IndexError, ValueError):
+            continue
+    return values
+
+
+FONT_FAMILIES_REGISTRY = Path(
+    os.environ.get("SPECTRUM_FONT_FAMILIES_FILE", "/usr/share/spectrumos/font-families.conf")
+)
+
+
+def read_font_family_labels() -> dict[str, str]:
+    # The shared slug=display-label registry -- font-family-menu (the picker) reads the
+    # exact same file, so the two never drift into independent hand-maintained copies
+    # again. Keys must still match FONT_FAMILIES in spectrum_theme.cli exactly; that dict
+    # is a different mapping (slug to the actual Nerd Font family renderers write into
+    # configs) owned by the theme engine's own package boundary, not duplicated here.
+    labels = {}
+    for line in FONT_FAMILIES_REGISTRY.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, label = line.split("=", 1)
+        labels[key] = label
+    return labels
+
+
+def compact_duration(seconds: float) -> tuple[str, str]:
+    minutes = int(seconds // 60)
+    days, minutes = divmod(minutes, 1440)
+    hours, minutes = divmod(minutes, 60)
+    short = f"{days}d {hours}h" if days else f"{hours}h {minutes}m"
+    long = f"Up for {days} days, {hours} hours" if days else f"Up for {hours} hours, {minutes} minutes"
+    return short, long
+
+
+def audio_state() -> tuple[str, str]:
+    try:
+        result = subprocess.run(("wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"), check=False, capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return "Unavailable", "PipeWire state unavailable"
+    parts = result.stdout.split()
+    try:
+        volume = round(float(parts[1]) * 100)
+    except (IndexError, ValueError):
+        return "Unavailable", "No default output"
+    muted = "[MUTED]" in parts
+    return ("Muted" if muted else f"{volume}%"), "Default PipeWire output"
+
+
+def temperature() -> str:
+    preferred = ("k10temp", "coretemp", "zenpower")
+    candidates = []
+    for device in Path("/sys/class/hwmon").glob("hwmon*"):
+        try:
+            name = (device / "name").read_text().strip()
+        except OSError:
+            continue
+        priority = preferred.index(name) if name in preferred else len(preferred)
+        candidates.extend((priority, candidate) for candidate in device.glob("temp*_input"))
+    candidates.extend((len(preferred) + 1, candidate) for candidate in Path("/sys/class/thermal").glob("thermal_zone*/temp"))
+    for _, candidate in sorted(candidates):
+        try:
+            value = int(candidate.read_text().strip()) / 1000
+        except (OSError, ValueError):
+            continue
+        if 0 < value < 150:
+            return f"󰔏 {value:.0f}°"
+    return ""
+
+
+def gpu_state() -> str:
+    for candidate in sorted(Path("/sys/class/drm").glob("card*/device/gpu_busy_percent")):
+        try:
+            return f"󰾲 {int(candidate.read_text().strip())}%"
+        except (OSError, ValueError):
+            continue
+    return ""
+
+
+def display_state() -> tuple[str, str, str]:
+    try:
+        result = subprocess.run(("hyprctl", "-j", "monitors"), check=False, capture_output=True, text=True, timeout=2)
+        monitors = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return "Unavailable", "Display state unavailable", ""
+    if not isinstance(monitors, list) or not monitors:
+        return "Unavailable", "No active display", ""
+    monitor = next((item for item in monitors if item.get("focused")), monitors[0])
+    width = monitor.get("width", 0)
+    height = monitor.get("height", 0)
+    transform = monitor.get("transform", 0)
+    if transform in (1, 3, 5, 7):
+        width, height = height, width
+    refresh = monitor.get("refreshRate", 0)
+    scale = monitor.get("scale", 1)
+    name = monitor.get("name", "Display")
+    resolution = f"{width}×{height}" if width and height else "Active"
+    detail = f"{name} · {refresh:.0f} Hz · {scale:g}×" if isinstance(refresh, (int, float)) else name
+    return resolution, detail, f"{refresh:.0f} Hz" if isinstance(refresh, (int, float)) else ""
+
+
+def brightness_state() -> dict:
+    try:
+        result = subprocess.run(
+            ("brightnessctl", "--machine-readable", "--class=backlight", "info"),
+            check=False, capture_output=True, text=True, timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"available": False, "percent": 0}
+    if result.returncode != 0:
+        return {"available": False, "percent": 0}
+    try:
+        fields = result.stdout.strip().splitlines()[0].split(",")
+        percent = round(int(fields[2]) * 100 / int(fields[4]))
+    except (ValueError, IndexError, ZeroDivisionError):
+        return {"available": False, "percent": 0}
+    if not 0 <= percent <= 100:
+        return {"available": False, "percent": 0}
+    return {"available": True, "percent": percent}
+
+
+def telemetry() -> dict:
+    memory = read_values("/proc/meminfo")
+    total = memory.get("MemTotal", 0)
+    available = memory.get("MemAvailable", 0)
+    used = max(0, total - available)
+    memory_percent = round(used / total * 100) if total else 0
+    disk = shutil.disk_usage("/")
+    disk_percent = round(disk.used / disk.total * 100) if disk.total else 0
+    load = os.getloadavg()[0]
+    cores = os.cpu_count() or 1
+    load_percent = min(999, round(load / cores * 100))
+    uptime_seconds = float(Path("/proc/uptime").read_text(encoding="utf-8").split()[0])
+    uptime, uptime_long = compact_duration(uptime_seconds)
+    return {
+        "load": f"{load_percent}%", "load_detail": f"{load:.2f} across {cores} threads",
+        "memory": f"{memory_percent}%", "memory_detail": f"{used / 1048576:.1f} of {total / 1048576:.1f} GiB",
+        "disk": f"{disk_percent}%", "disk_detail": f"{disk.free / 1073741824:.0f} GiB available",
+        "uptime": uptime, "uptime_long": uptime_long, "temperature": temperature(), "gpu": gpu_state(),
+    }
+
+
+def main() -> None:
+    metrics = telemetry()
+    if sys.argv[1:] == ["--telemetry-json"]:
+        print(json.dumps(metrics))
+        return
+    audio, audio_detail = audio_state()
+    resolution, display_detail, refresh = display_state()
+    font_file = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/typography/font-size"
+    try:
+        font_size = int(font_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        font_size = 13
+    font_family_labels = read_font_family_labels()
+    font_family_file = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/typography/font-family"
+    try:
+        font_family = font_family_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        font_family = "jetbrains-mono"
+    if font_family not in font_family_labels:
+        font_family = "jetbrains-mono"
+    kitty_file = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "spectrumos/theme/current/kitty.conf"
+    try:
+        rendered_font = next(
+            line.split(None, 1)[1].strip()
+            for line in kitty_file.read_text(encoding="utf-8").splitlines()
+            if line.startswith("font_family ")
+        )
+    except (OSError, StopIteration):
+        rendered_font = "JetBrainsMono Nerd Font"
+    keyboard_file = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "spectrumos/keyboard-layout"
+    try:
+        keyboard_id = keyboard_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        keyboard_id = "us"
+    keyboard_names = {
+        "us": "English (US)",
+        "us-intl": "English (US, international accents)",
+        "latam": "Spanish (Latin America)",
+        "es": "Spanish (Spain)",
+        "us,latam": "English (US) + Spanish (Latin America)",
+        "us-intl,latam": "US International + Spanish (Latin America)",
+        "us-intl,es": "US International + Spanish (Spain)",
+    }
+    keyboard_label = keyboard_names.get(keyboard_id, keyboard_names["us"])
+    keyboard_index = list(keyboard_names).index(keyboard_id) if keyboard_id in keyboard_names else 0
+    waybar_state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/waybar"
+    waybar = {}
+    for key, default in (
+        ("layout", "productivity"),
+        ("style", "spectrum"),
+        ("theme", "unified"),
+        ("workspace_icons", "pacman"),
+    ):
+        try:
+            waybar[key] = (waybar_state / key).read_text(encoding="utf-8").strip() or default
+        except OSError:
+            waybar[key] = default
+    try:
+        workspace_icon_sets = json.loads(
+            subprocess.run(
+                ("/usr/lib/spectrumos/waybar-workspace-icons", "--json"),
+                check=True, capture_output=True, text=True, timeout=2,
+            ).stdout
+        )["sets"]
+    except (subprocess.SubprocessError, OSError, ValueError, KeyError):
+        workspace_icon_sets = [{"key": "pacman", "label": "Pac-Man", "current": True}]
+    try:
+        performance_mode = json.loads(
+            subprocess.run(
+                ("/usr/lib/spectrumos/performance-mode", "--json"),
+                check=True, capture_output=True, text=True, timeout=2,
+            ).stdout
+        )
+    except (subprocess.SubprocessError, OSError, ValueError):
+        performance_mode = {"available": False, "backend": "none", "mode": "balanced"}
+    hypr_state = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "spectrumos/hyprland-controls.state"
+    hyprland = {
+        "blur": "spectrum", "gaps": "balanced", "rounding": "spectrum", "transparency": "opaque",
+        "layout": "dwindle", "border": "spectrum", "animations": "balanced",
+    }
+    try:
+        for line in hypr_state.read_text(encoding="utf-8").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                if key in hyprland:
+                    hyprland[key] = value
+    except OSError:
+        pass
+    # The state file predates Smooth/Balanced/Heavy and may still say the old "on" --
+    # map it the same way hyprland-menu's own load_state does, so the control center's
+    # checkmark lands on the tier that actually matches what's still running.
+    if hyprland["animations"] == "on":
+        hyprland["animations"] = "balanced"
+    payload = {
+        **metrics,
+        "audio": audio,
+        "audio_detail": audio_detail,
+        "resolution": resolution,
+        "display_detail": display_detail,
+        "refresh": refresh,
+        "brightness": brightness_state(),
+        "hostname": platform.node(),
+        "kernel": f"Linux {platform.release()}",
+        "user": pwd.getpwuid(os.getuid()).pw_name,
+        "time": datetime.now().strftime("%H:%M"),
+        "font_size": f"{font_size}px",
+        "font_family": font_family,
+        "font_family_rendered": rendered_font,
+        "font_family_label": font_family_labels[font_family],
+        "font_families": [{"key": key, "label": label} for key, label in font_family_labels.items()],
+        "keyboard_layout": keyboard_label,
+        "keyboard_index": keyboard_index,
+        "keyboard_multiple": "," in keyboard_id,
+        "waybar": waybar,
+        "workspace_icon_sets": workspace_icon_sets,
+        "performance_mode": performance_mode,
+        "hyprland": hyprland,
+    }
+    print(json.dumps(payload))
+
+
+if __name__ == "__main__":
+    main()

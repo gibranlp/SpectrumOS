@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Pacman PreTransaction hook: create a SpectrumOS restore point before an upgrade.
+
+Wired through system/pacman-hooks/05-spectrumos-pre-upgrade-snapshot.hook, which
+sets AbortOnFail so a real snapshot failure blocks the upgrade instead of letting
+it run without a safety net. A root filesystem that does not support Btrfs
+restore points is not treated as a failure here; the upgrade proceeds without
+one, exactly as it always has.
+"""
+from __future__ import annotations
+
+import subprocess
+import sys
+
+SNAPSHOT_LABEL = "pre-upgrade"
+RESTORE_POINT_CAP = 3
+
+
+def snapshot_supported() -> bool:
+    result = subprocess.run(
+        ["spectrum-snapshot", "status"], capture_output=True, text=True, check=False
+    )
+    return result.returncode == 0
+
+
+def create_snapshot(label: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["spectrum-snapshot", "create", "--label", label],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def enforce_cap(limit: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["spectrum-snapshot", "enforce-cap", "--limit", str(limit)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def main() -> int:
+    if not snapshot_supported():
+        print(
+            "spectrum: root filesystem does not support Btrfs restore points; "
+            "continuing without a pre-upgrade snapshot",
+            file=sys.stderr,
+        )
+        return 0
+    result = create_snapshot(SNAPSHOT_LABEL)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or "spectrum-snapshot create failed"
+        print(f"spectrum: pre-upgrade snapshot failed: {detail}", file=sys.stderr)
+        return 1
+    identifier = result.stdout.strip().rsplit("\n", 1)[-1]
+    print(f"spectrum: created pre-upgrade restore point {identifier}")
+
+    # A snapshot just succeeded, so the upgrade always gets its safety net.
+    # A cap failure is a cleanup problem, not a reason to abort an update
+    # that already has a good restore point behind it.
+    cap_result = enforce_cap(RESTORE_POINT_CAP)
+    if cap_result.returncode != 0:
+        detail = cap_result.stderr.strip() or "spectrum-snapshot enforce-cap failed"
+        print(f"spectrum: restore-point cap enforcement failed: {detail}", file=sys.stderr)
+    else:
+        for line in cap_result.stdout.strip().splitlines():
+            print(f"spectrum: {line}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

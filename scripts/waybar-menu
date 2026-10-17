@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/waybar
+mkdir -p -- "$state_dir"
+layout=productivity
+style=spectrum
+theme=unified
+[[ -f $state_dir/layout ]] && IFS= read -r layout < "$state_dir/layout"
+[[ -f $state_dir/style ]] && IFS= read -r style < "$state_dir/style"
+[[ -f $state_dir/theme ]] && IFS= read -r theme < "$state_dir/theme"
+
+restart_waybar() {
+    return 0
+}
+
+if [[ ${1:-} == --restart ]]; then
+    restart_waybar
+    exit 0
+fi
+
+if [[ ${1:-} == --json ]]; then
+    printf '{"layout":"%s","style":"%s","theme":"%s"}\n' "$layout" "$style" "$theme"
+    exit 0
+fi
+
+if [[ ${1:-} == --set ]]; then
+    field=${2:-}
+    value=${3:-}
+    if [[ $field == workspace_icons ]]; then
+        # waybar-workspace-icons owns this field's valid-key list, persistence, and
+        # restart on its own, since the option set is data-driven (one entry per icon
+        # set) rather than a small fixed enum like layout/style/theme below.
+        exec /usr/lib/spectrumos/waybar-workspace-icons set "$value"
+    fi
+    case $field:$value in
+        layout:minimal|layout:multimedia|layout:productivity|layout:detailed|layout:gaming|layout:hidden) layout=$value ;;
+        style:spectrum|style:square) style=$value ;;
+        theme:unified|theme:tonal|theme:prism) theme=$value ;;
+        *) exit 2 ;;
+    esac
+    printf '%s\n' "$value" > "$state_dir/$field"
+    restart_waybar
+    notify-send --app-name="SpectrumOS" --expire-time=2000 "Waybar updated" "$layout · $style · $theme"
+    exit 0
+fi
+
+workspace_icons=pacman
+[[ -f $state_dir/workspace_icons ]] && IFS= read -r workspace_icons < "$state_dir/workspace_icons"
+workspace_icons_label=$(/usr/lib/spectrumos/waybar-workspace-icons list | awk -F'\t' -v key="$workspace_icons" '$2 == key { print $3 }')
+
+choice=$(printf '%s\n' "Layout · ${layout^}" "Style · ${style^}" "Theme · ${theme^}" "Workspace icons · ${workspace_icons_label:-Pac-Man}" | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Waybar (Super+Shift+B)')
+case $choice in
+    Layout*)
+        selected=$(printf '%s\n' Minimal Multimedia Productivity Detailed Gaming Hidden | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Waybar layout')
+        [[ -n $selected ]] || exit 0
+        layout=${selected,,}
+        printf '%s\n' "$layout" > "$state_dir/layout"
+        ;;
+    Style*)
+        selected=$(printf '%s\n' Spectrum Square | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Waybar style')
+        [[ -n $selected ]] || exit 0
+        style=${selected,,}
+        printf '%s\n' "$style" > "$state_dir/style"
+        ;;
+    Theme*)
+        selected=$(printf '%s\n' Unified Tonal Prism | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Waybar color theme')
+        [[ -n $selected ]] || exit 0
+        theme=${selected,,}
+        printf '%s\n' "$theme" > "$state_dir/theme"
+        ;;
+    'Workspace icons'*)
+        workspace_icons_list=$(/usr/lib/spectrumos/waybar-workspace-icons list)
+        selected_label=$(cut -f3 <<< "$workspace_icons_list" | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Workspace icons')
+        [[ -n $selected_label ]] || exit 0
+        selected_key=$(awk -F'\t' -v label="$selected_label" '$3 == label { print $2; exit }' <<< "$workspace_icons_list")
+        [[ -n $selected_key ]] || exit 1
+        exec /usr/lib/spectrumos/waybar-workspace-icons set "$selected_key"
+        ;;
+    '') exit 0 ;;
+    *) exit 1 ;;
+esac
+
+restart_waybar
+notify-send --app-name="SpectrumOS" --expire-time=2000 "Waybar updated" "$layout · $style · $theme"

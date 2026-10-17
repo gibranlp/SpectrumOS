@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = spectrum-desktop
+Target = google-chrome
+Target = brave-bin
+
+[Action]
+Description = Configuring GTK appearance for new browser profiles...
+When = PostTransaction
+Exec = /usr/lib/spectrumos/spectrum-browser-defaults

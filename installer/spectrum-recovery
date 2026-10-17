@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# SpectrumOS recovery menu: opened from the live ISO with Super+R (or the
+# installer's "Recovery options" hint). Runs as root via the NOPASSWD
+# sudoers entry in 10-spectrum-live, mirroring spectrum-installer-backend's
+# own scoped rule, so every action below assumes EUID 0 rather than sudo-ing
+# each command individually.
+set -uo pipefail
+
+target=/mnt
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        exec sudo "$0" "$@"
+    fi
+}
+
+pause() {
+    read -r -p 'Press Enter to return to the menu...' _ || true
+}
+
+# Prints one device path per line: every Btrfs partition on the system that
+# has a top-level "@" subvolume, the same layout marker spectrum-snapshot
+# and the installer both use. Mounting subvolid=5 briefly to check does not
+# touch the partition's normal subvolumes.
+detect_installed_roots() {
+    local name fstype scratch
+    while read -r name fstype; do
+        [[ $fstype == btrfs ]] || continue
+        scratch=$(mktemp -d)
+        if mount -o subvolid=5 "/dev/$name" "$scratch" 2>/dev/null; then
+            [[ -d "$scratch/@" ]] && printf '/dev/%s\n' "$name"
+            umount "$scratch"
+        fi
+        rmdir "$scratch"
+    done < <(lsblk -rno NAME,FSTYPE 2>/dev/null)
+}
+
+# Finds the FAT32 SpectrumOS EFI System Partition, if any -- BIOS installs
+# and installs mid-repair may not have one.
+detect_esp() {
+    lsblk -rno NAME,LABEL 2>/dev/null | awk '$2 == "SPECTRM_EFI" {print "/dev/"$1; exit}'
+}
+
+choose_root_device() {
+    mapfile -t candidates < <(detect_installed_roots)
+    if ((${#candidates[@]} == 0)); then
+        printf 'No SpectrumOS-style Btrfs installation was found on any disk.\n' >&2
+        return 1
+    fi
+    if ((${#candidates[@]} == 1)); then
+        printf '%s\n' "${candidates[0]}"
+        return 0
+    fi
+    printf 'Multiple candidate installations were found:\n' >&2
+    local device
+    select device in "${candidates[@]}"; do
+        [[ -n $device ]] && { printf '%s\n' "$device"; return 0; }
+    done
+}
+
+# Mounts the chosen root at $target, then walks its own /etc/fstab to mount
+# everything else (home, any separate log/cache subvolumes, /boot) at their
+# real spots below $target -- so this works whatever the installed
+# subvolume layout actually is, rather than assuming one.
+mount_installed_system() {
+    local root_device=$1
+    mkdir -p "$target"
+    mount -o subvol=@ "$root_device" "$target" || return 1
+    [[ -f "$target/etc/fstab" ]] || return 0
+    local source mountpoint fstype options
+    while read -r source mountpoint fstype options _dump _pass; do
+        [[ $source == \#* || -z ${source:-} || $mountpoint == / ]] && continue
+        mkdir -p "$target$mountpoint"
+        mount -t "$fstype" -o "$options" "$source" "$target$mountpoint" 2>/dev/null \
+            || printf 'Warning: could not mount %s at %s\n' "$source" "$mountpoint" >&2
+    done < "$target/etc/fstab"
+}
+
+unmount_installed_system() {
+    umount -R "$target" 2>/dev/null || true
+}
+
+action_shell() {
+    printf '\nDropping to a shell. Type "exit" to return to the recovery menu.\n\n'
+    bash -l || true
+}
+
+action_chroot() {
+    local device
+    device=$(choose_root_device) || { pause; return; }
+    printf '\nMounting %s and its own /etc/fstab entries at %s...\n' "$device" "$target"
+    if ! mount_installed_system "$device"; then
+        printf 'Could not mount %s.\n' "$device" >&2
+        pause
+        return
+    fi
+    printf 'Entering chroot. Type "exit" to leave it and return here.\n\n'
+    arch-chroot "$target"
+    unmount_installed_system
+    pause
+}
+
+action_restore_snapshot() {
+    local root_device boot_device
+    root_device=$(choose_root_device) || { pause; return; }
+    boot_device=$(detect_esp)
+    printf 'Root device: %s\n' "$root_device"
+    printf 'Boot device: %s\n\n' "${boot_device:-none found}"
+    spectrum-snapshot list --root-device "$root_device" || true
+    if [[ -z $boot_device ]]; then
+        printf '\nNo EFI System Partition was auto-detected; specify it manually with spectrum-snapshot restore.\n'
+        pause
+        return
+    fi
+    local id confirm
+    read -r -p $'\nRestore-point id to restore (blank to cancel): ' id
+    [[ -n $id ]] || return
+    read -r -p 'Type the same id again to confirm: ' confirm
+    spectrum-snapshot restore "$id" \
+        --root-device "$root_device" \
+        --boot-device "$boot_device" \
+        --confirm "$confirm"
+    pause
+}
+
+action_repair_bootloader() {
+    local device disk
+    device=$(choose_root_device) || { pause; return; }
+    if ! mount_installed_system "$device"; then
+        printf 'Could not mount %s.\n' "$device" >&2
+        pause
+        return
+    fi
+    if [[ -d /sys/firmware/efi ]]; then
+        if [[ -f /usr/share/limine/BOOTX64.EFI ]]; then
+            mkdir -p "$target/boot/EFI/BOOT"
+            cp /usr/share/limine/BOOTX64.EFI "$target/boot/EFI/BOOT/BOOTX64.EFI"
+            [[ -f /usr/share/limine/BOOTIA32.EFI ]] && cp /usr/share/limine/BOOTIA32.EFI "$target/boot/EFI/BOOT/BOOTIA32.EFI"
+            printf 'Restored the Limine EFI boot files.\n'
+            if [[ ! -f "$target/boot/EFI/BOOT/limine.conf" ]]; then
+                printf 'limine.conf itself is missing; the boot files alone are not enough. Use the chroot option to restore it from a backup or restore point.\n'
+            fi
+        else
+            printf 'The limine package is not available on this recovery image.\n' >&2
+        fi
+    else
+        disk=$(lsblk -rno PKNAME "$device" 2>/dev/null | head -n1)
+        if [[ -n $disk ]]; then
+            arch-chroot "$target" limine bios-install "/dev/$disk"
+        else
+            printf 'Could not determine the parent disk of %s.\n' "$device" >&2
+        fi
+    fi
+    unmount_installed_system
+    pause
+}
+
+action_disk_report() {
+    printf '\n== Block devices ==\n'
+    lsblk -f
+    printf '\n== SMART health (best-effort) ==\n'
+    local disk
+    for disk in $(lsblk -dno NAME); do
+        printf -- '-- /dev/%s --\n' "$disk"
+        smartctl -H "/dev/$disk" 2>&1 | grep -i "result\|smart" || printf 'unavailable\n'
+    done
+    pause
+}
+
+action_network() {
+    if command -v nmtui >/dev/null 2>&1; then
+        nmtui
+    else
+        printf 'nmtui is not available on this recovery image.\n' >&2
+        pause
+    fi
+}
+
+menu() {
+    clear
+    cat <<'BANNER'
+SpectrumOS recovery menu
+-------------------------
+1) Open a shell
+2) Chroot into an installed system
+3) Restore a SpectrumOS snapshot
+4) Repair the Limine bootloader
+5) Disk and SMART report
+6) Network setup
+0) Exit to the desktop
+BANNER
+    local choice
+    read -r -p 'Choice: ' choice
+    case $choice in
+        1) action_shell ;;
+        2) action_chroot ;;
+        3) action_restore_snapshot ;;
+        4) action_repair_bootloader ;;
+        5) action_disk_report ;;
+        6) action_network ;;
+        0) exit 0 ;;
+        *) ;;
+    esac
+}
+
+require_root "$@"
+while true; do
+    menu
+done

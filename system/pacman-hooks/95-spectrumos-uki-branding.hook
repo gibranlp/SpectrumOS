@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = linux-*
+
+[Action]
+Description = Removing distribution splash from SpectrumOS kernel images...
+When = PostTransaction
+Exec = /usr/lib/spectrumos/uki-branding-sync --rebuild

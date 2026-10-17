@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+import contextlib
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+ROOT = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/focus"
+STATE = ROOT / "state.json"
+CONTROL = ROOT / "control.json"
+SOUNDSCAPES = ["Silent", "LoFi Radio", "Forest Sounds", "Rain Sounds", "Ocean Waves", "White Noise", "Music For Programming", "Local Folder"]
+ACTIVE = {"starting", "work", "paused"}
+
+
+def default_state():
+    return {"phase": "idle", "remaining": 1500, "duration": 25, "campaign": "", "task": "", "soundscape": "Silent"}
+
+
+@contextlib.contextmanager
+def locked(name="state.lock", nonblocking=False):
+    ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (ROOT / name).open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | (fcntl.LOCK_NB if nonblocking else 0))
+        yield
+
+
+def read_state():
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return default_state()
+
+
+def write_json(path, data):
+    with tempfile.NamedTemporaryFile(mode="w", dir=ROOT, delete=False) as handle:
+        json.dump(data, handle)
+        temporary = Path(handle.name)
+    temporary.replace(path)
+
+
+def backend_binary():
+    local = Path(__file__).resolve().parent.parent / "integrations/questline/spectrum-focus"
+    return str(local if local.is_file() else Path("/usr/lib/spectrumos/questline-focus"))
+
+
+def notify(message):
+    subprocess.run(["notify-send", "--app-name=SpectrumOS", "Questline Focus", message], check=False)
+
+
+def start(request):
+    duration = request.get("duration", 25)
+    if isinstance(duration, bool) or not isinstance(duration, int) or not 5 <= duration <= 180:
+        raise ValueError("Choose a duration from 5 to 180 minutes")
+    if request.get("soundscape", "Silent") not in SOUNDSCAPES:
+        raise ValueError("Unknown soundscape")
+    for field in ("project_id", "task_id"):
+        if request.get(field):
+            uuid.UUID(request[field])
+    with locked():
+        current = read_state()
+        if current["phase"] in ACTIVE:
+            raise ValueError("Pause or reset the current session before starting another")
+        session_id = str(uuid.uuid4())
+        state = {**default_state(), **request, "phase": "starting", "remaining": duration * 60, "session_id": session_id, "updated": time.time()}
+        write_json(CONTROL, {"paused": False, "cancelled": False})
+        write_json(STATE, state)
+        process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "worker", session_id], start_new_session=True,
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        state["worker_pid"] = process.pid
+        write_json(STATE, state)
+
+
+def control(action):
+    with locked():
+        state = read_state()
+        if action == "toggle" and state["phase"] not in ACTIVE:
+            request = {key: state.get(key) for key in ("duration", "project_id", "task_id", "campaign", "task", "soundscape")}
+        else:
+            request = None
+            write_json(CONTROL, {"paused": action == "toggle" and state["phase"] != "paused", "cancelled": action == "reset"})
+            if action == "reset" and state["phase"] not in ACTIVE:
+                state.update(phase="idle", remaining=state["duration"] * 60, message="")
+                write_json(STATE, state)
+    if request is not None:
+        start(request)
+
+
+def worker(session_id):
+    # Un solo proceso conserva la sesión aunque se cierre o recargue el shell.
+    with locked("worker.lock"):
+        with locked():
+            state = read_state()
+            if state.get("session_id") != session_id:
+                return
+        request = {**state, "control": str(CONTROL)}
+        with tempfile.TemporaryFile(mode="w+") as errors:
+            process = subprocess.Popen([backend_binary(), json.dumps(request)], stdout=subprocess.PIPE, stderr=errors, text=True)
+            for line in process.stdout:
+                update = json.loads(line)
+                with locked():
+                    state = read_state()
+                    state.update(update, updated=time.time())
+                    write_json(STATE, state)
+            result = process.wait()
+            if result:
+                errors.seek(0)
+                message = errors.read().strip()[:500] or "Questline focus session stopped unexpectedly"
+                with locked():
+                    state.update(phase="error", message=message, updated=time.time())
+                    write_json(STATE, state)
+                notify(message)
+            elif state["phase"] == "completed":
+                notify(state["message"])
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else "state"
+    if action == "state":
+        with locked():
+            state = read_state()
+            if state["phase"] in ACTIVE and time.time() - state.get("updated", 0) > 10:
+                try:
+                    pid = state.get("worker_pid", 0)
+                    if not isinstance(pid, int) or pid <= 0:
+                        raise ProcessLookupError
+                    os.kill(pid, 0)
+                except (ProcessLookupError, PermissionError):
+                    state.update(phase="error", message="Focus session interrupted. Start a new session to continue.")
+                    write_json(STATE, state)
+        print(json.dumps(state))
+    elif action == "start":
+        start(json.loads(sys.argv[2]))
+    elif action in {"toggle", "reset"}:
+        control(action)
+    elif action == "worker":
+        worker(sys.argv[2])
+    else:
+        raise ValueError("Unknown focus action")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError) as error:
+        if len(sys.argv) > 1 and sys.argv[1] == "worker":
+            with locked():
+                state = read_state()
+                state.update(phase="error", message=str(error), updated=time.time())
+                write_json(STATE, state)
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)

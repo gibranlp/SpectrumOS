@@ -1,0 +1,8 @@
+# Invitado QEMU/KVM con gráficos Virtio y agentes de integración.
+mesa
+lib32-mesa
+vulkan-virtio
+lib32-vulkan-virtio
+vulkan-tools
+qemu-guest-agent
+spice-vdagent

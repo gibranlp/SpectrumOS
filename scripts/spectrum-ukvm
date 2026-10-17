@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+widget=/usr/share/spectrumos/spectrum-ukvm
+if [[ ${1:-} == --repo ]]; then
+    project=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+    preview_root="${XDG_CACHE_HOME:-$HOME/.cache}/spectrumos/ukvm-preview"
+    "$project/integrations/ukvm/install" "$project" "$preview_root"
+    widget="$preview_root/usr/share/spectrumos/spectrum-ukvm"
+    export SPECTRUM_SHELL_BACKEND_DIR="$project/scripts"
+    shift
+fi
+if [[ $# -gt 0 ]]; then
+    printf 'Usage: spectrum-ukvm [--repo]\n' >&2
+    exit 2
+fi
+if qs --path "$widget" ipc call spectrum-ukvm open >/dev/null 2>&1; then
+    exit 0
+fi
+exec qs --path "$widget" --no-duplicate --daemonize

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+picker=(/usr/lib/spectrumos/spectrum-shell-picker right --dmenu)
+
+choose() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | "${picker[@]}" --prompt "$prompt" || true
+}
+
+notice() {
+    notify-send --app-name="SpectrumOS" --expire-time=3000 "$1" "${2:-}"
+}
+
+require_backend() {
+    if ! command -v bluetoothctl >/dev/null || ! systemctl is-active --quiet bluetooth.service; then
+        notice "Bluetooth unavailable" "Install BlueZ and start bluetooth.service."
+        exit 1
+    fi
+    if ! bluetoothctl show >/dev/null 2>&1; then
+        notice "Bluetooth unavailable" "No Bluetooth controller was detected."
+        exit 1
+    fi
+}
+
+device_rows() {
+    local filter=${1:-}
+    if [[ -n $filter ]]; then
+        bluetoothctl devices "$filter" 2>/dev/null || true
+    else
+        bluetoothctl devices 2>/dev/null || true
+    fi
+}
+
+select_device() {
+    local prompt=$1 filter=${2:-} selected
+    selected=$(device_rows "$filter" | sed 's/^Device //' | "${picker[@]}" --prompt "$prompt" || true)
+    [[ -n $selected ]] && printf '%s\n' "${selected%% *}"
+}
+
+run_device_action() {
+    local action=$1 address=$2 label output
+    label=$(bluetoothctl info "$address" 2>/dev/null | sed -n 's/^\s*Name: //p' | head -1)
+    local -a command=(bluetoothctl --timeout 35)
+    [[ $action == pair ]] && command+=(--agent NoInputNoOutput)
+    command+=("$action" "$address")
+    if output=$("${command[@]}" 2>&1); then
+        notice "Bluetooth ${action} complete" "${label:-$address}"
+    else
+        notice "Bluetooth ${action} failed" "${output##*$'\n'}"
+    fi
+}
+
+device_menu() {
+    local address=$1 info name connected trusted battery choice
+    info=$(bluetoothctl info "$address" 2>/dev/null || true)
+    name=$(sed -n 's/^\s*Name: //p' <<< "$info" | head -1)
+    connected=$(sed -n 's/^\s*Connected: //p' <<< "$info" | head -1)
+    trusted=$(sed -n 's/^\s*Trusted: //p' <<< "$info" | head -1)
+    battery=$(sed -n 's/^\s*Percentage: //p' <<< "$info" | head -1)
+    choice=$(choose "${name:-$address}${battery:+ · $battery}" \
+        "$([[ $connected == yes ]] && printf Disconnect || printf Connect)" \
+        "$([[ $trusted == yes ]] && printf Untrust || printf Trust)" \
+        "Pair" "Device details" "Remove device")
+    case $choice in
+        Connect) run_device_action connect "$address" ;;
+        Disconnect) run_device_action disconnect "$address" ;;
+        Trust) run_device_action trust "$address" ;;
+        Untrust) run_device_action untrust "$address" ;;
+        Pair) run_device_action pair "$address" ;;
+        "Device details") printf '%s\n' "$info" | "${picker[@]}" --prompt 'Bluetooth device' || true ;;
+        "Remove device") run_device_action remove "$address" ;;
+    esac
+}
+
+scan_devices() {
+    local address
+    notice "Bluetooth scan started" "Discovering devices for 10 seconds"
+    bluetoothctl --timeout 10 scan on >/dev/null 2>&1 || true
+    address=$(select_device "Discovered devices")
+    [[ -z $address ]] || device_menu "$address"
+}
+
+status() {
+    local powered connected count tooltip
+    if ! command -v bluetoothctl >/dev/null || ! systemctl is-active --quiet bluetooth.service || ! bluetoothctl show >/dev/null 2>&1; then
+        printf '{"text":"","tooltip":"Bluetooth unavailable","class":"unavailable"}\n'
+        return
+    fi
+    powered=$(bluetoothctl show | sed -n 's/^\s*Powered: //p' | head -1)
+    connected=$(device_rows Connected | sed 's/^Device //')
+    count=$(grep -c . <<< "$connected" || true)
+    if [[ $powered != yes ]]; then
+        printf '{"text":"󰂲","tooltip":"Bluetooth off","class":"off"}\n'
+    elif ((count > 0)); then
+        tooltip=$(printf '%s' "$connected" | sed 's/^[0-9A-F:]\+ //')
+        python - "$count" "$tooltip" <<'PY'
+import json, sys
+print(json.dumps({"text": f"󰂱 {sys.argv[1]}", "tooltip": "Bluetooth connected\n" + sys.argv[2], "class": "connected"}))
+PY
+    else
+        printf '{"text":"󰂯","tooltip":"Bluetooth on · no connected devices","class":"on"}\n'
+    fi
+}
+
+main() {
+    local powered choice address
+    require_backend
+    powered=$(bluetoothctl show | sed -n 's/^\s*Powered: //p' | head -1)
+    choice=$(choose "Bluetooth · $powered" "Connected devices" "Paired devices" "Scan and add device" \
+        "$([[ $powered == yes ]] && printf 'Turn Bluetooth off' || printf 'Turn Bluetooth on')" "Graphical settings")
+    case $choice in
+        "Connected devices") address=$(select_device 'Connected devices' Connected); [[ -z $address ]] || device_menu "$address" ;;
+        "Paired devices") address=$(select_device 'Paired devices' Paired); [[ -z $address ]] || device_menu "$address" ;;
+        "Scan and add device") scan_devices ;;
+        "Turn Bluetooth off") bluetoothctl power off; notice "Bluetooth disabled" ;;
+        "Turn Bluetooth on") bluetoothctl power on; notice "Bluetooth enabled" ;;
+        "Graphical settings") command -v blueman-manager >/dev/null && uwsm app -- blueman-manager || notice "Bluetooth settings unavailable" "Install Blueman for advanced pairing." ;;
+    esac
+}
+
+case ${1:-} in
+    '') main ;;
+    --status) status ;;
+    *) printf 'Usage: %s [--status]\n' "$0" >&2; exit 2 ;;
+esac

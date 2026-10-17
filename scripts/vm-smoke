@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+workspace=${SPECTRUM_VM_WORKSPACE:-/tmp/spectrumos-vm}
+memory=4096
+cpus=4
+disk_size=48G
+iso=
+action=plan
+headless=false
+
+usage() {
+    printf 'Usage: %s [--prepare|--run] [--iso PATH] [--workspace PATH] [--memory MiB] [--cpus N] [--disk-size SIZE] [--headless]\n' "$0"
+}
+
+die() {
+    printf 'Error: %s\n' "$1" >&2
+    exit 1
+}
+
+while (($#)); do
+    case $1 in
+        --prepare|--run) action=${1#--} ;;
+        --iso|--workspace|--memory|--cpus|--disk-size)
+            option=$1
+            shift
+            (($#)) || die "$option requires a value"
+            case $option in
+                --iso) iso=$1 ;;
+                --workspace) workspace=$1 ;;
+                --memory) memory=$1 ;;
+                --cpus) cpus=$1 ;;
+                --disk-size) disk_size=$1 ;;
+            esac
+            ;;
+        --headless) headless=true ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+    shift
+done
+
+[[ $memory =~ ^[1-9][0-9]*$ ]] || die "Memory must be a positive integer"
+[[ $cpus =~ ^[1-9][0-9]*$ ]] || die "CPU count must be a positive integer"
+[[ $disk_size =~ ^[1-9][0-9]*[MGT]$ ]] || die "Disk size must use M, G, or T"
+command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 is not installed"
+command -v qemu-img >/dev/null || die "qemu-img is not installed"
+
+firmware_code=/usr/share/edk2/x64/OVMF_CODE.4m.fd
+firmware_template=/usr/share/edk2/x64/OVMF_VARS.4m.fd
+[[ -r $firmware_code ]] || die "OVMF code firmware is missing"
+[[ -r $firmware_template ]] || die "OVMF variable template is missing"
+[[ -z $iso || -r $iso ]] || die "ISO is not readable: $iso"
+
+disk=$workspace/spectrumos.qcow2
+firmware_vars=$workspace/OVMF_VARS.4m.fd
+if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+    accelerator=kvm
+    acceleration=(-accel kvm -cpu host)
+else
+    accelerator=tcg
+    acceleration=(-accel 'tcg,thread=multi' -cpu max)
+fi
+
+qemu=(
+    qemu-system-x86_64
+    -name SpectrumOS2-smoke
+    -machine q35
+    "${acceleration[@]}"
+    -smp "$cpus"
+    -m "$memory"
+    -drive "if=pflash,format=raw,readonly=on,file=$firmware_code"
+    -drive "if=pflash,format=raw,file=$firmware_vars"
+    -drive "if=virtio,format=qcow2,file=$disk"
+    -device virtio-vga
+    -nic 'user,model=virtio-net-pci,hostfwd=tcp::2222-:22'
+)
+if [[ -n $iso ]]; then
+    qemu+=(-drive "media=cdrom,readonly=on,file=$iso" -boot order=d)
+fi
+if [[ $headless == true ]]; then
+    qemu+=(-display none -serial mon:stdio)
+else
+    qemu+=(-display 'gtk,gl=off')
+fi
+
+prepare() {
+    mkdir -p -- "$workspace"
+    if [[ ! -e $disk ]]; then
+        qemu-img create -q -f qcow2 "$disk" "$disk_size"
+    fi
+    if [[ ! -e $firmware_vars ]]; then
+        cp -- "$firmware_template" "$firmware_vars"
+    fi
+}
+
+printf 'Workspace: %s\nAccelerator: %s\nDisk: %s\nFirmware variables: %s\n' \
+    "$workspace" "$accelerator" "$disk" "$firmware_vars"
+
+case $action in
+    plan)
+        printf 'Mode: dry-run\nCommand:'
+        printf ' %q' "${qemu[@]}"
+        printf '\n'
+        ;;
+    prepare)
+        prepare
+        printf 'Prepared disposable VM state.\n'
+        ;;
+    run)
+        [[ -r $disk && -r $firmware_vars ]] || die "VM state is not prepared; run --prepare first"
+        exec "${qemu[@]}"
+        ;;
+esac

@@ -1,0 +1,9 @@
+# Base mínima de desarrollo general, no es un perfil personal de IDE.
+base-devel
+cmake
+git
+neovim
+python
+ripgrep
+rustup
+shellcheck

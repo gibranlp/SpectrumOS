@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import secrets
+import string
+import subprocess
+import sys
+import tempfile
+import unicodedata
+
+
+def search(query: str) -> int:
+    query = query.casefold().strip()
+    if len(query) < 2:
+        print("[]")
+        return 0
+    roots = [Path.home() / name for name in ("Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos")]
+    roots = [root for root in roots if root.is_dir()]
+    if not roots:
+        roots = [Path.home()]
+    matches = []
+    for root in roots:
+        for directory, folders, files in os.walk(root):
+            folders[:] = [name for name in folders if not name.startswith(".")]
+            for name in files:
+                if name.startswith(".") or query not in name.casefold():
+                    continue
+                matches.append(str(Path(directory) / name))
+                if len(matches) == 60:
+                    print(json.dumps(matches, ensure_ascii=False))
+                    return 0
+    print(json.dumps(matches, ensure_ascii=False))
+    return 0
+
+
+def emoji_search(query: str) -> int:
+    query = query.casefold().strip()
+    matches = []
+    for start, end in ((0x1F600, 0x1F650), (0x1F300, 0x1F600), (0x1F650, 0x1FB00), (0x2600, 0x27C0)):
+        for point in range(start, end):
+            character = chr(point)
+            name = unicodedata.name(character, "")
+            if not name or name.startswith(("CJK", "SQUARED CJK")):
+                continue
+            if query and query not in name.casefold():
+                continue
+            matches.append({"character": character, "name": name.title()})
+            if len(matches) == 60:
+                print(json.dumps(matches, ensure_ascii=False))
+                return 0
+    print(json.dumps(matches, ensure_ascii=False))
+    return 0
+
+
+def calculate(expression: str) -> int:
+    if not expression or len(expression) > 120:
+        print("Enter a calculation")
+        return 0
+    try:
+        result = subprocess.run(
+            ["numbat", "--no-config", "--color", "never", "--pretty-print", "never", "-e", expression],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        print("Calculator unavailable")
+        return 1
+    lines = [line.strip() for line in (result.stdout or result.stderr).splitlines() if line.strip()]
+    print(lines[-1] if lines else "Invalid expression")
+    return 0
+
+
+def password(length: str, options: str) -> int:
+    try:
+        size = int(length)
+    except ValueError:
+        return 2
+    if size < 8 or size > 128 or not options or any(option not in "lns" for option in options):
+        return 2
+    groups = {"l": string.ascii_letters, "n": string.digits, "s": "!@#$%_-+="}
+    selected = [groups[key] for key in "lns" if key in options]
+    characters = [secrets.choice(group) for group in selected]
+    characters.extend(secrets.choice("".join(selected)) for _ in range(size - len(characters)))
+    secrets.SystemRandom().shuffle(characters)
+    print("".join(characters))
+    return 0
+
+
+def color_history_path() -> Path:
+    return Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos" / "colors.json"
+
+
+def questline_campaign_path() -> Path:
+    return Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos" / "questline-campaign"
+
+
+def questline_campaign(value: str | None = None) -> int:
+    path = questline_campaign_path()
+    if value is None:
+        try:
+            print(path.read_text(encoding="utf-8").strip())
+        except OSError:
+            print("")
+        return 0
+    if not value or len(value) > 128 or any(character.isspace() for character in value):
+        return 2
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".questline-campaign-", delete=False) as temporary:
+        temporary.write(value + "\n")
+        name = temporary.name
+    os.replace(name, path)
+    return 0
+
+
+def color_history() -> list[str]:
+    try:
+        values = json.loads(color_history_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(values, list):
+        return []
+    return [value.upper() for value in values if isinstance(value, str) and len(value) == 7 and value.startswith("#") and all(character in string.hexdigits for character in value[1:])][:5]
+
+
+def add_color(value: str) -> int:
+    if len(value) != 7 or not value.startswith("#") or any(character not in string.hexdigits for character in value[1:]):
+        return 2
+    value = value.upper()
+    colors = [value] + [color for color in color_history() if color != value]
+    path = color_history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name = ""
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".colors-", delete=False) as temporary:
+            json.dump(colors[:5], temporary)
+            temporary_name = temporary.name
+        os.replace(temporary_name, path)
+    finally:
+        if temporary_name and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+    print(json.dumps(colors[:5]))
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "questline-campaign":
+        return questline_campaign()
+    if len(sys.argv) == 3 and sys.argv[1] == "questline-campaign":
+        return questline_campaign(sys.argv[2])
+    if len(sys.argv) == 2 and sys.argv[1] == "colors":
+        print(json.dumps(color_history()))
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "color-add":
+        return add_color(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "search":
+        return search(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "emoji":
+        return emoji_search(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "calculate":
+        return calculate(sys.argv[2])
+    if len(sys.argv) == 4 and sys.argv[1] == "password":
+        return password(sys.argv[2], sys.argv[3])
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

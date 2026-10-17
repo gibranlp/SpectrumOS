@@ -1,0 +1,11 @@
+# Gráficos híbridos AMD + NVIDIA con renderizado, Vulkan y cambio de GPU.
+mesa
+lib32-mesa
+vulkan-radeon
+lib32-vulkan-radeon
+linux-zen-headers
+nvidia-open-dkms
+nvidia-utils
+lib32-nvidia-utils
+switcheroo-control
+vulkan-tools

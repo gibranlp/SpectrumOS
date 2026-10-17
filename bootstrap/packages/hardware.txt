@@ -1,0 +1,2 @@
+# Índice histórico. Los perfiles instalables viven en cpu/, gpu/ y form-factor/.
+# El instalador selecciona uno de cada tipo de manera explícita.

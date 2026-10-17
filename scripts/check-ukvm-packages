@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+import subprocess
+import sys
+from pathlib import Path
+
+REQUIRED = {
+    "ukvm": ("usr/bin/ukvm", "usr/lib/ukvm/ukvm-portal-session", "usr/lib/systemd/user/ukvm.service",
+             "usr/share/doc/ukvm/REMOTE_SESSIONS.md", "usr/share/doc/ukvm/REMOTE_PERFORMANCE.md"),
+    "spectrum-xdg-desktop-portal-hyprland": (
+        "usr/lib/xdg-desktop-portal-hyprland", "usr/bin/hyprland-share-picker",
+        "usr/share/xdg-desktop-portal/portals/hyprland.portal",
+        "usr/lib/systemd/user/xdg-desktop-portal-hyprland.service.d/50-spectrum-session.conf",
+        "usr/lib/systemd/user/xdg-desktop-portal.service.d/50-spectrum-hyprland-session.conf"),
+    "spectrum-desktop": ("usr/bin/spectrum-ukvm", "usr/lib/spectrumos/ukvm-adapter",
+                         "usr/share/spectrumos/spectrum-ukvm/UkvmPage.qml"),
+}
+
+
+def archive(path, *args):
+    return subprocess.run(["bsdtar", *args, str(path)], check=True, capture_output=True, text=True).stdout
+
+
+def check(repository):
+    database = repository / "spectrumos.db.tar.zst"
+    index = {}
+    for entry in archive(database, "-tf").splitlines():
+        if not entry.endswith("/desc"):
+            continue
+        description = subprocess.run(["bsdtar", "-xOf", str(database), entry], check=True, capture_output=True, text=True).stdout.splitlines()
+        fields = {key: description[i + 1] for i, key in enumerate(description[:-1]) if key.startswith("%")}
+        index[fields.get("%NAME%")] = fields.get("%FILENAME%")
+    for name, required in REQUIRED.items():
+        filename = index.get(name)
+        if not filename or Path(filename).name != filename or not (repository / filename).is_file():
+            raise ValueError(f"Offline repository is missing its indexed {name} package. Build/sign/import it before creating an ISO.")
+        contents = set(archive(repository / filename, "-tf").splitlines())
+        missing = set(required) - contents
+        if missing:
+            raise ValueError(f"{name} is missing required UKVM files: {', '.join(sorted(missing))}")
+    return "Offline repository contains UKVM, its managed Hyprland portal and the SpectrumOS frontend."
+
+
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) != 2:
+            raise ValueError("Usage: check-ukvm-packages REPOSITORY")
+        print(check(Path(sys.argv[1])))
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)

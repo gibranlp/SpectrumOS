@@ -1,0 +1,17 @@
+[palette]
+schema_version = 1
+name = "Spectrum Light"
+variant = "light"
+source = "fixed-fallback"
+
+[roles]
+background = "#f7f8fb"
+surface = "#eef1f6"
+surface_alt = "#e1e6ee"
+foreground = "#1c2430"
+muted = "#566273"
+accent = "#245f9e"
+accent_alt = "#6a3d91"
+success = "#176b46"
+warning = "#7a5200"
+error = "#a3293d"

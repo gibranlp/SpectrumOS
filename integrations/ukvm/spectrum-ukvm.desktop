@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=UniversalKVM
+Comment=Manage shared Linux input, trusted machines and topology
+Exec=spectrum-ukvm
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Categories=Settings;
+Keywords=UKVM;KVM;keyboard;mouse;computers;SpectrumOS;

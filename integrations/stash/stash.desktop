@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Stash
+GenericName=Music Player
+Comment=Browse, play, and organize your music
+Exec=/usr/lib/spectrumos/stash-open %f
+Icon=audio-x-generic
+Terminal=false
+Categories=AudioVideo;Audio;Music;Player;
+Keywords=music;audio;player;library;
+MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-wav;audio/mp4;audio/aac;
+StartupWMClass=stash

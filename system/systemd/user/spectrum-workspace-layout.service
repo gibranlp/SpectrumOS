@@ -1,0 +1,12 @@
+[Unit]
+Description=SpectrumOS monitor workspace assignment
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=10
+StartLimitBurst=20
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/spectrumos/workspace-layout --watch
+Restart=on-failure
+RestartSec=1

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+channel=stable
+source_kind=public
+action=plan
+
+usage() {
+    printf 'Usage: %s [--channel edge|testing|stable] [--local] [--apply]\n' "$0"
+}
+
+while (($#)); do
+    case $1 in
+        --channel)
+            (($# >= 2)) || { usage >&2; exit 2; }
+            channel=$2
+            shift 2
+            ;;
+        --local)
+            source_kind=local
+            shift
+            ;;
+        --apply)
+            action=apply
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf 'Unknown option: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+case $channel in
+    edge|testing|stable) ;;
+    *) printf 'Invalid channel: %s\n' "$channel" >&2; exit 2 ;;
+esac
+
+public_key=$project_root/repo/keys/spectrumos-production.asc
+fingerprint_file=$project_root/repo/keys/spectrumos-production.fingerprint
+[[ -s $public_key && -s $fingerprint_file ]] || {
+    printf 'The production repository public key or fingerprint is missing.\n' >&2
+    exit 1
+}
+fingerprint=$(tr -d '[:space:]' < "$fingerprint_file")
+[[ $fingerprint =~ ^[0-9A-Fa-f]{40}$ ]] || { printf 'Invalid repository fingerprint.\n' >&2; exit 1; }
+
+if [[ $source_kind == local ]]; then
+    local_source="$project_root/repo/output/$channel/x86_64"
+    local_repository="/var/lib/spectrumos/repository/$channel/x86_64"
+    server="file:///var/lib/spectrumos/repository/$channel/\$arch"
+else
+    server="https://spectrum.gibranlp.dev/repo/$channel/\$arch"
+fi
+
+printf 'Repository: spectrumos\nChannel: %s\nServer: %s\nSigning fingerprint: %s\n' \
+    "$channel" "$server" "$fingerprint"
+if [[ $action == plan ]]; then
+    printf 'Dry-run only; add --apply as root to trust this key and configure pacman.\n'
+    exit 0
+fi
+((EUID == 0)) || { printf 'Client repository configuration must run as root.\n' >&2; exit 1; }
+command -v pacman-key >/dev/null || { printf 'pacman-key is required.\n' >&2; exit 1; }
+
+if [[ $source_kind == local ]]; then
+    [[ -s $local_source/spectrumos.db.tar.zst && -s $local_source/spectrumos.db.tar.zst.sig ]] || {
+        printf 'No signed local repository exists for channel %s.\n' "$channel" >&2
+        exit 1
+    }
+    install -d -m 0755 "$local_repository"
+    cp -a -- "$local_source/." "$local_repository/"
+    find "/var/lib/spectrumos/repository" -type d -exec chmod 0755 {} +
+    find "/var/lib/spectrumos/repository" -type f -exec chmod 0644 {} +
+fi
+
+installed_fingerprint=$(gpg --homedir /etc/pacman.d/gnupg --with-colons --fingerprint "$fingerprint" 2>/dev/null | \
+    awk -F: '$1 == "fpr" { print $10; exit }' || true)
+if [[ $installed_fingerprint != "$fingerprint" ]]; then
+    pacman-key --add "$public_key"
+fi
+pacman-key --finger "$fingerprint"
+pacman-key --lsign-key "$fingerprint"
+
+config=/etc/pacman.d/spectrumos.conf
+temporary=$(mktemp /etc/pacman.d/.spectrumos.conf.XXXXXX)
+trap 'rm -f -- "$temporary"' EXIT
+{
+    printf '[spectrumos]\n'
+    printf 'SigLevel = Required DatabaseRequired TrustedOnly\n'
+    printf 'Server = %s\n' "$server"
+} > "$temporary"
+chmod 0644 "$temporary"
+mv -f -- "$temporary" "$config"
+
+include='Include = /etc/pacman.d/spectrumos.conf'
+if ! grep -Fqx "$include" /etc/pacman.conf; then
+    printf '\n%s\n' "$include" >> /etc/pacman.conf
+fi
+printf 'Configured the signed SpectrumOS %s repository. Run pacman -Syu to synchronize it.\n' "$channel"

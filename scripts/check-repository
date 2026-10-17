@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Read-only source size and artifact inventory for the Git checkout."""
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+FILE_LIMIT = 50 * 1024 * 1024
+TREE_LIMIT = 350 * 1024 * 1024
+ARTIFACT = re.compile(r"(?:^|/)(?:artifacts|generated|__pycache__|node_modules|\.pytest_cache|\.venv)/|^repo/(?:output|work|state)/|^packages/[^/]+/pkg/|\.(?:iso|qcow2|vdi|vmdk|sfs)(?:\.|$)|\.pkg\.tar\.")
+PRIVATE_KEY = re.compile(rb"(?m)^-----BEGIN (?:(?:[A-Z0-9]+ )?PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----\r?$")
+
+
+def main():
+    result = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "-z"], check=True, stdout=subprocess.PIPE)
+    paths = sorted(set(result.stdout.decode().split("\0")) - {""})
+    records, errors = [], []
+    for name in paths:
+        path = ROOT / name
+        if path.is_symlink():
+            if not name.startswith("iso/spectrumos/airootfs/") and not path.resolve().is_relative_to(ROOT):
+                errors.append(f"Symlink leaves the repository: {name}")
+            continue
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        records.append((size, name))
+        if ARTIFACT.search(name) or (name.startswith("packages/") and "/src/" in name and not name.startswith("packages/spectrum-theme/src/")):
+            errors.append(f"Generated artifact in source inventory: {name}")
+        if size > FILE_LIMIT:
+            errors.append(f"File exceeds 50 MiB: {name}")
+        if size <= 2 * 1024 * 1024:
+            data = path.read_bytes()
+            if b"\0" not in data[:8192] and PRIVATE_KEY.search(data):
+                errors.append(f"Private-key material in source inventory: {name}")
+    total = sum(size for size, _ in records)
+    if total > TREE_LIMIT:
+        errors.append("Source inventory exceeds 350 MiB")
+    print(f"Source inventory: {len(records)} files, {total / 1024**2:.2f} MiB")
+    print("Largest files:")
+    for size, name in sorted(records, reverse=True)[:8]:
+        print(f"  {size / 1024**2:6.2f} MiB  {name}")
+    for error in errors:
+        print("ERROR: " + error, file=sys.stderr)
+    if not errors:
+        print("Repository size/artifact/private-key checks passed.")
+    return bool(errors)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

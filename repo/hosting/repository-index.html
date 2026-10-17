@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpectrumOS Package Repository</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0c1018; color: #e9eef8; }
+    body { max-width: 56rem; margin: 8vh auto; padding: 2rem; }
+    h1 { color: #9ecbff; }
+    a { color: #8ed8c4; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SpectrumOS Package Repository</h1>
+    <p>Production trust root:</p>
+    <p><code>7F064D404E79BDECC5FA0EEB8EBC1B05ACF9CCB6</code></p>
+    <p>Current package-signing subkey:</p>
+    <p><code>0F4B4D2D8AE036D1972B89192F4F88BAFD59BA24</code></p>
+    <p>
+      <a href="spectrumos-production.asc">Public key</a> ·
+      <a href="spectrumos-production.fingerprint">Primary fingerprint</a> ·
+      <a href="spectrumos-production-signing.fingerprint">Signing fingerprint</a>
+    </p>
+    <p>SpectrumOS 1.0 is available on the production-signed Stable channel. Existing installations update with sudo pacman -Syu. Each snapshot retains package checksums, signatures and clean-chroot build evidence.</p>
+  </main>
+</body>
+</html>

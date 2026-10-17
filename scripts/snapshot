@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+
+import argparse
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+
+SNAPSHOT_ROOT = Path("@snapshots/spectrumos")
+PRUNING_ROOT = SNAPSHOT_ROOT / ".pruning"
+ID_PATTERN = re.compile(r"^[0-9]{8}T[0-9]{6}Z(?:-[a-z0-9][a-z0-9-]{0,31})?$")
+RETENTION_LATEST = 3
+RETENTION_DAILY = 7
+RETENTION_WEEKLY = 4
+RETENTION_MONTHLY = 6
+
+
+class SnapshotError(RuntimeError):
+    pass
+
+
+def run(command: list[str], *, capture: bool = True) -> str:
+    result = subprocess.run(command, check=False, capture_output=capture, text=True)
+    if result.returncode != 0:
+        detail = result.stderr.strip() if capture else ""
+        raise SnapshotError(detail or f"Command failed: {' '.join(command)}")
+    return result.stdout.strip() if capture else ""
+
+
+def root_mount() -> dict[str, str]:
+    payload = json.loads(run(["findmnt", "--json", "--output", "SOURCE,FSTYPE,OPTIONS", "/"]))
+    filesystems = payload.get("filesystems", [])
+    if len(filesystems) != 1:
+        raise SnapshotError("Unable to identify the root filesystem")
+    filesystem = filesystems[0]
+    if filesystem.get("fstype") != "btrfs":
+        raise SnapshotError("The root filesystem is not Btrfs")
+    options = filesystem.get("options", "").split(",")
+    subvolume = next((item.split("=", 1)[1] for item in options if item.startswith("subvol=")), None)
+    if not subvolume:
+        raise SnapshotError("The mounted Btrfs root does not declare a subvolume")
+    source = filesystem["source"].split("[", 1)[0]
+    return {"source": source, "subvolume": subvolume.lstrip("/")}
+
+
+def snapshot_id(label: str | None, now: dt.datetime | None = None) -> str:
+    timestamp = (now or dt.datetime.now(dt.timezone.utc)).strftime("%Y%m%dT%H%M%SZ")
+    if not label:
+        return timestamp
+    normalized = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:32].rstrip("-")
+    if not normalized:
+        raise SnapshotError("The snapshot label must contain a letter or number")
+    return f"{timestamp}-{normalized}"
+
+
+def require_snapshot_id(value: str) -> str:
+    if not ID_PATTERN.fullmatch(value):
+        raise SnapshotError("Invalid snapshot identifier")
+    return value
+
+
+def mounted_top_level(source: str):
+    class TopLevelMount:
+        def __enter__(self):
+            Path("/run/spectrumos").mkdir(mode=0o755, parents=True, exist_ok=True)
+            self.temporary = tempfile.TemporaryDirectory(prefix="snapshot-", dir="/run/spectrumos")
+            self.path = Path(self.temporary.name)
+            run(["mount", "-o", "subvolid=5", source, str(self.path)], capture=False)
+            return self.path
+
+        def __exit__(self, exception_type, exception, traceback):
+            try:
+                run(["umount", str(self.path)], capture=False)
+            finally:
+                self.temporary.cleanup()
+
+    return TopLevelMount()
+
+
+def mounted_device(source: str, prefix: str):
+    class DeviceMount:
+        def __enter__(self):
+            Path("/run/spectrumos").mkdir(mode=0o755, parents=True, exist_ok=True)
+            self.temporary = tempfile.TemporaryDirectory(prefix=prefix, dir="/run/spectrumos")
+            self.path = Path(self.temporary.name)
+            run(["mount", source, str(self.path)], capture=False)
+            return self.path
+
+        def __exit__(self, exception_type, exception, traceback):
+            try:
+                run(["umount", str(self.path)], capture=False)
+            finally:
+                self.temporary.cleanup()
+
+    return DeviceMount()
+
+
+def metadata_for(identifier: str, mount: dict[str, str]) -> dict[str, object]:
+    packages = run(["pacman", "-Q"])
+    return {
+        "schema": 1,
+        "id": identifier,
+        "created_utc": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+        "root_source": mount["source"],
+        "root_subvolume": mount["subvolume"],
+        "snapshot_subvolume": str(SNAPSHOT_ROOT / identifier / "root"),
+        "boot_archive": "boot.tar",
+        "packages": packages.splitlines(),
+    }
+
+
+def create(label: str | None) -> str:
+    if os.geteuid() != 0:
+        raise SnapshotError("Snapshot creation requires root privileges")
+    mount = root_mount()
+    identifier = snapshot_id(label)
+    with mounted_top_level(mount["source"]) as top:
+        source = top / mount["subvolume"]
+        destination = top / SNAPSHOT_ROOT / identifier
+        if destination.exists():
+            raise SnapshotError(f"Snapshot already exists: {identifier}")
+        destination.mkdir(mode=0o700, parents=True)
+        try:
+            run(["btrfs", "subvolume", "snapshot", "-r", str(source), str(destination / "root")], capture=False)
+            run(["tar", "--numeric-owner", "-cpf", str(destination / "boot.tar"), "-C", "/boot", "."], capture=False)
+            metadata = metadata_for(identifier, mount)
+            temporary = destination / "metadata.json.new"
+            temporary.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, destination / "metadata.json")
+        except Exception:
+            if (destination / "root").exists():
+                run(["btrfs", "subvolume", "delete", str(destination / "root")], capture=False)
+            for child in destination.iterdir():
+                child.unlink()
+            destination.rmdir()
+            raise
+    return identifier
+
+
+def entries(top: Path) -> list[dict[str, object]]:
+    base = top / SNAPSHOT_ROOT
+    if not base.is_dir():
+        return []
+    found = []
+    for directory in sorted(base.iterdir(), reverse=True):
+        metadata = directory / "metadata.json"
+        if directory.is_dir() and ID_PATTERN.fullmatch(directory.name) and metadata.is_file():
+            found.append(json.loads(metadata.read_text(encoding="utf-8")))
+    return found
+
+
+def created_time(item: dict[str, object]) -> dt.datetime:
+    value = item.get("created_utc")
+    if not isinstance(value, str):
+        raise SnapshotError(f"Restore point {item.get('id', 'unknown')} has no creation time")
+    try:
+        created = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise SnapshotError(f"Restore point {item.get('id', 'unknown')} has an invalid creation time") from error
+    if created.tzinfo is None:
+        raise SnapshotError(f"Restore point {item.get('id', 'unknown')} creation time has no timezone")
+    return created.astimezone(dt.timezone.utc)
+
+
+def month_buckets(now: dt.datetime, count: int) -> set[tuple[int, int]]:
+    buckets = set()
+    year = now.year
+    month = now.month
+    for _index in range(count):
+        buckets.add((year, month))
+        month -= 1
+        if month == 0:
+            year -= 1
+            month = 12
+    return buckets
+
+
+def retention_plan(items: list[dict[str, object]], now: dt.datetime | None = None) -> dict[str, object]:
+    moment = (now or dt.datetime.now(dt.timezone.utc)).astimezone(dt.timezone.utc)
+    ordered = sorted(((created_time(item), item) for item in items), key=lambda pair: pair[0], reverse=True)
+    if any(created > moment for created, _item in ordered):
+        raise SnapshotError("Restore-point creation time is in the future")
+
+    reasons: dict[str, set[str]] = {str(item["id"]): set() for _created, item in ordered}
+    for _created, item in ordered[:RETENTION_LATEST]:
+        reasons[str(item["id"])].add("latest")
+    for _created, item in ordered:
+        if item.get("protected") is True:
+            reasons[str(item["id"])].add("protected")
+
+    daily_buckets = {(moment - dt.timedelta(days=offset)).date() for offset in range(RETENTION_DAILY)}
+    weekly_buckets = {
+        (moment - dt.timedelta(weeks=offset)).date().isocalendar()[:2]
+        for offset in range(RETENTION_WEEKLY)
+    }
+    monthly_buckets = month_buckets(moment, RETENTION_MONTHLY)
+    selected_daily = set()
+    selected_weekly = set()
+    selected_monthly = set()
+    for created, item in ordered:
+        identifier = str(item["id"])
+        day = created.date()
+        week = day.isocalendar()[:2]
+        month = (created.year, created.month)
+        if day in daily_buckets and day not in selected_daily:
+            reasons[identifier].add("daily")
+            selected_daily.add(day)
+        if week in weekly_buckets and week not in selected_weekly:
+            reasons[identifier].add("weekly")
+            selected_weekly.add(week)
+        if month in monthly_buckets and month not in selected_monthly:
+            reasons[identifier].add("monthly")
+            selected_monthly.add(month)
+
+    decisions = []
+    for created, item in ordered:
+        identifier = str(item["id"])
+        keep_reasons = sorted(reasons[identifier])
+        decisions.append(
+            {
+                "id": identifier,
+                "created_utc": created.isoformat(),
+                "decision": "retain" if keep_reasons else "candidate",
+                "reasons": keep_reasons,
+            }
+        )
+    retained = sum(item["decision"] == "retain" for item in decisions)
+    return {
+        "schema_version": 1,
+        "mode": "read-only",
+        "deletion_enabled": False,
+        "policy": {
+            "latest": RETENTION_LATEST,
+            "daily": RETENTION_DAILY,
+            "weekly": RETENTION_WEEKLY,
+            "monthly": RETENTION_MONTHLY,
+        },
+        "counts": {"total": len(decisions), "retained": retained, "candidates": len(decisions) - retained},
+        "restore_points": decisions,
+    }
+
+
+def render_retention(plan: dict[str, object]) -> str:
+    policy = plan["policy"]
+    counts = plan["counts"]
+    lines = [
+        "SpectrumOS snapshot retention plan (read-only)",
+        f"Policy: latest {policy['latest']}, daily {policy['daily']}, weekly {policy['weekly']}, monthly {policy['monthly']}",
+        f"Restore points: {counts['total']} total, {counts['retained']} retained, {counts['candidates']} candidates",
+    ]
+    for item in plan["restore_points"]:
+        reason = ", ".join(item["reasons"]) if item["reasons"] else "outside retention windows"
+        lines.append(f"{item['decision']}: {item['id']} ({reason})")
+    lines.append("Deletion: disabled")
+    return "\n".join(lines)
+
+
+def validate(top: Path, identifier: str) -> dict[str, object]:
+    identifier = require_snapshot_id(identifier)
+    directory = top / SNAPSHOT_ROOT / identifier
+    metadata_path = directory / "metadata.json"
+    root = directory / "root"
+    archive = directory / "boot.tar"
+    if not metadata_path.is_file() or not root.is_dir() or not archive.is_file():
+        raise SnapshotError(f"Incomplete restore point: {identifier}")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if metadata.get("schema") != 1 or metadata.get("id") != identifier or not metadata.get("packages"):
+        raise SnapshotError(f"Invalid restore-point metadata: {identifier}")
+    property_output = run(["btrfs", "property", "get", str(root), "ro"])
+    if property_output.strip() != "ro=true":
+        raise SnapshotError(f"Root snapshot is not read-only: {identifier}")
+    run(["tar", "-tf", str(archive)])
+    return metadata
+
+
+def _quarantine_for_deletion(top: Path, identifier: str, *, require_candidate: bool) -> Path:
+    source = top / SNAPSHOT_ROOT / identifier
+    quarantine = top / PRUNING_ROOT / identifier
+    marker_name = "prune.json"
+
+    if quarantine.exists():
+        marker = quarantine / marker_name
+        try:
+            authorization = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise SnapshotError(f"Invalid interrupted-prune state: {identifier}") from error
+        if authorization.get("schema") != 1 or authorization.get("id") != identifier:
+            raise SnapshotError(f"Invalid interrupted-prune state: {identifier}")
+        return quarantine
+
+    if not source.is_dir():
+        raise SnapshotError(f"Restore point does not exist: {identifier}")
+    if require_candidate:
+        decision = next(
+            (item for item in retention_plan(entries(top))["restore_points"] if item["id"] == identifier),
+            None,
+        )
+        if decision is None or decision["decision"] != "candidate":
+            raise SnapshotError(f"Retention policy requires this restore point: {identifier}")
+    validate(top, identifier)
+    authorization = {
+        "schema": 1,
+        "id": identifier,
+        "authorized_utc": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    temporary = source / f"{marker_name}.new"
+    temporary.write_text(json.dumps(authorization, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, source / marker_name)
+    quarantine.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.replace(source, quarantine)
+    return quarantine
+
+
+def _erase_quarantined(quarantine: Path) -> None:
+    root = quarantine / "root"
+    if root.exists():
+        run(["btrfs", "subvolume", "delete", str(root)], capture=False)
+    clear_directory(quarantine)
+    quarantine.rmdir()
+    try:
+        quarantine.parent.rmdir()
+    except OSError:
+        pass
+
+
+def prune(top: Path, identifier: str, confirmation: str) -> str:
+    identifier = require_snapshot_id(identifier)
+    if confirmation != identifier:
+        raise SnapshotError("Prune confirmation must exactly match the restore-point identifier")
+    quarantine = _quarantine_for_deletion(top, identifier, require_candidate=True)
+    _erase_quarantined(quarantine)
+    return identifier
+
+
+def enforce_cap(top: Path, limit: int) -> list[str]:
+    """Delete restore points beyond the newest `limit`, oldest first.
+
+    Unlike `prune`, this bypasses the conservative daily/weekly/monthly
+    retention windows: it exists only for the automatic pre-upgrade hook,
+    which needs a hard, predictable ceiling on how much space restore
+    points can use without a human confirming each deletion. The
+    interactive, exact-confirmed `prune` command keeps its own
+    policy-gated contract unchanged.
+    """
+    if limit < 0:
+        raise SnapshotError("The restore-point cap must not be negative")
+    ordered = sorted(entries(top), key=created_time, reverse=True)
+    removed = []
+    for item in ordered[limit:]:
+        identifier = str(item["id"])
+        quarantine = _quarantine_for_deletion(top, identifier, require_candidate=False)
+        _erase_quarantined(quarantine)
+        removed.append(identifier)
+    return removed
+
+
+def with_top_level(action, root_device: str | None = None):
+    # An explicit root_device lets `list` inspect a restore-point inventory
+    # on a device other than the currently mounted root -- the case that
+    # matters from recovery media, where / is the live environment itself,
+    # not the installation being recovered.
+    if root_device:
+        with mounted_top_level(root_device) as top:
+            return action(top, {"source": root_device})
+    mount = root_mount()
+    with mounted_top_level(mount["source"]) as top:
+        return action(top, mount)
+
+
+def rollback_plan(metadata: dict[str, object]) -> str:
+    identifier = metadata["id"]
+    snapshot = metadata["snapshot_subvolume"]
+    return "\n".join([
+        f"Restore point: {identifier}",
+        f"Root snapshot: {snapshot}",
+        "Rollback must run from recovery media or another bootable root.",
+        "Restore the archived EFI /boot contents together with the root snapshot.",
+        "Do not replace the mounted live root or restore only packages/kernel files.",
+    ])
+
+
+def device_for(path: str) -> str:
+    source = run(["findmnt", "--noheadings", "--output", "SOURCE", path])
+    return source.split("[", 1)[0]
+
+
+def require_block_device(path: str) -> str:
+    resolved = str(Path(path).resolve())
+    try:
+        mode = os.stat(resolved).st_mode
+    except FileNotFoundError as error:
+        raise SnapshotError(f"Device does not exist: {path}") from error
+    if not stat.S_ISBLK(mode):
+        raise SnapshotError(f"Not a block device: {path}")
+    return resolved
+
+
+def require_root_subvolume(value: str) -> str:
+    if not re.fullmatch(r"@[A-Za-z0-9._-]*", value):
+        raise SnapshotError("The target root subvolume must be a single safe @ name")
+    return value
+
+
+def ensure_offline(root_device: str, running_device: str | None = None) -> None:
+    current = str(Path(running_device or device_for("/")).resolve())
+    if str(Path(root_device).resolve()) == current:
+        raise SnapshotError("Refusing to replace the root filesystem running this command")
+
+
+def clear_directory(directory: Path) -> None:
+    for child in directory.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
+def restore(identifier: str, root_device: str, boot_device: str, target: str, confirmation: str) -> str:
+    if os.geteuid() != 0:
+        raise SnapshotError("restore requires root privileges")
+    identifier = require_snapshot_id(identifier)
+    if confirmation != identifier:
+        raise SnapshotError("Restore confirmation must exactly match the restore-point identifier")
+    root_device = require_block_device(root_device)
+    boot_device = require_block_device(boot_device)
+    if root_device == boot_device:
+        raise SnapshotError("Root and boot devices must be different")
+    ensure_offline(root_device)
+    target = require_root_subvolume(target)
+    operation = snapshot_id("rollback")
+    with mounted_top_level(root_device) as top:
+        metadata = validate(top, identifier)
+        if metadata.get("root_source") != root_device:
+            raise SnapshotError("Restore point belongs to a different root device")
+        if metadata.get("root_subvolume") != target:
+            raise SnapshotError("Restore point targets a different root subvolume")
+        selected = top / str(metadata["snapshot_subvolume"])
+        active = top / target
+        failed = top / "@failed" / "spectrumos" / operation
+        boot_backup = failed.parent / f"{operation}.boot.tar"
+        if not active.is_dir():
+            raise SnapshotError(f"Active root subvolume is missing: {target}")
+        failed.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with mounted_device(boot_device, "restore-boot-") as boot:
+            run(["tar", "--numeric-owner", "-cpf", str(boot_backup), "-C", str(boot), "."], capture=False)
+            os.rename(active, failed)
+            replacement_created = False
+            try:
+                run(["btrfs", "subvolume", "snapshot", str(selected), str(active)], capture=False)
+                replacement_created = True
+                clear_directory(boot)
+                run(["tar", "--numeric-owner", "-xpf", str(top / SNAPSHOT_ROOT / identifier / "boot.tar"), "-C", str(boot)], capture=False)
+                run(["sync"], capture=False)
+            except Exception:
+                if replacement_created and active.exists():
+                    run(["btrfs", "subvolume", "delete", str(active)], capture=False)
+                if not active.exists() and failed.exists():
+                    os.rename(failed, active)
+                clear_directory(boot)
+                run(["tar", "--numeric-owner", "-xpf", str(boot_backup), "-C", str(boot)], capture=False)
+                run(["sync"], capture=False)
+                raise
+        result = {
+            "schema": 1,
+            "restored_from": identifier,
+            "restored_utc": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+            "active_root": target,
+            "preserved_failed_root": str(failed.relative_to(top)),
+            "preserved_boot_archive": str(boot_backup.relative_to(top)),
+        }
+        result_path = top / SNAPSHOT_ROOT / identifier / f"restore-{operation}.json"
+        result_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return operation
+
+
+def parser() -> argparse.ArgumentParser:
+    command_parser = argparse.ArgumentParser(prog="spectrum-snapshot")
+    commands = command_parser.add_subparsers(dest="command", required=True)
+    create_parser = commands.add_parser("create", help="Create a pre-upgrade restore point")
+    create_parser.add_argument("--label")
+    list_parser = commands.add_parser("list", help="List complete restore points")
+    list_parser.add_argument(
+        "--root-device",
+        help="inspect this device's restore points instead of the currently mounted root (for recovery media)",
+    )
+    check_parser = commands.add_parser("check", help="Validate a restore point")
+    check_parser.add_argument("id")
+    plan_parser = commands.add_parser("plan", help="Print the offline rollback contract")
+    plan_parser.add_argument("id")
+    restore_parser = commands.add_parser("restore", help="Restore root and EFI state from recovery media")
+    restore_parser.add_argument("id")
+    restore_parser.add_argument("--root-device", required=True)
+    restore_parser.add_argument("--boot-device", required=True)
+    restore_parser.add_argument("--target", default="@")
+    restore_parser.add_argument("--confirm", required=True)
+    commands.add_parser("status", help="Report snapshot support for this root")
+    retention_parser = commands.add_parser("retention", help="Plan restore-point retention without deleting anything")
+    retention_parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    prune_parser = commands.add_parser("prune", help="Delete one policy candidate with exact confirmation")
+    prune_parser.add_argument("id")
+    prune_parser.add_argument("--confirm", required=True)
+    cap_parser = commands.add_parser(
+        "enforce-cap",
+        help="Delete restore points beyond the newest N, bypassing retention windows (for automation only)",
+    )
+    cap_parser.add_argument("--limit", type=int, default=RETENTION_LATEST)
+    return command_parser
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    try:
+        if arguments.command in {
+            "create", "list", "check", "plan", "restore", "retention", "prune", "enforce-cap",
+        } and os.geteuid() != 0:
+            raise SnapshotError(f"{arguments.command} requires root privileges")
+        if arguments.command == "create":
+            print(create(arguments.label))
+        elif arguments.command == "status":
+            mount = root_mount()
+            print(f"supported: btrfs root {mount['subvolume']} on {mount['source']}")
+        elif arguments.command == "list":
+            for item in with_top_level(lambda top, _mount: entries(top), arguments.root_device):
+                print(f"{item['id']}\t{item['created_utc']}\t{len(item['packages'])} packages")
+        elif arguments.command == "check":
+            metadata = with_top_level(lambda top, _mount: validate(top, arguments.id))
+            print(f"valid: {metadata['id']}")
+        elif arguments.command == "plan":
+            metadata = with_top_level(lambda top, _mount: validate(top, arguments.id))
+            print(rollback_plan(metadata))
+        elif arguments.command == "restore":
+            operation = restore(
+                arguments.id,
+                arguments.root_device,
+                arguments.boot_device,
+                arguments.target,
+                arguments.confirm,
+            )
+            print(f"restored: {arguments.id}")
+            print(f"preserved failed system: @failed/spectrumos/{operation}")
+        elif arguments.command == "retention":
+            plan = with_top_level(lambda top, _mount: retention_plan(entries(top)))
+            print(json.dumps(plan, indent=2, sort_keys=True) if arguments.json else render_retention(plan))
+        elif arguments.command == "prune":
+            identifier = with_top_level(lambda top, _mount: prune(top, arguments.id, arguments.confirm))
+            print(f"pruned: {identifier}")
+        elif arguments.command == "enforce-cap":
+            removed = with_top_level(lambda top, _mount: enforce_cap(top, arguments.limit))
+            for identifier in removed:
+                print(f"pruned: {identifier}")
+    except (SnapshotError, json.JSONDecodeError, OSError) as error:
+        print(f"spectrum-snapshot: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

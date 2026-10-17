@@ -1,0 +1,14 @@
+# Requires multilib and the matching GPU profile from hardware.txt.
+gamemode
+gamescope
+goverlay
+lib32-gamemode
+lib32-gnutls
+lib32-libcurl-compat
+lib32-libcurl-gnutls
+lib32-mangohud
+lutris
+mangohud
+steam
+wine-staging
+winetricks

@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Creating a SpectrumOS pre-upgrade restore point...
+When = PreTransaction
+Exec = /usr/lib/spectrumos/pre-upgrade-snapshot
+AbortOnFail

@@ -1,0 +1,9 @@
+source /usr/share/spectrumos/zsh/defaults.zsh
+
+for spectrum_fragment in \
+    "$HOME/.config/spectrumos-personal/aliases"/*.zsh(N) \
+    "$HOME/.config/spectrumos-personal/zsh"/*.zsh(N) \
+    "$HOME/.config/spectrumos-personal/work"/*.zsh(N); do
+    source "$spectrum_fragment"
+done
+unset spectrum_fragment

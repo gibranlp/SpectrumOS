@@ -1,0 +1,18 @@
+pkgbase = spectrum-sddm
+	pkgdesc = Adaptive SDDM login theme for SpectrumOS
+	pkgver = 1.0.0
+	pkgrel = 2
+	url = https://spectrum.gibranlp.dev
+	arch = any
+	license = GPL-3.0-or-later
+	depends = sddm
+	depends = qt5-quickcontrols2
+	depends = qt5-graphicaleffects
+	depends = spectrum-base
+	options = !strip
+	options = !debug
+	backup = etc/sddm.conf
+	source = spectrumos-source-1.0.0-a66ae26d50893c89.tar.zst
+	sha256sums = 7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162
+
+pkgname = spectrum-sddm

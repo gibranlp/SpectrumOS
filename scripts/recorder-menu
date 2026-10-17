@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/recorder
+pid_file=$state_dir/pid
+output_file=$state_dir/output
+mkdir -p -- "$state_dir"
+wofi=(/usr/lib/spectrumos/spectrum-shell-picker recorder --dmenu)
+
+choose() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | "${wofi[@]}" --prompt "$prompt" || true
+}
+
+recording_pid() {
+    local pid=""
+    [[ -f $pid_file ]] && IFS= read -r pid < "$pid_file"
+    [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && \
+        [[ $(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null) == *wf-recorder* ]] && printf '%s\n' "$pid"
+}
+
+recording_path() {
+    local videos=${XDG_VIDEOS_DIR:-$HOME/Videos}
+    mkdir -p -- "$videos/Recordings"
+    printf '%s/Recordings/Spectrum-%(%Y%m%d-%H%M%S)T-%s.%s\n' "$videos" -1 "$$" "${1:-mp4}"
+}
+
+select_audio() {
+    local selected source
+    local -a choices=("No audio")
+    while IFS= read -r source; do
+        [[ -n $source ]] || continue
+        if [[ $source == *.monitor ]]; then
+            choices+=("Desktop audio · $source")
+        else
+            choices+=("Microphone · $source")
+        fi
+    done < <(pactl list short sources 2>/dev/null | cut -f2)
+    selected=$(printf '%s\n' "${choices[@]}" | "${wofi[@]}" --prompt 'Recording audio' || true)
+    [[ $selected == *" · "* ]] && printf '%s\n' "${selected#* · }"
+}
+
+resolve_audio() {
+    local choice=${1:-} source=""
+    case $choice in
+        none) return 0 ;;
+        desktop)
+            source=$(pactl get-default-sink 2>/dev/null || true)
+            [[ -z $source ]] || source="$source.monitor"
+            ;;
+        microphone)
+            source=$(pactl get-default-source 2>/dev/null || true)
+            [[ $source != *.monitor ]] || source=""
+            ;;
+        '') source=$(select_audio || true) ;;
+        *)
+            # Valida el dispositivo elegido para no usar una fuente desconectada.
+            if pactl list short sources 2>/dev/null | cut -f2 | grep -qxF "$choice"; then
+                source=$choice
+            else
+                return 2
+            fi
+            ;;
+    esac
+    [[ -z $source ]] || printf '%s\n' "$source"
+}
+
+focused_output() {
+    hyprctl monitors -j | python -c 'import json,sys; m=json.load(sys.stdin); print(next((x["name"] for x in m if x.get("focused")), m[0]["name"]))'
+}
+
+select_window() {
+    python - <<'PY' | slurp -r || true
+import json
+import subprocess
+
+clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+for client in clients:
+    x, y = client.get("at", (0, 0))
+    width, height = client.get("size", (0, 0))
+    if client.get("mapped", True) and width > 0 and height > 0:
+        title = str(client.get("title", "Window")).replace("\n", " ")
+        print(f"{x},{y} {width}x{height} {title}")
+PY
+}
+
+start_recording() {
+    local mode=$1 audio_choice=${2:-} destination geometry="" output="" audio=""
+    local format=${3:-mp4} quality=${4:-balanced} fps=${5:-auto} audio_bitrate=${6:-192}
+    local crf video_codec=libx264 audio_codec=aac
+    case $format in mp4|mkv|webm) ;; *) printf 'Unknown recording format\n' >&2; return 2 ;; esac
+    case $quality in small|balanced|high) ;; *) printf 'Unknown video quality\n' >&2; return 2 ;; esac
+    case $fps in auto|24|30|60) ;; *) printf 'Unknown frame rate\n' >&2; return 2 ;; esac
+    case $audio_bitrate in 96|128|192|256|320) ;; *) printf 'Unknown audio bitrate\n' >&2; return 2 ;; esac
+    case $quality in small) crf=28 ;; balanced) crf=23 ;; high) crf=18 ;; esac
+    if [[ $format == webm ]]; then
+        video_codec=libvpx-vp9
+        audio_codec=libopus
+        case $quality in small) crf=40 ;; balanced) crf=32 ;; high) crf=24 ;; esac
+    fi
+    command -v wf-recorder >/dev/null || { notify-send --app-name=SpectrumOS "Recording unavailable" "Install wf-recorder."; return; }
+    [[ -z $(recording_pid || true) ]] || return 0
+    destination=$(recording_path "$format")
+    case $mode in
+        # Slurp lee rectángulos de stdin; el pipe abierto del shell lo deja esperando.
+        Area) geometry=$(slurp </dev/null || true); [[ -n $geometry ]] || return 0 ;;
+        Window) geometry=$(select_window); [[ -n $geometry ]] || return 0 ;;
+        Monitor) output=$(focused_output) ;;
+    esac
+    audio=$(resolve_audio "$audio_choice") || { printf 'The selected audio source is unavailable.\n' >&2; return 1; }
+    mkdir -p -- "$state_dir"
+    local -a command=(wf-recorder -f "$destination" -c "$video_codec" -x yuv420p -p "crf=$crf")
+    # Conserva dimensiones pares para que cualquier área funcione con yuv420p.
+    command+=(-F 'pad=ceil(iw/2)*2:ceil(ih/2)*2')
+    if [[ $format == webm ]]; then
+        command+=(-p b=0 -p deadline=realtime -p cpu-used=6)
+    else
+        command+=(-p preset=superfast)
+    fi
+    [[ $fps == auto ]] || command+=(-r "$fps")
+    [[ -z $geometry ]] || command+=(-g "$geometry")
+    [[ -z $output ]] || command+=(-o "$output")
+    [[ -z $audio ]] || command+=("--audio=$audio" -C "$audio_codec" -P "b=${audio_bitrate}k" -R 48000)
+    "${command[@]}" >"$state_dir/wf-recorder.log" 2>&1 &
+    printf '%s\n' "$!" > "$pid_file"
+    printf '%s\n' "$destination" > "$output_file"
+    sleep 0.5
+    if ! recording_pid >/dev/null; then
+        rm -f -- "$pid_file"
+        printf 'Screen recording could not start.\n' >&2
+        tail -n 5 "$state_dir/wf-recorder.log" >&2
+        return 1
+    fi
+    notify-send --app-name=SpectrumOS --expire-time=2500 "Recording started" "${mode,,} · ${destination##*/}"
+}
+
+stop_recording() {
+    local pid destination=""
+    pid=$(recording_pid || true)
+    [[ -n $pid ]] || return 0
+    kill -INT "$pid"
+    for _ in {1..40}; do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
+    [[ -f $output_file ]] && IFS= read -r destination < "$output_file"
+    rm -f -- "$pid_file"
+    notify-send --app-name=SpectrumOS --expire-time=4000 "Recording saved" "$destination"
+}
+
+status() {
+    if recording_pid >/dev/null; then
+        printf '{"text":"󰑊","tooltip":"Screen recording active\nClick to stop","class":"recording"}\n'
+    else
+        printf '{"text":"","tooltip":"Screen recorder","class":"idle"}\n'
+    fi
+}
+
+json_status() {
+    if recording_pid >/dev/null; then
+        printf '{"active":true,"label":"Recording now"}\n'
+    else
+        printf '{"active":false,"label":"Ready to record"}\n'
+    fi
+}
+
+open_recordings() {
+    local directory=${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings
+    mkdir -p -- "$directory"
+    uwsm app -- thunar "$directory"
+}
+
+main() {
+    local choice pid
+    pid=$(recording_pid || true)
+    if [[ -n $pid ]]; then
+        choice=$(choose 'Recording active' 'Stop and save recording')
+        [[ $choice == 'Stop and save recording' ]] && stop_recording
+        return
+    fi
+    choice=$(choose 'Screen recording' 'Record selected area' 'Record selected window' 'Record focused monitor' 'Open recordings folder')
+    case $choice in
+        'Record selected area') start_recording Area ;;
+        'Record selected window') start_recording Window ;;
+        'Record focused monitor') start_recording Monitor ;;
+        'Open recordings folder') open_recordings ;;
+    esac
+}
+
+case ${1:-} in
+    '') main ;;
+    --status) status ;;
+    --json) json_status ;;
+    --stop) stop_recording ;;
+    --open) open_recordings ;;
+    --start)
+        case ${2:-} in
+            area) mode=Area ;;
+            window) mode=Window ;;
+            monitor) mode=Monitor ;;
+            *) printf 'Unknown recording target\n' >&2; exit 2 ;;
+        esac
+        case ${3:-none} in
+            none|desktop|microphone) ;;
+            *) [[ ${3} =~ ^[A-Za-z0-9_.:-]+$ ]] || { printf 'Unknown audio source\n' >&2; exit 2; } ;;
+        esac
+        (($# <= 7)) || { printf 'Too many recording options\n' >&2; exit 2; }
+        start_recording "$mode" "${3:-none}" "${4:-mp4}" "${5:-balanced}" "${6:-auto}" "${7:-192}"
+        ;;
+    *) printf 'Usage: %s [--status|--json|--stop|--open|--start TARGET AUDIO [FORMAT QUALITY FPS AUDIO_KBPS]]\n' "$0" >&2; exit 2 ;;
+esac

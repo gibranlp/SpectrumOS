@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Runs a command on the discrete NVIDIA GPU via PRIME render offload, for
+# hybrid nvidia-intel/nvidia-amd installs where Hyprland itself renders on the
+# integrated GPU (setting these vars globally would force every app, including
+# the compositor and every panel widget, onto the dGPU -- this wrapper keeps
+# that opt-in and per-invocation instead, the standard hybrid Optimus pattern).
+set -euo pipefail
+
+if (($# == 0)); then
+    printf 'Usage: %s <command> [args...]\n' "$(basename -- "$0")" >&2
+    exit 2
+fi
+
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __VK_LAYER_NV_optimus=NVIDIA_only
+exec "$@"

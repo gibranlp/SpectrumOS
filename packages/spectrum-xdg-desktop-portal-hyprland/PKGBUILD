@@ -1,0 +1,47 @@
+pkgname=spectrum-xdg-desktop-portal-hyprland
+pkgver=1.4.1.r30.g0204ffb
+pkgrel=1
+pkgdesc="SpectrumOS Hyprland portal with consent-capable RemoteDesktop and session-bound activation"
+arch=(x86_64)
+url="https://github.com/hyprwm/xdg-desktop-portal-hyprland/pull/426"
+license=(BSD-3-Clause)
+depends=(gcc-libs glibc hyprland hyprlang hyprutils libdrm libei libpipewire libxkbcommon mesa qt6-base qt6-wayland sdbus-cpp systemd-libs ukvm util-linux-libs wayland xdg-desktop-portal)
+depends+=(libhyprlang.so libhyprutils.so libsdbus-c++.so libuuid.so)
+optdepends=('grim: Screenshot portal support' 'slurp: Interactive screenshot selection')
+makedepends=(cmake ninja hyprwayland-scanner pkgconf wayland-protocols)
+provides=("xdg-desktop-portal-hyprland=1.4.1" xdg-desktop-portal-impl)
+conflicts=(xdg-desktop-portal-hyprland xdg-desktop-portal-hyprland-git)
+options=(!debug)
+_revision=0204ffbbcb3cef72af76804cdf59f114f2e2f6d9
+_protocols_revision=bd153e76f751f150a09328dbdeb5e4fab9d23622
+source=("xdph-$_revision.tar.gz::https://codeload.github.com/hyprwm/xdg-desktop-portal-hyprland/tar.gz/$_revision"
+        "hyprland-protocols-$_protocols_revision.tar.gz::https://codeload.github.com/hyprwm/hyprland-protocols/tar.gz/$_protocols_revision"
+        backend.conf frontend.conf)
+sha256sums=('6e61c6c8ffbc2698c3f9c6a917efe42bcebcb40787653cde0dbebc1b0de4e2bd'
+            'f31112800ec83ec529d0d35699a3d20fa0ed3cbb97d344146340815fec5ac055'
+            '2d822a8378edc0c01ab23f5b4fb72a8af76ad9d065e89b5b6dfe77252b7ce825' '6cf08bbf07a6edb159d4a8e96d5e8c520e83fc6a06a71737195d06b625356c1d')
+prepare() {
+    cp -a "$srcdir/hyprland-protocols-$_protocols_revision/." \
+        "$srcdir/xdg-desktop-portal-hyprland-$_revision/subprojects/hyprland-protocols/"
+}
+build() {
+    cmake -S "$srcdir/xdg-desktop-portal-hyprland-$_revision" -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBEXECDIR=lib
+    cmake --build build
+}
+check() {
+    test -x build/xdg-desktop-portal-hyprland
+    test -x build/hyprland-share-picker/hyprland-share-picker
+    grep -q 'org.freedesktop.impl.portal.RemoteDesktop;' "$srcdir/xdg-desktop-portal-hyprland-$_revision/hyprland.portal"
+    grep -q 'org.freedesktop.impl.portal.InputCapture;' "$srcdir/xdg-desktop-portal-hyprland-$_revision/hyprland.portal"
+}
+package() {
+    DESTDIR="$pkgdir" cmake --install build
+    install -Dm644 "$srcdir/backend.conf" "$pkgdir/usr/lib/systemd/user/xdg-desktop-portal-hyprland.service.d/50-spectrum-session.conf"
+    install -Dm644 "$srcdir/frontend.conf" "$pkgdir/usr/lib/systemd/user/xdg-desktop-portal.service.d/50-spectrum-hyprland-session.conf"
+    install -Dm644 "$srcdir/xdg-desktop-portal-hyprland-$_revision/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -d "$pkgdir/usr/share/doc/$pkgname"
+    printf '%s\n' "XDPH revision: $_revision" "hyprland-protocols revision: $_protocols_revision" \
+        "Temporary SpectrumOS downstream package; upstream PR #426 is not merged." \
+        > "$pkgdir/usr/share/doc/$pkgname/revisions.txt"
+}

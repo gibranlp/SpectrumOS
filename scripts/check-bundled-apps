@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository=${1:?Usage: check-bundled-apps REPOSITORY}
+database=$repository/spectrumos.db.tar.zst
+entry=$(bsdtar -tf "$database" | awk '/^spectrum-desktop-[^/]+\/desc$/ { print; exit }')
+[[ -n $entry ]] || { printf 'The offline repository has no spectrum-desktop package.\n' >&2; exit 1; }
+filename=$(bsdtar -xOf "$database" "$entry" | awk '/^%FILENAME%$/ { getline; print; exit }')
+[[ -n $filename && $filename != */* && -f $repository/$filename ]] || {
+    printf 'The offline repository is missing its indexed spectrum-desktop artifact.\n' >&2
+    exit 1
+}
+contents=$(bsdtar -tf "$repository/$filename")
+for required in usr/bin/stash usr/bin/questline usr/lib/spectrumos/stash-open usr/lib/spectrumos/questline-open usr/share/applications/stash.desktop; do
+    if ! printf '%s\n' "$contents" | grep -Fx "$required" >/dev/null; then
+        printf 'The offline desktop package is missing %s. Rebuild and sign it before creating an ISO.\n' "$required" >&2
+        exit 1
+    fi
+done
+printf 'Offline desktop package includes Stash, Questline-cli, and their launchers.\n'

@@ -1,0 +1,419 @@
+#!/usr/bin/env python3
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import select
+import signal
+import socket
+import subprocess
+import sys
+import time
+import uuid
+
+LIMIT = 65536
+NAMED = {"Enter":"Return", "Space":"space", "Tab":"Tab", "Escape":"Escape", "Backspace":"BackSpace", "Delete":"Delete", "Up":"Up", "Down":"Down", "Left":"Left", "Right":"Right", "Home":"Home", "End":"End", "PageUp":"Prior", "PageDown":"Next", **{f"F{i}":f"F{i}" for i in range(1, 25)}}
+MODS = {"ctrl":("CTRL",4), "control":("CTRL",4), "shift":("SHIFT",1), "alt":("ALT",8), "super":("SUPER",64)}
+IDENTITY = re.compile(r"[a-f0-9]{32}\Z")
+
+
+def keys(text):
+    if not isinstance(text, str) or not 1 <= len(text) <= 256:
+        raise ValueError("Enter 1–32 keys, for example 234 or [Enter].")
+    result = []
+    while text:
+        if text.startswith("["):
+            end = text.find("]")
+            name = text[1:end] if end >= 0 else ""
+            if name not in NAMED:
+                raise ValueError("Unknown named key. Use the key selector.")
+            result.append(NAMED[name]); text = text[end+1:]
+        else:
+            char, text = text[0], text[1:]
+            if not char.isascii() or not char.isalnum():
+                raise ValueError("Type letters/numbers or select a named key.")
+            result.append(char)
+    if len(result) > 32:
+        raise ValueError("Each sequence supports up to 32 keys.")
+    return result
+
+
+def shortcut(text):
+    if not isinstance(text, str) or len(text) > 80:
+        raise ValueError("Enter a shortcut such as Control+Shift+2.")
+    parts = [p.strip() for p in text.split("+")]
+    modifiers = []
+    mask = 0
+    for part in parts[:-1]:
+        modifier = MODS.get(part.lower())
+        if not modifier or mask & modifier[1]:
+            raise ValueError("Use Control, Shift, Alt or Super once each.")
+        modifiers.append(modifier[0]); mask |= modifier[1]
+    key = parts[-1]
+    key = NAMED.get(key, key)
+    if not (re.fullmatch(r"[A-Za-z0-9]", key) or key in NAMED.values()):
+        raise ValueError("Use one letter, number or named key, optionally with modifiers.")
+    key = key.upper() if len(key) == 1 else key
+    modifiers.sort(key=lambda m: {"CTRL":0,"SHIFT":1,"ALT":2,"SUPER":3}[m])
+    return " + ".join(modifiers+[key]), mask, key
+
+
+def rule(value):
+    if not isinstance(value, dict) or set(value) - {"id", "keys", "interval_ms", "shortcut"}:
+        raise ValueError("Invalid HotKey rule.")
+    identity = value.get("id") or uuid.uuid4().hex
+    if not isinstance(identity, str) or not IDENTITY.fullmatch(identity):
+        raise ValueError("Invalid rule ID.")
+    interval = value.get("interval_ms")
+    if type(interval) is not int or not 10 <= interval <= 60000:
+        raise ValueError("Interval must be 10–60000 ms.")
+    keys(value.get("keys"))
+    chord, _, _ = shortcut(value.get("shortcut"))
+    return dict(id=identity, keys=value["keys"], interval_ms=interval, shortcut=chord)
+
+
+def config_path():
+    return Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home()/".config")))/"spectrumos/hotkey.json"
+
+
+def runtime_path():
+    return Path(os.environ["XDG_RUNTIME_DIR"])/"spectrum-hotkey"
+
+
+def hypr(*args):
+    result = subprocess.run(["hyprctl", *args], capture_output=True, text=True, timeout=2)
+    if result.returncode != 0 or (args[0] == "eval" and result.stdout.strip() != "ok"):
+        raise ValueError("Hyprland shortcut registration failed.")
+    return result.stdout
+
+
+class Keyboard:
+    def __init__(self):
+        self.process = None
+        self.pending = None
+        self.started = 0
+        self.reply = bytearray()
+
+    def send(self, identity, key, now):
+        if not self.process:
+            helper = os.environ.get("SPECTRUM_HOTKEY_KEYBOARD", "/usr/lib/spectrumos/hotkey-keyboard")
+            self.process = subprocess.Popen([helper], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            stderr=subprocess.DEVNULL, bufsize=0)
+            os.set_blocking(self.process.stdout.fileno(), False)
+        self.process.stdin.write(("press " + key + "\n").encode())
+        self.pending = identity
+        self.started = now
+
+    def poll(self, now):
+        if not self.process or not self.pending:
+            return None
+        if self.process.poll() is not None:
+            raise ValueError("Wayland keyboard disconnected; repetition stopped.")
+        if select.select([self.process.stdout], [], [], 0)[0]:
+            chunk = os.read(self.process.stdout.fileno(), 64)
+            if not chunk or len(self.reply) + len(chunk) > 64:
+                raise ValueError("Wayland key delivery failed; repetition stopped.")
+            self.reply.extend(chunk)
+            if b"\n" in self.reply:
+                if self.reply != b"ok\n":
+                    raise ValueError("Wayland key delivery failed; repetition stopped.")
+                self.reply.clear()
+                identity = self.pending
+                self.pending = None
+                return identity
+        if now - self.started > 1:
+            raise ValueError("Wayland key delivery timed out; repetition stopped.")
+        return None
+
+    def close(self):
+        if self.process:
+            process = self.process
+            process.stdin.close()
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=.2)
+                except subprocess.TimeoutExpired:
+                    process.kill(); process.wait()
+            process.stdout.close()
+        self.process = None
+        self.pending = None
+        self.reply.clear()
+
+
+class Engine:
+    def __init__(self):
+        self.rules = []
+        self.active = {}
+        self.errors = {}
+        self.registered = set()
+        self.keyboard = Keyboard()
+        self.toggles = 0
+        self.delivered = 0
+        path = config_path()
+        if path.exists():
+            if path.stat().st_size > LIMIT:
+                raise ValueError("HotKey configuration is too large.")
+            data = json.loads(path.read_text())
+            if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("rules"), list) or len(data["rules"]) > 32:
+                raise ValueError("Invalid HotKey configuration.")
+            self.rules = [rule(item) for item in data["rules"]]
+            if len({r["id"] for r in self.rules}) != len(self.rules) or len({r["shortcut"] for r in self.rules}) != len(self.rules):
+                raise ValueError("Duplicate HotKey rule or shortcut.")
+
+    def persist(self):
+        path = config_path(); path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        with os.fdopen(os.open(temporary, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o600), "w") as stream:
+            json.dump(dict(version=1, rules=self.rules), stream)
+        os.replace(temporary, path)
+
+    def bindings(self):
+        return json.loads(hypr("-j", "binds"))
+
+    def matches(self, item, binding):
+        _, mask, key = shortcut(item["shortcut"])
+        return binding.get("modmask") == mask and str(binding.get("key", "")).lower() == key.lower()
+
+    def owned(self, item, binding):
+        return binding.get("description") == "Spectrum HotKey " + item["id"]
+
+    def check(self, item, bindings):
+        for binding in bindings:
+            if self.matches(item, binding) and not self.owned(item, binding):
+                raise ValueError("Shortcut already belongs to another desktop action. Choose another.")
+        for other in self.rules:
+            if other["id"] != item["id"] and other["shortcut"] == item["shortcut"]:
+                raise ValueError("Another HotKey rule already uses that shortcut.")
+
+    def register(self, item):
+        identity = item["id"]
+        command = "/usr/lib/spectrumos/hotkey-adapter toggle " + identity
+        chord = json.dumps(item["shortcut"])
+        description = json.dumps("Spectrum HotKey " + identity)
+        # El teclado virtual escribe en la app sin volver a activar el atajo.
+        helper = Path(os.environ.get("SPECTRUM_HOTKEY_KEYBOARD", "/usr/lib/spectrumos/hotkey-keyboard")).name
+        virtual = json.dumps("hl-virtual-keyboard-" + helper)
+        hypr("eval", f'hl.bind({chord}, hl.dsp.exec_cmd({json.dumps(command)}), {{description={description}, device={{inclusive=false, list={{"hl-virtual-keyboard", {virtual}}}}}}})')
+        self.registered.add(identity)
+
+    def unregister(self, item):
+        bindings = self.bindings()
+        matching = [b for b in bindings if self.matches(item, b)]
+        if matching and all(self.owned(item, b) for b in matching):
+            hypr("eval", "hl.unbind(" + json.dumps(item["shortcut"]) + ")")
+        self.registered.discard(item["id"])
+
+    def reconcile(self):
+        if not self.rules:
+            return
+        bindings = self.bindings()
+        for item in self.rules:
+            try:
+                self.check(item, bindings)
+                if not any(self.matches(item,b) and self.owned(item,b) for b in bindings):
+                    self.stop(item["id"])
+                    self.register(item)
+                if self.errors.get(item["id"], "").startswith("Shortcut unavailable"):
+                    self.errors.pop(item["id"], None)
+            except (ValueError, OSError, subprocess.SubprocessError):
+                self.stop(item["id"])
+                self.errors[item["id"]] = "Shortcut unavailable or conflicts with another desktop action."
+
+    def stop(self, identity):
+        self.active.pop(identity, None)
+        if self.keyboard.pending == identity or not self.active:
+            self.keyboard.close()
+
+    def stop_all(self):
+        for identity in list(self.active):
+            self.stop(identity)
+
+    def dispatch(self, args):
+        if not isinstance(args, list) or not args or not all(isinstance(a,str) for a in args):
+            raise ValueError("Invalid HotKey command.")
+        if args == ["status"]:
+            pass
+        elif args == ["stop-all"]:
+            self.stop_all()
+        elif len(args) == 2 and args[0] == "save":
+            item = rule(json.loads(args[1]))
+            if len(self.rules) >= 32 and not any(r["id"] == item["id"] for r in self.rules):
+                raise ValueError("Up to 32 HotKey rules can be saved.")
+            self.check(item, self.bindings())
+            old = next((r for r in self.rules if r["id"] == item["id"]), None)
+            self.stop(item["id"])
+            if old:
+                self.unregister(old)
+            self.register(item)
+            previous = self.rules[:]
+            self.rules = [r for r in self.rules if r["id"] != item["id"]]+[item]
+            try:
+                self.persist()
+            except OSError:
+                self.unregister(item); self.rules = previous
+                if old:
+                    self.register(old)
+                raise
+            self.errors.pop(item["id"], None)
+        elif len(args) == 2 and args[0] in ("remove", "toggle") and IDENTITY.fullmatch(args[1]):
+            item = next((r for r in self.rules if r["id"] == args[1]), None)
+            if not item:
+                raise ValueError("HotKey rule no longer exists. Refresh the widget.")
+            if args[0] == "toggle":
+                self.toggles += 1
+            if args[0] == "remove":
+                self.stop(item["id"]); self.unregister(item)
+                previous = self.rules[:]
+                self.rules = [r for r in self.rules if r["id"] != item["id"]]
+                try:
+                    self.persist()
+                except OSError:
+                    self.rules = previous; self.register(item); raise
+                self.errors.pop(item["id"], None)
+            elif item["id"] in self.active:
+                self.stop(item["id"])
+            else:
+                self.check(item, self.bindings())
+                if sum(len(keys(r["keys"]))*1000/r["interval_ms"] for r in self.rules if r["id"] in self.active)+len(keys(item["keys"]))*1000/item["interval_ms"] > 200:
+                    raise ValueError("Combined repeat rate is limited to 200 keys/second. Increase an interval or stop a rule.")
+                self.errors.pop(item["id"], None)
+                self.active[item["id"]] = dict(next=time.monotonic()+.25, index=0)
+        else:
+            raise ValueError("Unsupported HotKey command.")
+        return dict(ok=True, rules=[dict(r, active=r["id"] in self.active, error=self.errors.get(r["id"], "")) for r in self.rules], error="", diagnostics=dict(toggle_requests=self.toggles, delivered_keys=self.delivered, queue_depth=int(self.keyboard.pending is not None)))
+
+    def tick(self, now):
+        try:
+            identity = self.keyboard.poll(now)
+            if identity:
+                self.delivered += 1
+                if identity in self.active and self.active[identity]["index"] == 0:
+                    item = next(r for r in self.rules if r["id"] == identity)
+                    self.active[identity]["next"] = now+item["interval_ms"]/1000
+        except (ValueError, OSError) as error:
+            for identity in self.active:
+                self.errors[identity] = str(error)
+            self.stop_all()
+            return
+        if self.keyboard.pending:
+            return
+        due = sorted((item for item in self.rules if item["id"] in self.active),
+                     key=lambda item: self.active[item["id"]]["next"])
+        for item in due:
+            state = self.active[item["id"]]
+            if now < state["next"]:
+                continue
+            sequence = keys(item["keys"])
+            try:
+                self.keyboard.send(item["id"], sequence[state["index"]], now)
+            except OSError:
+                self.errors[item["id"]] = "Persistent Wayland keyboard unavailable; repetition stopped."
+                self.stop_all()
+                return
+            state["index"] = (state["index"]+1)%len(sequence)
+            # La pausa empieza al confirmar la última tecla; no acumulamos ciclos vencidos.
+            state["next"] = float("inf") if state["index"] == 0 else now
+            break
+
+    def wait_timeout(self, now):
+        if self.keyboard.pending:
+            return .005
+        deadline = min((state["next"] for state in self.active.values()), default=now+.2)
+        return max(.001, min(.2, deadline-now))
+
+
+def serve():
+    directory = runtime_path(); directory.mkdir(mode=0o700, exist_ok=True)
+    directory.chmod(0o700)
+    lock = open(directory/"owner.lock", "a")
+    fcntl.flock(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+    path = directory/"control.sock"
+    path.unlink(missing_ok=True)
+    engine = Engine()
+    server = socket.socket(socket.AF_UNIX)
+    server.bind(str(path)); path.chmod(0o600); server.listen(8); server.settimeout(.005)
+    stopping = False
+    def shutdown(*_):
+        nonlocal stopping
+        stopping = True
+    signal.signal(signal.SIGTERM, shutdown); signal.signal(signal.SIGINT, shutdown)
+    next_reconcile = 0
+    session = os.environ.get("XDG_SESSION_ID")
+    if not session:
+        session = subprocess.run(["loginctl","show-user",str(os.getuid()),"-p","Display","--value"],capture_output=True,text=True,timeout=2).stdout.strip()
+    next_lock_check = 0
+    try:
+        while not stopping:
+            now = time.monotonic()
+            if now >= next_reconcile:
+                try:
+                    engine.reconcile()
+                except (ValueError, OSError, subprocess.SubprocessError):
+                    engine.stop_all()
+                next_reconcile = now+2
+            if engine.active and now >= next_lock_check:
+                result = subprocess.run(["loginctl","show-session",session or "missing","-p","LockedHint","--value"],capture_output=True,text=True,timeout=2)
+                if result.returncode != 0 or result.stdout.strip() != "no":
+                    for identity in engine.active:
+                        engine.errors[identity] = "Session locked or unavailable; repetition stopped."
+                    engine.stop_all()
+                next_lock_check = now+.25
+            engine.tick(time.monotonic())
+            server.settimeout(engine.wait_timeout(time.monotonic()))
+            try:
+                connection, _ = server.accept()
+            except socket.timeout:
+                continue
+            with connection:
+                connection.settimeout(.2)
+                try:
+                    data = bytearray()
+                    while b"\n" not in data:
+                        chunk = connection.recv(4096)
+                        if not chunk or len(data)+len(chunk)>LIMIT:
+                            raise ValueError("Invalid or oversized HotKey request.")
+                        data.extend(chunk)
+                    response = engine.dispatch(json.loads(data.split(b"\n",1)[0]))
+                except (ValueError, OSError, subprocess.SubprocessError) as error:
+                    response = dict(ok=False, error=str(error))
+                try:
+                    connection.sendall(json.dumps(response).encode()+b"\n")
+                except OSError:
+                    pass
+    finally:
+        engine.stop_all()
+        for item in engine.rules:
+            try:
+                engine.unregister(item)
+            except (ValueError, OSError, subprocess.SubprocessError):
+                pass
+        server.close(); path.unlink(missing_ok=True); lock.close()
+
+
+def client(args):
+    data = json.dumps(args).encode()+b"\n"
+    if len(data)>LIMIT:
+        raise ValueError("HotKey request is too large.")
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.settimeout(5)
+        connection.connect(str(runtime_path()/"control.sock")); connection.sendall(data)
+        response = bytearray()
+        while b"\n" not in response:
+            chunk = connection.recv(4096)
+            if not chunk or len(response)+len(chunk)>LIMIT:
+                raise ValueError("HotKey service returned an invalid response.")
+            response.extend(chunk)
+        return json.loads(response.split(b"\n",1)[0])
+
+
+if __name__ == "__main__":
+    try:
+        if sys.argv[1:] == ["serve"]:
+            serve(); sys.exit(0)
+        result = client(sys.argv[1:])
+    except (ValueError, OSError, subprocess.SubprocessError):
+        result = dict(ok=False, error="HotKey unavailable. Start spectrum-hotkey.service in a supported Hyprland/Wayland session.")
+    print(json.dumps(result), flush=True)
+    sys.exit(0 if result["ok"] else 1)

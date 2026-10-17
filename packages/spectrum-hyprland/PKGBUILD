@@ -1,0 +1,35 @@
+pkgname=spectrum-hyprland
+pkgver=1.0.0
+pkgrel=4
+pkgdesc="Hyprland session defaults for SpectrumOS"
+arch=(any)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=('spectrum-base>=1.0.0' hyprland hypridle hyprlock polkit-gnome uwsm spectrum-theme xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
+install=spectrum-hyprland.install
+options=(!strip !debug)
+_source_revision=7e5a2b355c9b5325
+_source_root="spectrumos-source-$pkgver"
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
+sha256sums=('ec95683d57ae456c79bf4c41a4f06e74b50db807ef17996d404220e84ad369e8')
+
+check() {
+    local _project="$srcdir/$_source_root"
+    python "$_project/scripts/validate-hyprland.py" \
+        --config-dir "$_project/configs/hyprland"
+}
+
+package() {
+    local _project="$srcdir/$_source_root"
+    local defaults="$pkgdir/usr/share/spectrumos/hyprland"
+    install -d -m 0755 "$defaults/gpu" "$pkgdir/usr/lib/spectrumos" \
+        "$pkgdir/usr/share/spectrumos/hardware/nvidia" "$pkgdir/usr/share/licenses/$pkgname"
+    install -m 0644 "$_project"/configs/hyprland/*.lua "$defaults/"
+    install -m 0644 "$_project"/configs/hyprland/gpu/*.lua "$defaults/gpu/"
+    install -m 0644 "$_project/configs/hyprland/hypridle.conf" "$defaults/"
+    install -m 0755 "$_project/scripts/nvidia-offload" \
+        "$pkgdir/usr/lib/spectrumos/nvidia-offload"
+    install -m 0644 "$_project/system/modprobe.d/spectrumos-nvidia-power.conf" \
+        "$pkgdir/usr/share/spectrumos/hardware/nvidia/spectrumos-nvidia-power.conf"
+    install -m 0644 "$_project/packages/$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

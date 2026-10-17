@@ -1,0 +1,11 @@
+[Unit]
+Description=SpectrumOS resource warning monitor
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/spectrumos/resource-monitor
+Restart=on-failure
+RestartSec=5
+Nice=10

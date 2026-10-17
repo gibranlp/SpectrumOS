@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch for SpectrumOS boot appearance changes
+# El watcher hereda el limite de arranques del oneshot que dispara; ver spectrumos-limine-
+# appearance.service para por que una racha legitima de cambios de wallpaper no debe apagarlo.
+StartLimitIntervalSec=0
+
+[Path]
+PathChanged=/var/lib/spectrumos/appearance/request
+Unit=spectrumos-limine-appearance.service
+
+[Install]
+WantedBy=multi-user.target

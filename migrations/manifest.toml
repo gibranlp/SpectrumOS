@@ -1,0 +1,45 @@
+schema_version = 1
+release_api = 1
+
+[[migrations]]
+id = "0001-release-foundation"
+introduced_in = "0.1.0"
+description = "Establish package-owned SpectrumOS release and migration metadata."
+from_versions = ["unversioned"]
+to_version = "0.1.0"
+mode = "declarative"
+
+[migrations.preconditions]
+packages = ["spectrum-base>=0.1.0-9"]
+paths_present = ["/usr/share/spectrumos/release.toml"]
+paths_absent = []
+
+[migrations.completion]
+marker = "/var/lib/spectrumos/migrations/0001-release-foundation.complete"
+verification = "Release metadata exists and passes schema validation."
+
+[migrations.rollback]
+supported = true
+notes = "Remove only the completion marker; package-owned metadata follows the package transaction."
+
+
+[[migrations]]
+id = "0002-stable-release"
+introduced_in = "1.0.0"
+description = "Record SpectrumOS 1.0 stable package-owned release metadata."
+from_versions = ["0.1.0", "unversioned"]
+to_version = "1.0.0"
+mode = "declarative"
+
+[migrations.preconditions]
+packages = ["spectrum-base>=1.0.0-1"]
+paths_present = ["/usr/share/spectrumos/release.toml"]
+paths_absent = []
+
+[migrations.completion]
+marker = "/var/lib/spectrumos/migrations/0002-stable-release.complete"
+verification = "SpectrumOS 1.0 stable release metadata is installed."
+
+[migrations.rollback]
+supported = true
+notes = "Remove only the completion marker; package-owned metadata follows package rollback."

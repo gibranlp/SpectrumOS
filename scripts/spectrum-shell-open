@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (($# < 1 || $# > 2)); then
+    printf 'Usage: %s {bar|dashboard|control|appearance|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|calendar|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
+    exit 2
+fi
+
+case $1 in
+    bar) method=focusBar; fallback=none ;;
+    dashboard) method=toggleDashboard; fallback=none ;;
+    control) method=toggleControlCenter; fallback=home ;;
+    appearance) method=openControlPage; method_arg=Appearance; fallback=appearance ;;
+    appimages) method=toggleAppImages; fallback=none ;;
+    more) method=toggleBarExtras; fallback=none ;;
+    typography) method=toggleTypography; fallback=none ;;
+    mouse) method=toggleMouse; fallback=none ;;
+    displays) method=toggleDisplays; fallback=displays ;;
+    weather) method=toggleWeather; fallback=weather ;;
+    time) method=toggleTimeRegion; fallback=none ;;
+    wallpapers) method=toggleWallpapers; fallback=wallpapers ;;
+    power|battery) method=toggleBattery; fallback=none ;;
+    audio) method=toggleAudio; fallback=audio ;;
+    network) method=toggleWifi; fallback=network ;;
+    bluetooth) method=toggleBluetooth; fallback=bluetooth ;;
+    notifications) method=toggleNotifications; fallback=home ;;
+    session) method=toggleSession; fallback=session ;;
+    screenshot) method=toggleScreenshot; fallback=none ;;
+    audio-recorder) method=toggleAudioRecorder; fallback=none ;;
+    recorder) method=toggleRecorder; fallback=recorder ;;
+    search) method=toggleFileSearch; fallback=search ;;
+    calculator) method=toggleCalculator; fallback=calculator ;;
+    password) method=togglePassword; fallback=password ;;
+    emoji) method=toggleEmoji; fallback=emoji ;;
+    color) method=toggleColorPicker; fallback=color ;;
+    color-history) method=toggleColorHistory; fallback=none ;;
+    spectrumdrop) method=toggleSpectrumDrop; fallback=none ;;
+    hotkey) method=toggleHotKey; fallback=none ;;
+    shortcuts) method=toggleShortcuts; fallback=shortcuts ;;
+    updates) method=toggleUpdates; fallback=updates ;;
+    focus) method=toggleFocusTimer; fallback=home ;;
+    calendar) method=toggleCalendar; fallback=home ;;
+    questline) method=toggleQuestline; fallback=none ;;
+    new-task) method=openQuestlineNewTask; fallback=none ;;
+    new-scroll) method=openQuestlineNewScroll; fallback=none ;;
+    dismiss-notification) method=dismissLatestNotification; fallback=dismiss-notification ;;
+    clear-notifications) method=clearNotifications; fallback=clear-notifications ;;
+    *) printf 'Unknown SpectrumShell page: %s\n' "$1" >&2; exit 2 ;;
+esac
+
+if (($# == 2)); then
+    [[ $2 == --repo ]] || exit 2
+    config_dir=$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")/../configs/spectrum-shell")
+else
+    config_dir=/usr/share/spectrumos/spectrum-shell
+fi
+
+if command -v qs >/dev/null 2>&1; then
+    for _ in 1 2 3; do
+        if [[ -n ${method_arg:-} ]]; then
+            response=$(qs --path "$config_dir" ipc call spectrum-shell "$method" "$method_arg" 2>&1) && [[ -z $response ]] && exit 0
+        else
+            response=$(qs --path "$config_dir" ipc call spectrum-shell "$method" 2>&1) && [[ -z $response ]] && exit 0
+        fi
+        [[ $response == *'Not ready to accept queries yet.'* ]] || break
+        sleep 0.1
+    done
+fi
+case $fallback in
+    session) exec /usr/lib/spectrumos/session-menu ;;
+    network) exec /usr/lib/spectrumos/network-menu ;;
+    bluetooth) exec uwsm app -- blueman-manager ;;
+    wallpapers) exec /usr/lib/spectrumos/theme-menu ;;
+    audio) exec /usr/lib/spectrumos/panel --audio ;;
+    search) exec /usr/lib/spectrumos/panel --search ;;
+    calculator) exec /usr/lib/spectrumos/calculator-menu ;;
+    password) exec /usr/lib/spectrumos/panel --password ;;
+    emoji) exec /usr/lib/spectrumos/panel --emoji ;;
+    color) exec /usr/lib/spectrumos/panel --color-picker ;;
+    recorder) exec /usr/lib/spectrumos/recorder-menu ;;
+    updates) exec uwsm app -- kitty --hold -e /usr/lib/spectrumos/spectrum-update-run all ;;
+    appearance) exec /usr/lib/spectrumos/panel --appearance ;;
+    displays) exec /usr/lib/spectrumos/display-menu ;;
+    weather) exec /usr/lib/spectrumos/weather-adapter select-native ;;
+    dismiss-notification|clear-notifications) exit 1 ;;
+    none) exit 1 ;;
+esac
+exec /usr/lib/spectrumos/panel

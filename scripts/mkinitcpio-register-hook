@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Idempotently insert a hook name into /etc/mkinitcpio.conf's HOOKS array,
+immediately before another named hook already present there.
+"""
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import re
+
+
+HOOKS_LINE = re.compile(r"^HOOKS=\((.*)\)\s*$")
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Insert a hook into mkinitcpio.conf's HOOKS array")
+    parser.add_argument("hook")
+    parser.add_argument("--before", required=True)
+    parser.add_argument("--config", type=Path, default=Path("/etc/mkinitcpio.conf"))
+    return parser.parse_args()
+
+
+def insert_hook(content: str, hook: str, before: str) -> str | None:
+    """Returns the updated file content, or None if `hook` is already present.
+
+    Raises SystemExit if no single-line HOOKS=(...) array is found, or if
+    `before` is not in it -- a multi-line or unrecognized HOOKS declaration
+    is refused rather than guessing where to insert.
+    """
+    lines = content.splitlines()
+    for index, line in enumerate(lines):
+        match = HOOKS_LINE.match(line)
+        if not match:
+            continue
+        names = match.group(1).split()
+        if hook in names:
+            return None
+        if before not in names:
+            raise SystemExit(f"HOOKS does not contain {before!r}; refusing to guess a position")
+        names.insert(names.index(before), hook)
+        lines[index] = f"HOOKS=({' '.join(names)})"
+        return "\n".join(lines) + "\n"
+    raise SystemExit("No single-line HOOKS=(...) array was found")
+
+
+def main() -> int:
+    options = arguments()
+    content = options.config.read_text(encoding="utf-8")
+    updated = insert_hook(content, options.hook, options.before)
+    if updated is None:
+        return 0
+    options.config.write_text(updated, encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

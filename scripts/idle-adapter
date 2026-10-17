@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+
+
+STATE_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "spectrumos"
+PID_FILE = STATE_DIR / "idle-inhibitor.pid"
+
+
+def inhibitor_pid() -> int | None:
+    try:
+        pid = int(PID_FILE.read_text(encoding="utf-8").strip())
+        command = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ")
+        if b"systemd-inhibit" in command and b"SpectrumOS keep awake" in command:
+            return pid
+    except (OSError, ValueError):
+        pass
+    PID_FILE.unlink(missing_ok=True)
+    return None
+
+
+def enable() -> None:
+    if inhibitor_pid() is not None:
+        return
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    process = subprocess.Popen(
+        [
+            # Toggled from either Eww's header icon or Waybar's custom/keep-awake, both of
+            # which fork this as a child living in that app's own systemd cgroup
+            # (spectrum-eww.service / spectrum-waybar.service) -- a wallpaper or theme
+            # change restarts both of those (waybar-menu --restart, eww-refresh), and
+            # KillMode=control-group (systemd's default) kills every process in a service's
+            # cgroup on restart, this one included, silently turning keep awake back off
+            # even though nothing asked for that. `uwsm app` launches it into its own
+            # independent session-graphical.slice scope instead (confirmed: a completely
+            # separate cgroup from either service's own), so it survives both -- the same
+            # decoupling autostart.lua already relies on for dunst/awww-daemon/etc.
+            "uwsm", "app", "-s", "s", "--",
+            "systemd-inhibit",
+            "--what=idle:sleep",
+            "--who=SpectrumOS",
+            "--why=SpectrumOS keep awake",
+            "--mode=block",
+            "sleep",
+            "infinity",
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    PID_FILE.write_text(f"{process.pid}\n", encoding="utf-8")
+
+
+def disable() -> None:
+    pid = inhibitor_pid()
+    if pid is not None:
+        try:
+            os.killpg(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    PID_FILE.unlink(missing_ok=True)
+
+
+def main() -> int:
+    action = sys.argv[1] if len(sys.argv) == 2 else ""
+    if action == "check":
+        return 1 if inhibitor_pid() is not None else 0
+    if action == "--json":
+        active = inhibitor_pid() is not None
+        print(json.dumps({"active": active, "label": "Keep awake" if active else "Allow sleep"}, separators=(",", ":")))
+        return 0
+    if action == "--status":
+        # Waybar's own custom-module shape (text/tooltip/class), distinct from --json
+        # above which is what the Eww header icon polls. md-coffee/md-coffee_off, the same
+        # glyphs the Eww header icon uses, verified present in every Nerd Font family
+        # SpectrumOS offers (see font-family-menu).
+        active = inhibitor_pid() is not None
+        text = "\U000f0176" if active else "\U000f0faa"
+        label = "Keep awake" if active else "Allow sleep"
+        klass = "active" if active else "idle"
+        print(json.dumps({"text": text, "tooltip": f"{label}\nClick to toggle", "class": klass}, separators=(",", ":")))
+        return 0
+    if action == "toggle":
+        disable() if inhibitor_pid() is not None else enable()
+        return 0
+    if action == "on":
+        enable()
+        return 0
+    if action == "off":
+        disable()
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

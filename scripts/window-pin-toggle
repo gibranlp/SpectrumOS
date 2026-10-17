@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Floats the active window if it isn't already, then toggles Hyprland's
+native pin: a pinned floating window stays at the exact same screen
+position across every workspace switch, like `position: fixed` in CSS
+relative to the monitor rather than the page. One keypress turns any
+window into that; the same keypress again releases it back to a normal
+floating window on whatever workspace it's on. Pinning also raises it to
+the top of the stacking order, so it stays visible over a fullscreen game
+or video rather than being covered by it.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+
+
+def active_window() -> dict | None:
+    result = subprocess.run(
+        ["hyprctl", "-j", "activewindow"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def dispatch(expression: str) -> None:
+    # This Hyprland version's `hyprctl dispatch` no longer accepts the classic
+    # "dispatcher arg1 arg2" form -- it evaluates its argument as a Lua
+    # expression that must itself produce a dispatcher, e.g. the same
+    # hl.dsp.* calls used directly in the Lua config (confirmed live: the old
+    # "togglefloating active" form errors with "hl.dispatch: expected a
+    # dispatcher (e.g. hl.dsp.window.close())").
+    subprocess.run(["hyprctl", "dispatch", expression], check=False)
+
+
+def main() -> int:
+    window = active_window()
+    if window is None:
+        return 1
+    if not window.get("floating", False):
+        dispatch('hl.dsp.window.float({action="toggle"})')
+    pinning = not window.get("pinned", False)
+    dispatch("hl.dsp.window.pin()")
+    if pinning:
+        # Puts it at the very front of the stacking order right now, on top of
+        # whatever else is open -- pin alone only keeps it *visible* across
+        # workspaces, not necessarily drawn above a fullscreen window that
+        # takes focus afterward. layouts.lua's binds.allow_pin_fullscreen is
+        # the other half: it stops a later fullscreen from cancelling the pin
+        # outright.
+        dispatch('hl.dsp.window.alter_zorder({mode="top"})')
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

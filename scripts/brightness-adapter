@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+import fcntl
+import json
+import math
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+BACKLIGHT = Path('/sys/class/backlight')
+DRM = Path('/sys/class/drm')
+
+
+def run(arguments: list[str]) -> str:
+    try:
+        result = subprocess.run(arguments, capture_output=True, text=True, timeout=4)
+    except FileNotFoundError as error:
+        raise ValueError(f'{arguments[0]} is not installed.') from error
+    except subprocess.TimeoutExpired as error:
+        raise ValueError('Display brightness request timed out.') from error
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise ValueError(detail.splitlines()[0][:240] if detail else 'Display brightness request failed.')
+    return result.stdout
+
+
+def percentage(current: int, maximum: int) -> int:
+    if maximum <= 0 or not 0 <= current <= maximum:
+        raise ValueError('Invalid brightness measurement.')
+    return math.floor(current * 100 / maximum + 0.5)
+
+
+def targets() -> list[dict]:
+    devices = []
+    for path in sorted(BACKLIGHT.glob('*')):
+        try:
+            maximum = int((path / 'max_brightness').read_text())
+            if maximum <= 0:
+                continue
+            kind = (path / 'type').read_text().strip()
+        except (OSError, ValueError):
+            continue
+        devices.append(dict(id='backlight:' + path.name, name=path.name, backend='backlight',
+                            path=str(path), maximum=maximum, kind=kind))
+    devices.sort(key=lambda device: ({'raw': 0, 'platform': 1, 'firmware': 2}.get(device['kind'], 3), device['name']))
+    for path in sorted(DRM.glob('card*-*')):
+        try:
+            if (path / 'status').read_text().strip() != 'connected':
+                continue
+            name = path.name.split('-', 1)[1]
+            if name.startswith(('eDP-', 'LVDS-', 'DSI-')):
+                continue
+            auxiliary = sorted(item for item in path.glob('i2c-*') if re.fullmatch(r'i2c-\d+', item.name))
+            bus = auxiliary[0].name if auxiliary else (path / 'ddc').resolve(strict=True).name
+            if not re.fullmatch(r'i2c-\d+', bus):
+                continue
+        except OSError:
+            continue
+        devices.append(dict(id='ddc:' + path.name, name=name, backend='ddc', bus=bus[4:]))
+    return devices[:16]
+
+
+def measure(device: dict) -> dict:
+    result = dict(id=device['id'], name=device['name'], backend=device['backend'], available=False, percent=None, error='')
+    try:
+        if device['backend'] == 'backlight':
+            current = int((Path(device['path']) / 'brightness').read_text())
+            maximum = device['maximum']
+        else:
+            output = run(['ddcutil', '--bus', device['bus'], '--brief', 'getvcp', '10'])
+            match = re.search(r'^VCP 10 C (\d+) (\d+)\s*$', output, re.MULTILINE)
+            if not match:
+                raise ValueError('Monitor does not advertise DDC/CI brightness. Enable DDC/CI in its menu if supported.')
+            current, maximum = map(int, match.groups())
+        result.update(available=True, percent=percentage(current, maximum), current=current, maximum=maximum)
+    except (OSError, ValueError) as error:
+        result['error'] = str(error)[:240]
+    return result
+
+
+def state() -> dict:
+    devices = targets()
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        readings = list(pool.map(measure, devices))
+    return dict(available=any(device['available'] for device in readings), devices=readings,
+                error='' if readings else 'No hardware brightness interface detected.')
+
+
+def select(devices: list[dict], identifier: str | None) -> dict:
+    if identifier:
+        target = next((item for item in devices if item['id'] == identifier), None)
+        if not target:
+            raise ValueError('This display is no longer connected. Refresh and try again.')
+        return target
+    internal = next((item for item in devices if item['backend'] == 'backlight'), None)
+    if internal:
+        return internal
+    if not devices:
+        raise ValueError('No hardware brightness interface detected.')
+    try:
+        monitors = json.loads(run(['hyprctl', '-j', 'monitors']))
+        focused = next((item['name'] for item in monitors if item.get('focused')), '')
+        target = next((item for item in devices if item['name'] == focused), None)
+        if target:
+            return target
+    except (ValueError, KeyError, TypeError):
+        pass
+    if len(devices) == 1:
+        return devices[0]
+    raise ValueError('Select a display in the Displays widget to change its brightness.')
+
+
+def change(operation: str, identifier: str | None) -> dict:
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'spectrumos'
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (runtime / 'brightness.lock').open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ValueError('Brightness is still changing; try again in a moment.') from error
+        device = select(targets(), identifier)
+        before = measure(device)
+        if not before['available']:
+            raise ValueError(before['error'])
+        percent = min(100, max(1, before['percent'] + (5 if operation == 'up' else -5)))
+        if device['backend'] == 'backlight':
+            run(['brightnessctl', '--quiet', '--class=backlight', '--device', device['name'], 'set', f'{percent}%'])
+        else:
+            value = max(1, math.floor(percent * before['maximum'] / 100 + 0.5))
+            run(['ddcutil', '--bus', device['bus'], 'setvcp', '10', str(value)])
+        after = measure(device)
+        if not after['available']:
+            raise ValueError('Brightness changed but could not be read back: ' + after['error'])
+        return dict(ok=True, device=after, error='')
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description='Read and change hardware display brightness without notifications.')
+    parser.add_argument('operation', nargs='?', choices=('up', 'down', 'status'), default='status')
+    parser.add_argument('--device')
+    parser.add_argument('--json', action='store_true')
+    args = parser.parse_args()
+    try:
+        payload = state() if args.operation == 'status' else change(args.operation, args.device)
+    except (OSError, ValueError) as error:
+        payload = dict(ok=False, error=str(error)[:240])
+        if args.json:
+            print(json.dumps(payload))
+        else:
+            print(payload['error'], file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(payload))
+    elif args.operation == 'status':
+        for device in payload['devices']:
+            print(f"{device['name']}: {str(device['percent']) + '%' if device['available'] else device['error']}")
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,17 @@
+[palette]
+schema_version = 1
+name = "Spectrum Dark"
+variant = "dark"
+source = "fixed-fallback"
+
+[roles]
+background = "#101218"
+surface = "#191c24"
+surface_alt = "#252a35"
+foreground = "#e9edf5"
+muted = "#9ca6b8"
+accent = "#76b7ff"
+accent_alt = "#c49aff"
+success = "#78dba9"
+warning = "#f2c66d"
+error = "#ff8c9a"

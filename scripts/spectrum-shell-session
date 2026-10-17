@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command -v qs >/dev/null || { printf 'Quickshell is required for SpectrumShell.\n' >&2; exit 1; }
+[[ -f /usr/share/spectrumos/spectrum-shell/shell.qml ]] || { printf 'SpectrumShell configuration is missing.\n' >&2; exit 1; }
+/usr/lib/spectrumos/spectrum-shell &
+shell_pid=$!
+for ((attempt = 0; attempt < 20; attempt++)); do
+    kill -0 "$shell_pid" 2>/dev/null || { wait "$shell_pid"; exit 1; }
+    if busctl --user status org.freedesktop.Notifications 2>/dev/null | grep -qx "PID=$shell_pid"; then
+        wait "$shell_pid"
+        exit $?
+    fi
+    sleep 0.25
+done
+printf 'SpectrumShell did not acquire desktop notifications.\n' >&2
+kill "$shell_pid" 2>/dev/null || true
+wait "$shell_pid" || true
+exit 1

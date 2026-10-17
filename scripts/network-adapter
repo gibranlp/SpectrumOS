@@ -1,0 +1,387 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import json
+import ipaddress
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import sys
+import time
+import uuid
+
+
+def run(*arguments: str, timeout: int = 12) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(arguments, check=False, capture_output=True, text=True, timeout=timeout)
+
+
+def split_nmcli(row: str) -> list[str]:
+    fields = []
+    current = []
+    escaped = False
+    for character in row:
+        if escaped:
+            current.append(character)
+            escaped = False
+        elif character == "\\":
+            escaped = True
+        elif character == ":":
+            fields.append("".join(current))
+            current = []
+        else:
+            current.append(character)
+    if escaped:
+        current.append("\\")
+    fields.append("".join(current))
+    return fields
+
+
+def saved_wifi() -> dict[str, str]:
+    saved = {}
+    connections = run("nmcli", "--terse", "--escape", "yes", "--fields", "UUID,TYPE", "connection", "show")
+    for row in connections.stdout.splitlines():
+        fields = split_nmcli(row)
+        if len(fields) != 2 or fields[1] not in ("802-11-wireless", "wifi"):
+            continue
+        identifier = fields[0]
+        name = run("nmcli", "--get-values", "802-11-wireless.ssid", "connection", "show", "uuid", identifier).stdout.strip()
+        if name:
+            saved[name] = identifier
+    return saved
+
+
+def format_rate(bytes_per_second: float) -> str:
+    value = max(0.0, bytes_per_second)
+    for unit in ("B/s", "KiB/s", "MiB/s", "GiB/s"):
+        if value < 1024 or unit == "GiB/s":
+            return f"{value:.0f} {unit}" if unit == "B/s" else f"{value:.1f} {unit}"
+        value /= 1024
+    return "0 B/s"
+
+
+def interface_throughput(interface: str) -> tuple[str, str]:
+    statistics_dir = Path("/sys/class/net") / interface / "statistics"
+    try:
+        rx = int((statistics_dir / "rx_bytes").read_text(encoding="utf-8"))
+        tx = int((statistics_dir / "tx_bytes").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "0 B/s", "0 B/s"
+    cache_file = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"spectrumos-network-{interface}-rates.json"
+    now = time.monotonic()
+    download = upload = 0.0
+    try:
+        previous = json.loads(cache_file.read_text(encoding="utf-8"))
+        elapsed = now - float(previous["time"])
+        if elapsed > 0:
+            download = (rx - int(previous["rx"])) / elapsed
+            upload = (tx - int(previous["tx"])) / elapsed
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    try:
+        temporary = cache_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"time": now, "rx": rx, "tx": tx}), encoding="utf-8")
+        temporary.replace(cache_file)
+    except OSError:
+        pass
+    return format_rate(download), format_rate(upload)
+
+
+def public_ip() -> str:
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "spectrumos"
+    cache_file = cache_root / "public-ip.json"
+    refresh_file = cache_root / "public-ip-refresh"
+    now = time.time()
+    address = "Checking…"
+    try:
+        cached = json.loads(cache_file.read_text(encoding="utf-8"))
+        address = str(cached.get("address") or "Unavailable")
+        if now - float(cached["time"]) < 900 and cached.get("address"):
+            return address
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    try:
+        recently_started = now - refresh_file.stat().st_mtime < 60
+    except OSError:
+        recently_started = False
+    if not recently_started:
+        try:
+            cache_root.mkdir(parents=True, exist_ok=True)
+            refresh_file.touch()
+            subprocess.Popen((sys.executable, __file__, "--refresh-public-ip"), start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+    return address
+
+
+def invalidate_public_ip() -> None:
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "spectrumos"
+    for name in ("public-ip.json", "public-ip-refresh"):
+        try:
+            (cache_root / name).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def refresh_public_ip() -> None:
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "spectrumos"
+    cache_file = cache_root / "public-ip.json"
+    try:
+        result = subprocess.run(("curl", "--fail", "--silent", "--max-time", "3", "https://api.ipify.org"), check=False, capture_output=True, text=True, timeout=4)
+        address = result.stdout.strip()
+        if result.returncode != 0:
+            return
+        ipaddress.ip_address(address)
+        cache_root.mkdir(parents=True, exist_ok=True)
+        temporary = cache_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"time": time.time(), "address": address}), encoding="utf-8")
+        temporary.replace(cache_file)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+
+
+def ethernet_state() -> dict[str, object]:
+    empty = {"connected": False, "interface": "", "connection": "No Ethernet connection", "ipv4": "—", "ipv6": "—", "gateway": "—", "public_ip": "—", "speed": "—", "download": "0 B/s", "upload": "0 B/s"}
+    devices = run("nmcli", "--terse", "--escape", "yes", "--fields", "DEVICE,TYPE,STATE,CONNECTION", "device", "status")
+    selected = None
+    for row in devices.stdout.splitlines():
+        fields = split_nmcli(row)
+        if len(fields) == 4 and fields[1] == "ethernet" and fields[2] in ("connected", "connecting"):
+            selected = fields
+            break
+    if selected is None:
+        return empty
+    interface, _, state_name, connection = selected
+    ipv4 = run("nmcli", "--get-values", "IP4.ADDRESS", "device", "show", interface).stdout.splitlines()
+    ipv6_output = run("nmcli", "--get-values", "IP6.ADDRESS", "device", "show", interface).stdout.replace("\\:", ":")
+    ipv6 = [address.strip() for row in ipv6_output.splitlines() for address in row.split(" | ") if address.strip() and not address.strip().startswith("fe80:")]
+    gateway = run("nmcli", "--get-values", "IP4.GATEWAY", "device", "show", interface).stdout.strip() or "—"
+    try:
+        link_speed = int((Path("/sys/class/net") / interface / "speed").read_text(encoding="utf-8").strip())
+        speed = f"{link_speed / 1000:g} Gbps" if link_speed >= 1000 else f"{link_speed} Mbps"
+    except (OSError, ValueError):
+        speed = "Unknown"
+    download, upload = interface_throughput(interface)
+    return {"connected": state_name == "connected", "interface": interface, "connection": connection, "ipv4": ipv4[0] if ipv4 else "—", "ipv6": ipv6[0] if ipv6 else "—", "gateway": gateway, "public_ip": public_ip(), "speed": speed, "download": download, "upload": upload}
+
+
+def wifi_state(ssid: str, signal: int, speed: str, device_rows: str | None = None) -> dict[str, object]:
+    empty = {"connected": False, "interface": "", "connection": "", "ssid": "", "signal": 0, "speed": "—", "ipv4": "—", "ipv6": "—", "gateway": "—", "download": "0 B/s", "upload": "0 B/s"}
+    if device_rows is None:
+        device_rows = run("nmcli", "--terse", "--escape", "yes", "--fields", "DEVICE,TYPE,STATE,CONNECTION", "device", "status").stdout
+    for row in device_rows.splitlines():
+        fields = split_nmcli(row)
+        if len(fields) != 4 or fields[1] != "wifi" or fields[2] != "connected":
+            continue
+        interface = fields[0]
+        ipv4 = run("nmcli", "--get-values", "IP4.ADDRESS", "device", "show", interface).stdout.splitlines()
+        ipv6 = run("nmcli", "--get-values", "IP6.ADDRESS", "device", "show", interface).stdout.splitlines()
+        gateway = run("nmcli", "--get-values", "IP4.GATEWAY", "device", "show", interface).stdout.strip() or "—"
+        download, upload = interface_throughput(interface)
+        return {"connected": True, "interface": interface, "connection": fields[3], "ssid": ssid or fields[3], "signal": signal, "speed": speed or "—", "ipv4": ipv4[0] if ipv4 else "—", "ipv6": next((value for value in ipv6 if value and not value.startswith("fe80:")), "—"), "gateway": gateway, "download": download, "upload": upload}
+    return empty
+
+
+def connection_profiles() -> list[dict[str, object]]:
+    result = run("nmcli", "--terse", "--escape", "yes", "--fields", "UUID,NAME,TYPE", "connection", "show")
+    profiles = []
+    for row in result.stdout.splitlines():
+        fields = split_nmcli(row)
+        if len(fields) != 3 or fields[2] not in ("ethernet", "802-3-ethernet", "wifi", "802-11-wireless"):
+            continue
+        identifier, name, kind = fields
+        try:
+            identifier = str(uuid.UUID(identifier))
+        except ValueError:
+            continue
+        methods = run("nmcli", "--escape", "no", "--get-values", "ipv4.method,ipv6.method", "connection", "show", "uuid", identifier)
+        values = methods.stdout.splitlines()
+        valid = methods.returncode == 0 and len(values) == 2
+        profiles.append({"uuid": identifier, "name": name, "type": "wifi" if kind in ("wifi", "802-11-wireless") else "ethernet",
+                         "ipv4_enabled": values[0] != "disabled" if valid else None,
+                         "ipv6_enabled": values[1] != "disabled" if valid else None,
+                         "error": "" if valid else methods.stderr.strip() or "Connection settings unavailable"})
+    return profiles
+
+
+def profile_value(identifier: str, field: str) -> str:
+    result = run("nmcli", "--escape", "no", "--get-values", field, "connection", "show", "uuid", identifier)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "Connection settings unavailable")
+    return result.stdout.strip()
+
+
+def ip_backup_path(identifier: str, family: str) -> Path:
+    directory = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos/network"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return directory / (identifier + "-" + family + ".json")
+
+
+def save_ip_backup(path: Path, saved: dict[str, str]) -> None:
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            json.dump(saved, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def set_ip_family(identifier: str, family: str, enabled: str) -> None:
+
+    identifier = str(uuid.UUID(identifier))
+    if family not in ("ipv4", "ipv6") or enabled not in ("on", "off"):
+        raise ValueError("Expected IPv4/IPv6 and on/off")
+    kind = profile_value(identifier, "connection.type")
+    if kind not in ("ethernet", "802-3-ethernet", "wifi", "802-11-wireless"):
+        raise ValueError("IP controls apply only to Ethernet and Wi-Fi connections")
+    method = profile_value(identifier, family + ".method")
+    if (method != "disabled") == (enabled == "on"):
+        return
+    other = "ipv6" if family == "ipv4" else "ipv4"
+    if enabled == "off" and profile_value(identifier, other + ".method") == "disabled":
+        raise ValueError("Keep at least one IP protocol enabled")
+    fields = ["method", "addresses", "gateway", "dns", "dns-search"]
+    if family == "ipv4":
+        fields.append("link-local")
+    backup = ip_backup_path(identifier, family)
+    command = ["nmcli", "connection", "modify", "uuid", identifier]
+    if enabled == "off":
+        saved = {field: profile_value(identifier, family + "." + field) for field in fields}
+        if family == "ipv4":
+            saved["link-local"] = saved["link-local"].split()[0]
+        save_ip_backup(backup, saved)
+        command += [family + ".method", "disabled"]
+        for field in fields:
+            if field != "method":
+                command += [family + "." + field, "0" if field == "link-local" else ""]
+    else:
+        saved = {"method": "auto"}
+        if backup.exists():
+            try:
+                if backup.stat().st_size > 65536:
+                    raise ValueError("oversized settings")
+                saved = json.loads(backup.read_text())
+                allowed_methods = {"auto", "manual", "shared", "link-local"} | ({"dhcp", "ignore"} if family == "ipv6" else set())
+                if not isinstance(saved, dict) or set(saved) != set(fields) or not all(isinstance(v, str) for v in saved.values()) or saved["method"] not in allowed_methods:
+                    raise ValueError("invalid settings")
+            except (ValueError, TypeError, KeyError) as error:
+                raise ValueError("Saved IP settings are invalid. Use Network settings to inspect this connection.") from error
+        for field, value in saved.items():
+            command += [family + "." + field, value]
+    # El respaldo se guarda antes del cambio para poder recuperar una dirección estática.
+    result = run(*command)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "Could not save IP protocol settings")
+    if enabled == "on":
+        backup.unlink(missing_ok=True)
+    devices = profile_value(identifier, "GENERAL.DEVICES")
+    interface = devices.split(",")[0].strip()
+    if interface and interface != "--":
+        result = run("nmcli", "device", "reapply", interface)
+        if result.returncode:
+            result = run("nmcli", "connection", "up", "uuid", identifier, "ifname", interface, timeout=60)
+        if result.returncode:
+            raise ValueError("IP settings saved, but reconnect failed: " + (result.stderr.strip() or "Reconnect this connection from Network settings"))
+    invalidate_public_ip()
+
+
+def state() -> None:
+    ethernet = ethernet_state()
+    if run("systemctl", "is-active", "--quiet", "NetworkManager.service").returncode != 0:
+        print(json.dumps({"available": False, "wifi_enabled": False, "connected": False, "connection_type": "none", "status": "NetworkManager unavailable", "summary": "Unavailable", "profiles": [], "networks": [], "ethernet": ethernet, "wifi": wifi_state("", 0, "", ""), "public_ip": "—"}))
+        return
+    radio = run("nmcli", "--terse", "--fields", "WIFI", "radio").stdout.strip()
+    device_rows = run("nmcli", "--terse", "--escape", "yes", "--fields", "DEVICE,TYPE,STATE,CONNECTION", "device", "status").stdout
+    has_wifi = any(len(fields := split_nmcli(row)) == 4 and fields[1] == "wifi" for row in device_rows.splitlines())
+    scan_rows = run("nmcli", "--terse", "--escape", "yes", "--fields", "IN-USE,SSID,SIGNAL,SECURITY,RATE", "device", "wifi", "list", "--rescan", "no").stdout if radio == "enabled" and has_wifi else ""
+    ssid = ""
+    signal = 0
+    speed = ""
+    networks = []
+    seen = set()
+    saved = saved_wifi() if radio == "enabled" and has_wifi else {}
+    for row in scan_rows.splitlines():
+        fields = split_nmcli(row)
+        if len(fields) != 5:
+            continue
+        active, name, strength, security, rate = fields
+        try:
+            strength_value = int(strength)
+        except ValueError:
+            strength_value = 0
+        if active == "*":
+            ssid = name
+            signal = strength_value
+            speed = rate
+        if name and name not in seen:
+            seen.add(name)
+            identifier = saved.get(name, "")
+            networks.append({"ssid": name, "signal": strength_value, "security": security or "Open", "active": active == "*", "saved": bool(identifier), "uuid": identifier})
+    networks.sort(key=lambda item: (not item["active"], -item["signal"], item["ssid"].casefold()))
+    nearby = networks[:3]
+    summary = " · ".join(item["ssid"] for item in nearby) if nearby else "No networks found"
+    enabled = radio == "enabled"
+    wifi = wifi_state(ssid, signal, speed, device_rows)
+    primary = ethernet if ethernet["connected"] else wifi
+    connection_type = "ethernet" if ethernet["connected"] else "wifi" if wifi["connected"] else "none"
+    status = f"Ethernet · {ethernet['speed']}" if ethernet["connected"] else f"{wifi['ssid']} · {signal}%" if wifi["connected"] else ("Not connected" if enabled else "Wi-Fi disabled")
+    print(json.dumps({"available": True, "wifi_enabled": enabled, "connected": connection_type != "none", "connection_type": connection_type, "ssid": wifi["ssid"], "signal": signal, "status": status, "summary": summary, "profiles": connection_profiles(), "networks": networks[:16], "ethernet": ethernet, "wifi": wifi, "ipv4": primary["ipv4"], "ipv6": primary["ipv6"], "public_ip": ethernet["public_ip"] if ethernet["connected"] else public_ip() if wifi["connected"] else "—", "download": primary["download"], "upload": primary["upload"]}))
+
+
+def open_network_menu() -> None:
+    subprocess.Popen(("/usr/lib/spectrumos/network-menu",), start_new_session=True)
+
+
+def action(name: str, value: str | None = None) -> None:
+    if name == "toggle":
+        enabled = run("nmcli", "--terse", "--fields", "WIFI", "radio").stdout.strip() == "enabled"
+        result = run("nmcli", "radio", "wifi", "off" if enabled else "on")
+    elif name == "rescan":
+        result = run("nmcli", "device", "wifi", "rescan")
+    elif name == "connect" and value:
+        try:
+            identifier = str(uuid.UUID(value))
+        except ValueError as error:
+            raise SystemExit("Invalid saved connection identifier") from error
+        result = run("nmcli", "connection", "up", "uuid", identifier, timeout=60)
+    elif name in ("connect-open", "connect-secured") and value:
+        if not 1 <= len(value.encode("utf-8")) <= 32 or "\n" in value:
+            raise SystemExit("Invalid Wi-Fi network name")
+        if name == "connect-open":
+            result = run("nmcli", "device", "wifi", "connect", value, timeout=60)
+        else:
+            password = sys.stdin.readline(256).rstrip("\n")
+            if not password or "\r" in password:
+                raise SystemExit("Wi-Fi password is required")
+            result = run("nmcli", "device", "wifi", "connect", value, "password", password, timeout=60)
+    elif name == "settings":
+        open_network_menu()
+        return
+    elif name == "menu":
+        open_network_menu()
+        return
+    else:
+        raise SystemExit(f"Unknown network action: {name}")
+    if result.returncode != 0:
+        raise SystemExit(result.stderr.strip() or f"Network action failed: {name}")
+    if name in ("toggle", "connect", "connect-open", "connect-secured"):
+        invalidate_public_ip()
+
+
+if __name__ == "__main__":
+    try:
+        if not sys.argv[1:] or sys.argv[1:] == ["--json"]:
+            state()
+        elif sys.argv[1:] == ["--refresh-public-ip"]:
+            refresh_public_ip()
+        elif len(sys.argv) == 5 and sys.argv[1] == "ip-family":
+            set_ip_family(*sys.argv[2:])
+        elif len(sys.argv) in (2, 3):
+            action(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else None)
+        else:
+            raise SystemExit(f"Usage: {sys.argv[0]} [--json|toggle|rescan|connect UUID|connect-open SSID|connect-secured SSID|ip-family UUID ipv4|ipv6 on|off|settings|menu]")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        raise SystemExit(f"Network adapter error: {error}") from error

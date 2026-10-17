@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pacman replaces the pipewire/wireplumber files on disk during an upgrade,
+# but any already-running session keeps the old code mapped in memory. That
+# skew leaves the audio graph producing duplicate/ghost devices and makes
+# pavucontrol fail with "pa_context_get_card_info_by_index() failed: invalid
+# argument". Restart the user services for every logged-in graphical session
+# so they pick up the new version immediately instead of waiting on a reboot.
+while read -r uid _; do
+    [[ -n $uid ]] || continue
+    runtime_dir="/run/user/$uid"
+    [[ -S $runtime_dir/bus ]] || continue
+    user=$(id -un "$uid" 2>/dev/null) || continue
+    sudo -u "$user" XDG_RUNTIME_DIR="$runtime_dir" \
+        systemctl --user try-restart wireplumber.service pipewire-pulse.service pipewire.service \
+        || true
+done < <(loginctl list-users --no-legend 2>/dev/null)

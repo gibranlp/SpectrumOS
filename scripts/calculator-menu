@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos
+history_file=$state_dir/calculator-history
+
+# A wide spread of what numbat actually handles -- arithmetic, percentages, powers/roots,
+# trig, scientific notation, and unit conversions across several different domains (speed,
+# length, temperature, data size, time) -- rather than the previous half-dozen that leaned
+# almost entirely on unit conversions. Each one verified against the real numbat binary
+# before being added here.
+examples=(
+    '12 + 4 * 3'
+    '240 * 15%'
+    '2^10'
+    'sqrt(2)'
+    'sin(30 deg)'
+    '6.022e23'
+    '60 mph -> km/h'
+    '5 ft + 8 in -> cm'
+    '25 °C -> °F'
+    '1 GiB -> MiB'
+    '2 min + 30 s -> s'
+    'log10(1000)'
+)
+
+# `wofi --dmenu` is a single-shot picker -- it exits the moment something is chosen, which
+# used to mean one calculation and done. Looping back into a fresh prompt after every
+# result (until Escape or "close") is the closest a dmenu-style picker gets to behaving
+# like a real calculator that stays open across a whole session; the running result is
+# folded into the next prompt's own text so it's still visible once the list reappears.
+last_result=""
+while true; do
+    prompt='Scientific calculator · type an expression'
+    [[ -n $last_result ]] && prompt="= $last_result  ·  next expression"
+
+    selection=$(
+        printf '%s\n' "${examples[@]}" 'reset' 'close' |
+            /usr/lib/spectrumos/spectrum-shell-picker calculator --dmenu --prompt "$prompt" || true
+    )
+    [[ -n $selection ]] || break
+    [[ $selection == close ]] && break
+
+    if [[ $selection == reset ]]; then
+        mkdir -p -- "$state_dir"
+        : > "$history_file"
+        notify-send --app-name='SpectrumOS Calculator' --expire-time=1800 'Calculator reset' 'Variables and previous results were cleared.'
+        last_result=""
+        continue
+    fi
+
+    arguments=(--no-config --color never --pretty-print never)
+    if [[ -f $history_file ]]; then
+        while IFS= read -r previous; do
+            [[ -n $previous ]] && arguments+=(-e "$previous")
+        done < "$history_file"
+    fi
+    arguments+=(-e "$selection")
+
+    if ! output=$(numbat "${arguments[@]}" 2>&1); then
+        notify-send --app-name='SpectrumOS Calculator' --urgency=normal 'Calculation error' "$output"
+        last_result=""
+        continue
+    fi
+
+    result=$(sed '/^[[:space:]]*$/d' <<< "$output" | tail -n 1)
+    mkdir -p -- "$state_dir"
+    printf '%s\n' "$selection" >> "$history_file"
+    tail -n 50 "$history_file" > "$history_file.tmp"
+    mv -f -- "$history_file.tmp" "$history_file"
+    printf '%s' "$result" | wl-copy
+    notify-send --app-name='SpectrumOS Calculator' --expire-time=10000 "$selection" "$result\nCopied to clipboard"
+    last_result=$result
+done

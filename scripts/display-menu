@@ -1,0 +1,365 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+
+
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "spectrumos"
+STATE_FILE = CONFIG_DIR / "monitors.json"
+LUA_FILE = CONFIG_DIR / "hyprland-monitors.lua"
+WOFI = "/usr/lib/spectrumos/spectrum-shell-picker"
+
+
+def command(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    if arguments and arguments[0] == "hyprctl":
+        result = subprocess.CompletedProcess(arguments, 1, "", "")
+        for attempt in range(3):
+            with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+                process = subprocess.run(arguments, check=False, stdout=output, stderr=subprocess.PIPE, text=True)
+                output.seek(0)
+                result = subprocess.CompletedProcess(arguments, process.returncode, output.read(), process.stderr)
+            if result.returncode == 0 or attempt == 2:
+                break
+            time.sleep(0.15)
+        if check:
+            result.check_returncode()
+        return result
+    return subprocess.run(arguments, check=check, capture_output=True, text=True)
+
+
+def monitors() -> list[dict]:
+    return json.loads(command("hyprctl", "-j", "monitors", "all").stdout)
+
+
+def choose(prompt: str, options: list[str], password: bool = False) -> str:
+    arguments = [WOFI, "displays", "--dmenu", "--prompt", prompt]
+    if password:
+        arguments.append("--password")
+    result = subprocess.run(arguments, input="\n".join(options), capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def notify(title: str, body: str = "", critical: bool = False) -> None:
+    arguments = ["notify-send", "--app-name=SpectrumOS", "--expire-time=3500"]
+    if critical:
+        arguments.append("--urgency=critical")
+    subprocess.run((*arguments, title, body), check=False)
+
+
+def live_state() -> dict[str, dict]:
+    state = {}
+    for monitor in monitors():
+        refresh = f'{monitor.get("refreshRate", 60):.2f}'.rstrip("0").rstrip(".")
+        state[monitor["name"]] = {
+            "description": monitor.get("description", monitor["name"]),
+            "disabled": monitor.get("disabled", False),
+            "mode": f'{monitor.get("width", 0)}x{monitor.get("height", 0)}@{refresh}',
+            "position": f'{monitor.get("x", 0)}x{monitor.get("y", 0)}',
+            "scale": monitor.get("scale", 1),
+            "transform": monitor.get("transform", 0),
+            "available_modes": list(dict.fromkeys(mode.removesuffix("Hz") for mode in monitor.get("availableModes", []))),
+        }
+    return state
+
+
+def load_state() -> dict[str, dict]:
+    current = live_state()
+    try:
+        stored = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return current
+    for name, settings in stored.items():
+        if name in current and isinstance(settings, dict):
+            available = current[name]["available_modes"]
+            live_position = current[name]["position"]
+            current[name].update(settings)
+            current[name]["available_modes"] = available
+            if str(current[name]["position"]).startswith("auto"):
+                current[name]["position"] = live_position
+    return current
+
+
+def mode_dimensions(settings: dict) -> tuple[int, int]:
+    mode = str(settings["mode"])
+    if mode in {"preferred", "highres", "highrr"}:
+        modes = settings.get("available_modes", [])
+        mode = modes[0] if modes else "1920x1080@60"
+    resolution = mode.split("@", 1)[0]
+    width, height = (int(value) for value in resolution.split("x", 1))
+    scale = settings["scale"]
+    numeric_scale = 1.0 if scale == "auto" else float(scale)
+    width, height = round(width / numeric_scale), round(height / numeric_scale)
+    if int(settings["transform"]) % 2 == 1:
+        width, height = height, width
+    return width, height
+
+
+def explicit_arrangement(state: dict[str, dict], direction: str) -> None:
+    active = [name for name, settings in state.items() if not settings["disabled"]]
+    if not active:
+        return
+    state[active[0]]["position"] = "0x0"
+    offset = 0
+    for index, name in enumerate(active[1:], start=1):
+        width, height = mode_dimensions(state[name])
+        if direction == "right":
+            previous_width, _ = mode_dimensions(state[active[index - 1]])
+            offset += previous_width
+            state[name]["position"] = f"{offset}x0"
+        elif direction == "left":
+            offset -= width
+            state[name]["position"] = f"{offset}x0"
+        elif direction == "down":
+            _, previous_height = mode_dimensions(state[active[index - 1]])
+            offset += previous_height
+            state[name]["position"] = f"0x{offset}"
+        else:
+            offset -= height
+            state[name]["position"] = f"0x{offset}"
+
+
+def relative_position(state: dict[str, dict], name: str, anchor: str, direction: str) -> None:
+    if name == anchor or name not in state or anchor not in state:
+        raise ValueError("A secondary and primary display are required")
+    if state[name]["disabled"] or state[anchor]["disabled"]:
+        raise ValueError("Both displays must be enabled")
+    anchor_x, anchor_y = (int(value) for value in str(state[anchor]["position"]).split("x", 1))
+    anchor_width, anchor_height = mode_dimensions(state[anchor])
+    width, height = mode_dimensions(state[name])
+    positions = {
+        "left": (anchor_x - width, anchor_y),
+        "right": (anchor_x + anchor_width, anchor_y),
+        "up": (anchor_x, anchor_y - height),
+        "down": (anchor_x, anchor_y + anchor_height),
+    }
+    x, y = positions[direction]
+    state[name]["position"] = f"{x}x{y}"
+
+
+def lua_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_lua(state: dict[str, dict]) -> str:
+    lines = []
+    for name in sorted(state):
+        settings = state[name]
+        if settings["disabled"]:
+            lines.extend(("hl.monitor({", f"    output = {lua_string(name)},", "    disabled = true,", "})", ""))
+        else:
+            lines.extend(
+                (
+                    "hl.monitor({",
+                    f"    output = {lua_string(name)},",
+                    f"    mode = {lua_string(str(settings['mode']))},",
+                    f"    position = {lua_string(str(settings['position']))},",
+                    f"    scale = {lua_string(settings['scale']) if settings['scale'] == 'auto' else settings['scale']},",
+                    f"    transform = {settings['transform']},",
+                    "})",
+                    "",
+                )
+            )
+    return "\n".join(lines)
+
+
+def atomic_write(path: Path, content: str) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=CONFIG_DIR)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as target:
+            target.write(content)
+            target.flush()
+            os.fsync(target.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def save_and_apply(state: dict[str, dict]) -> bool:
+    previous_lua = LUA_FILE.read_text(encoding="utf-8") if LUA_FILE.exists() else None
+    previous_state = STATE_FILE.read_text(encoding="utf-8") if STATE_FILE.exists() else None
+    atomic_write(STATE_FILE, json.dumps(state, indent=2, sort_keys=True) + "\n")
+    atomic_write(LUA_FILE, render_lua(state))
+    reload_result = command("hyprctl", "reload", "config-only", check=False)
+    errors = command("hyprctl", "configerrors", check=False).stdout.strip()
+    if reload_result.returncode == 0 and not errors:
+        notify("Displays updated", "Monitor configuration saved")
+        return True
+    if previous_lua is None:
+        LUA_FILE.unlink(missing_ok=True)
+    else:
+        atomic_write(LUA_FILE, previous_lua)
+    if previous_state is None:
+        STATE_FILE.unlink(missing_ok=True)
+    else:
+        atomic_write(STATE_FILE, previous_state)
+    command("hyprctl", "reload", "config-only", check=False)
+    notify("Display update rejected", errors or reload_result.stderr, True)
+    return False
+
+
+def monitor_label(name: str, settings: dict) -> str:
+    state = "Disabled" if settings["disabled"] else f'{settings["mode"]} · {settings["scale"]}x · {settings["position"]}'
+    return f'{name} · {settings["description"]} · {state}'
+
+
+def configure_monitor(state: dict[str, dict], name: str) -> None:
+    settings = state[name]
+    action = choose(
+        name,
+        [
+            f'Mode · {settings["mode"]}',
+            f'Scale · {settings["scale"]}',
+            f'Position · {settings["position"]}',
+            f'Rotation · {settings["transform"] * 90 if settings["transform"] < 4 else settings["transform"]}',
+            "Enable" if settings["disabled"] else "Disable",
+        ],
+    )
+    if action.startswith("Mode"):
+        selected = choose("Resolution and refresh", ["preferred", "highres", "highrr", *settings["available_modes"]])
+        if selected:
+            settings["mode"] = selected
+    elif action.startswith("Scale"):
+        selected = choose("Display scale", ["1", "1.25", "1.5", "1.75", "2", "auto"])
+        if selected:
+            settings["scale"] = "auto" if selected == "auto" else float(selected)
+    elif action.startswith("Position"):
+        selected = choose("Display position", ["auto", "auto-right", "auto-left", "auto-up", "auto-down", "0x0", "Custom position"])
+        if selected == "Custom position":
+            selected = choose("Position · XxY", [settings["position"]])
+        if selected:
+            settings["position"] = selected
+    elif action.startswith("Rotation"):
+        selected = choose("Rotation", ["0°", "90°", "180°", "270°"])
+        if selected:
+            settings["transform"] = {"0°": 0, "90°": 1, "180°": 2, "270°": 3}[selected]
+    elif action == "Disable":
+        if sum(not item["disabled"] for item in state.values()) <= 1:
+            notify("Cannot disable display", "At least one monitor must remain active.", True)
+            return
+        settings["disabled"] = True
+    elif action == "Enable":
+        settings["disabled"] = False
+        settings["mode"] = "preferred"
+        explicit_arrangement(state, "right")
+    else:
+        return
+    save_and_apply(state)
+
+
+def arrange(state: dict[str, dict]) -> None:
+    active = [name for name, settings in state.items() if not settings["disabled"]]
+    if len(active) < 2:
+        notify("Arrangement unavailable", "Connect and enable at least two monitors.")
+        return
+    selected = choose("Monitor arrangement", ["Horizontal · primary left", "Horizontal · primary right", "Vertical · primary top", "Vertical · primary bottom", "Automatic"])
+    if not selected:
+        return
+    if selected == "Horizontal · primary left":
+        explicit_arrangement(state, "right")
+    elif selected == "Horizontal · primary right":
+        explicit_arrangement(state, "left")
+    elif selected == "Vertical · primary top":
+        explicit_arrangement(state, "down")
+    elif selected == "Vertical · primary bottom":
+        explicit_arrangement(state, "up")
+    else:
+        live = live_state()
+        for name in active:
+            state[name]["position"] = live[name]["position"]
+    save_and_apply(state)
+
+
+def status() -> None:
+    try:
+        active = [monitor for monitor in monitors() if not monitor.get("disabled", False)]
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        print(json.dumps({"text": "󰍹 ?", "class": "unavailable", "tooltip": "Display status unavailable"}))
+        return
+    tooltip = [f'{monitor["name"]}: {monitor["width"]}×{monitor["height"]} @ {monitor["refreshRate"]:.0f}Hz · {monitor["scale"]}x' for monitor in active]
+    print(json.dumps({"text": f"󰍹 {len(active)}", "tooltip": "Displays\n" + "\n".join(tooltip)}))
+
+
+def main() -> None:
+    state = load_state()
+    options = [monitor_label(name, settings) for name, settings in state.items()]
+    options.extend(("Arrange displays", "Detect displays", "Reset automatic configuration"))
+    selected = choose("Displays", options)
+    if selected == "Arrange displays":
+        arrange(state)
+    elif selected == "Detect displays":
+        command("hyprctl", "reload", "config-only", check=False)
+        notify("Displays detected", f"{len(monitors())} output(s) found")
+    elif selected == "Reset automatic configuration":
+        for settings in state.values():
+            settings.update({"disabled": False, "mode": "preferred", "scale": 1, "transform": 0})
+        explicit_arrangement(state, "right")
+        save_and_apply(state)
+    else:
+        for name in state:
+            if selected.startswith(f"{name} ·"):
+                configure_monitor(state, name)
+                break
+
+
+def cli_action(arguments: list[str]) -> None:
+    # Al escalar conservamos los modos y la geometría reales, sin restaurar ajustes guardados.
+    state = live_state() if arguments and arguments[0] == "--scale" else load_state()
+    if arguments == ["--json"]:
+        payload = []
+        for name, settings in state.items():
+            payload.append({"name": name, **settings})
+        print(json.dumps({"monitors": payload}))
+        return
+    if len(arguments) == 2 and arguments[0] == "--arrange" and arguments[1] in ("right", "left", "down", "up"):
+        if sum(not settings["disabled"] for settings in state.values()) < 2:
+            raise SystemExit("At least two enabled displays are required")
+        explicit_arrangement(state, arguments[1])
+        raise SystemExit(0 if save_and_apply(state) else 1)
+    if len(arguments) == 4 and arguments[0] == "--relative" and arguments[3] in ("right", "left", "down", "up"):
+        try:
+            relative_position(state, arguments[1], arguments[2], arguments[3])
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        raise SystemExit(0 if save_and_apply(state) else 1)
+    if arguments == ["--reset"]:
+        for settings in state.values():
+            settings.update({"disabled": False, "mode": "preferred", "scale": 1, "transform": 0})
+        explicit_arrangement(state, "right")
+        raise SystemExit(0 if save_and_apply(state) else 1)
+    if len(arguments) != 3 or arguments[1] not in state:
+        raise SystemExit("Invalid display action or monitor")
+    action, name, value = arguments[0], arguments[1], arguments[2]
+    settings = state[name]
+    if action == "--scale" and value in ("1", "1.25", "1.5", "1.75", "2", "auto"):
+        settings["scale"] = "auto" if value == "auto" else float(value)
+    elif action == "--rotate" and value in ("0", "1", "2", "3"):
+        settings["transform"] = int(value)
+    elif action == "--mode" and value in {"preferred", "highres", "highrr", *settings["available_modes"]}:
+        settings["mode"] = value
+    elif action == "--enabled" and value in ("yes", "no"):
+        if value == "no" and sum(not item["disabled"] for item in state.values()) <= 1:
+            raise SystemExit("Cannot disable the only active display")
+        settings["disabled"] = value == "no"
+        if value == "yes":
+            settings["mode"] = "preferred"
+            explicit_arrangement(state, "right")
+    else:
+        raise SystemExit("Invalid display value")
+    raise SystemExit(0 if save_and_apply(state) else 1)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--status"]:
+        status()
+    elif sys.argv[1:]:
+        cli_action(sys.argv[1:])
+    else:
+        main()

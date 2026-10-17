@@ -1,0 +1,1 @@
+# El escritorio no necesita un demonio adicional de energía.

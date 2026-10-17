@@ -1,0 +1,618 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import configparser
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import shutil
+import sys
+import zipfile
+
+
+CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+CURRENT = CACHE_HOME / "spectrumos/theme/current"
+IMPORT = '@import url("spectrum.css");'
+
+
+def ensure_import(version: str) -> None:
+    directory = CONFIG_HOME / f"gtk-{version}.0"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "spectrum.css"
+    if version == "3":
+        # GTK conserva este proveedor durante toda la vida del proceso; los colores van en el tema recargable.
+        contents = "/* Los colores de GTK 3 se cargan desde el tema SpectrumOS. */\n"
+        if target.is_symlink() or not target.is_file() or target.read_text(encoding="utf-8") != contents:
+            temporary = directory / ".spectrum.css.new"
+            temporary.unlink(missing_ok=True)
+            temporary.write_text(contents, encoding="utf-8")
+            os.replace(temporary, target)
+    else:
+        relative = os.path.relpath(CURRENT / f"gtk-{version}.css", directory)
+        if not target.is_symlink() or os.readlink(target) != relative:
+            temporary = directory / ".spectrum.css.new"
+            temporary.unlink(missing_ok=True)
+            temporary.symlink_to(relative)
+            os.replace(temporary, target)
+
+    user_css = directory / "gtk.css"
+    if user_css.is_symlink():
+        raise RuntimeError(f"Cannot adopt symlinked GTK stylesheet: {user_css}")
+    existing = user_css.read_text(encoding="utf-8") if user_css.exists() else ""
+    if IMPORT not in existing.splitlines():
+        temporary_css = directory / ".gtk.css.new"
+        temporary_css.write_text(f"{IMPORT}\n{existing}", encoding="utf-8")
+        os.replace(temporary_css, user_css)
+
+
+def ensure_gtk_theme(variant: str) -> str:
+    css = (CURRENT / "gtk-3.css").read_text(encoding="utf-8")
+    digest = hashlib.sha256((variant + "\n" + css).encode("utf-8")).hexdigest()[:16]
+    name = "Spectrum-" + digest
+    themes = DATA_HOME / "themes"
+    root = themes / name
+    marker = root / ".spectrum-managed"
+    if root.is_symlink() or (root.exists() and not marker.is_file()):
+        raise RuntimeError(f"Cannot replace user-owned GTK theme: {root}")
+    directory = root / "gtk-3.0"
+    directory.mkdir(parents=True, exist_ok=True)
+    base = "gtk-contained-dark.css" if variant == "dark" else "gtk-contained.css"
+    stylesheet = '@import url("resource:///org/gtk/libgtk/theme/Adwaita/' + base + '");\n' + css
+    for filename in ("gtk.css", "gtk-dark.css"):
+        target = directory / filename
+        if not target.exists() or target.read_text(encoding="utf-8") != stylesheet:
+            temporary = directory / ("." + filename + ".new")
+            temporary.write_text(stylesheet, encoding="utf-8")
+            os.replace(temporary, target)
+    marker.touch()
+    managed = sorted((path for path in themes.glob("Spectrum-*")
+                      if not path.is_symlink() and (path / ".spectrum-managed").is_file()),
+                     key=lambda path: (path / ".spectrum-managed").stat().st_mtime, reverse=True)
+    for old in managed[8:]:
+        if old != root:
+            shutil.rmtree(old)
+    return name
+
+
+def ensure_link(link: Path, source: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
+    relative = os.path.relpath(source, link.parent)
+    if link.is_symlink() and os.readlink(link) == relative:
+        return
+    if link.exists() and not link.is_symlink():
+        raise RuntimeError(f"Cannot replace user-owned appearance file: {link}")
+    temporary = link.parent / f".{link.name}.new"
+    temporary.unlink(missing_ok=True)
+    temporary.symlink_to(relative)
+    os.replace(temporary, link)
+
+
+def ensure_gtk_settings(version: str, theme: str, variant: str) -> None:
+    path = CONFIG_HOME / f"gtk-{version}.0/settings.ini"
+    if path.is_symlink():
+        raise RuntimeError(f"Cannot adopt symlinked GTK settings: {path}")
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    if path.exists():
+        parser.read(path, encoding="utf-8")
+    if not parser.has_section("Settings"):
+        parser.add_section("Settings")
+    parser.set("Settings", "gtk-theme-name", theme)
+    parser.set("Settings", "gtk-icon-theme-name", "Spectrum")
+    parser.set("Settings", "gtk-application-prefer-dark-theme", str(variant == "dark").lower())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(".settings.ini.new")
+    with temporary.open("w", encoding="utf-8") as handle:
+        parser.write(handle, space_around_delimiters=False)
+    os.replace(temporary, path)
+
+
+def select_kvantum() -> None:
+    directory = CONFIG_HOME / "Kvantum"
+    ensure_link(directory / "Spectrum/Spectrum.kvconfig", CURRENT / "Spectrum.kvconfig")
+    ensure_link(directory / "Spectrum/Spectrum.colors", CURRENT / "Spectrum.colors")
+    ensure_link(directory / "Spectrum/Spectrum.svg", CURRENT / "Spectrum.svg")
+    selection = directory / "kvantum.kvconfig"
+    if selection.is_symlink():
+        raise RuntimeError(f"Cannot adopt symlinked Kvantum selection: {selection}")
+    existing = selection.read_text(encoding="utf-8") if selection.exists() else ""
+    lines = [line for line in existing.splitlines() if not line.startswith("theme=")]
+    temporary = directory / ".kvantum.kvconfig.new"
+    temporary.write_text("theme=Spectrum\n" + "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    os.replace(temporary, selection)
+
+
+def ensure_cava() -> None:
+    directory = CONFIG_HOME / "cava"
+    ensure_link(directory / "themes/Spectrum", CURRENT / "cava.theme")
+    config = directory / "config"
+    if config.is_symlink():
+        return
+    existing = config.read_text(encoding="utf-8") if config.exists() else ""
+    lines = existing.splitlines(keepends=True)
+    section = ""
+    insertion = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped.lower()
+            if section == "[color]":
+                insertion = index + 1
+        elif section == "[color]" and not stripped.startswith(("#", ";")) and "=" in stripped:
+            key, value = stripped.split("=", 1)
+            if key.strip().lower() == "theme" and value.strip().strip("\"'").lower() == "spectrum":
+                return
+            if key.strip().lower() in {"theme", "background", "foreground", "gradient", "horizontal_gradient"} or key.strip().lower().startswith(("gradient_color_", "horizontal_gradient_color_")):
+                return
+    if insertion is None:
+        updated = existing.rstrip("\n") + ("\n\n" if existing else "") + "[color]\ntheme = 'Spectrum'\n"
+    else:
+        lines.insert(insertion, "theme = 'Spectrum'\n")
+        updated = "".join(lines)
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = directory / ".config.new"
+    temporary.write_text(updated, encoding="utf-8")
+    os.replace(temporary, config)
+
+
+VENCORD_BEGIN = "/* >>> SpectrumOS generated: edits outside this block are preserved >>> */"
+VENCORD_END = "/* <<< SpectrumOS generated <<< */"
+
+
+def ensure_vencord() -> None:
+    # Vesktop (Discord + Vencord) injects QuickCSS straight into Discord's own
+    # web renderer. Unlike GTK, a relative `@import url("spectrum.css")` in
+    # that context resolves against Discord's own remote origin, not the
+    # local file next to it, so it silently fails to load -- confirmed by a
+    # real restart showing no theme. The generated CSS has to be written
+    # directly into quickCss.css; anything the user adds outside the marked
+    # block is preserved across regenerations.
+    directory = CONFIG_HOME / "vesktop/settings"
+    directory.mkdir(parents=True, exist_ok=True)
+    old_link = directory / "spectrum.css"
+    if old_link.is_symlink():
+        old_link.unlink()
+    generated = (CURRENT / "integrations/vencord-quickcss.css").read_text(encoding="utf-8").rstrip("\n")
+    block = f"{VENCORD_BEGIN}\n{generated}\n{VENCORD_END}"
+    user_css = directory / "quickCss.css"
+    if user_css.is_symlink():
+        raise RuntimeError(f"Cannot adopt symlinked Vencord QuickCSS: {user_css}")
+    existing = user_css.read_text(encoding="utf-8") if user_css.exists() else ""
+    if VENCORD_BEGIN in existing and VENCORD_END in existing:
+        before, _, rest = existing.partition(VENCORD_BEGIN)
+        _, _, after = rest.partition(VENCORD_END)
+        updated = f"{before}{block}{after}"
+    else:
+        updated = f"{block}\n{existing}" if existing else f"{block}\n"
+    if updated != existing:
+        temporary_css = directory / ".quickCss.css.new"
+        temporary_css.write_text(updated, encoding="utf-8")
+        os.replace(temporary_css, user_css)
+
+    # QuickCSS custom-property overrides don't reach every screen -- newer
+    # redesigned Discord surfaces (the Friends page, in particular) hardcode
+    # some chrome rather than reading those variables. Vencord's ClientTheme
+    # plugin recreates Discord's own former single-color client theme (and
+    # patches around Discord's gate on it), deriving a full recolor from one
+    # seed color using Discord's own current internals, so it actually
+    # reaches those pages too. Confirmed by a real cold restart.
+    # ClientTheme takes exactly one seed color and derives the whole ramp
+    # from it, including how light or dark the result is -- it does not
+    # separately know about a "dark mode" flag. Seeding it with our accent
+    # role (a light, saturated color even in dark palettes) produced a
+    # washed-out, inappropriately light theme regardless of variant, worst
+    # on light palettes where accent can be lighter still. Seeding it with
+    # our background role instead tracks the palette's actual variant
+    # correctly (dark background -> dark theme, light background -> light
+    # theme) while still carrying that role's hue -- confirmed by a real
+    # restart producing a properly dark result from a dark palette.
+    settings_path = directory / "settings.json"
+    if settings_path.is_file():
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        background = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))["roles"]["background"]
+        client_theme = settings.setdefault("plugins", {}).setdefault("ClientTheme", {})
+        if not client_theme.get("enabled") or client_theme.get("color") != background.lstrip("#"):
+            client_theme["enabled"] = True
+            client_theme["color"] = background.lstrip("#")
+            temporary_settings = directory / ".settings.json.new"
+            temporary_settings.write_text(json.dumps(settings, indent=4), encoding="utf-8")
+            os.replace(temporary_settings, settings_path)
+
+
+ZEN_BEGIN = "/* >>> SpectrumOS generated: edits outside this block are preserved >>> */"
+ZEN_END = "/* <<< SpectrumOS generated <<< */"
+ZEN_EXTENSION_ID = "spectrumos-theme@spectrumos.dev"
+
+
+def zen_profile_roots() -> tuple[Path, ...]:
+    # Community/upstream docs describe ~/.zen (the traditional non-XDG Mozilla-style
+    # layout), but the actual zen-browser-bin AUR build on this machine was confirmed live
+    # to use ~/.config/zen instead (an XDG-style layout) -- ~/.zen never gets created at
+    # all under it, which is exactly why the first version of this silently found nothing
+    # and never wrote a single file. Both are checked, in this order, so whichever build a
+    # given install actually uses is still found.
+    home = Path.home()
+    return (home / ".zen", home / ".config/zen")
+
+
+def zen_default_profile(root: Path) -> Path | None:
+    # Firefox-family profile discovery: installs.ini's Default= names the profile *this*
+    # installed build actually uses at startup, which can differ from profiles.ini's own
+    # Default=1 marker once more than one profile exists -- checked first, with
+    # profiles.ini only as a fallback for setups that predate installs.ini or have a
+    # single profile.
+    def resolve(raw_path: str, is_relative: bool) -> Path:
+        return (root / raw_path) if is_relative else Path(raw_path)
+
+    installs = root / "installs.ini"
+    if installs.is_file():
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(installs, encoding="utf-8")
+        for section in parser.sections():
+            default = parser.get(section, "Default", fallback="")
+            if default:
+                candidate = resolve(default, True)
+                if candidate.is_dir():
+                    return candidate
+
+    profiles = root / "profiles.ini"
+    if profiles.is_file():
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(profiles, encoding="utf-8")
+        for section in parser.sections():
+            if parser.get(section, "Default", fallback="0") == "1":
+                path = parser.get(section, "Path", fallback="")
+                is_relative = parser.get(section, "IsRelative", fallback="1") == "1"
+                if path:
+                    candidate = resolve(path, is_relative)
+                    if candidate.is_dir():
+                        return candidate
+    return None
+
+
+def ensure_user_js_prefs(profile: Path, prefs: dict[str, bool | str]) -> None:
+    # user.js -- unlike prefs.js, which the browser owns and periodically rewrites
+    # wholesale itself -- is only ever read at startup and never written back to, so it's
+    # the safe place for a script to persist prefs without racing the browser's own
+    # prefs.js writes. One read-modify-write pass covers every pref requested at once.
+    # Each pref name gets exactly one line, replaced in place with the current value --
+    # some of these (like the Zen accent color) change on every theme regeneration, so a
+    # plain "already present" skip would leave a stale color behind forever.
+    user_js = profile / "user.js"
+    existing = user_js.read_text(encoding="utf-8") if user_js.exists() else ""
+    lines = existing.splitlines()
+    changed = False
+    for name, value in prefs.items():
+        prefix = f'user_pref("{name}", '
+        formatted = "true" if value is True else "false" if value is False else json.dumps(value)
+        line = f"{prefix}{formatted});"
+        if line in lines:
+            continue
+        lines = [existing_line for existing_line in lines if not existing_line.startswith(prefix)]
+        lines.append(line)
+        changed = True
+    if changed:
+        temporary = profile / ".user.js.new"
+        temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        os.replace(temporary, user_js)
+
+
+def ensure_zen_browser() -> None:
+    # Zen (Firefox-based) only re-themes its own chrome -- toolbar, URL bar, tab strip,
+    # sidebar -- through userChrome.css, gated behind a preference the browser never
+    # enables on its own. As with Vencord's QuickCSS, the generated block is embedded
+    # directly rather than symlinked/@import-ed: whether a chrome-privileged @import
+    # resolves a relative local path here is unconfirmed, and the embed pattern is
+    # already proven safe for exactly this situation. Silently does nothing if Zen has
+    # never been launched (no profile exists yet to theme) -- unlike every other
+    # integration here, "not installed/not yet run" is the common case, not an edge one.
+    profile = None
+    for root in zen_profile_roots():
+        profile = zen_default_profile(root)
+        if profile is not None:
+            break
+    if profile is None:
+        return
+    accent_color = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))["roles"]["accent"]
+    chrome_dir = profile / "chrome"
+    chrome_dir.mkdir(parents=True, exist_ok=True)
+    generated = (CURRENT / "integrations/zen-browser.css").read_text(encoding="utf-8").rstrip("\n")
+    block = f"{ZEN_BEGIN}\n{generated}\n{ZEN_END}"
+    user_chrome = chrome_dir / "userChrome.css"
+    if user_chrome.is_symlink():
+        raise RuntimeError(f"Cannot adopt symlinked Zen userChrome.css: {user_chrome}")
+    existing = user_chrome.read_text(encoding="utf-8") if user_chrome.exists() else ""
+    if ZEN_BEGIN in existing and ZEN_END in existing:
+        before, _, rest = existing.partition(ZEN_BEGIN)
+        _, _, after = rest.partition(ZEN_END)
+        updated = f"{before}{block}{after}"
+    else:
+        updated = f"{block}\n{existing}" if existing else f"{block}\n"
+    if updated != existing:
+        temporary_css = chrome_dir / ".userChrome.css.new"
+        temporary_css.write_text(updated, encoding="utf-8")
+        os.replace(temporary_css, user_chrome)
+
+    # A real WebExtension "theme" add-on, sideloaded straight into the profile's own
+    # extensions/ directory (the same mechanism used to deploy managed/enterprise
+    # extensions) -- confirmed by reading Zen's own LightweightThemeConsumer.sys.mjs that
+    # an active theme add-on makes Firefox/Zen's official theme pipeline inline-set every
+    # --lwt-* variable itself, sidestepping the internal cascade userChrome.css alone has
+    # to fight. Firefox refuses an unsigned add-on unless this second pref is set.
+    manifest = (CURRENT / "integrations/zen-extension-manifest.json").read_bytes()
+    extensions_dir = profile / "extensions"
+    extensions_dir.mkdir(parents=True, exist_ok=True)
+    xpi_path = extensions_dir / f"{ZEN_EXTENSION_ID}.xpi"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("manifest.json", manifest)
+    packaged = buffer.getvalue()
+    if not xpi_path.exists() or xpi_path.read_bytes() != packaged:
+        temporary_xpi = extensions_dir / f".{ZEN_EXTENSION_ID}.xpi.new"
+        temporary_xpi.write_bytes(packaged)
+        os.replace(temporary_xpi, xpi_path)
+
+    ensure_user_js_prefs(profile, {
+        "toolkit.legacyUserProfileCustomizations.stylesheets": True,
+        "xpinstall.signatures.required": False,
+        # Zen ships this true by default (browser/omni.ja:defaults/preferences/firefox.js),
+        # which makes LightweightThemeConsumer._update() treat hasTheme as false and skip
+        # applying ANY WebExtension theme -- installed and enabled or not. Without flipping
+        # this, the sideloaded extension above is inert.
+        "zen.theme.disable-lightweight": False,
+        # The actual visible chrome background/gradient is NOT driven by the CSS
+        # variables or the WebExtension theme above at all -- ZenGradientGenerator.mjs
+        # and zenThemeModifier.js both inline-set --zen-primary-color/
+        # --zen-main-browser-background* directly on specific DOM elements every window
+        # load and workspace switch, always winning the cascade over anything set on
+        # :root regardless of !important. Both read this single string pref (default
+        # "AccentColor", meaning "ask the OS/portal"); pointing it at our own accent
+        # hex is the one lever that actually reaches Zen's real rendering path.
+        "zen.theme.accent-color": accent_color,
+    })
+
+
+def ensure_icon_theme() -> None:
+    root = DATA_HOME / "icons/Spectrum"
+    marker = root / ".spectrum-managed"
+    if root.exists() and not marker.exists() and any(root.iterdir()):
+        raise RuntimeError(f"Cannot adopt user-owned icon theme: {root}")
+    places = root / "scalable/places"
+    places.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    index = root / "index.theme"
+    temporary = root / ".index.theme.new"
+    temporary.write_text(
+        "[Icon Theme]\nName=Spectrum\nComment=Generated Spectrum folder and Places colors\n"
+        "Inherits=Adwaita,hicolor\nDirectories=scalable/places\n\n"
+        "[scalable/places]\nSize=64\nMinSize=16\nMaxSize=256\nType=Scalable\nContext=Places\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, index)
+    sources = {
+        "folder": "folder",
+        "inode-directory": "folder",
+        "folder-documents": "folder-documents",
+        "folder-download": "folder-downloads",
+        "folder-downloads": "folder-downloads",
+        "folder-music": "folder-music",
+        "folder-pictures": "folder-pictures",
+        "folder-videos": "folder-videos",
+        "folder-desktop": "folder",
+        "user-desktop": "folder",
+        "folder-public": "folder-downloads",
+        "folder-publicshare": "folder-downloads",
+        "user-public": "folder-downloads",
+        "folder-templates": "folder-documents",
+        "user-templates": "folder-documents",
+        "user-home": "user-home",
+    }
+    for icon, source in sources.items():
+        for suffix in ("", "-symbolic"):
+            ensure_link(places / f"{icon}{suffix}.svg", CURRENT / f"Spectrum-{source}.svg")
+    try:
+        subprocess.run(
+            ("gtk-update-icon-cache", "--force", "--ignore-theme-index", str(root)),
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+
+GAMEMODE_BEGIN = "# >>> SpectrumOS generated: edits outside this block are preserved >>>"
+GAMEMODE_END = "# <<< SpectrumOS generated <<<"
+
+
+def ensure_gamemode_hook() -> None:
+    # GameMode merges gamemode.ini from several locations, this user one included; its
+    # [custom] start/end hooks are what let performance-mode switch automatically for any
+    # GameMode-integrated game (most Steam/Proton titles out of the box, no per-game
+    # recognition needed on SpectrumOS's part) without a separate one-time install step --
+    # this self-heals every time appearance-sync runs, same as the GTK/Vencord imports.
+    path = CONFIG_HOME / "gamemode.ini"
+    block = (
+        f"{GAMEMODE_BEGIN}\n"
+        "[custom]\n"
+        "start=/usr/lib/spectrumos/performance-mode --game-start\n"
+        "end=/usr/lib/spectrumos/performance-mode --game-end\n"
+        f"{GAMEMODE_END}"
+    )
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if GAMEMODE_BEGIN in existing and GAMEMODE_END in existing:
+        before, _, rest = existing.partition(GAMEMODE_BEGIN)
+        _, _, after = rest.partition(GAMEMODE_END)
+        updated = f"{before}{block}{after}"
+    else:
+        updated = f"{existing}\n{block}\n" if existing else f"{block}\n"
+    if updated != existing:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.new")
+        temporary.write_text(updated, encoding="utf-8")
+        os.replace(temporary, path)
+
+
+def setting(schema: str, key: str, value: str) -> None:
+    try:
+        subprocess.run(("gsettings", "set", schema, key, value), check=False, timeout=2)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def font_size() -> int:
+    state_file = (
+        Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos/typography/font-size"
+    )
+    try:
+        value = int(state_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return 13
+    return value if 8 <= value <= 24 else 13
+
+
+def resized_font(schema: str, key: str, size: int, default_family: str) -> str:
+    # Preserves whichever family is already configured (GNOME's own schema default, or a
+    # user's manual override) and only replaces the trailing point-size field, so the
+    # global font-size control never silently switches anyone's font family.
+    family = default_family
+    try:
+        result = subprocess.run(
+            ("gsettings", "get", schema, key), check=True, capture_output=True, text=True, timeout=2
+        )
+        current = result.stdout.strip().strip("'")
+        parts = current.rsplit(" ", 1)
+        if len(parts) == 2 and parts[1].replace(".", "", 1).isdigit():
+            family = parts[0]
+        elif current:
+            family = current
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return f"{family} {size}"
+
+
+def sync_gtk_font_size(size: int) -> None:
+    setting(
+        "org.gnome.desktop.interface", "font-name",
+        resized_font("org.gnome.desktop.interface", "font-name", size, "Sans"),
+    )
+    setting(
+        "org.gnome.desktop.interface", "monospace-font-name",
+        resized_font("org.gnome.desktop.interface", "monospace-font-name", size, "Monospace"),
+    )
+
+
+QFONT_DEFAULT_SUFFIX = ["-1", "5", "50", "0", "0", "0", "0", "0"]
+
+
+def ensure_qt_font(path: Path, size: int, defaults: dict[str, str]) -> None:
+    # qt5ct/qt6ct store each font role as a serialized QFont string: family, point size,
+    # then eight more style-hint fields this doesn't touch. Only field 1 (point size) is
+    # ever replaced; an existing family or style hint is preserved exactly, and any other
+    # section/key already in the file (colors, custom widget styles, ...) round-trips
+    # through configparser untouched.
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    if path.exists():
+        parser.read(path, encoding="utf-8")
+    if not parser.has_section("Fonts"):
+        parser.add_section("Fonts")
+    for key, default_family in defaults.items():
+        current = parser.get("Fonts", key, fallback="").strip('"')
+        fields = current.split(",") if current else []
+        if not fields:
+            # Genuinely missing/empty -- nothing to preserve.
+            fields = [default_family, str(size), *QFONT_DEFAULT_SUFFIX]
+        elif len(fields) < 2:
+            # A bare family with no point size yet (hand-edited, or written by a
+            # non-Qt tool) -- keep it rather than discarding it for the default.
+            fields = [fields[0], str(size), *QFONT_DEFAULT_SUFFIX]
+        else:
+            fields[1] = str(size)
+        parser.set("Fonts", key, f'"{",".join(fields)}"')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.new")
+    with temporary.open("w", encoding="utf-8") as handle:
+        parser.write(handle, space_around_delimiters=False)
+    os.replace(temporary, path)
+
+
+def sync_qt_font_size(size: int) -> None:
+    defaults = {"general": "Sans Serif", "fixed": "JetBrains Mono"}
+    ensure_qt_font(CONFIG_HOME / "qt5ct/qt5ct.conf", size, defaults)
+    ensure_qt_font(CONFIG_HOME / "qt6ct/qt6ct.conf", size, defaults)
+
+
+def apply() -> str:
+    metadata = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))
+    variant = metadata.get("variant", "dark")
+    theme = ensure_gtk_theme(variant)
+    for version in ("3", "4"):
+        ensure_import(version)
+        ensure_gtk_settings(version, theme, variant)
+    select_kvantum()
+    ensure_cava()
+    ensure_vencord()
+    ensure_zen_browser()
+    ensure_icon_theme()
+    ensure_gamemode_hook()
+    preferred = "prefer-dark" if variant == "dark" else "prefer-light"
+    setting("org.gnome.desktop.interface", "color-scheme", preferred)
+    setting("org.gnome.desktop.interface", "gtk-theme", theme)
+    setting("org.gnome.desktop.interface", "icon-theme", "Adwaita")
+    setting("org.gnome.desktop.interface", "icon-theme", "Spectrum")
+    mouse_state = CONFIG_HOME / "spectrumos/mouse.json"
+    if mouse_state.exists():
+        helper = Path(__file__).resolve().with_name("mouse-adapter")
+        subprocess.run((str(helper), "--cursor"), check=True, timeout=30)
+    size = font_size()
+    sync_gtk_font_size(size)
+    sync_qt_font_size(size)
+    try:
+        subprocess.run(("pkill", "-USR1", "-u", str(os.getuid()), "-x", "cava"), check=False, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return variant
+
+
+def status() -> None:
+    try:
+        variant = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))["variant"]
+    except (OSError, KeyError, json.JSONDecodeError):
+        variant = "unavailable"
+    gtk = all((CONFIG_HOME / f"gtk-{version}.0/spectrum.css").is_file() for version in ("3", "4"))
+    qt = all((CONFIG_HOME / f"Kvantum/Spectrum/Spectrum.{suffix}").is_symlink() for suffix in ("kvconfig", "colors", "svg"))
+    icons = (DATA_HOME / "icons/Spectrum/.spectrum-managed").is_file()
+    quick_css = CONFIG_HOME / "vesktop/settings/quickCss.css"
+    vencord = quick_css.is_file() and VENCORD_BEGIN in quick_css.read_text(encoding="utf-8")
+    zen_profile = None
+    for zen_root in zen_profile_roots():
+        zen_profile = zen_default_profile(zen_root)
+        if zen_profile is not None:
+            break
+    zen = False
+    if zen_profile is not None:
+        user_chrome = zen_profile / "chrome/userChrome.css"
+        xpi = zen_profile / "extensions" / f"{ZEN_EXTENSION_ID}.xpi"
+        zen = (
+            user_chrome.is_file() and ZEN_BEGIN in user_chrome.read_text(encoding="utf-8")
+            and xpi.is_file()
+        )
+    print(json.dumps({"variant": variant, "gtk3": gtk, "gtk4": gtk, "qt5": qt, "qt6": qt, "icons": icons, "vencord": vencord, "zen": zen}))
+
+
+if __name__ == "__main__":
+    try:
+        if sys.argv[1:] == ["--status"]:
+            status()
+        elif not sys.argv[1:] or sys.argv[1:] == ["--apply"]:
+            apply()
+        else:
+            raise SystemExit(f"Usage: {sys.argv[0]} [--apply|--status]")
+    except (OSError, KeyError, json.JSONDecodeError, RuntimeError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

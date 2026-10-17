@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def config_path():
+    base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    return base / "spectrumos" / "shell.json"
+
+
+def read_config(path):
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def main():
+    path = config_path()
+    data = read_config(path)
+    if sys.argv[1:] == ["--json"]:
+        position = data.get("bar_position", "left")
+        profile = data.get("bar_profile", "standard")
+        profiles = ("standard", "minimal", "detailed", "multimedia", "gaming")
+        per_monitor = data.get("bar_profiles", {})
+        if not isinstance(per_monitor, dict):
+            per_monitor = {}
+        print(json.dumps({
+            "desktop_logo_enabled": data.get("desktop_logo_enabled", True) is not False,
+            "desktop_logo_corner": data.get("desktop_logo_corner") if data.get("desktop_logo_corner") in (
+                "top-left", "top-right", "bottom-left", "bottom-right"
+            ) else "bottom-right",
+            "igor_enabled": data.get("igor_enabled", True) is not False,
+            "widget_bounce_enabled": data.get("widget_bounce_enabled", True) is not False,
+            "bar_position": position if position in ("top", "left") else "left",
+            "bar_style": data.get("bar_style") if data.get("bar_style") in ("full", "islands") else "full",
+            "gaming_enabled": data.get("gaming_enabled", False) is True,
+            "bar_profile": profile if profile in profiles else "standard",
+            "bar_profiles": {name: value for name, value in per_monitor.items()
+                             if isinstance(name, str) and name and value in profiles},
+        }))
+        return 0
+    if len(sys.argv) == 3 and (
+        (sys.argv[1] in ("set-logo", "set-bounce", "set-gaming") and sys.argv[2] in ("on", "off")) or
+        (sys.argv[1] == "set-logo-corner" and sys.argv[2] in (
+            "top-left", "top-right", "bottom-left", "bottom-right"
+        ))
+    ):
+        if sys.argv[1] in ("set-logo", "set-bounce", "set-gaming"):
+            key = {"set-logo": "desktop_logo_enabled", "set-bounce": "widget_bounce_enabled", "set-gaming": "gaming_enabled"}[sys.argv[1]]
+            data[key] = sys.argv[2] == "on"
+        else:
+            data["desktop_logo_corner"] = sys.argv[2]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, path)
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "set-style" and sys.argv[2] in ("full", "islands"):
+        data["bar_style"] = sys.argv[2]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, path)
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "set-mascot" and sys.argv[2] in ("on", "off"):
+        data["igor_enabled"] = sys.argv[2] == "on"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, path)
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "set" and sys.argv[2] in ("top", "left"):
+        data["bar_position"] = sys.argv[2]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, path)
+        return 0
+    if len(sys.argv) in (3, 4) and sys.argv[1] == "set-profile" and sys.argv[2] in (
+        "standard", "minimal", "detailed", "multimedia", "gaming"
+    ):
+        if sys.argv[2] == "gaming":
+            data["gaming_enabled"] = True
+        elif len(sys.argv) == 4:
+            data["gaming_enabled"] = False
+            monitor = sys.argv[3]
+            if not monitor or len(monitor) > 256 or any(ord(char) < 32 for char in monitor):
+                print("Invalid monitor name", file=sys.stderr)
+                return 2
+            per_monitor = data.get("bar_profiles", {})
+            if not isinstance(per_monitor, dict):
+                per_monitor = {}
+            per_monitor[monitor] = sys.argv[2]
+            data["bar_profiles"] = per_monitor
+        else:
+            data["gaming_enabled"] = False
+            data["bar_profile"] = sys.argv[2]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, indent=2) + "\n")
+        os.replace(temporary, path)
+        return 0
+    print("Usage: spectrum-shell-layout --json | set top|left | set-style full|islands | set-bounce on|off | set-mascot on|off | set-logo on|off | set-gaming on|off | set-logo-corner top-left|top-right|bottom-left|bottom-right | set-profile standard|minimal|detailed|multimedia|gaming [MONITOR]", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

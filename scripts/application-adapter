@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+import configparser
+import hashlib
+import json
+import os
+import re
+import shlex
+import shutil
+from pathlib import Path
+import subprocess
+import sys
+
+
+def desktop_files() -> list[tuple[str, Path]]:
+    data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+    data_dirs = (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    roots = [data_home / "applications"]
+    roots.extend(Path(directory) / "applications" for directory in data_dirs if directory)
+    roots.extend([
+        data_home / "flatpak/exports/share/applications",
+        Path("/var/lib/flatpak/exports/share/applications"),
+    ])
+    found: dict[str, Path] = {}
+    visited = set()
+    for root in roots:
+        resolved = root.resolve()
+        if resolved in visited:
+            continue
+        visited.add(resolved)
+        if root.is_dir():
+            for path in sorted(root.rglob("*.desktop")):
+                desktop_id = str(path.relative_to(root)).replace("/", "-")
+                found.setdefault(desktop_id, path)
+    return list(found.items())
+
+
+def flatpak_applications():
+    try:
+        result = subprocess.run(
+            ["flatpak", "list", "--app", "--columns=application"],
+            check=True, capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return set(result.stdout.splitlines())
+
+
+def flatpak_id(entry, command):
+    declared = entry.get("X-Flatpak", "").strip()
+    if declared:
+        return declared
+    for index, argument in enumerate(command[:-1]):
+        if Path(argument).name == "flatpak" and command[index + 1] == "run":
+            skip = False
+            for token in command[index + 2:]:
+                if skip:
+                    skip = False
+                    continue
+                if token in {"--arch", "--branch", "--command", "--env", "--filesystem", "-a", "-b", "-c"}:
+                    skip = True
+                    continue
+                if token.startswith("-"):
+                    continue
+                if token.startswith("app/"):
+                    token = token.split("/")[1]
+                return token if re.fullmatch(r"[\w-]+(?:\.[\w-]+){2,}", token) else None
+    return None
+
+
+def launch_identity(command):
+    if len(command) == 3 and Path(command[0]).name == "appimage-adapter" and command[1] == "launch":
+        identifier = command[2]
+        if re.fullmatch(r"[a-f0-9]{32}", identifier):
+            directory = Path.home() / "Applications/SpectrumOS" / identifier
+            try:
+                metadata = json.loads((directory / "metadata.json").read_text())
+                filename = metadata["file"]
+                if re.fullmatch(r"[a-f0-9]{32}\.AppImage", filename):
+                    return (str(directory / filename),), True
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+            return None, True
+    return tuple(token for token in command if token not in {"%f", "%F", "%u", "%U"}), False
+
+
+def applications() -> list[dict]:
+    items = {}
+    installed_flatpaks = None
+    checked_flatpaks = False
+    for desktop_id, path in desktop_files():
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        try:
+            parser.read(path, encoding="utf-8")
+            entry = parser["Desktop Entry"]
+            if entry.get("Type") != "Application" or entry.getboolean("NoDisplay", fallback=False) or entry.getboolean("Hidden", fallback=False):
+                continue
+            command = shlex.split(entry.get("Exec", ""))
+            dbus_activatable = entry.getboolean("DBusActivatable", fallback=False)
+        except (configparser.Error, KeyError, OSError, UnicodeError, ValueError):
+            continue
+        name = entry.get("Name", "").strip()
+        if not name:
+            continue
+        required = entry.get("TryExec", "").strip()
+        if required and not shutil.which(required):
+            continue
+        app_id = flatpak_id(entry, command)
+        if app_id:
+            if not checked_flatpaks:
+                installed_flatpaks = flatpak_applications()
+                checked_flatpaks = True
+            if installed_flatpaks is not None and app_id not in installed_flatpaks:
+                continue
+        identity, managed_appimage = launch_identity(command)
+        if managed_appimage and identity is None:
+            continue
+        if not app_id and not dbus_activatable:
+            if not identity or not shutil.which(identity[0].replace("%%", "%")):
+                continue
+        source = "Flatpak" if app_id else "AppImage" if managed_appimage or (command and command[0].lower().endswith(".appimage")) else ""
+        # Dos entradas que abren el mismo AppImage comparten identidad; se prefiere la integración administrada.
+        key = identity if source == "AppImage" else (desktop_id,)
+        if key in items and not managed_appimage:
+            continue
+        items[key] = {
+            "token": hashlib.sha256(desktop_id.encode("utf-8")).hexdigest()[:16],
+            "desktop_id": desktop_id,
+            "id": desktop_id.removesuffix(".desktop"),
+            "icon": entry.get("Icon", ""),
+            "genericName": entry.get("GenericName", ""),
+            "comment": entry.get("Comment", ""),
+            "keywords": entry.get("Keywords", "").split(";"),
+            "name": name,
+            "source": source,
+            "detail": entry.get("Comment", entry.get("GenericName", "Application")).strip() or "Application",
+        }
+    return sorted(items.values(), key=lambda item: item["name"].casefold())
+
+
+def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--json":
+        items = applications()
+        print(json.dumps({"count": len(items), "applications": items}, ensure_ascii=False, separators=(",", ":")))
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "launch":
+        selected = next((item for item in applications() if item["token"] == sys.argv[2]), None)
+        if selected is None:
+            return 2
+        subprocess.Popen(
+            ["uwsm", "app", "--", selected["desktop_id"]],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,13 @@
+SPDX-License-Identifier: GPL-2.0-only
+
+These patches are derived from the Linux kernel, by way of the Asahi Linux
+tree, and are licensed under version 2 of the GNU General Public License —
+the same terms as the code they modify.
+
+The full text of that licence ships with the kernel source as COPYING, and is
+published at:
+
+    https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+Copyright is held by the contributors named in each patch's authorship and
+Signed-off-by lines, and by the original authors of the files they modify.

@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wofi_left=(/usr/lib/spectrumos/spectrum-shell-picker left --dmenu)
+wofi_right=(/usr/lib/spectrumos/spectrum-shell-picker right --dmenu)
+
+choose() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | "${wofi_left[@]}" --prompt "$prompt" || true
+}
+
+choose_right() {
+    local prompt=$1
+    shift
+    printf '%s\n' "$@" | "${wofi_right[@]}" --prompt "$prompt" || true
+}
+
+notice() {
+    notify-send --app-name="SpectrumOS" --expire-time=3500 "$1" "${2:-}"
+}
+
+unavailable() {
+    notice "$1 unavailable" "$2"
+}
+
+appearance_menu() {
+    local choice
+    choice=$(choose Appearance \
+        "Theme and wallpaper (Super+W)" \
+        "Random theme (Super+R)" \
+        "Previous theme" \
+        "Synchronize application theme" \
+        "Hyprland settings" \
+        "Global font size" \
+        "Waybar layout, style and theme (Super+Shift+B)")
+    case $choice in
+        "Theme and wallpaper"*) /usr/lib/spectrumos/theme-menu ;;
+        "Random theme"*) /usr/lib/spectrumos/theme-menu --random ;;
+        "Previous theme") /usr/lib/spectrumos/theme-menu --previous ;;
+        "Synchronize application theme")
+            if /usr/lib/spectrumos/appearance-sync --apply; then
+                notice "Application theme synchronized" "GTK 3 and GTK 4 · current Spectrum palette"
+            else
+                unavailable "Application theme" "GTK integration could not be applied safely."
+            fi
+            ;;
+        "Hyprland settings") /usr/lib/spectrumos/hyprland-menu ;;
+        "Global font size") /usr/lib/spectrumos/font-size-menu ;;
+        "Waybar layout, style and theme"*) /usr/lib/spectrumos/waybar-menu ;;
+    esac
+}
+
+audio_devices() {
+    local kind=$1 selected
+    if [[ $kind == output ]]; then
+        selected=$(pactl list short sinks | cut -f2 | "${wofi_left[@]}" --prompt 'Audio output' || true)
+        [[ -z $selected ]] || pactl set-default-sink "$selected"
+    else
+        selected=$(pactl list short sources | cut -f2 | "${wofi_left[@]}" --prompt 'Audio input' || true)
+        [[ -z $selected ]] || pactl set-default-source "$selected"
+    fi
+}
+
+audio_menu() {
+    local choice
+    choice=$(choose "Audio devices" "Select output" "Select input")
+    case $choice in
+        "Select output") audio_devices output ;;
+        "Select input") audio_devices input ;;
+    esac
+}
+
+screenshot_path() {
+    local pictures=${XDG_PICTURES_DIR:-$HOME/Pictures}
+    mkdir -p -- "$pictures/Screenshots"
+    printf '%s/Screenshots/Spectrum-%(%Y%m%d-%H%M%S)T.png\n' "$pictures" -1
+}
+
+take_screenshot() {
+    local mode=$1 destination geometry output
+    destination=$(screenshot_path)
+    case $mode in
+        Full) grim "$destination" ;;
+        Monitor)
+            output=$(slurp -o -r -f '%l' </dev/null || true)
+            [[ -n $output ]] || return 0
+            grim -o "$output" "$destination"
+            ;;
+        Area)
+            geometry=$(slurp || true)
+            [[ -n $geometry ]] || return 0
+            grim -g "$geometry" -t ppm - | satty \
+                --filename - \
+                --output-filename "$destination" \
+                --actions-on-enter save-to-file \
+                --early-exit
+            [[ -f $destination ]] || return 0
+            ;;
+        Window)
+            geometry=$(python - <<'PY' | slurp -r || true
+import json
+import subprocess
+
+clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+for client in clients:
+    x, y = client.get("at", (0, 0))
+    width, height = client.get("size", (0, 0))
+    if client.get("mapped", True) and width > 0 and height > 0:
+        title = str(client.get("title", "Window")).replace("\n", " ")
+        print(f"{x},{y} {width}x{height} {title}")
+PY
+            )
+            [[ -n $geometry ]] || return 0
+            grim -g "$geometry" -t ppm - | satty \
+                --filename - \
+                --output-filename "$destination" \
+                --actions-on-enter save-to-file \
+                --early-exit
+            [[ -f $destination ]] || return 0
+            ;;
+        Delayed)
+            sleep 5
+            grim "$destination"
+            ;;
+    esac
+    wl-copy < "$destination"
+    notice "Screenshot captured" "$destination · copied to clipboard"
+}
+
+capture_menu() {
+    /usr/lib/spectrumos/spectrum-shell-open screenshot
+}
+
+calculator() {
+    /usr/lib/spectrumos/calculator-menu
+}
+
+password_generator() {
+    local length password
+    length=$(choose 'Password length' 10 12 14 16 20 24 32 48)
+    [[ $length =~ ^(10|12|14|16|20|24|32|48)$ ]] || return 0
+    password=$(python - "$length" <<'PY'
+import secrets
+import string
+import sys
+
+alphabet = string.ascii_letters + string.digits + "!@#$%_-+="
+print("".join(secrets.choice(alphabet) for _ in range(int(sys.argv[1]))))
+PY
+    )
+    printf '%s' "$password" | wl-copy
+    notice "Password generated · copied" "$password"
+}
+
+color_picker() {
+    local color cache_dir swatch
+    color=$(hyprpicker -r || true)
+    [[ $color =~ ^#[0-9A-Fa-f]{6}$ ]] || return 0
+    cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/spectrumos
+    swatch=$cache_dir/color-picker-swatch.svg
+    mkdir -p -- "$cache_dir"
+    printf '%s\n' \
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">' \
+        "  <rect x=\"3\" y=\"3\" width=\"58\" height=\"58\" rx=\"12\" fill=\"$color\" stroke=\"#ffffff\" stroke-width=\"3\"/>" \
+        '</svg>' > "$swatch"
+    printf '%s' "$color" | wl-copy
+    notify-send --app-name="SpectrumOS" --icon="$swatch" --expire-time=3500 "Color copied" "$color"
+}
+
+file_search() {
+    local selected
+    local -a roots=()
+    local directory
+    for directory in Desktop Documents Downloads Music Pictures Videos; do
+        [[ -d $HOME/$directory ]] && roots+=("$HOME/$directory")
+    done
+    ((${#roots[@]} > 0)) || roots=("$HOME")
+    selected=$(find "${roots[@]}" -xdev -type f -not -path '*/.*' -print 2>/dev/null | \
+        /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Files (Super+S)' || true)
+    [[ -n $selected && -f $selected ]] || return 0
+    uwsm app -- xdg-open "$selected"
+}
+
+emoji_picker() {
+    local selected emoji
+    selected=$(python - <<'PY' | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Emoji (Super+V)' || true
+import unicodedata
+
+for start, end in ((0x2600, 0x27C0), (0x1F300, 0x1FB00)):
+    for point in range(start, end):
+        character = chr(point)
+        name = unicodedata.name(character, "")
+        if name and not name.startswith(("CJK", "SQUARED CJK")):
+            print(f"{character}  {name.title()}")
+PY
+    )
+    [[ -n $selected ]] || return 0
+    emoji=${selected%% *}
+    printf '%s' "$emoji" | wl-copy
+    notice "Emoji copied" "$emoji"
+}
+
+utilities_menu() {
+    local choice
+    choice=$(choose Utilities \
+        "File search (Super+S)" \
+        "Calculator" \
+        "Password generator (Super+G)" \
+        "Color picker (Super+I)" \
+        "Emoji picker (Super+V)")
+    case $choice in
+        "File search"*) file_search ;;
+        Calculator) calculator ;;
+        "Password generator"*) password_generator ;;
+        "Color picker"*) color_picker ;;
+        "Emoji picker"*) emoji_picker ;;
+    esac
+}
+
+power_profile_menu() {
+    local current choice profile output
+    if ! systemctl is-active --quiet tuned.service; then
+        unavailable "Power profiles" "TuneD is not active. Apply the Spectrum system phase first."
+        return 0
+    fi
+    current=$(tuned-adm active 2>/dev/null | sed -n 's/^Current active profile: //p')
+    choice=$(choose_right "Power profile · ${current:-unknown}" "Balanced" "Desktop" "Performance" "Power saver")
+    case $choice in
+        Balanced) profile=balanced ;;
+        Desktop) profile=desktop ;;
+        Performance) profile=throughput-performance ;;
+        "Power saver") profile=powersave ;;
+        *) return 0 ;;
+    esac
+    if output=$(tuned-adm profile "$profile" 2>&1); then
+        notice "Power profile changed" "$choice · $profile"
+    else
+        unavailable "Power profile" "${output##*$'\n'}"
+    fi
+}
+
+show_command_output() {
+    local prompt=$1
+    shift
+    "$@" 2>&1 | "${wofi_right[@]}" --prompt "$prompt" || true
+}
+
+system_menu() {
+    local choice updates
+    choice=$(choose_right System "Network controls (Super+B)" "Bluetooth" "Available updates" "Temperatures" "Power profile")
+    case $choice in
+        "Network controls"*) /usr/lib/spectrumos/network-menu ;;
+        Bluetooth)
+            /usr/lib/spectrumos/bluetooth-menu
+            ;;
+        "Available updates")
+            updates=$(checkupdates 2>/dev/null || true)
+            if [[ -n $updates ]]; then
+                printf '%s\n' "$updates" | "${wofi_right[@]}" --prompt 'Available updates' || true
+            else
+                notice "System updates" "No package updates are currently listed."
+            fi
+            ;;
+        Temperatures) show_command_output Temperatures sensors ;;
+        "Power profile") power_profile_menu ;;
+    esac
+}
+
+session_menu() {
+    local choice
+    choice=$(choose_right 'Session (Super+X)' "Lock (Super+L)" "Suspend" "Log out" "Restart" "Power off")
+    case $choice in
+        Lock*) hyprlock -c "$HOME/.cache/spectrumos/theme/current/hyprlock.conf" ;;
+        Suspend) systemctl suspend ;;
+        "Log out") uwsm stop ;;
+        Restart) systemctl reboot ;;
+        "Power off") systemctl poweroff ;;
+    esac
+}
+
+main() {
+    local choice
+    choice=$(printf '%s\n' \
+        "Applications (Super+D)" \
+        "Appearance" \
+        "Audio (Super+A)" \
+        "Capture (Print)" \
+        "Screen recording (Super+Shift+S)" \
+        "Utilities" \
+        "System (Super+B)" \
+        "Session (Super+X)" | "${wofi_left[@]}" --prompt 'Spectrum (Super+P)' || true)
+    [[ -n $choice ]] || return 0
+    case $choice in
+        Applications*) exec /usr/lib/spectrumos/application-menu ;;
+        Appearance) appearance_menu ;;
+        Audio*) audio_menu ;;
+        Capture*) capture_menu ;;
+        "Screen recording"*) exec /usr/lib/spectrumos/recorder-menu ;;
+        Utilities) utilities_menu ;;
+        System*) system_menu ;;
+        Session*) session_menu ;;
+    esac
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    case ${1:-} in
+        '') main ;;
+        --applications) exec /usr/lib/spectrumos/application-menu ;;
+        --appearance) appearance_menu ;;
+        --theme) exec /usr/lib/spectrumos/theme-menu ;;
+        --theme-random) exec /usr/lib/spectrumos/theme-menu --random ;;
+        --theme-previous) exec /usr/lib/spectrumos/theme-menu --previous ;;
+        --theme-sync) /usr/lib/spectrumos/appearance-sync --apply ;;
+        --hyprland-settings) exec /usr/lib/spectrumos/hyprland-menu ;;
+        --font-size) exec /usr/lib/spectrumos/font-size-menu ;;
+        --waybar-settings) exec /usr/lib/spectrumos/waybar-menu ;;
+        --audio) audio_menu ;;
+        --capture) capture_menu ;;
+        --screenshot-area) take_screenshot Area ;;
+        --screenshot-window) take_screenshot Window ;;
+        --screenshot-monitor) take_screenshot Monitor ;;
+        --screenshot-full) take_screenshot Full ;;
+        --screenshot-delay) take_screenshot Delayed ;;
+        --recording) exec /usr/lib/spectrumos/recorder-menu ;;
+        --utilities) utilities_menu ;;
+        --calculator) exec /usr/lib/spectrumos/calculator-menu ;;
+        --password) password_generator ;;
+        --search) file_search ;;
+        --emoji) emoji_picker ;;
+        --color-picker)
+            color_picker
+            ;;
+        --system) system_menu ;;
+        --session) session_menu ;;
+        *) printf 'Unknown Spectrum panel route: %s\n' "${1:-}" >&2; exit 2 ;;
+    esac
+fi

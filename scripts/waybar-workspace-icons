@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Shared workspace icon sets for SpectrumShell and Waybar."""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import sys
+
+
+MAX_WORKSPACE = 6
+DEFAULT_KEY = "pacman"
+
+# Los puntos de código salen del mapa de glifos de JetBrainsMono Nerd Font instalado.
+# Cada tema usa iconos distintos para el escritorio activo, uno con ventanas y uno vacío.
+ICON_SETS: dict[str, dict[str, object]] = {
+    "kanji": {"label": "Kanji Numbers", "glyphs": ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]},
+    "pacman": {"label": "Pac-Man", "states": {"active": "\U000f0baf", "occupied": "\U000f02a0", "empty": "•"}},
+    "computers": {"label": "Computers", "states": {"active": "\U000f0ddc", "occupied": "\U000f0379", "empty": "\U000f0d90"}},
+    "cosmos": {"label": "Cosmos", "states": {"active": "\U000f14de", "occupied": "\ue22e", "empty": "\U000f04d2"}},
+    "arcade": {"label": "Arcade", "states": {"active": "\U000f0297", "occupied": "\U000f089a", "empty": "\U000f0e36"}},
+    "garden": {"label": "Garden", "states": {"active": "\U000f024a", "occupied": "\U000f032a", "empty": "\U000f0e63"}},
+    "music": {"label": "Music", "states": {"active": "\U000f02cb", "occupied": "\U000f0387", "empty": "\U000f038a"}},
+    "code": {"label": "Code Lab", "states": {"active": "\uea85", "occupied": "\ueac4", "empty": "\ueae4"}},
+}
+
+
+def state_file() -> Path:
+    state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+    return state_home / "spectrumos/waybar/workspace_icons"
+
+
+def current_key() -> str:
+    try:
+        value = state_file().read_text(encoding="utf-8").strip()
+    except OSError:
+        return DEFAULT_KEY
+    return value if value in ICON_SETS else DEFAULT_KEY
+
+
+def format_icons(key: str) -> dict[str, str]:
+    entry = ICON_SETS[key]
+    if "states" in entry:
+        states = entry["states"]
+        return {
+            "active": states["active"],
+            "persistent": states["occupied"],
+            "default": states["occupied"],
+            "empty": states["empty"],
+        }
+    glyphs = entry["glyphs"]
+    return {str(n): glyphs[n] for n in range(1, MAX_WORKSPACE + 1)}
+
+
+def staged_layout_path() -> Path:
+    cache_home = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+    return cache_home / "spectrumos/waybar/staged-layout.json"
+
+
+def stage(layout_path: str) -> None:
+    # Always prints a usable config path, even on any failure, so a corrupt state file or
+    # unreadable layout degrades to the original unmodified layout instead of failing the
+    # whole `waybar` launch.
+    try:
+        payload = json.loads(Path(layout_path).read_text(encoding="utf-8"))
+        key = current_key()
+        if isinstance(payload.get("hyprland/workspaces"), dict):
+            payload["hyprland/workspaces"]["format-icons"] = format_icons(key)
+        else:
+            print(layout_path)
+            return
+        destination = staged_layout_path()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(payload), encoding="utf-8")
+        temporary.replace(destination)
+        print(destination)
+    except (OSError, ValueError):
+        print(layout_path)
+
+
+def set_key(key: str) -> int:
+    if key not in ICON_SETS:
+        return 2
+    destination = state_file()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    temporary.write_text(key, encoding="utf-8")
+    temporary.replace(destination)
+    return 0
+
+
+def print_list() -> None:
+    active = current_key()
+    for key, entry in ICON_SETS.items():
+        print(f"{'*' if key == active else ' '}\t{key}\t{entry['label']}")
+
+
+def print_json() -> None:
+    active = current_key()
+    sets = []
+    for key, entry in ICON_SETS.items():
+        states = entry.get("states", {})
+        preview = [states["active"], states["occupied"], states["empty"]] if states else entry["glyphs"][1:MAX_WORKSPACE + 1]
+        sets.append({"key": key, "label": entry["label"], "current": key == active, "preview": preview})
+    selected = ICON_SETS[active]
+    states = selected.get("states", {})
+    glyphs = [states["empty"]] * MAX_WORKSPACE if states else selected["glyphs"][1:MAX_WORKSPACE + 1]
+    print(json.dumps({"current": active, "sets": sets, "states": states, "glyphs": glyphs}, ensure_ascii=False, separators=(",", ":")))
+
+
+def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "list":
+        print_list()
+        return 0
+    if len(sys.argv) == 2 and sys.argv[1] == "--json":
+        print_json()
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "stage":
+        stage(sys.argv[2])
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] == "set":
+        return set_key(sys.argv[2])
+    print("Usage: waybar-workspace-icons list|--json|stage LAYOUT_PATH|set KEY", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

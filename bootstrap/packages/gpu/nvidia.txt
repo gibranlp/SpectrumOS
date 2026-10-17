@@ -1,0 +1,6 @@
+# NVIDIA moderno con módulos abiertos DKMS y bibliotecas de ambas arquitecturas.
+linux-zen-headers
+nvidia-open-dkms
+nvidia-utils
+lib32-nvidia-utils
+vulkan-tools

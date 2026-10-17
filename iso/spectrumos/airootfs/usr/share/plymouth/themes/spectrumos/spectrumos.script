@@ -1,0 +1,82 @@
+// El fondo negro evita destellos antes de que aparezca la animación.
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+// Dimensiones actuales de la pantalla
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+// Carga de cuadros de animación
+for (i = 0; i < 240; i++) {
+    intro_image[i] = Image("progress-" + i + ".png");
+}
+
+// Sprite animado
+intro_sprite = Sprite();
+intro_sprite.SetImage(intro_image[0]);
+
+// Centrado del sprite
+intro_sprite.SetX((screen_width - intro_image[0].GetWidth()) / 2);
+intro_sprite.SetY((screen_height - intro_image[0].GetHeight()) / 2);
+
+// Avance de la animación
+progress = 0;
+
+fun refresh_callback() {
+    // La secuencia termina en el logo; no vuelve al primer cuadro transparente.
+    if (progress > 239) return;
+    intro_sprite.SetImage(intro_image[progress]);
+    progress++;
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// Centrado horizontal para mensajes y contraseña
+fun center_x(width) {
+    return (screen_width - width) / 2;
+}
+
+// Posición debajo de la animación
+under_image_y = intro_sprite.GetY() + intro_image[0].GetHeight() + 20;
+
+// Solicitud de contraseña
+fun password_callback(prompt, bullets) {
+    // Limpia cualquier solicitud anterior.
+    global.prompt_sprite = null;
+    global.bullet_sprites = null;
+
+    // Muestra el texto de la solicitud.
+    prompt_image = Image.Text("Enter Password", 1, 1, 1);
+    global.prompt_sprite = Sprite(prompt_image);
+    global.prompt_sprite.SetX(center_x(prompt_image.GetWidth()));
+    global.prompt_sprite.SetY(under_image_y);
+
+    // Muestra un punto por cada carácter capturado.
+    bullet_image = Image.Text("•", 1, 1, 1);
+    global.bullet_sprites = [];
+
+    for (i = 0; i < bullets; i++) {
+        global.bullet_sprites[i] = Sprite(bullet_image);
+        global.bullet_sprites[i].SetX(center_x(bullets * bullet_image.GetWidth()) + i * bullet_image.GetWidth());
+        global.bullet_sprites[i].SetY(under_image_y + 30);
+    }
+}
+
+Plymouth.SetDisplayPasswordFunction(password_callback);
+
+// Mensajes del arranque
+fun message_callback(text) {
+    message_image = Image.Text(text, 1, 1, 1);
+    message_sprite = Sprite(message_image);
+    message_sprite.SetPosition(center_x(message_image.GetWidth()), 10);
+}
+
+Plymouth.SetMessageFunction(message_callback);
+
+// El modo normal limpia las solicitudes.
+fun normal_callback() {
+    global.prompt_sprite = null;
+    global.bullet_sprites = null;
+}
+
+Plymouth.SetDisplayNormalFunction(normal_callback);

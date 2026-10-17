@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "${1:?Usage: check PROJECT}"
+bash -n scripts/spectrum-ukvm integrations/ukvm/install integrations/ukvm/check
+if command -v shellcheck >/dev/null; then
+    shellcheck scripts/spectrum-ukvm integrations/ukvm/install integrations/ukvm/check
+fi
+python -m py_compile scripts/ukvm-adapter
+python -m unittest tests.test_ukvm_adapter
+if command -v desktop-file-validate >/dev/null; then
+    desktop-file-validate integrations/ukvm/spectrum-ukvm.desktop
+fi
+if [[ -x /usr/lib/qt6/bin/qmllint ]]; then
+    /usr/lib/qt6/bin/qmllint --uncreatable-type info --signal-handler-parameters info -I /usr/lib/qt6/qml configs/spectrum-ukvm/*.qml
+fi
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_Ukvm.qml
+if command -v qs >/dev/null; then
+    python3 tests/run_ukvm_theme.py
+    python3 - "$PWD" <<'PY'
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+project = Path(sys.argv[1])
+with tempfile.TemporaryDirectory(prefix="spectrum-ukvm-state-test-") as temporary:
+    for source in ("configs/spectrum-ukvm/UkvmState.qml", "configs/spectrum-ukvm/UkvmModel.js", "tests/qml/UkvmStateTests.qml"):
+        shutil.copyfile(project / source, Path(temporary) / Path(source).name)
+    environment = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software", XDG_RUNTIME_DIR=temporary)
+    adapter = Path(temporary) / "test-adapter"
+    adapter.write_text('''#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+args = json.loads(sys.argv[2])
+marker = Path(__file__).with_name("apply-failure")
+ok, data, error = True, {}, None
+if args[0] == "peer":
+    peer = args[2]
+    if marker.exists(): marker.unlink()
+    if peer == "f" * 64: marker.touch()
+    if peer == "c" * 64:
+        ok, error = False, {"message":"Permission refused"}
+    else:
+        data = {"node_id": "e" * 64 if peer == "d" * 64 else peer,
+                "permissions":{"control_this_node":True,"share_clipboard":True,"receive_files":True}}
+elif args == ["apply"]:
+    if marker.exists(): ok, error = False, {"message":"Apply refused"}
+    else: data = {"applied":True}
+print(json.dumps(dict(schema_version=1,integration_version=1,installed=True,
+    apply_pending=not (args == ["apply"] and ok), command=args[0],ok=ok,data=data,error=error)))
+sys.exit(0 if ok else 1)
+''')
+    adapter.chmod(0o755)
+    environment["SPECTRUM_UKVM_TEST_ADAPTER"] = str(adapter)
+    result = subprocess.run(["qs", "--path", str(Path(temporary) / "UkvmStateTests.qml"), "--no-color"],
+                            env=environment, capture_output=True, text=True, timeout=15)
+    output = result.stdout + result.stderr
+    print(output, end="")
+    if result.returncode or "UKVM state checks:" not in output or "0 failed" not in output or "FAIL!" in output:
+        sys.exit("UKVM permission-state validation failed")
+PY
+fi
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellMotion.qml
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellSurface.qml

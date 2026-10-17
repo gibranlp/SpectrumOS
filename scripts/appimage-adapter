@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+import configparser
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import uuid
+
+
+def root():
+    return Path.home() / "Applications/SpectrumOS"
+
+
+def desktop_dir():
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "applications"
+
+
+def app_dir(identifier):
+    if not re.fullmatch(r"[a-f0-9]{32}", identifier):
+        raise ValueError("Invalid application identifier.")
+    directory = root() / identifier
+    if directory.is_symlink():
+        raise ValueError("The managed application directory is a symbolic link.")
+    return directory
+
+
+def read_app(identifier):
+    directory = app_dir(identifier)
+    item = json.loads((directory / "metadata.json").read_text())
+    if not re.fullmatch(r"[a-f0-9]{32}\.AppImage", item["file"]):
+        raise ValueError("Invalid managed AppImage filename.")
+    binary = directory / item["file"]
+    if binary.is_symlink() or not binary.is_file():
+        raise ValueError("The managed AppImage is missing.")
+    return dict(item, id=identifier, path=str(binary), size=binary.stat().st_size)
+
+
+def status():
+    items = []
+    for directory in sorted(root().glob("*")):
+        if re.fullmatch(r"[a-f0-9]{32}", directory.name):
+            try:
+                items.append(read_app(directory.name))
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+    return dict(ok=True, applications=sorted(items, key=lambda item: item["name"].casefold()), folder=str(root()))
+
+
+def atomic_json(path, value):
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False))
+    temporary.chmod(0o600)
+    os.replace(temporary, path)
+
+
+def inspect_image(source):
+    with source.open("rb") as stream:
+        header = stream.read(64)
+        if len(header) < 64 or header[:4] != b"\x7fELF" or header[8:11] != b"AI\x02":
+            raise ValueError("Choose a modern Type 2 AppImage (ELF with an AppImage header).")
+        if header[4:6] != b"\x02\x01" or struct.unpack_from("<H", header, 18)[0] != 62:
+            raise ValueError("This PC requires an x86-64 AppImage.")
+        stream.seek(0)
+        runtime = stream.read(16 * 1024 * 1024)
+    offset = runtime.find(b"hsqs")
+    while offset >= 0:
+        result = subprocess.run(["unsquashfs", "-s", "-o", str(offset), str(source)], capture_output=True, timeout=15)
+        if result.returncode == 0:
+            break
+        offset = runtime.find(b"hsqs", offset + 4)
+    if offset < 0:
+        raise ValueError("The AppImage does not contain a readable SquashFS filesystem.")
+
+    def cat(pattern, limit):
+        result = subprocess.run(["unsquashfs", "-cat", "-o", str(offset), str(source), pattern], capture_output=True, timeout=15)
+        if result.returncode or len(result.stdout) > limit:
+            return b""
+        return result.stdout
+
+    name = source.stem
+    icon_name = ""
+    metadata = cat("*.desktop", 128 * 1024)
+    try:
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        parser.read_string(metadata.decode("utf-8"))
+        entry = parser["Desktop Entry"]
+        name = entry.get("Name", name).strip() or name
+        icon_name = entry.get("Icon", "")
+    except (ValueError, KeyError, configparser.Error, UnicodeError):
+        pass
+    icon = b""
+    extension = ""
+    candidates = [".DirIcon"]
+    if re.fullmatch(r"[\w. -]+", icon_name):
+        candidates.extend([icon_name, icon_name + ".png", icon_name + ".svg"])
+    for candidate in candidates:
+        content = cat(candidate, 4 * 1024 * 1024)
+        if content.startswith(b"\x89PNG\r\n\x1a\n"):
+            icon, extension = content, ".png"
+            break
+        if b"<svg" in content[:2048]:
+            icon, extension = content, ".svg"
+            break
+    return name.replace("\n", " ").replace("\r", " ")[:160], icon, extension
+
+
+def desktop_value(value):
+    return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
+
+
+def integrate(source, identifier=None):
+    source = Path(source).expanduser().resolve(strict=True)
+    if not source.is_file():
+        raise ValueError("Choose an AppImage file.")
+    previous = read_app(identifier) if identifier else None
+    identifier = identifier or uuid.uuid4().hex
+    directory = app_dir(identifier)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    staged = directory / (uuid.uuid4().hex + ".AppImage")
+    icon_path = None
+    committed = False
+    try:
+        shutil.copyfile(source, staged)
+        staged.chmod(0o700)
+        name, icon, extension = inspect_image(staged)
+        if name == staged.stem:
+            name = source.stem
+        name = previous["name"] if previous else name
+        if icon:
+            icon_path = directory / (staged.stem + extension)
+            icon_path.write_bytes(icon)
+        item = dict(name=name, file=staged.name, icon=str(icon_path) if icon_path else "application-x-executable")
+        desktop_dir().mkdir(parents=True, exist_ok=True)
+        launcher = desktop_dir() / ("spectrum-appimage-" + identifier + ".desktop")
+        desktop = "\n".join([
+            "[Desktop Entry]", "Type=Application", "Name=" + desktop_value(name),
+            "Comment=Managed AppImage", "Icon=" + desktop_value(item["icon"]),
+            "Exec=/usr/lib/spectrumos/appimage-adapter launch " + identifier,
+            "Terminal=false", "Categories=Utility;", "Keywords=AppImage;", "",
+        ])
+        launcher_tmp = launcher.with_suffix(".tmp")
+        launcher_tmp.write_text(desktop)
+        atomic_json(directory / "metadata.json", item)
+        committed = True
+        os.replace(launcher_tmp, launcher)
+        if previous:
+            (directory / previous["file"]).unlink(missing_ok=True)
+            old_icon = Path(previous.get("icon", ""))
+            if old_icon.parent == directory:
+                old_icon.unlink(missing_ok=True)
+    finally:
+        if not committed:
+            staged.unlink(missing_ok=True)
+            if icon_path:
+                icon_path.unlink(missing_ok=True)
+            if not previous:
+                shutil.rmtree(directory)
+    return identifier
+
+
+def choose():
+    result = subprocess.run(["zenity", "--file-selection", "--title=Choose an AppImage", "--file-filter=AppImages | *.AppImage *.appimage", "--file-filter=All files | *"], capture_output=True, text=True)
+    if result.returncode == 1:
+        return None
+    if result.returncode:
+        raise ValueError("Could not open the file chooser.")
+    return result.stdout.rstrip("\n") or None
+
+
+def launch(identifier):
+    item = read_app(identifier)
+    subprocess.Popen(["uwsm", "app", "--", item["path"]], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def remove(identifier):
+    read_app(identifier)
+    (desktop_dir() / ("spectrum-appimage-" + identifier + ".desktop")).unlink(missing_ok=True)
+    shutil.rmtree(app_dir(identifier))
+
+
+def main(args):
+    if not args:
+        raise ValueError("Choose status, add, replace, choose-add, choose-replace, launch, folder or remove.")
+    command = args[0]
+    counts = {"status": 1, "add": 2, "replace": 3, "choose-add": 1, "choose-replace": 2, "launch": 2, "folder": 1, "remove": 2}
+    if command not in counts or len(args) != counts[command]:
+        raise ValueError("Invalid AppImage manager arguments.")
+    if command.startswith("choose-"):
+        selected = choose()
+        if selected is None:
+            return dict(ok=True, cancelled=True)
+        args = [command.removeprefix("choose-"), *args[1:], selected]
+        command = args[0]
+    root().mkdir(parents=True, exist_ok=True)
+    with (root() / ".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if command == "add":
+            integrate(args[1])
+        elif command == "replace":
+            integrate(args[2], args[1])
+        elif command == "launch":
+            launch(args[1])
+        elif command == "remove":
+            remove(args[1])
+        elif command == "folder":
+            subprocess.Popen(["xdg-open", str(root())], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return status()
+
+
+if __name__ == "__main__":
+    try:
+        print(json.dumps(main(sys.argv[1:]), ensure_ascii=False))
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        print(json.dumps(dict(ok=False, error=str(error))))
+        sys.exit(1)

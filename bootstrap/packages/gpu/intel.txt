@@ -1,0 +1,8 @@
+# Gráficos Intel con aceleración multimedia y Vulkan para aplicaciones de 64 y 32 bits.
+mesa
+lib32-mesa
+intel-media-driver
+libva-intel-driver
+vulkan-intel
+lib32-vulkan-intel
+vulkan-tools

@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+
+
+def answer(directory: str) -> int:
+    request_dir = Path(directory).resolve()
+    if request_dir.parent != Path(tempfile.gettempdir()).resolve() or not request_dir.name.startswith("spectrum-picker-"):
+        return 2
+    if not request_dir.is_dir() or request_dir.stat().st_uid != os.getuid():
+        return 2
+    (request_dir / "response").write_text(sys.stdin.readline(), encoding="utf-8")
+    return 0
+
+
+def main() -> int:
+    arguments = sys.argv[1:]
+    if len(arguments) == 2 and arguments[0] == "--answer":
+        return answer(arguments[1])
+    if "--show" in arguments and arguments[arguments.index("--show") + 1:][:1] == ["drun"]:
+        return subprocess.run(("/usr/lib/spectrumos/spectrum-shell-launcher",), check=False).returncode
+    prompt = "Select"
+    if "--prompt" in arguments:
+        position = arguments.index("--prompt")
+        if position + 1 < len(arguments):
+            prompt = arguments[position + 1]
+    password = "--password" in arguments
+    rows = [] if password else sys.stdin.read().splitlines()
+    with tempfile.TemporaryDirectory(prefix="spectrum-picker-") as directory:
+        request_dir = Path(directory)
+        (request_dir / "request.json").write_text(
+            json.dumps({"prompt": prompt, "password": password, "rows": rows}), encoding="utf-8"
+        )
+        shell_path = os.environ.get("SPECTRUM_SHELL_CONFIG_DIR", "/usr/share/spectrumos/spectrum-shell")
+        for _ in range(3):
+            opened = subprocess.run(
+                ("qs", "--path", shell_path, "ipc", "call", "spectrum-shell", "openPicker", directory),
+                check=False, capture_output=True, text=True, timeout=5,
+            )
+            if opened.returncode == 0 or "Not ready to accept queries yet." not in opened.stderr:
+                break
+            time.sleep(0.1)
+        if opened.returncode != 0:
+            print("SpectrumShell picker is unavailable", file=sys.stderr)
+            return 1
+        response = request_dir / "response"
+        deadline = time.monotonic() + 300
+        while time.monotonic() < deadline:
+            if response.exists():
+                selected = response.read_text(encoding="utf-8").rstrip("\n")
+                if selected:
+                    print(selected)
+                    return 0
+                return 1
+            time.sleep(0.05)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

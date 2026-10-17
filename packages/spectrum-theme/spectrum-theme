@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PYTHONPATH=/usr/share/spectrumos/theme-engine
+exec python -m spectrum_theme.cli "$@"

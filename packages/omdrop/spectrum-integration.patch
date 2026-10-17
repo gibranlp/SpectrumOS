@@ -1,0 +1,66 @@
+--- a/bin/omdrop
++++ b/bin/omdrop
+@@ -520,8 +520,8 @@
+ identity_notice() {
+   local msg=$1
+   printf '%s\n' "$msg" >&2
+-  command -v omarchy-notification-send >/dev/null 2>&1 \
+-    && omarchy-notification-send -t 8000 "Omdrop" "$msg" >/dev/null 2>&1
++  command -v /usr/lib/spectrumos/omdrop-notify >/dev/null 2>&1 \
++    && /usr/lib/spectrumos/omdrop-notify -t 8000 "Omdrop" "$msg" >/dev/null 2>&1
+   return 0
+ }
+ 
+@@ -697,7 +697,6 @@
+   else
+     printf '\nReady. Turn receiving on from the bar, or run: omdrop on\n'
+   fi
+-  skills_offer
+ }
+ 
+ # What is missing, in the order it has to be fixed: no receiver library means
+@@ -2266,7 +2265,7 @@
+ # service, and a service's cgroup is killed when it exits -- taking any
+ # setsid-detached child with it, which is why an opened image vanished before
+ # it could map a window. uwsm-app puts the app in its own unit in app.slice,
+-# which is what the rest of Omarchy does (see omarchy-launch-browser).
++# which is what the rest of Omarchy does (see xdg-open).
+ launch() {
+   # Synchronously, and NOT backgrounded: uwsm-app returns once the app has its
+   # own unit, and we must still be alive at that moment. Backgrounding it and
+@@ -2295,7 +2294,7 @@
+ cmd_open_link() {
+   local f=${1:?usage: omdrop open-link FILE} url raw why
+   if url=$(link_target "$f"); then
+-    omarchy-launch-browser "$url" >/dev/null 2>&1
++    xdg-open "$url" >/dev/null 2>&1
+     return
+   fi
+   if raw=$(link_url "$f") && [[ "$raw" == *:* ]]; then
+@@ -2303,7 +2302,7 @@
+   else
+     why="There is no web link in it."
+   fi
+-  omarchy-notification-send "Can't open $(basename "$f")" "$why" >/dev/null 2>&1 \
++  /usr/lib/spectrumos/omdrop-notify "Can't open $(basename "$f")" "$why" >/dev/null 2>&1 \
+     || echo "omdrop: can't open $f: $why" >&2
+   return 1
+ }
+@@ -2558,7 +2557,7 @@
+   # claiming the urgency of one.
+   local what="Saved to $(tildify "$(dirname "$f")")/"
+   command -v wl-copy >/dev/null 2>&1 && what="Copied to clipboard, saved to $(tildify "$(dirname "$f")")/"
+-  omarchy-notification-send -t 8000 "$(basename "$f")" "$what (or click this)" \
++  /usr/lib/spectrumos/omdrop-notify -t 8000 "$(basename "$f")" "$what (or click this)" \
+     "${args[@]}" --exec "$SELF" act open "$f" >/dev/null \
+     || echo "omdrop: notification failed for $f" >&2
+ }
+@@ -2571,7 +2570,7 @@
+   local dir; dir=$(dirname "$f")
+   case "$what" in
+     open)   act_open "$f" ;;
+-    shell)  ( cd "$dir" && launch "$(omarchy-default-terminal)" ) ;;
++    shell)  ( cd "$dir" && launch "foot" ) ;;
+     browse) launch xdg-open "$dir" ;;
+     *) die "act $what: one of open, shell, browse" ;;
+   esac

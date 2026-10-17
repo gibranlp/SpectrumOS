@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+import json
+from pathlib import Path
+import re
+import sys
+
+
+def render(palette: Path, template: Path, output: Path) -> None:
+    roles = json.loads(palette.read_text(encoding="utf-8"))["roles"]
+
+    def substitute(match: re.Match[str]) -> str:
+        color = roles[match.group(1).lower()]
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            raise ValueError("Installer palette contains an invalid color")
+        return color[1:]
+
+    css = re.sub(r"__([A-Z_]+)__", substitute, template.read_text(encoding="utf-8"))
+    output.write_text(css, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    render(*(Path(argument) for argument in sys.argv[1:]))

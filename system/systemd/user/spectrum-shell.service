@@ -1,0 +1,14 @@
+[Unit]
+Description=SpectrumShell desktop session
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStartPre=/usr/lib/spectrumos/thunar-actions sync
+ExecStart=/usr/lib/spectrumos/spectrum-shell-session
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5

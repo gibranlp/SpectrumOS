@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = ROOT / "repo" / "config.toml"
+DEFAULT_HOST = "gibranlp.dev"
+DEFAULT_IDENTITY = Path.home() / ".ssh" / "id_ed25519"
+DEFAULT_REMOTE_ROOT = "/home2/gibranlp/spectrum.gibranlp.dev/repo"
+
+
+class PublishError(RuntimeError):
+    pass
+
+
+def run(command: list[str]) -> str:
+    result = subprocess.run(command, cwd=ROOT, check=False, text=True, capture_output=True)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise PublishError(f"Command failed ({shlex.join(command)}): {detail}")
+    return result.stdout.strip()
+
+
+def load_config() -> dict:
+    with CONFIG_PATH.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def safe_remote(value: str, label: str, pattern: str) -> str:
+    if not re.fullmatch(pattern, value):
+        raise PublishError(f"Invalid {label}: {value}")
+    return value
+
+
+def ssh_command(identity: Path, host: str, arguments: list[str], options: list[str] | None = None) -> list[str]:
+    return ["ssh", *(options or []), "-i", str(identity), host, shlex.join(arguments)]
+
+
+def snapshot(config: dict, channel: str) -> tuple[Path, dict, str]:
+    directory = ROOT / "repo" / "output" / channel / config["architecture"]
+    manifest_path = directory / "snapshot.json"
+    if not manifest_path.is_file():
+        raise PublishError(f"No local {channel} snapshot exists")
+    run([str(ROOT / "scripts" / "spectrum-repo"), "verify", "--channel", channel])
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if document.get("channel") != channel or document.get("build_kind") != "clean-chroot":
+        raise PublishError("Only a matching clean-chroot snapshot can be published")
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()[:16]
+    timestamp = re.sub(r"[^0-9TZ]", "", document["created_at"])
+    release_id = safe_remote(f"{timestamp}-{digest}", "release identifier", r"[0-9TZ]+-[0-9a-f]{16}")
+    return directory, document, release_id
+
+
+def publish(
+    channel: str,
+    host: str,
+    identity: Path,
+    remote_root: str,
+    apply: bool,
+    confirmation: str | None,
+) -> None:
+    config = load_config()
+    host = safe_remote(host, "SSH host", r"[A-Za-z0-9.-]+")
+    remote_root = safe_remote(remote_root, "remote root", r"/[A-Za-z0-9._/-]+")
+    if not identity.is_file():
+        raise PublishError(f"SSH identity does not exist: {identity}")
+    if apply and confirmation != channel:
+        raise PublishError(f"Publication requires --confirm {channel}")
+    directory, document, release_id = snapshot(config, channel)
+    remote_release = f"{remote_root}/releases/{release_id}/{channel}"
+    print(f"Channel: {channel}")
+    print(f"Snapshot: {release_id}")
+    print(f"Source: {directory}")
+    print(f"Destination: {host}:{remote_release}")
+    print(f"Public URL: {config['public_base_url'].rstrip('/')}/{channel}/{config['architecture']}")
+    if not apply:
+        mode = config["signing"].get("mode", "development")
+        print(f"Signing mode: {mode}")
+        print("Dry-run only; publication requires production signing and --apply --confirm CHANNEL.")
+        return
+    if config["signing"].get("mode") != "production":
+        raise PublishError("Refusing public upload while the development signing key is active")
+    with tempfile.TemporaryDirectory(prefix="spectrum-repo-ssh.") as temporary:
+        control_path = str(Path(temporary) / "connection")
+        ssh_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=30", "-o", f"ControlPath={control_path}"]
+        try:
+            run(ssh_command(identity, host, ["mkdir", "-p", f"{remote_release}/{config['architecture']}"], ssh_options))
+            run([
+                "rsync", "--archive", "--checksum", "--delete-delay",
+                "-e", shlex.join(["ssh", *ssh_options, "-i", str(identity)]),
+                f"{directory}/", f"{host}:{remote_release}/{config['architecture']}/",
+            ])
+            expected_hashes = {}
+            for entry in document["files"]:
+                name = safe_remote(entry["name"], "snapshot filename", r"[A-Za-z0-9._+-]+")
+                remote_file = f"{remote_release}/{config['architecture']}/{name}"
+                expected_hashes[remote_file] = entry["sha256"]
+            for name in ("snapshot.json", "snapshot.json.sig"):
+                remote_file = f"{remote_release}/{config['architecture']}/{name}"
+                expected_hashes[remote_file] = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+            checksum_output = run(ssh_command(identity, host, ["sha256sum", *expected_hashes], ssh_options))
+            remote_hashes = {
+                line.split(maxsplit=1)[1]: line.split(maxsplit=1)[0]
+                for line in checksum_output.splitlines()
+                if len(line.split(maxsplit=1)) == 2
+            }
+            for remote_file, expected in expected_hashes.items():
+                if remote_hashes.get(remote_file) != expected:
+                    raise PublishError(f"Remote checksum mismatch: {Path(remote_file).name}")
+            next_link = f"{remote_root}/.{channel}.next"
+            target = f"releases/{release_id}/{channel}"
+            run(ssh_command(identity, host, ["ln", "-sfn", target, next_link], ssh_options))
+            run(ssh_command(identity, host, ["mv", "-Tf", next_link, f"{remote_root}/{channel}"], ssh_options))
+        finally:
+            if Path(control_path).exists():
+                subprocess.run(["ssh", "-S", control_path, "-O", "exit", host], check=False,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"Published {channel}: {config['public_base_url'].rstrip('/')}/{channel}/{config['architecture']}")
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description="Publish a verified SpectrumOS snapshot over SSH")
+    result.add_argument("channel", choices=("edge", "testing", "stable"))
+    result.add_argument("--host", default=DEFAULT_HOST)
+    result.add_argument("--identity", type=Path, default=DEFAULT_IDENTITY)
+    result.add_argument("--remote-root", default=DEFAULT_REMOTE_ROOT)
+    result.add_argument("--apply", action="store_true")
+    result.add_argument("--confirm")
+    return result
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    try:
+        publish(
+            arguments.channel,
+            arguments.host,
+            arguments.identity.expanduser().resolve(),
+            arguments.remote_root,
+            arguments.apply,
+            arguments.confirm,
+        )
+    except PublishError as error:
+        print(f"spectrum-repo-publish: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

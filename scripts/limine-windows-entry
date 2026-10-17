@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+
+EFI_SYSTEM_PARTITION = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+WINDOWS_PATH = ("EFI", "Microsoft", "Boot", "bootmgfw.efi")
+PARTUUID_PATTERN = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\Z")
+
+
+def candidates(devices: dict, excluded_disk: str) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for disk in devices.get("blockdevices", []):
+        if disk.get("type") != "disk" or os.path.realpath(disk.get("path", "")) == excluded_disk:
+            continue
+        for partition in disk.get("children", []):
+            partuuid = partition.get("partuuid")
+            if (
+                partition.get("type") == "part"
+                and str(partition.get("parttype", "")).lower() == EFI_SYSTEM_PARTITION
+                and str(partition.get("fstype", "")).lower() == "vfat"
+                and isinstance(partuuid, str)
+                and PARTUUID_PATTERN.fullmatch(partuuid)
+                and partition.get("path")
+            ):
+                found.append((partition["path"], partuuid.lower()))
+    return sorted(found, key=lambda item: item[1])
+
+
+def windows_loader(root: Path) -> str | None:
+    current = root
+    names: list[str] = []
+    try:
+        for component in WINDOWS_PATH:
+            match = next(name for name in os.listdir(current) if name.casefold() == component.casefold())
+            names.append(match)
+            current /= match
+        if current.is_file():
+            with current.open("rb") as executable:
+                if executable.read(2) == b"MZ":
+                    return "/" + "/".join(names)
+    except (OSError, StopIteration):
+        pass
+    return None
+
+
+def discover(disks: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for device, partuuid in disks:
+        with tempfile.TemporaryDirectory(prefix="spectrum-windows-esp-") as directory:
+            mounted = subprocess.run(
+                ["mount", "-t", "vfat", "-o", "ro,nosuid,nodev,noexec", device, directory],
+                check=False, capture_output=True,
+            )
+            if mounted.returncode != 0:
+                print(
+                    f"Could not inspect EFI partition {device}: {mounted.stderr.decode(errors='replace').strip()}",
+                    file=sys.stderr,
+                )
+                continue
+            try:
+                loader = windows_loader(Path(directory))
+                if loader is not None:
+                    found.append((partuuid, loader))
+            finally:
+                subprocess.run(["umount", directory], check=True)
+    return found
+
+
+def add_entries(content: str, windows: list[tuple[str, str]]) -> str:
+    additions: list[str] = []
+    for partuuid, loader in windows:
+        path = f"guid({partuuid}):{loader}"
+        if path.casefold() in content.casefold():
+            continue
+        title = "Windows Boot Manager" if len(windows) == 1 else f"Windows Boot Manager ({partuuid[:8]})"
+        additions.extend((f"/{title}", "    protocol: efi", f"    path: {path}", ""))
+    if not additions:
+        return content
+    return content.rstrip() + "\n\n" + "\n".join(additions).rstrip() + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Add detected Windows UEFI loaders to Limine")
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--exclude-disk", required=True)
+    options = parser.parse_args()
+    result = subprocess.run(
+        ["lsblk", "--json", "--tree", "--paths", "--output", "PATH,TYPE,PARTTYPE,PARTUUID,FSTYPE"],
+        check=True, capture_output=True, text=True,
+    )
+    disks = candidates(json.loads(result.stdout), os.path.realpath(options.exclude_disk))
+    windows = discover(disks)
+    content = options.config.read_text(encoding="utf-8")
+    updated = add_entries(content, windows)
+    if updated != content:
+        descriptor, temporary = tempfile.mkstemp(prefix=".limine-windows-", dir=options.config.parent)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                stream.write(updated)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(temporary, options.config.stat().st_mode & 0o777)
+            os.replace(temporary, options.config)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    print(f"Windows boot entries found: {len(windows)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

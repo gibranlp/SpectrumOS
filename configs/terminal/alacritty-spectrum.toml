@@ -1,0 +1,17 @@
+[general]
+import = ["~/.cache/spectrumos/theme/current/alacritty.toml"]
+live_config_reload = true
+
+[window]
+dynamic_title = true
+decorations = "None"
+opacity = 1.0
+
+[scrolling]
+history = 10000
+
+[selection]
+save_to_clipboard = true
+
+[cursor]
+unfocused_hollow = true

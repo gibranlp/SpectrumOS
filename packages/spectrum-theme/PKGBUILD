@@ -1,0 +1,29 @@
+pkgname=spectrum-theme
+pkgver=1.0.0
+pkgrel=2
+pkgdesc="Semantic palette extraction and atomic theme generation for SpectrumOS"
+arch=(any)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=(python ffmpeg)
+optdepends=('matugen: Material color extraction backend')
+options=(!strip !debug)
+_source_revision=a66ae26d50893c89
+_source_root="spectrumos-source-$pkgver"
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
+sha256sums=('7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162')
+
+check() {
+    local _theme_source="$srcdir/$_source_root/packages/spectrum-theme"
+    PYTHONPATH="$_theme_source/src" python -m unittest discover -s "$_theme_source/tests" -v
+}
+
+package() {
+    local _theme_source="$srcdir/$_source_root/packages/spectrum-theme"
+    local engine="$pkgdir/usr/share/spectrumos/theme-engine/spectrum_theme"
+    install -d -m 0755 "$engine/palettes" "$pkgdir/usr/bin" "$pkgdir/usr/share/licenses/$pkgname"
+    install -m 0644 "$_theme_source"/src/spectrum_theme/*.py "$engine/"
+    install -m 0644 "$_theme_source"/src/spectrum_theme/palettes/*.toml "$engine/palettes/"
+    install -m 0755 "$_theme_source/spectrum-theme" "$pkgdir/usr/bin/spectrum-theme"
+    install -m 0644 "$_theme_source/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

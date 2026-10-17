@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+build() {
+    add_module btrfs
+    add_module vfat
+    add_module fat
+    add_module nls_cp437
+    add_module nls_ascii
+    add_binary btrfs
+    add_binary tar
+    add_binary mv
+    add_binary date
+    add_binary find
+    add_binary mountpoint
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+This hook checks the spectrumos.restore= kernel parameter before the normal
+root-mounting hooks run. When present ("latest" or an explicit restore-point
+id), it promotes that SpectrumOS Btrfs restore point to a new writable @,
+restores the matching /boot archive onto the EFI partition labeled
+SPECTRM_EFI, and lets boot continue normally into the now-restored root. The
+previous @ and EFI contents are preserved under @failed/spectrumos/, never
+deleted. Absent the parameter, this hook has no effect on boot.
+
+Place it in HOOKS before "filesystems" (after "block", so udev has already
+settled device and by-label symlinks).
+HELPEOF
+}

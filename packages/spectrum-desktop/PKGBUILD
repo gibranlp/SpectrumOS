@@ -1,0 +1,187 @@
+pkgname=spectrum-desktop
+pkgver=1.0.0
+pkgrel=13
+pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
+arch=(x86_64)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=(
+    'ukvm>=0.1.0.r21' spectrumdrop acl adwaita-cursors alacritty alsa-lib awww blueman bluez bluez-utils brightnessctl cava curl dbus ddcutil evolution fastfetch ffmpeg flatpak gcc-libs glibc gnome-disk-utility gnome-keyring grim gtk-layer-shell gtk3 gvfs gvfs-mtp hyprpicker
+    imagemagick htop hypridle hyprland hyprlock kdeconnect kitty kvantum kvantum-qt5 libdbusmenu-gtk3 libnotify networkmanager nm-connection-editor noto-fonts noto-fonts-cjk noto-fonts-emoji ntfs-3g numbat pavucontrol pipewire pipewire-alsa pipewire-jack pipewire-pulse
+    playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct satty sddm slurp spectrum-base 'spectrum-hyprland>=1.0.0-4' spectrum-plymouth spectrum-sddm spectrum-theme swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
+    ttf-jetbrains-mono-nerd ttf-firacode-nerd ttf-sourcecodepro-nerd ttf-cascadia-code-nerd ttf-hack-nerd ttf-ibmplex-mono-nerd ttf-iosevka-nerd ttf-victor-mono-nerd ttf-ubuntu-mono-nerd ttf-meslo-nerd
+    ffmpegthumbnailer gst-thumbnailers gst-libav gst-plugins-bad gst-plugins-ugly gnome-epub-thumbnailer poppler poppler-glib libgsf libgepub libopenraw
+    webp-pixbuf-loader libheif uwsm vlc
+    wayland libxkbcommon wf-recorder wireplumber wl-clipboard xdg-desktop-portal-gtk spectrum-xdg-desktop-portal-hyprland xdg-user-dirs xdg-utils
+)
+depends+=('quickshell>=0.3.0' qt6-declarative gamemode)
+depends+=(fuse2 squashfs-tools zenity)
+depends+=(file-roller 7zip unrar unzip zip libarchive tar gzip bzip2 xz zstd lzip lz4 cpio arj lhasa bzip3)
+makedepends=(desktop-file-utils pkgconf)
+optdepends=(
+    'gowall-bin: optional wallpaper recoloring' 'vesktop-bin: Spectrum-themed Discord client'
+    'brave-bin: Brave browser' 'google-chrome: Google Chrome browser'
+    'whatsie: WhatsApp desktop client' 'zen-browser-bin: Zen browser'
+    'power-profiles-daemon: Performance/Balanced toggle on laptop form factors'
+    'paru: AUR packages in the Control Center Updates page'
+    'transmission-cli: Background transfers (full install)'
+    'cups: Printing (full install)'
+    'tuned: Performance profiles on desktops (full install)'
+)
+provides=(notification-daemon)
+conflicts=(eww eww-git wofi waybar dunst)
+replaces=(eww eww-git wofi waybar dunst)
+options=(!strip !debug)
+backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/fastfetch/config.jsonc')
+_source_revision=7e5a2b355c9b5325
+_source_root="spectrumos-source-$pkgver"
+_questline_version=2.0.1
+_stash_version=0.7.0
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst"
+        "questline-2.0.1-spectrum-autosave-419ebd37c015005a.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.1-spectrum-autosave-419ebd37c015005a.tar.zst"
+        'questline.LICENSE'
+        "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
+sha256sums=('ec95683d57ae456c79bf4c41a4f06e74b50db807ef17996d404220e84ad369e8'
+            '419ebd37c015005a8201c1414fd2f0fe3e0f59e49d617e6d9d4c2bf0337698b5'
+            '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
+            '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')
+
+build() {
+    "$srcdir/$_source_root/integrations/hotkey/build" "$srcdir/$_source_root" "$srcdir/hotkey-keyboard"
+}
+
+check() {
+    install -Dm644 "$startdir/PKGBUILD" "$srcdir/$_source_root/packages/spectrum-desktop/PKGBUILD"
+    makepkg --dir "$startdir" --printsrcinfo > "$srcdir/$_source_root/packages/spectrum-desktop/.SRCINFO"
+    "$srcdir/$_source_root/integrations/ukvm/check" "$srcdir/$_source_root"
+    local _project="$srcdir/$_source_root" script
+    desktop-file-validate "$_project/system/autostart/spectrum-kdeconnect-indicator.desktop"
+    desktop-file-validate "$_project/system/spectrum-appimages.desktop"
+    for script in "$_project"/scripts/{volume,brightness,theme-menu,waybar-menu,panel,hyprland-menu,font-size-menu,font-family-menu,calculator-menu,network-menu,bluetooth-menu,recorder-menu,waybar-cava,session-menu,keyboard-layout,spectrum-update-run,spectrum-shell,spectrum-shell-launcher,spectrum-shell-open,spectrum-shell-session,spectrum-user-avatar,media-control,questline-open,stash-open}; do
+        bash -n "$script"
+    done
+    python -m py_compile "$_project/scripts/appimage-adapter" "$_project/scripts/network-adapter" "$_project/scripts/theme-adapter" "$_project/scripts/application-adapter" "$_project/scripts/idle-adapter" "$_project/scripts/media-adapter" "$_project/scripts/spectrum-shell-tools" "$_project/scripts/spectrum-shell-picker" "$_project/scripts/time-region-adapter" "$_project/scripts/mouse-adapter" "$_project/scripts/audio-recorder" "$_project/scripts/hotkey-adapter" "$_project/scripts/spectrumdrop-adapter"
+    python -m py_compile "$_project/scripts/system-adapter" "$_project/scripts/brightness-adapter" "$_project/scripts/control-adapter" "$_project/scripts/display-menu" "$_project/scripts/weather-adapter" "$_project/scripts/workspace-layout" "$_project/scripts/waybar-workspace-icons" "$_project/scripts/appearance-sync" "$_project/scripts/performance-mode" "$_project/scripts/resource-monitor" "$_project/scripts/window-pin-toggle" "$_project/scripts/spectrum-shell-layout" "$_project/scripts/spectrum-gaming-session" "$_project/scripts/questline-adapter" "$_project/scripts/questline-action" "$_project/scripts/questline-widget-state"
+    cd "$_project"
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_widget_polling.py
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_launcher.py
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_capture_notifications.py
+    local _media_runtime="$srcdir/media-test-runtime"
+    install -d -m 700 "$_media_runtime"
+    XDG_RUNTIME_DIR="$_media_runtime" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_media.py
+    python -m unittest tests.test_widget_device_controls tests.test_brightness tests.test_hotkey tests.test_spectrumdrop
+    python -m unittest tests.test_appimage tests.test_screensaver
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_Screensaver.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_SpectrumDrop.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_HotKey.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_DeviceControls.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_DisplayScale.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_AppImages.qml
+    python -m unittest \
+        tests.test_flatpak tests.test_bar_style tests.test_gaming_profile tests.test_thunar_actions tests.test_waybar tests.test_wofi tests.test_desktop_cleanup tests.test_network_menu tests.test_spectrum_shell_network tests.test_spectrum_shell_picker tests.test_panel \
+        tests.test_hyprland_menu tests.test_display_menu tests.test_recorder_menu tests.test_eww tests.test_weather tests.test_installer tests.test_rescue_shell tests.test_workspace_layout tests.test_appearance_sync tests.test_browser_defaults tests.test_performance_mode tests.test_notifications \
+        tests.test_font_size_menu tests.test_font_family_menu tests.test_theme_menu tests.test_idle_adapter tests.test_hyprland_config tests.test_calculator_menu tests.test_resource_monitor tests.test_session_menu tests.test_system_adapter tests.test_spectrum_update_run tests.test_window_pin_toggle tests.test_time_region_adapter tests.test_igor tests.test_shell_idle tests.test_desktop_branding tests.test_user_avatar tests.test_questline_adapter tests.test_questline_widget_state tests.test_media_adapter tests.test_media_control tests.test_fastfetch tests.test_stash tests.test_mouse_adapter tests.test_audio_recorder
+    QUESTLINE_TEST_BINARY="$srcdir/questline-$_questline_version-linux-x86_64" python -m unittest tests.test_questline_autosave
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineDrafts.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python tests/run_questline_workspace.py
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorCoverage.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellMotion.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_WidgetAction.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_BarExtras.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellSurface.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_BarIslands.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_DetailedBarStats.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorStage.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorMovie.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorChin.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_Igor.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorSleeper.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_KeyboardNavigation.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_MediaArtwork.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_MediaTitle.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorMusicNote.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTasks.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTreasury.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineFocus.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineHero.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_RecordingDot.qml
+}
+
+package() {
+    "$srcdir/$_source_root/integrations/ukvm/install" "$srcdir/$_source_root" "$pkgdir"
+    local _project="$srcdir/$_source_root"
+    local spectrum="$pkgdir/usr/share/spectrumos" script
+    install -Dm 0755 "$srcdir/hotkey-keyboard" "$pkgdir/usr/lib/spectrumos/hotkey-keyboard"
+    install -Dm 0644 "$_project/integrations/hotkey/virtual-keyboard-unstable-v1.xml" "$pkgdir/usr/share/licenses/spectrum-desktop/virtual-keyboard-unstable-v1.xml"
+    install -d -m 0755 \
+        "$spectrum/spectrum-shell" \
+        "$spectrum/terminal" "$spectrum/environment" "$spectrum/vlc" \
+        "$pkgdir/usr/lib/spectrumos" "$pkgdir/usr/lib/systemd/user" \
+        "$pkgdir/usr/lib/systemd/system-preset" "$pkgdir/usr/lib/sysusers.d" "$pkgdir/usr/lib/tmpfiles.d" \
+        "$pkgdir/usr/share/libalpm/hooks" "$pkgdir/etc/NetworkManager/conf.d" "$pkgdir/etc/samba" "$pkgdir/etc/xdg" \
+        "$pkgdir/usr/share/applications" "$pkgdir/usr/share/licenses/$pkgname" "$pkgdir/usr/share/licenses/questline" "$pkgdir/usr/bin"
+
+    install -m 0644 "$_project"/configs/spectrum-shell/*.qml "$spectrum/spectrum-shell/"
+    install -m 0644 "$_project"/configs/spectrum-shell/*.js "$spectrum/spectrum-shell/"
+    install -d -m 0755 "$spectrum/spectrum-shell/igor"
+    install -m 0644 "$_project"/configs/spectrum-shell/igor/*.svg "$spectrum/spectrum-shell/igor/"
+    install -m 0644 "$_project"/configs/terminal/* "$spectrum/terminal/"
+    install -Dm644 "$_project/configs/terminal/kitty-user.conf" "$pkgdir/etc/skel/.config/kitty/kitty.conf"
+    install -Dm644 "$_project/configs/terminal/alacritty-user.toml" "$pkgdir/etc/skel/.config/alacritty/alacritty.toml"
+    install -Dm 0644 "$_project/configs/fastfetch/config.jsonc" \
+        "$pkgdir/etc/xdg/fastfetch/config.jsonc"
+    install -m 0644 "$_project"/configs/environment/90-spectrumos-qt.conf \
+        "$spectrum/environment/90-spectrumos-qt.conf"
+    install -m 0644 "$_project/system/spectrumos/font-families.conf" \
+        "$spectrum/font-families.conf"
+    install -m 0644 "$_project/configs/vlc/vlcrc" "$spectrum/vlc/vlcrc"
+    install -m 0644 "$_project/configs/networkmanager/20-spectrumos.conf" \
+        "$pkgdir/etc/NetworkManager/conf.d/20-spectrumos.conf"
+    install -m 0644 "$_project/configs/samba/smb.conf" "$pkgdir/etc/samba/smb.conf"
+    install -m 0644 "$_project/configs/xdg/mimeapps.list" "$pkgdir/etc/xdg/mimeapps.list"
+    install -m 0644 "$_project/system/sysusers.d/spectrumos-sharing.conf" \
+        "$pkgdir/usr/lib/sysusers.d/spectrumos-sharing.conf"
+    install -m 0644 "$_project/system/tmpfiles.d/spectrumos-sharing.conf" \
+        "$pkgdir/usr/lib/tmpfiles.d/spectrumos-sharing.conf"
+
+    install -Dm644 "$_project/system/modules-load.d/spectrumos-ddc.conf" "$pkgdir/usr/lib/modules-load.d/spectrumos-ddc.conf"
+
+    for script in \
+        volume brightness theme-menu waybar-menu panel hyprland-menu font-size-menu font-family-menu application-menu calculator-menu \
+        network-menu bluetooth-menu recorder-menu display-menu appearance-sync waybar-widgets \
+        waybar-cava wallpaper-restore session-menu keyboard-layout spectrum-update-run window-pin-toggle spectrum-browser-defaults \
+        spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder application-adapter idle-adapter screensaver-adapter appimage-adapter media-adapter media-control weather-adapter workspace-layout waybar-workspace-icons performance-mode resource-monitor spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session spectrum-shell-tools spectrum-shell-picker thunar-actions spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-widget-state stash-open spectrum-focus; do
+        install -m 0755 "$_project/scripts/$script" "$pkgdir/usr/lib/spectrumos/$script"
+    done
+    install -m 0644 "$_project/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/90-spectrumos-desktop-cleanup.hook"
+    install -m 0644 "$_project/system/pacman-hooks/91-spectrumos-browser-defaults.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/91-spectrumos-browser-defaults.hook"
+    install -Dm 0644 "$_project/system/polkit/org.spectrumos.time-region.policy" \
+        "$pkgdir/usr/share/polkit-1/actions/org.spectrumos.time-region.policy"
+    install -m 0755 "$_project/integrations/questline/spectrum-focus" "$pkgdir/usr/lib/spectrumos/questline-focus"
+    install -m 0755 "$_project/scripts/pipewire-restart" \
+        "$pkgdir/usr/lib/spectrumos/pipewire-restart"
+    install -m 0644 "$_project/system/pacman-hooks/60-spectrumos-pipewire-restart.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/60-spectrumos-pipewire-restart.hook"
+
+    install -m 0644 "$_project/system/systemd/user/spectrum-hotkey.service" "$pkgdir/usr/lib/systemd/user/spectrum-hotkey.service"
+    install -m 0644 "$_project/system/systemd/user/spectrum-resource-monitor.service" \
+        "$pkgdir/usr/lib/systemd/user/spectrum-resource-monitor.service"
+    install -m 0644 "$_project/system/systemd/user/spectrum-shell.service" \
+        "$pkgdir/usr/lib/systemd/user/spectrum-shell.service"
+    install -m 0644 "$_project/system/systemd/user/spectrum-workspace-layout.service" \
+        "$pkgdir/usr/lib/systemd/user/spectrum-workspace-layout.service"
+    install -m 0644 "$_project/system/systemd/system-preset/60-spectrumos-desktop.preset" \
+        "$pkgdir/usr/lib/systemd/system-preset/60-spectrumos-desktop.preset"
+
+    install -m 0644 "$_project/packages/$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -m 0644 "$srcdir/questline.LICENSE" "$pkgdir/usr/share/licenses/questline/LICENSE"
+    install -m 0755 "$srcdir/questline-$_questline_version-linux-x86_64" "$pkgdir/usr/bin/questline"
+    install -m 0755 "$srcdir/stash-$_stash_version-linux-x86_64" "$pkgdir/usr/bin/stash"
+    install -m 0644 "$_project/integrations/omdrop/spectrumdrop.desktop" "$pkgdir/usr/share/applications/spectrumdrop.desktop"
+    install -m 0644 "$_project/system/spectrum-appimages.desktop" "$pkgdir/usr/share/applications/spectrum-appimages.desktop"
+    install -m 0644 "$_project/integrations/stash/stash.desktop" "$pkgdir/usr/share/applications/stash.desktop"
+    install -Dm 0644 "$_project/system/autostart/spectrum-kdeconnect-indicator.desktop" \
+        "$pkgdir/etc/xdg/autostart/spectrum-kdeconnect-indicator.desktop"
+}

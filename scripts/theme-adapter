@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+
+EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+MODES = {"spectrum", "clustered", "median-cut", "weighted-regions"}
+VARIANTS = {"auto", "dark", "light"}
+
+
+def preferences_file() -> Path:
+    state_home = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+    return state_home / "spectrumos/theme/preferences"
+
+
+def cache_home() -> Path:
+    return Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+
+
+def gowall_bin() -> str | None:
+    return shutil.which("gowall")
+
+
+def gowall_scheme_names() -> list[str]:
+    """Available gowall theme names, cached to disk so the 2s eww poll driving this
+    script doesn't spawn `gowall list` on every tick -- the list only changes when gowall
+    itself is upgraded, which the cached binary mtime detects."""
+    binary = gowall_bin()
+    if binary is None:
+        return []
+    cache_path = cache_home() / "spectrumos/theme/gowall-schemes.json"
+    try:
+        binary_mtime = Path(binary).stat().st_mtime_ns
+    except OSError:
+        return []
+    try:
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        if cached.get("binary_mtime") == binary_mtime and isinstance(cached.get("schemes"), list):
+            return cached["schemes"]
+    except (OSError, ValueError):
+        pass
+    try:
+        result = subprocess.run([binary, "list"], capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if result.returncode != 0:
+        return []
+    names = sorted(line.strip() for line in result.stdout.splitlines() if line.strip())
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({"binary_mtime": binary_mtime, "schemes": names}), encoding="utf-8")
+    except OSError:
+        pass
+    return names
+
+
+def scheme_label(name: str) -> str:
+    return " ".join(word.capitalize() for word in name.split("-"))
+
+
+def preferences() -> dict[str, str]:
+    result = {"mode": "spectrum", "variant": "dark", "scheme": "none"}
+    valid_schemes: set[str] | None = None
+    try:
+        for line in preferences_file().read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if not separator:
+                continue
+            if key == "mode" and value in MODES:
+                result[key] = value
+            elif key == "variant" and value in VARIANTS:
+                result[key] = value
+            elif key == "scheme":
+                if valid_schemes is None:
+                    valid_schemes = set(gowall_scheme_names())
+                if value == "none" or value in valid_schemes:
+                    result[key] = value
+    except OSError:
+        pass
+    return result
+
+
+def palette_state() -> dict[str, str | bool]:
+    values = preferences()
+    return {
+        **values,
+        **{f"mode_{mode.replace('-', '_')}": values["mode"] == mode for mode in MODES},
+        **{f"variant_{variant}": values["variant"] == variant for variant in VARIANTS},
+        "scheme_label": "None" if values["scheme"] == "none" else scheme_label(values["scheme"]),
+    }
+
+
+def gowall_state() -> dict:
+    names = gowall_scheme_names()
+    current = preferences()["scheme"]
+    schemes = [{"name": "none", "label": "None — original colors", "current": current == "none"}]
+    schemes += [{"name": name, "label": scheme_label(name), "current": current == name} for name in names]
+    return {"installed": bool(names), "schemes": schemes}
+
+
+def save_preferences(values: dict[str, str]) -> None:
+    destination = preferences_file()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    temporary.write_text(
+        f"mode={values['mode']}\nvariant={values['variant']}\nscheme={values['scheme']}\n",
+        encoding="utf-8",
+    )
+    temporary.replace(destination)
+
+
+def wallpaper_dir() -> Path:
+    configured = os.environ.get("SPECTRUM_WALLPAPER_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    pictures = os.environ.get("XDG_PICTURES_DIR", str(Path.home() / "Pictures"))
+    return Path(pictures).expanduser() / "Wallpapers"
+
+
+def token_for(path: Path) -> str:
+    return hashlib.sha256(os.fsencode(path.resolve())).hexdigest()[:16]
+
+
+def wallpapers() -> list[Path]:
+    root = wallpaper_dir()
+    if not root.is_dir():
+        return []
+    return sorted(
+        (path for path in root.iterdir() if path.is_file() and path.suffix.lower() in EXTENSIONS),
+        key=lambda path: path.name.casefold(),
+    )
+
+
+def thumbnail_for(path: Path) -> Path:
+    cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "spectrumos/wallpaper-thumbnails"
+    cache.mkdir(parents=True, exist_ok=True)
+    thumbnail = cache / f"{token_for(path)}.jpg"
+    try:
+        if thumbnail.stat().st_mtime_ns >= path.stat().st_mtime_ns:
+            return thumbnail
+    except OSError:
+        pass
+    with Image.open(path) as source:
+        image = source if source.mode == "RGB" else source.convert("RGB")
+        preview = ImageOps.fit(image, (300, 168), method=Image.Resampling.LANCZOS)
+        temporary = thumbnail.with_suffix(".new.jpg")
+        preview.save(temporary, "JPEG", quality=82, optimize=True)
+        temporary.replace(thumbnail)
+    return thumbnail
+
+
+def current_wallpaper() -> Path | None:
+    last_file = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos/theme/last-wallpaper"
+    try:
+        resolved = Path(last_file.read_text(encoding="utf-8").strip()).resolve()
+    except (OSError, ValueError):
+        return None
+    return resolved if resolved.is_file() else None
+
+
+def state() -> dict:
+    current = current_wallpaper()
+    items = []
+    for path in wallpapers():
+        try:
+            thumbnail = thumbnail_for(path)
+        except (OSError, UnidentifiedImageError):
+            continue
+        items.append(
+            {
+                "token": token_for(path),
+                "name": path.stem.replace("_", " ").replace("-", " "),
+                "path": str(thumbnail.resolve()),
+                "source": str(path.resolve()),
+                "current": current is not None and path.resolve() == current,
+            }
+        )
+    return {
+        "available": bool(items),
+        "count": len(items),
+        "wallpapers": items,
+        "palette": palette_state(),
+        "gowall": gowall_state(),
+    }
+
+
+def launch(args: list[str]) -> None:
+    backend_dir = os.environ.get("SPECTRUM_SHELL_BACKEND_DIR")
+    if backend_dir and args and args[0] == "/usr/lib/spectrumos/theme-menu":
+        args[0] = str(Path(backend_dir) / "theme-menu")
+    subprocess.Popen(
+        args,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def apply_to_current_wallpaper(mode: str, variant: str) -> None:
+    # Vuelve a correr todo el pipeline del tema sobre el wallpaper que ya está activo, para que
+    # cambiar de backend o de variante en el centro de control se vea reflejado de inmediato en
+    # vez de esperar hasta la próxima vez que se (re)aplique un wallpaper a mano.
+    current = current_wallpaper()
+    if current is not None:
+        launch(["/usr/lib/spectrumos/theme-menu", "--apply", str(current), mode, variant])
+
+
+def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--json":
+        print(json.dumps(state(), ensure_ascii=False, separators=(",", ":")))
+        return 0
+    if len(sys.argv) == 2 and sys.argv[1] in {"random", "previous"}:
+        launch(["/usr/lib/spectrumos/theme-menu", f"--{sys.argv[1]}"])
+        return 0
+    if len(sys.argv) == 3 and sys.argv[1] in {"mode", "variant", "scheme"}:
+        field, value = sys.argv[1:]
+        if field == "mode" and value not in MODES:
+            return 2
+        if field == "variant" and value not in VARIANTS:
+            return 2
+        if field == "scheme" and value != "none" and value not in gowall_scheme_names():
+            return 2
+        values = preferences()
+        values[field] = value
+        save_preferences(values)
+        apply_to_current_wallpaper(values["mode"], values["variant"])
+        return 0
+    if len(sys.argv) == 5 and sys.argv[1] == "apply":
+        token, mode, variant = sys.argv[2:]
+        if mode not in MODES or variant not in VARIANTS:
+            return 2
+        selected = next((path for path in wallpapers() if token_for(path) == token), None)
+        if selected is None:
+            return 2
+        launch(["/usr/lib/spectrumos/theme-menu", "--apply", str(selected.resolve()), mode, variant])
+        return 0
+    print(
+        "Usage: theme-adapter --json|random|previous|mode VALUE|variant VALUE|scheme VALUE|apply TOKEN MODE VARIANT",
+        file=sys.stderr,
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

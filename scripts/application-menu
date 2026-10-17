@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec /usr/lib/spectrumos/spectrum-shell-picker launcher --show drun --allow-images --prompt 'Applications'

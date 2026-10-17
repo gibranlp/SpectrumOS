@@ -1,0 +1,503 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root=${SPECTRUM_PROJECT_ROOT:-/usr/local/share/spectrumos/source}
+target=/mnt/spectrumos
+mode=plan
+disk=
+username=
+hostname=spectrum
+timezone=UTC
+password_file=
+confirm_erase=
+cpu_profile=
+gpu_profile=
+form_factor=desktop
+keyboard_profile=us
+browsers=
+lean=false
+
+die() {
+    printf 'Error: %s\n' "$*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: spectrum-installer-backend [--list-disks [--json] | install options]
+
+Installation is a dry-run unless both --apply and --confirm-erase DEVICE are used.
+
+Options:
+  --list-disks                 List eligible whole disks
+  --json                       Emit disk data as JSON
+  --apply                      Perform the installation
+  --disk DEVICE                Whole disk to erase and install to
+  --username NAME              Initial administrator account
+  --hostname NAME              Installed system hostname
+  --timezone ZONE              IANA timezone, for example America/Cancun
+  --password-file PATH         Root-readable file containing the user password
+  --cpu amd|intel              CPU microcode profile
+  --gpu amd|intel|nvidia|nvidia-intel|nvidia-amd|vm
+                               Graphics profile
+  --form-factor desktop|laptop Hardware form factor
+  --lean                       Skip optional background services and integrations
+  --keyboard us|us-intl|latam|es|us,latam|us-intl,latam|us-intl,es
+                               Keyboard layout
+  --browsers LIST              Comma-separated optional browsers to install:
+                               chrome, brave, zen (default: none)
+  --confirm-erase DEVICE       Exact destructive confirmation
+EOF
+}
+
+list_disks() {
+    local json=${1:-false}
+    # lsblk marca los disquetes y zram como discos; ninguno sirve como destino.
+    # El tamaño nominal del disquete puede ser distinto de cero sin tener medio.
+    # Los discos reales pequeños se muestran y validate() exige al menos 20 GiB.
+    if [[ $json == true ]]; then
+        lsblk --json --bytes --nodeps --output PATH,SIZE,MODEL,TYPE,RO,RM,TRAN | \
+            python -c 'import json,re,sys; data=json.load(sys.stdin); print(json.dumps([d for d in data["blockdevices"] if d["type"] == "disk" and not d["ro"] and d["size"] > 0 and not re.match(r"^/dev/(fd|zram)[0-9]+$", d["path"])]))'
+    else
+        lsblk --bytes --nodeps --paths --output PATH,SIZE,MODEL,TRAN,RO,TYPE | \
+            awk 'NR == 1 || ($NF == "disk" && $(NF-1) == 0 && $2 > 0 && $1 !~ /^\/dev\/(fd|zram)[0-9]+$/)'
+    fi
+}
+
+validate() {
+    [[ $disk == /dev/* ]] || die "A whole-disk device under /dev is required"
+    [[ ! $disk =~ ^/dev/(fd|zram)[0-9]+$ ]] || die "Refusing a floppy or RAM-backed installation device: $disk"
+    [[ -b $disk ]] || die "Disk does not exist: $disk"
+    [[ $(lsblk -dn -o TYPE "$disk") == disk ]] || die "Refusing a device that is not a whole disk: $disk"
+    [[ $(lsblk -dn -o RO "$disk") == 0 ]] || die "Disk is read-only: $disk"
+    (( $(blockdev --getsize64 "$disk") >= 20 * 1024 * 1024 * 1024 )) || die "Disk must be at least 20 GiB"
+    if lsblk -nrpo MOUNTPOINT "$disk" | grep -qv '^$'; then
+        die "Refusing to erase a disk with mounted filesystems"
+    fi
+    [[ $username =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Username is invalid"
+    [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]] || die "Hostname is invalid"
+    [[ -e /usr/share/zoneinfo/$timezone && $timezone != *..* ]] || die "Timezone is invalid"
+    [[ -r $password_file ]] || die "Password file is not readable"
+    [[ -n $(head -n 1 "$password_file") ]] || die "Password cannot be empty"
+    [[ $cpu_profile == amd || $cpu_profile == intel ]] || die "CPU profile is invalid"
+    [[ $gpu_profile == amd || $gpu_profile == intel || $gpu_profile == nvidia || $gpu_profile == nvidia-intel || $gpu_profile == nvidia-amd || $gpu_profile == vm ]] || die "GPU profile is invalid"
+    [[ $form_factor == desktop || $form_factor == laptop ]] || die "Form factor is invalid"
+    [[ $keyboard_profile == us || $keyboard_profile == us-intl || $keyboard_profile == latam || $keyboard_profile == es || $keyboard_profile == us,latam || $keyboard_profile == us-intl,latam || $keyboard_profile == us-intl,es ]] || die "Keyboard profile is invalid"
+    if [[ -n $browsers ]]; then
+        local browser
+        IFS=',' read -r -a requested_browsers <<< "$browsers"
+        for browser in "${requested_browsers[@]}"; do
+            [[ $browser == chrome || $browser == brave || $browser == zen ]] || \
+                die "Unknown optional browser: $browser"
+        done
+    fi
+    [[ -x $project_root/install.sh ]] || die "SpectrumOS source tree is unavailable: $project_root"
+    if [[ $mode == apply ]]; then
+        ((EUID == 0)) || die "Installation must run as root"
+        [[ $confirm_erase == "$disk" ]] || die "Erase confirmation does not exactly match the selected disk"
+    fi
+}
+
+partition_path() {
+    local number=$1
+    if [[ $disk == *[0-9] ]]; then
+        printf '%sp%s\n' "$disk" "$number"
+    else
+        printf '%s%s\n' "$disk" "$number"
+    fi
+}
+
+run() {
+    printf '+ '
+    printf '%q ' "$@"
+    printf '\n'
+    if [[ $mode == apply ]]; then
+        "$@"
+    fi
+}
+
+# Emits a machine-readable marker the GUI installer's log reader recognizes
+# and strips before showing the rest of this line's output to the user --
+# see spectrum-installer's append_log(). Percentages are coarse milestones
+# picked to roughly track how long each stage actually takes; the pacstrap
+# stretch additionally gets fine-grained progress from the per-package
+# "installing"/"upgrading" lines pacman itself prints (see the ##PACKAGES
+# marker below), since pacstrap is by far the slowest single step.
+progress() {
+    printf '##PROGRESS %s\n' "$1"
+}
+
+collect_packages() {
+    # None of these manifests list an actual kernel package (only
+    # linux-firmware, and linux-zen-headers for the Nvidia profiles) -- deliberately,
+    # since install.sh also pacman-installs this same set onto an *existing*
+    # Arch system via its own packages phase, where a user may already be
+    # running linux-lts/linux-zen/etc. and forcing SpectrumOS's default kernel there
+    # would be wrong. A from-scratch pacstrap install has no such system to
+    # respect, and ends up with no kernel and no /etc/mkinitcpio.d presets at
+    # all without one -- confirmed live, mkinitcpio -P died with "No presets
+    # found in /etc/mkinitcpio.d" further down. `linux-zen` is added directly to
+    # the pacstrap invocation below instead of here for that reason.
+    sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' \
+        "$project_root/bootstrap/packages/base.txt" \
+        "$project_root/bootstrap/packages/desktop.txt" \
+        "$project_root/bootstrap/packages/cpu/$cpu_profile.txt" \
+        "$project_root/bootstrap/packages/gpu/$gpu_profile.txt" \
+        "$project_root/bootstrap/packages/form-factor/$form_factor.txt" | \
+        # Estos paquetes se instalan después de registrar el repositorio firmado.
+        grep -vx -e paru -e ukvm -e spectrum-xdg-desktop-portal-hyprland | { if [[ $form_factor == laptop ]]; then
+            grep -vx tuned
+        else
+            cat
+        fi; } | { if [[ $lean == true ]]; then
+            grep -vxFf "$project_root/bootstrap/packages/desktop-lean-exclude.txt"
+        else
+            cat
+        fi; } | sort -u
+}
+
+install_spectrum_repository() {
+    local live_repository=/var/lib/spectrumos/repository/edge/x86_64
+    local target_repository="$target/var/lib/spectrumos/repository/edge/x86_64"
+    local public_key="$project_root/repo/keys/spectrumos-production.asc"
+    local fingerprint_file="$project_root/repo/keys/spectrumos-production.fingerprint"
+    local fingerprint
+    fingerprint=$(tr -d '[:space:]' < "$fingerprint_file")
+    [[ $fingerprint =~ ^[0-9A-Fa-f]{40}$ ]] || die "Invalid SpectrumOS repository fingerprint"
+
+    if [[ $mode == apply ]]; then
+        [[ -s $live_repository/spectrumos.db.tar.zst && -s $live_repository/spectrumos.db.tar.zst.sig ]] || \
+            die "The signed SpectrumOS repository is missing from the live environment"
+        [[ -s $public_key ]] || die "The SpectrumOS repository public key is missing"
+        install -d -m 0755 "$target_repository" "$target/usr/share/spectrumos/repository" "$target/etc/pacman.d"
+        cp -a -- "$live_repository/." "$target_repository/"
+        install -m 0644 "$public_key" "$target/usr/share/spectrumos/repository/spectrumos-production.asc"
+        install -m 0644 "$fingerprint_file" "$target/usr/share/spectrumos/repository/spectrumos-production.fingerprint"
+        printf '%s\n' \
+            '[spectrumos]' \
+            'SigLevel = Required DatabaseRequired TrustedOnly' \
+            'Server = file:///var/lib/spectrumos/repository/edge/$arch' \
+            > "$target/etc/pacman.d/spectrumos.conf"
+        grep -Fqx 'Include = /etc/pacman.d/spectrumos.conf' "$target/etc/pacman.conf" || \
+            printf '\nInclude = /etc/pacman.d/spectrumos.conf\n' >> "$target/etc/pacman.conf"
+    else
+        printf '+ install the signed SpectrumOS Edge repository in %q\n' "$target_repository"
+    fi
+    run arch-chroot "$target" pacman-key --add /usr/share/spectrumos/repository/spectrumos-production.asc
+    run arch-chroot "$target" pacman-key --lsign-key "$fingerprint"
+    run arch-chroot "$target" pacman -Syu --needed --noconfirm spectrum-desktop ukvm spectrum-xdg-desktop-portal-hyprland
+    run arch-chroot "$target" test -x /usr/bin/stash
+    run arch-chroot "$target" /usr/bin/questline --version
+    if [[ $mode == apply ]]; then
+        printf '%s\n' \
+            '[spectrumos]' \
+            'SigLevel = Required DatabaseRequired TrustedOnly' \
+            'Server = https://spectrum.gibranlp.dev/repo/stable/$arch' \
+            > "$target/etc/pacman.d/spectrumos.conf"
+    else
+        printf '+ activate the public SpectrumOS Stable repository in %q\n' \
+            "$target/etc/pacman.d/spectrumos.conf"
+    fi
+}
+
+configure_keyboard() {
+    local layouts variants options keymap config_dir
+    case $keyboard_profile in
+        us) layouts=us; variants=; options=; keymap=us ;;
+        us-intl) layouts=us; variants=intl; options=; keymap=us-acentos ;;
+        latam) layouts=latam; variants=; options=; keymap=la-latin1 ;;
+        es) layouts=es; variants=; options=; keymap=es ;;
+        us,latam) layouts=us,latam; variants=,; options=grp:alt_shift_toggle; keymap=us ;;
+        us-intl,latam) layouts=us,latam; variants=intl,; options=grp:alt_shift_toggle; keymap=us-acentos ;;
+        us-intl,es) layouts=us,es; variants=intl,; options=grp:alt_shift_toggle; keymap=us-acentos ;;
+    esac
+    config_dir="$target/home/$username/.config/spectrumos"
+    if [[ $mode == apply ]]; then
+        install -d -m 0755 "$config_dir"
+        printf '%s\n' "$keyboard_profile" > "$config_dir/keyboard-layout"
+        printf '%s\n' \
+            'hl.config({' \
+            '    input = {' \
+            "        kb_layout = \"$layouts\"," \
+            "        kb_variant = \"$variants\"," \
+            "        kb_options = \"$options\"," \
+            '    },' \
+            '})' > "$config_dir/keyboard-layout.lua"
+        printf 'KEYMAP=%s\n' "$keymap" > "$target/etc/vconsole.conf"
+    else
+        printf '+ configure keyboard profile %q\n' "$keyboard_profile"
+    fi
+    run arch-chroot "$target" chown -R "$username:$username" "/home/$username/.config/spectrumos"
+}
+
+install_aur_desktop_apps() {
+    local -A browser_packages=([chrome]=google-chrome [brave]=brave-bin [zen]=zen-browser-bin)
+    local -a aur_packages=()
+    if [[ $lean == false ]]; then
+        aur_packages=(gowall-bin vesktop-bin)
+    fi
+    local browser sudoers_file
+
+    if [[ -n $browsers ]]; then
+        local -a requested_browsers
+        IFS=',' read -r -a requested_browsers <<< "$browsers"
+        for browser in "${requested_browsers[@]}"; do
+            [[ -n ${browser_packages[$browser]:-} ]] && aur_packages+=("${browser_packages[$browser]}")
+        done
+    fi
+
+    if ((${#aur_packages[@]} == 0)); then
+        printf 'No optional desktop AUR applications selected.\n'
+        return 0
+    fi
+    printf 'Installing desktop AUR applications: %s\n' "${aur_packages[*]}"
+    if [[ $mode != apply ]]; then
+        printf '+ install bundled Paru and %s\n' "${aur_packages[*]}"
+        return 0
+    fi
+
+    if [[ ! -x $project_root/vendor/paru ]]; then
+        printf 'Warning: bundled Paru is unavailable; skipping desktop AUR applications.\n' >&2
+        return 0
+    fi
+    install -m 0755 "$project_root/vendor/paru" "$target/usr/local/bin/paru"
+
+    if ! run arch-chroot "$target" pacman -S --needed --asdeps --noconfirm base-devel git; then
+        printf 'Warning: could not install AUR build tools; skipping desktop AUR applications.\n' >&2
+        return 0
+    fi
+
+    sudoers_file=$target/etc/sudoers.d/90-spectrum-aur-build
+    printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$username" > "$sudoers_file"
+    chmod 0440 "$sudoers_file"
+    if ! arch-chroot "$target" sudo -u "$username" -- paru -S --needed --noconfirm -- "${aur_packages[@]}"; then
+        printf 'Warning: one or more desktop AUR applications failed to install.\n' >&2
+    fi
+    rm -f "$sudoers_file"
+    arch-chroot "$target" pacman -Rns --noconfirm base-devel >/dev/null 2>&1 || true
+}
+
+install_system() {
+    local firmware root_partition boot_partition root_uuid boot_source
+    local -a packages
+    local -a profile_args=(--cpu "$cpu_profile" --gpu "$gpu_profile" --form-factor "$form_factor")
+    [[ $lean == false ]] || profile_args+=(--lean)
+    mapfile -t packages < <(collect_packages)
+
+    if [[ $lean == true && $mode == apply ]]; then
+        bash "$project_root/scripts/check-lean-package" \
+            /var/lib/spectrumos/repository/edge/x86_64/spectrumos.db.tar.zst \
+            "$project_root/bootstrap/packages/desktop-lean-exclude.txt"
+    fi
+
+    if [[ -d /sys/firmware/efi ]]; then
+        firmware=uefi
+    else
+        firmware=bios
+    fi
+    boot_partition=$(partition_path 1)
+    root_partition=$(partition_path 2)
+
+    progress 2
+    printf 'Checking package mirrors before touching the destination disk.\n'
+    if [[ $mode == apply ]]; then
+        # Every gpu/*.txt profile pulls in lib32-mesa plus a matching lib32
+        # Vulkan driver, but the live medium's own /etc/pacman.conf ships
+        # with pacman's stock multilib section commented out (the profile's
+        # build-time pacman.conf that enables it is only ever consulted by
+        # mkarchiso while assembling the image -- it never lands as the live
+        # rootfs's actual config). Left as-is, `pacman -Sy` below never syncs
+        # a multilib database at all, so pacstrap's lib32-* packages come
+        # back "target not found" and the install aborts. Enable it here,
+        # the same way the target's freshly-pacstrapped pacman.conf is
+        # enabled further down, before the one sync that has to see it.
+        sed -i '/^#\[multilib\]/,+1 s/^#//' /etc/pacman.conf
+        pacman -Sy --noconfirm || die "An internet connection is required to install SpectrumOS"
+    else
+        printf '+ pacman -Sy --noconfirm\n'
+    fi
+    progress 5
+    printf 'Installing SpectrumOS to %s (%s firmware).\n' "$disk" "$firmware"
+    if mountpoint -q "$target"; then
+        run umount --recursive "$target"
+    fi
+    run wipefs --all --force "$disk"
+    run sgdisk --zap-all "$disk"
+    if [[ $firmware == uefi ]]; then
+        run sgdisk --new=1:0:+1GiB --typecode=1:ef00 --change-name=1:SPECTRUM_EFI "$disk"
+    else
+        run sgdisk --new=1:0:+2MiB --typecode=1:ef02 --change-name=1:SPECTRUM_BIOS "$disk"
+    fi
+    run sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:SPECTRUM_ROOT "$disk"
+    run partprobe "$disk"
+    run udevadm settle
+    progress 10
+    [[ $firmware == bios ]] || run mkfs.fat -F 32 -n SPECTRM_EFI "$boot_partition"
+    run mkfs.btrfs --force --label SPECTRUM_ROOT "$root_partition"
+    run mkdir -p "$target"
+    run mount "$root_partition" "$target"
+    run btrfs subvolume create "$target/@"
+    run btrfs subvolume create "$target/@home"
+    run btrfs subvolume create "$target/@snapshots"
+    run umount "$target"
+    run mount -o subvol=@,compress=zstd,noatime "$root_partition" "$target"
+    run mkdir -p "$target/home" "$target/.snapshots" "$target/boot"
+    run mount -o subvol=@home,compress=zstd,noatime "$root_partition" "$target/home"
+    run mount -o subvol=@snapshots,compress=zstd,noatime "$root_partition" "$target/.snapshots"
+    [[ $firmware == bios ]] || run mount "$boot_partition" "$target/boot"
+    # spectrum-base registra su preset de rescate durante la primera transacción
+    # de Pacman; mkinitcpio exige que el directorio padre del UKI ya exista.
+    run mkdir -p "$target/boot/EFI/Linux"
+    progress 15
+
+    # Written here, before pacstrap/install.sh run, rather than alongside the
+    # rest of the Limine setup further down: install.sh's theme phase invokes
+    # plymouth-boot-sync, which refuses to proceed unless it can already find
+    # a Limine config in the target's /boot -- confirmed live, a fresh install
+    # aborted mid-theme-phase with "No Limine configuration was found" because
+    # this file did not exist yet at that point. The boot loader *binaries*
+    # (BOOTX64.EFI / limine bios-install) still have to wait until after
+    # pacstrap, since they come from the target's own freshly-installed limine
+    # package.
+    if [[ $mode == apply ]]; then
+        root_uuid=$(blkid -s UUID -o value "$root_partition")
+        boot_source='boot():/boot'
+        [[ $firmware == uefi ]] && boot_source='boot():'
+        cat > "$target/boot/limine.conf" <<EOF
+timeout: 5
+interface_branding: SpectrumOS
+
+/SpectrumOS
+    protocol: linux
+    path: $boot_source/vmlinuz-linux-zen
+    module_path: $boot_source/initramfs-linux-zen.img
+    cmdline: root=UUID=$root_uuid rootfstype=btrfs rootflags=subvol=@ rw quiet splash
+
+/SpectrumOS fallback
+    protocol: linux
+    path: $boot_source/vmlinuz-linux-zen
+    module_path: $boot_source/initramfs-linux-zen-fallback.img
+    cmdline: root=UUID=$root_uuid rootfstype=btrfs rootflags=subvol=@ rw
+EOF
+        if [[ $firmware == uefi ]]; then
+            python "$project_root/scripts/limine-windows-entry" \
+                --config "$target/boot/limine.conf" --exclude-disk "$disk"
+        fi
+    else
+        printf '+ write Limine configuration for %s firmware\n' "$firmware"
+    fi
+
+    progress 18
+    # ##PACKAGES tells the GUI installer how many pacman "installing"/
+    # "upgrading" lines to expect, so it can grow the progress bar smoothly
+    # across this stage instead of sitting still until pacstrap finishes --
+    # by far the slowest single step in the whole install.
+    printf '##PACKAGES %s %s\n' "$((${#packages[@]} + 1))" 65
+    progress 20
+    run pacstrap -K "$target" linux-zen "${packages[@]}"
+    progress 65
+    if [[ $mode == apply ]]; then
+        genfstab -U "$target" >> "$target/etc/fstab"
+        sed -i '/^#\[multilib\]/,+1 s/^#//' "$target/etc/pacman.conf"
+        install -d -m 0755 "$target/opt/SpectrumOS2"
+        tar -C "$project_root" --exclude=.git --exclude=artifacts --exclude='packages/*/pkg' -cf - . | \
+            tar -C "$target/opt/SpectrumOS2" -xf -
+    else
+        printf '+ copy SpectrumOS source tree to %q\n' "$target/opt/SpectrumOS2"
+    fi
+    progress 70
+
+    install_spectrum_repository
+    progress 73
+
+    run arch-chroot "$target" ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime
+    run arch-chroot "$target" hwclock --systohc
+    if [[ $mode == apply ]]; then
+        printf 'en_US.UTF-8 UTF-8\n' > "$target/etc/locale.gen"
+        printf 'LANG=en_US.UTF-8\n' > "$target/etc/locale.conf"
+        printf '%s\n' "$hostname" > "$target/etc/hostname"
+        printf '127.0.0.1 localhost\n::1 localhost\n127.0.1.1 %s.localdomain %s\n' \
+            "$hostname" "$hostname" > "$target/etc/hosts"
+    fi
+    run arch-chroot "$target" locale-gen
+    run arch-chroot "$target" useradd --create-home --groups wheel --shell /usr/bin/zsh "$username"
+    if [[ $mode == apply ]]; then
+        printf '%s:%s\n' "$username" "$(head -n 1 "$password_file")" | arch-chroot "$target" chpasswd
+        printf '%%wheel ALL=(ALL:ALL) ALL\n' > "$target/etc/sudoers.d/10-spectrum-wheel"
+        chmod 0440 "$target/etc/sudoers.d/10-spectrum-wheel"
+    fi
+    progress 75
+
+    run arch-chroot "$target" /opt/SpectrumOS2/install.sh --apply \
+        --phase system,user,theme --target-user "$username" --set-default-shell --no-reload "${profile_args[@]}"
+    configure_keyboard
+    run arch-chroot "$target" systemctl enable NetworkManager.service sddm.service
+    if [[ $gpu_profile == nvidia-intel || $gpu_profile == nvidia-amd ]]; then
+        run arch-chroot "$target" systemctl enable switcheroo-control.service
+    fi
+    progress 90
+    install_aur_desktop_apps
+    progress 93
+
+    if [[ $mode == apply ]]; then
+        if [[ $firmware == uefi ]]; then
+            install -d -m 0755 "$target/boot/EFI/BOOT"
+            cp "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/BOOT/BOOTX64.EFI"
+        else
+            arch-chroot "$target" limine bios-install "$disk"
+        fi
+        arch-chroot "$target" /usr/lib/spectrumos/limine-appearance-sync
+    else
+        printf '+ install Limine bootloader for %s firmware\n' "$firmware"
+    fi
+    progress 98
+    # pacstrap -K starts a gpg-agent scoped to the target's own freshly
+    # initialized pacman keyring, and it keeps running as a background
+    # daemon listening on sockets under $target/etc/pacman.d/gnupg -- unlike
+    # everything else touching the target, nothing ever chroots into it to
+    # let it exit on its own. Confirmed live: left running, it holds the
+    # mount open and `umount --recursive` below fails with "target is busy".
+    if [[ $mode == apply ]]; then
+        gpgconf --homedir "$target/etc/pacman.d/gnupg" --kill gpg-agent 2>/dev/null || true
+    fi
+    run umount --recursive "$target"
+    progress 100
+    printf 'SpectrumOS installation completed successfully.\n'
+}
+
+if (($# == 0)); then
+    usage
+    exit 0
+fi
+if [[ $1 == --list-disks ]]; then
+    shift
+    if [[ ${1:-} == --json ]]; then
+        list_disks true
+    else
+        list_disks false
+    fi
+    exit 0
+fi
+while (($#)); do
+    case $1 in
+        --apply) mode=apply ;;
+        --disk) shift; disk=${1:-} ;;
+        --username) shift; username=${1:-} ;;
+        --hostname) shift; hostname=${1:-} ;;
+        --timezone) shift; timezone=${1:-} ;;
+        --password-file) shift; password_file=${1:-} ;;
+        --cpu) shift; cpu_profile=${1:-} ;;
+        --gpu) shift; gpu_profile=${1:-} ;;
+        --form-factor) shift; form_factor=${1:-} ;;
+        --keyboard) shift; keyboard_profile=${1:-} ;;
+        --browsers) shift; browsers=${1:-} ;;
+        --lean) lean=true ;;
+        --confirm-erase) shift; confirm_erase=${1:-} ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "Unknown option: $1" ;;
+    esac
+    shift
+done
+
+validate
+install_system

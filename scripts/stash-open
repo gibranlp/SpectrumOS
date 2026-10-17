@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+stash_binary=${STASH_BINARY:-/usr/bin/stash}
+if [[ ! -x $stash_binary ]]; then
+    printf 'Stash is not installed. Install or update spectrum-desktop.\n' >&2
+    exit 1
+fi
+
+exec kitty --class stash -e "$stash_binary" "$@"

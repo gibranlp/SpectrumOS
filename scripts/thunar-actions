@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+import copy
+import importlib.machinery
+import importlib.util
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+from PIL import Image
+
+FORMATS = ('pdf', 'png', 'jpeg', 'webp', 'tiff', 'bmp')
+BACKEND = Path('/usr/lib/spectrumos')
+
+
+def notify(message, critical=False):
+    subprocess.run(['notify-send', '--app-name=SpectrumOS',
+                    '--urgency=critical' if critical else '--urgency=normal',
+                    'Thunar actions', message], check=False)
+
+
+def definitions():
+    root = ET.Element('actions')
+    items = [('terminal', 'Open Kitty here', 'utilities-terminal', '*', '', 'directories', '1'),
+             ('wallpaper', 'Set as Spectrum wallpaper', 'preferences-desktop-wallpaper',
+              '*.png;*.jpg;*.jpeg;*.webp;*.PNG;*.JPG;*.JPEG;*.WEBP', '', 'image-files', '1')]
+    patterns = ';'.join(f'*.{suffix}' for suffix in ('png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'bmp', 'avif')
+                        for suffix in (suffix, suffix.upper()))
+    items.extend((fmt, f'Convert to {fmt.upper()}', 'image-x-generic', patterns,
+                  'Convert image', 'image-files', '') for fmt in FORMATS)
+    pdf_patterns = ';'.join(f'*.{p}{d}{f}' for p in 'pP' for d in 'dD' for f in 'fF')
+    items.append(('merge-pdf', 'Merge PDFs', 'application-pdf', pdf_patterns, '', 'other-files', '2-999999'))
+    for action, name, icon, pattern, submenu, kind, selection in items:
+        node = ET.SubElement(root, 'action')
+        command = f'{BACKEND}/thunar-actions '
+        command += f'convert {action} %F' if action in FORMATS else 'merge-pdf %F' if action == 'merge-pdf' else f'{action} %f'
+        for tag, value in {'icon': icon, 'name': name, 'submenu': submenu,
+                           'unique-id': f'spectrumos-{action}', 'command': command,
+                           'description': 'Use current Spectrum theme settings' if action == 'wallpaper' else name,
+                           'range': selection, 'patterns': pattern}.items():
+            ET.SubElement(node, tag).text = value
+        ET.SubElement(node, kind)
+    return root
+
+
+def sync():
+    config = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'Thunar/uca.xml'
+    root = ET.parse(config).getroot() if config.exists() else ET.Element('actions')
+    if root.tag != 'actions':
+        raise ValueError('Invalid Thunar custom actions file')
+    before = ET.tostring(root)
+    managed = definitions()
+    managed_ids = {node.findtext('unique-id') for node in managed}
+    for node in list(root):
+        identifier = node.findtext('unique-id', '')
+        command = node.findtext('command', '')
+        if identifier in managed_ids or command == 'exo-open --working-directory %f --launch TerminalEmulator':
+            root.remove(node)
+    root.extend(copy.deepcopy(list(managed)))
+    if ET.tostring(root) == before:
+        return
+    config.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=config.parent, delete=False) as temporary:
+        staged = Path(temporary.name)
+    try:
+        ET.ElementTree(root).write(staged, encoding='UTF-8', xml_declaration=True)
+        staged.replace(config)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def publish(staged, desired):
+    for index in range(10000):
+        destination = desired if index == 0 else desired.with_name(f'{desired.stem} ({index}){desired.suffix}')
+        try:
+            os.link(staged, destination)
+            return destination
+        except FileExistsError:
+            continue
+    raise ValueError('Too many files with the same output name')
+
+
+def set_wallpaper(source):
+    loader = importlib.machinery.SourceFileLoader('spectrum_theme_adapter', str(BACKEND / 'theme-adapter'))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    adapter = importlib.util.module_from_spec(spec)
+    loader.exec_module(adapter)
+    source = source.resolve(strict=True)
+    if source.suffix.lower() not in adapter.EXTENSIONS:
+        raise ValueError('Select a PNG, JPEG, or WebP wallpaper')
+    with Image.open(source) as image:
+        image.verify()
+    directory = adapter.wallpaper_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    if source.parent != directory.resolve():
+        with tempfile.NamedTemporaryFile(dir=directory, delete=False) as temporary:
+            staged = Path(temporary.name)
+        try:
+            shutil.copyfile(source, staged)
+            source = publish(staged, directory / source.name)
+        finally:
+            staged.unlink(missing_ok=True)
+    preferences = adapter.preferences()
+    subprocess.run([str(BACKEND / 'theme-menu'), '--apply', str(source),
+                    preferences['mode'], preferences['variant']], check=True)
+
+
+def convert(fmt, sources):
+    if fmt not in FORMATS or not sources:
+        raise ValueError('Select images and a supported output format')
+    failures = []
+    completed = 0
+    for source in sources:
+        staged = None
+        try:
+            source = source.resolve(strict=True)
+            with tempfile.NamedTemporaryFile(dir=source.parent, delete=False) as temporary:
+                staged = Path(temporary.name)
+            with source.open('rb') as image:
+                command = ['magick', '-[0]', '-auto-orient']
+                if fmt in ('jpeg', 'pdf', 'bmp'):
+                    command.extend(['-background', 'white', '-alpha', 'remove', '-alpha', 'off'])
+                command.append(f'{fmt}:{staged}')
+                result = subprocess.run(command, stdin=image, capture_output=True, text=True)
+            if result.returncode:
+                raise ValueError(result.stderr.strip() or 'ImageMagick conversion failed')
+            publish(staged, source.with_suffix('.jpg' if fmt == 'jpeg' else f'.{fmt}'))
+            completed += 1
+        except (OSError, ValueError) as error:
+            failures.append(f'{source.name}: {error}')
+        finally:
+            if staged is not None:
+                staged.unlink(missing_ok=True)
+    notify(f'Converted {completed} image(s) to {fmt.upper()}.' + ('\n' + '\n'.join(failures) if failures else ''), bool(failures))
+    return 1 if failures else 0
+
+
+def merge_pdfs(sources):
+    if len(sources) < 2:
+        raise ValueError('Select at least two PDF files to merge')
+    sources = [source.resolve(strict=True) for source in sources]
+    if any(not source.is_file() or source.suffix.lower() != '.pdf' for source in sources):
+        raise ValueError('Select PDF files only')
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=sources[0].parent, prefix='.spectrum-pdf-merge-', suffix='.pdf', delete=False) as temporary:
+            staged = Path(temporary.name)
+        result = subprocess.run(['pdfunite', *[str(source) for source in sources], str(staged)],
+                                capture_output=True, text=True, timeout=300)
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or 'Could not merge the selected PDFs')
+        with staged.open('rb') as output:
+            if output.read(5) != b'%PDF-':
+                raise ValueError('PDF merge did not produce a valid PDF')
+        destination = publish(staged, sources[0].with_name(f'{sources[0].stem}-merged.pdf'))
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+    notify(f'Merged {len(sources)} PDFs into {destination.name}.')
+    return destination
+
+
+def main(args):
+    try:
+        if args == ['sync']:
+            sync()
+        elif len(args) == 2 and args[0] == 'terminal':
+            directory = Path(args[1]).resolve(strict=True)
+            if not directory.is_dir():
+                raise ValueError('Select a folder')
+            subprocess.Popen(['kitty', '--directory', str(directory)], start_new_session=True)
+        elif len(args) == 2 and args[0] == 'wallpaper':
+            set_wallpaper(Path(args[1]))
+        elif args and args[0] == 'merge-pdf':
+            merge_pdfs([Path(value) for value in args[1:]])
+        elif len(args) >= 3 and args[0] == 'convert':
+            return convert(args[1], [Path(value) for value in args[2:]])
+        else:
+            raise ValueError('Usage: thunar-actions sync|terminal FOLDER|wallpaper IMAGE|convert FORMAT IMAGE...|merge-pdf PDF PDF...')
+        return 0
+    except (OSError, ValueError, ET.ParseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        notify(str(error), True)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

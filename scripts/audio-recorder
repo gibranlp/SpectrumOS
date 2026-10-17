@@ -1,0 +1,268 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+STATE = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/audio-recorder"
+UNIT = "spectrum-audio-recorder.service"
+FORMATS = {"mp3": ("mp3", "libmp3lame"), "opus": ("opus", "libopus"),
+           "aac": ("m4a", "aac"), "flac": ("flac", "flac"), "wav": ("wav", "pcm_s16le")}
+
+
+def run(*args: str, check: bool = True, timeout: int = 6) -> str:
+    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    if check and result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"{args[0]} failed")
+    return result.stdout.strip()
+
+
+def read(name: str) -> dict:
+    try:
+        return json.loads((STATE / name).read_text())
+    except FileNotFoundError:
+        return {}
+
+
+def write(name: str, value: dict) -> None:
+    STATE.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", dir=STATE, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            json.dump(value, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.replace(temporary, STATE / name)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def active() -> bool:
+    value = run("systemctl", "--user", "show", UNIT, "--property=ActiveState", "--value", check=False)
+    return value in ("active", "activating", "deactivating")
+
+
+def status() -> dict:
+    state = read("status.json")
+    state["active"] = active()
+    state["elapsed"] = max(0, int(time.time() - state.get("started", time.time()))) if state["active"] else state.get("duration", 0)
+    if not state["active"] and state.get("phase") in ("starting", "recording"):
+        state["error"] = "Recording ended unexpectedly. Check the last file before using it."
+    return state
+
+
+def devices() -> dict:
+    sinks = json.loads(run("pactl", "-f", "json", "list", "sinks"))
+    sources = json.loads(run("pactl", "-f", "json", "list", "sources"))
+    default_sink = run("pactl", "get-default-sink", check=False)
+    default_source = run("pactl", "get-default-source", check=False)
+    monitors = {item.get("name") for item in sources}
+
+    def rows(items, default, output=False):
+        result = []
+        for item in items:
+            name = item["name"]
+            if not output and (name.endswith(".monitor") or item.get("monitor_of_sink_name")):
+                continue
+            channels = list(item.get("volume", {}).values())
+            volume = round(sum(channel.get("value", 0) for channel in channels) / len(channels) / 65536 * 100) if channels else 0
+            result.append(dict(name=name, label=item.get("description", name), default=name == default,
+                               volume=volume, muted=bool(item.get("mute")),
+                               monitor=item.get("monitor_source_name", name + ".monitor") if output else name,
+                               recordable=(item.get("monitor_source_name", name + ".monitor") in monitors) if output else True))
+        return result
+    return {"sinks": rows(sinks, default_sink, True), "sources": rows(sources, default_source)}
+
+
+def validate(options: dict, audio: dict) -> dict:
+    if not isinstance(options, dict):
+        raise ValueError("Recording options must be an object")
+    values = {"mode": "input", "input": "", "output": "", "format": "mp3", "bitrate": 192, "sample_rate": 48000, "channels": 2}
+    if set(options) - set(values):
+        raise ValueError("Unknown recording option")
+    values.update(options)
+    if any(not isinstance(values[key], str) for key in ("mode", "input", "output", "format")):
+        raise ValueError("Source and format options must be text")
+    if values["mode"] not in ("input", "output", "both") or values["format"] not in FORMATS:
+        raise ValueError("Choose a supported source and format")
+    for key, choices in (("bitrate", (64, 96, 128, 192, 256, 320)),
+                         ("sample_rate", (44100, 48000)), ("channels", (1, 2))):
+        if type(values[key]) is not int or values[key] not in choices:
+            raise ValueError(f"Unsupported {key}")
+    if values["format"] == "opus" and values["sample_rate"] != 48000:
+        raise ValueError("Opus requires the 48 kHz sample rate")
+    for kind in ("input", "output"):
+        if values["mode"] not in (kind, "both"):
+            continue
+        rows = audio["sources" if kind == "input" else "sinks"]
+        row = next((row for row in rows if row["name"] == values[kind] and row["recordable"]), None)
+        if not row:
+            raise ValueError(f"Selected {kind} is unavailable. Choose a connected device.")
+    return values
+
+
+def command(options: dict, audio: dict, output: Path) -> list[str]:
+    values = validate(options, audio)
+    args = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin", "-n"]
+    names = []
+    if values["mode"] in ("input", "both"):
+        names.append(values["input"])
+    if values["mode"] in ("output", "both"):
+        names.append(next(row["monitor"] for row in audio["sinks"] if row["name"] == values["output"]))
+    for name in names:
+        args += ["-thread_queue_size", "1024", "-f", "pulse", "-i", name]
+    if len(names) == 2:
+        args += ["-filter_complex", "[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0,alimiter=limit=0.95:level=0[a]", "-map", "[a]"]
+    else:
+        args += ["-map", "0:a"]
+    args += ["-vn", "-c:a", FORMATS[values["format"]][1]]
+    if values["format"] in ("mp3", "opus", "aac"):
+        args += ["-b:a", f'{values["bitrate"]}k']
+    if values["format"] == "flac":
+        args += ["-compression_level", "5"]
+    args += ["-ar", str(values["sample_rate"]), "-ac", str(values["channels"])]
+    if values["format"] == "aac":
+        args += ["-movflags", "+faststart"]
+    args.append(str(output))
+    return args
+
+
+def folder() -> Path:
+    configured = os.environ.get("XDG_MUSIC_DIR")
+    if not configured:
+        try:
+            configured = run("xdg-user-dir", "MUSIC")
+        except (OSError, RuntimeError):
+            configured = str(Path.home() / "Music")
+    return Path(configured) / "Recordings"
+
+
+def start(options: dict) -> None:
+    if active():
+        raise ValueError("An audio recording is already running")
+    audio = devices()
+    values = validate(options, audio)
+    directory = folder()
+    directory.mkdir(parents=True, exist_ok=True)
+    extension = FORMATS[values["format"]][0]
+    output = directory / f'Spectrum-Audio-{time.strftime("%Y%m%d-%H%M%S")}-{time.time_ns()}.{extension}'
+    args = command(values, audio, output)
+    state = dict(active=True, phase="starting", started=time.time(), file=str(output), options=values, error="")
+    write("job.json", {"command": args, "status": state})
+    write("status.json", state)
+    try:
+        run("systemd-run", "--user", "--collect", "--quiet", "--unit=" + UNIT,
+            "--setenv=XDG_STATE_HOME=" + str(STATE.parent.parent),
+            "--property=KillMode=mixed", "--property=KillSignal=SIGINT", "--property=TimeoutStopSec=20",
+            "--", sys.executable, str(Path(__file__).resolve()), "--record")
+        time.sleep(0.5)
+        current = status()
+        if not current["active"]:
+            raise RuntimeError(current.get("error") or "Audio recorder could not start")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        if not active():
+            write("status.json", {**state, "active": False, "phase": "failed", "error": str(error)})
+        raise
+
+
+def record() -> None:
+    job = read("job.json")
+    state = job["status"]
+    child = None
+    stopped = False
+
+    def stop(signum, frame):
+        nonlocal stopped
+        stopped = True
+        if child and child.poll() is None:
+            child.send_signal(signal.SIGINT)
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+    try:
+        with (STATE / "ffmpeg.log").open("w") as log:
+            child = subprocess.Popen(job["command"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log)
+            if stopped:
+                child.send_signal(signal.SIGINT)
+            write("status.json", {**state, "phase": "recording"})
+            code = child.wait()
+        if code not in (0, 255) or (code == 255 and not stopped):
+            detail = (STATE / "ffmpeg.log").read_text().strip()[-1200:]
+            raise RuntimeError(detail or "The audio source disconnected or encoding failed")
+        if not Path(state["file"]).is_file() or Path(state["file"]).stat().st_size == 0:
+            raise RuntimeError("No audio was captured")
+        duration = float(run("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", state["file"]))
+        if duration <= 0:
+            raise RuntimeError("No audio was captured")
+        write("status.json", {**state, "active": False, "phase": "saved", "duration": int(duration)})
+    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+        write("status.json", {**state, "active": False, "phase": "failed", "error": str(error)})
+        raise
+
+
+def device_action(kind: str, name: str, setting: str, value: str) -> None:
+    if kind not in ("input", "output"):
+        raise ValueError("Choose input or output")
+    rows = devices()["sources" if kind == "input" else "sinks"]
+    if name not in {row["name"] for row in rows}:
+        raise ValueError("Audio device is no longer connected")
+    target = "source" if kind == "input" else "sink"
+    if setting == "volume" and value.isdigit() and 0 <= int(value) <= 150:
+        run("pactl", f"set-{target}-volume", name, value + "%")
+    elif setting == "mute" and value in ("on", "off"):
+        run("pactl", f"set-{target}-mute", name, "1" if value == "on" else "0")
+    else:
+        raise ValueError("Unsupported audio level")
+
+
+def main(args: list[str]) -> None:
+    if args == ["--record"]:
+        record()
+    elif args == ["--status"]:
+        print(json.dumps(status()))
+    elif args == ["--json"]:
+        state = status()
+        try:
+            state.update(devices())
+            state["available"] = True
+        except (OSError, RuntimeError, ValueError) as error:
+            state.update(available=False, sources=[], sinks=[], device_error=str(error))
+        print(json.dumps(state))
+    elif args == ["--open"]:
+        directory = folder()
+        directory.mkdir(parents=True, exist_ok=True)
+        subprocess.Popen(["uwsm", "app", "--", "thunar", str(directory)], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        STATE.mkdir(parents=True, exist_ok=True)
+        with (STATE / ".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if len(args) == 2 and args[0] == "--start":
+                start(json.loads(args[1]))
+            elif args == ["--stop"]:
+                if not active():
+                    raise ValueError("No audio recording is running")
+                run("systemctl", "--user", "stop", UNIT, timeout=25)
+                state = status()
+                if state.get("phase") != "saved":
+                    raise RuntimeError(state.get("error") or "Could not finish the audio file")
+            elif len(args) == 5 and args[0] == "--device":
+                device_action(*args[1:])
+            else:
+                raise ValueError("Usage: audio-recorder --json|--status|--start JSON|--stop|--open|--device input|output NAME volume|mute VALUE")
+
+
+if __name__ == "__main__":
+    try:
+        main(sys.argv[1:])
+    except (OSError, RuntimeError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+        print(f"Audio recording: {error}", file=sys.stderr)
+        sys.exit(1)

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/typography
+state_file=$state_dir/font-size
+size=13
+[[ -f $state_file ]] && IFS= read -r size < "$state_file"
+[[ $size =~ ^([89]|1[0-9]|2[0-4])$ ]] || size=13
+
+if [[ ${1:-} == --status ]]; then
+    python - "$size" <<'PY'
+import json
+import sys
+size = sys.argv[1]
+print(json.dumps({"text": "Aa", "tooltip": f"Global font size: {size}px\nClick to change"}))
+PY
+    exit 0
+fi
+
+if [[ ${1:-} == --set ]]; then
+    selected=${2:-}
+else
+    selected=$(seq 8 24 | /usr/lib/spectrumos/spectrum-shell-picker typography --dmenu --prompt "Font size" || true)
+fi
+[[ $selected =~ ^([89]|1[0-9]|2[0-4])$ ]] || exit 0
+mkdir -p -- "$state_dir"
+temporary=$(mktemp "$state_dir/.font-size.XXXXXX")
+printf '%s\n' "$selected" > "$temporary"
+mv -f -- "$temporary" "$state_file"
+
+# Picking several sizes in quick succession (no wofi prompt in the way, since the Eww grid
+# calls --set directly) used to spawn one of these per click with nothing serializing them:
+# concurrent runs raced on the same hyprctl/waybar/eww steps below, and under `set -e` one
+# of them failing mid-pipeline could abort before ever reaching dunstctl reload -- landing a
+# dunstrc that already says the newest size while the running dunst (and everything else)
+# was left stuck on whatever an earlier, still-finishing click had last reloaded. The lock
+# serializes full runs one at a time; the check right after it skips the heavy steps
+# entirely for a run whose size has already been superseded by a newer click, since that
+# newer click's own run (next in line for the lock) is the one that will actually apply and
+# reload -- redoing the same work for a stale size only adds flicker and re-invites the race.
+lock_dir=${XDG_RUNTIME_DIR:-/tmp}/spectrumos
+install -d -m 0700 -- "$lock_dir"
+exec 9>"$lock_dir/font-size-menu.lock"
+flock 9
+current=13
+[[ -f $state_file ]] && IFS= read -r current < "$state_file"
+[[ $current == "$selected" ]] || exit 0
+
+PYTHONPATH=/usr/share/spectrumos/theme-engine python -m spectrum_theme.cli rerender-current
+hyprctl reload config-only
+pkill -USR1 -x kitty 2>/dev/null || true
+# A bare `pkill -USR2` only asks a running waybar to reload in place; it doesn't guarantee
+# the process actually picks up the freshly-rendered CSS (confirmed live: a font change
+# left the running bar showing the previous font for good, unreloaded, with no error). A
+# full restart through the same path layout/style/theme changes already use reliably reads
+# the current file from a clean process instead of trusting an in-place reload.
+if ! /usr/lib/spectrumos/waybar-menu --restart; then
+    notify-send --app-name="SpectrumOS" --urgency=normal \
+        "Waybar restart failed" "It may still show the previous theme until restarted manually"
+fi
+/usr/lib/spectrumos/appearance-sync --apply
+notify-send --app-name="SpectrumOS" --expire-time=2500 "Typography updated" "Global font size · ${selected}px"

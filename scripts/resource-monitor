@@ -1,0 +1,242 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import argparse
+from collections import defaultdict
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import time
+
+
+KIB = 1024
+GIB = 1024 * 1024 * 1024
+DEFAULT_INTERVAL = 5.0
+MEMORY_WARNING_PERCENT = 15.0
+MEMORY_CRITICAL_PERCENT = 8.0
+SWAP_WARNING_PERCENT = 85.0
+SWAP_CRITICAL_PERCENT = 97.0
+SWAP_PRESSURE_MEMORY_PERCENT = 25.0
+CPU_WARNING_PERCENT = 95.0
+CPU_WARNING_SECONDS = 60.0
+CPU_RECOVERY_PERCENT = 80.0
+DISK_WARNING_PERCENT = 10.0
+DISK_CRITICAL_PERCENT = 5.0
+DISK_WARNING_BYTES = 10 * GIB
+DISK_CRITICAL_BYTES = 2 * GIB
+WARNING_COOLDOWN = 15 * 60.0
+CRITICAL_COOLDOWN = 5 * 60.0
+
+
+def read_key_values(path: Path) -> dict[str, int]:
+    values: dict[str, int] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        key, separator, raw = line.partition(":")
+        if not separator:
+            continue
+        try:
+            values[key] = int(raw.split()[0])
+        except (IndexError, ValueError):
+            continue
+    return values
+
+
+def memory_level(values: dict[str, int]) -> tuple[int, float, float]:
+    total = values.get("MemTotal", 0)
+    available = values.get("MemAvailable", 0)
+    swap_total = values.get("SwapTotal", 0)
+    swap_free = values.get("SwapFree", 0)
+    available_percent = available / total * 100 if total else 100.0
+    swap_percent = (swap_total - swap_free) / swap_total * 100 if swap_total else 0.0
+    if available_percent <= MEMORY_CRITICAL_PERCENT or (
+        available_percent <= MEMORY_WARNING_PERCENT and swap_percent >= SWAP_CRITICAL_PERCENT
+    ):
+        return 2, available_percent, swap_percent
+    if available_percent <= MEMORY_WARNING_PERCENT or (
+        available_percent <= SWAP_PRESSURE_MEMORY_PERCENT and swap_percent >= SWAP_WARNING_PERCENT
+    ):
+        return 1, available_percent, swap_percent
+    return 0, available_percent, swap_percent
+
+
+def read_cpu_totals(path: Path = Path("/proc/stat")) -> tuple[int, int] | None:
+    try:
+        fields = path.read_text(encoding="utf-8").splitlines()[0].split()
+        counters = [int(value) for value in fields[1:]]
+    except (OSError, IndexError, ValueError):
+        return None
+    if len(counters) < 4:
+        return None
+    idle = counters[3] + (counters[4] if len(counters) > 4 else 0)
+    return sum(counters), idle
+
+
+def cpu_percent(previous: tuple[int, int], current: tuple[int, int]) -> float:
+    total_delta = current[0] - previous[0]
+    idle_delta = current[1] - previous[1]
+    if total_delta <= 0:
+        return 0.0
+    return max(0.0, min(100.0, (total_delta - idle_delta) / total_delta * 100))
+
+
+def disk_level(total: int, available: int) -> tuple[int, float]:
+    free_percent = available / total * 100 if total else 100.0
+    if free_percent <= DISK_CRITICAL_PERCENT or available <= DISK_CRITICAL_BYTES:
+        return 2, free_percent
+    if free_percent <= DISK_WARNING_PERCENT or available <= DISK_WARNING_BYTES:
+        return 1, free_percent
+    return 0, free_percent
+
+
+def format_size_kib(value: int) -> str:
+    if value >= KIB * KIB:
+        return f"{value / KIB / KIB:.1f} GiB"
+    return f"{value / KIB:.0f} MiB"
+
+
+def largest_memory_processes(proc_root: Path = Path("/proc"), limit: int = 3) -> list[tuple[str, int]]:
+    grouped: dict[str, int] = defaultdict(int)
+    try:
+        entries = list(proc_root.iterdir())
+    except OSError:
+        return []
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        values = read_key_values(entry / "status")
+        rss = values.get("VmRSS", 0)
+        if not rss:
+            continue
+        try:
+            name = (entry / "comm").read_text(encoding="utf-8").strip()
+        except OSError:
+            name = entry.name
+        grouped[name or entry.name] += rss
+    return sorted(grouped.items(), key=lambda item: item[1], reverse=True)[:limit]
+
+
+def notify(tag: str, level: int, title: str, body: str) -> None:
+    urgency = "critical" if level == 2 else "normal"
+    try:
+        subprocess.run(
+            (
+                "notify-send",
+                "--app-name=Spectrum Resources",
+                f"--urgency={urgency}",
+                "--expire-time=10000",
+                f"--hint=string:x-dunst-stack-tag:spectrum-resource-{tag}",
+                title,
+                body,
+            ),
+            check=False,
+            timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+class ResourceMonitor:
+    def __init__(self, interval: float = DEFAULT_INTERVAL) -> None:
+        self.interval = max(1.0, interval)
+        self.levels = {"memory": 0, "disk": 0}
+        self.last_sent = {"memory": 0.0, "disk": 0.0}
+        self.cpu_high_seconds = 0.0
+        self.cpu_alerted = False
+        self.previous_cpu = read_cpu_totals()
+
+    def should_notify(self, key: str, level: int, now: float) -> bool:
+        previous = self.levels[key]
+        if level == 0:
+            self.levels[key] = 0
+            return False
+        cooldown = CRITICAL_COOLDOWN if level == 2 else WARNING_COOLDOWN
+        due = level > previous or now - self.last_sent[key] >= cooldown
+        self.levels[key] = level
+        if due:
+            self.last_sent[key] = now
+        return due
+
+    def check_memory(self, now: float) -> None:
+        values = read_key_values(Path("/proc/meminfo"))
+        level, available_percent, swap_percent = memory_level(values)
+        if not self.should_notify("memory", level, now):
+            return
+        available = values.get("MemAvailable", 0)
+        largest = largest_memory_processes()
+        process_text = ", ".join(f"{name} {format_size_kib(rss)}" for name, rss in largest)
+        title = "Memory critically low" if level == 2 else "Memory running low"
+        body = f"{format_size_kib(available)} available ({available_percent:.0f}%) · Swap {swap_percent:.0f}% used"
+        if process_text:
+            body += f"\nLargest: {process_text}"
+        notify("memory", level, title, body)
+
+    def check_cpu(self) -> None:
+        current = read_cpu_totals()
+        if current is None or self.previous_cpu is None:
+            self.previous_cpu = current
+            return
+        usage = cpu_percent(self.previous_cpu, current)
+        self.previous_cpu = current
+        if usage >= CPU_WARNING_PERCENT:
+            self.cpu_high_seconds += self.interval
+        elif usage <= CPU_RECOVERY_PERCENT:
+            self.cpu_high_seconds = 0.0
+            self.cpu_alerted = False
+        if self.cpu_high_seconds >= CPU_WARNING_SECONDS and not self.cpu_alerted:
+            load = os.getloadavg()[0]
+            cores = os.cpu_count() or 1
+            notify(
+                "cpu",
+                1,
+                "CPU continuously saturated",
+                f"{usage:.0f}% CPU for at least {CPU_WARNING_SECONDS:.0f} seconds · Load {load:.1f} across {cores} threads",
+            )
+            self.cpu_alerted = True
+
+    def check_disk(self, now: float) -> None:
+        usage = shutil.disk_usage("/")
+        level, free_percent = disk_level(usage.total, usage.free)
+        if not self.should_notify("disk", level, now):
+            return
+        title = "Disk space critically low" if level == 2 else "Disk space running low"
+        body = f"{usage.free / GIB:.1f} GiB free on / ({free_percent:.0f}%)"
+        notify("disk", level, title, body)
+
+    def check(self) -> None:
+        now = time.monotonic()
+        self.check_memory(now)
+        self.check_cpu()
+        self.check_disk(now)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Notify when SpectrumOS system resources run low")
+    parser.add_argument("--once", action="store_true", help="Check resources once and exit")
+    parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL, help="Sampling interval in seconds")
+    arguments = parser.parse_args()
+    monitor = ResourceMonitor(arguments.interval)
+    if arguments.once:
+        monitor.check()
+        return 0
+    running = True
+
+    def stop(_signum: int, _frame: object) -> None:
+        nonlocal running
+        running = False
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+    while running:
+        monitor.check()
+        time.sleep(monitor.interval)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

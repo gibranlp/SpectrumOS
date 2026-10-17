@@ -1,0 +1,2 @@
+spectrum ALL=(ALL:ALL) NOPASSWD: /usr/local/lib/spectrumos/spectrum-installer-backend
+spectrum ALL=(ALL:ALL) NOPASSWD: /usr/local/bin/spectrum-recovery

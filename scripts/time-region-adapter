@@ -1,0 +1,196 @@
+#!/usr/bin/python3
+from __future__ import annotations
+
+from datetime import datetime
+import ipaddress
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+LOCALE_GEN = Path('/etc/locale.gen')
+LOCALE_CONF = Path('/etc/locale.conf')
+SUPPORTED = Path('/usr/share/i18n/SUPPORTED')
+NTP_CONF = Path('/etc/systemd/timesyncd.conf.d/90-spectrumos.conf')
+HELPER = '/usr/lib/spectrumos/time-region-adapter'
+
+
+def run(*args: str, timeout: int = 15, check: bool = True) -> str:
+    result = subprocess.run(
+        ['/usr/bin/' + args[0], *args[1:]], capture_output=True, text=True,
+        timeout=timeout, env={**os.environ, 'LC_ALL': 'C', 'PATH': '/usr/bin'},
+    )
+    if check and result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f'{args[0]} failed')
+    return result.stdout.strip()
+
+
+def properties(text: str) -> dict[str, str]:
+    return dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
+
+
+def supported_locales() -> list[str]:
+    return sorted({line.split()[0] for line in SUPPORTED.read_text().splitlines()
+                   if len(line.split()) == 2 and line.split()[1] == 'UTF-8'})
+
+
+def active(service: str) -> bool:
+    return run('systemctl', 'is-active', service, check=False) == 'active'
+
+
+def timesyncd_available() -> bool:
+    return (run('systemctl', 'show', '--property=LoadState', '--value', 'systemd-timesyncd.service', check=False) == 'loaded'
+            and not any(active(service) for service in ('chronyd.service', 'ntpd.service')))
+
+
+def state() -> dict:
+    timedate = properties(run('timedatectl', 'show'))
+    sync = properties(run('timedatectl', 'show-timesync', '--all', check=False)) if active('systemd-timesyncd.service') else {}
+    configured = properties(LOCALE_CONF.read_text()) if LOCALE_CONF.exists() else {}
+    language = configured.get('LANG', 'C.UTF-8').strip('"\'')
+    region = configured.get('LC_TIME', language).strip('"\'')
+    servers = ''
+    if NTP_CONF.exists():
+        servers = properties(NTP_CONF.read_text()).get('NTP', '')
+    return {
+        'available': True, 'timezone': timedate.get('Timezone', ''),
+        'ntp': timedate.get('NTP') == 'yes', 'can_ntp': timedate.get('CanNTP') == 'yes',
+        'synchronized': timedate.get('NTPSynchronized') == 'yes',
+        'local_rtc': timedate.get('LocalRTC') == 'yes',
+        'server': sync.get('ServerName', ''), 'server_address': sync.get('ServerAddress', ''),
+        'fallback_servers': sync.get('FallbackNTPServers', ''), 'servers': servers,
+        'server_controls': timesyncd_available(), 'language': language, 'region': region,
+        'timezones': run('timedatectl', 'list-timezones').splitlines(),
+        'locales': sorted(set(supported_locales()) | {language, region}),
+    }
+
+
+def validate_servers(value: str) -> list[str]:
+    if '\n' in value or '\r' in value or len(value) > 2048:
+        raise ValueError('Enter server hostnames or IP addresses separated by spaces')
+    servers = value.split()
+    if len(servers) > 8:
+        raise ValueError('Choose up to eight NTP servers')
+    for server in servers:
+        try:
+            ipaddress.ip_address(server)
+            continue
+        except ValueError:
+            pass
+        if len(server) > 253 or not all(re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?', part)
+                                       for part in server.rstrip('.').split('.')):
+            raise ValueError(f'Invalid NTP server: {server}')
+    return servers
+
+
+def atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix='.' + path.name + '.', dir=path.parent)
+    try:
+        with os.fdopen(descriptor, 'w') as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def apply_locales(language: str, region: str) -> None:
+    supported = set(supported_locales()) | {'C.UTF-8', 'C', 'POSIX'}
+    if language not in supported or region not in supported:
+        raise ValueError('Choose a supported language and region')
+    if os.geteuid() != 0:
+        run('pkexec', HELPER, 'locale', language, region, timeout=180)
+        return
+    original = LOCALE_GEN.read_text()
+    updated = original
+    for name in sorted({language, region} - {'C.UTF-8', 'C', 'POSIX'}):
+        pattern = re.compile(r'^[ \t]*#?[ \t]*' + re.escape(name) + r'[ \t]+UTF-8[ \t]*$', re.MULTILINE)
+        if pattern.search(updated):
+            updated = pattern.sub(name + ' UTF-8', updated)
+        else:
+            updated += '\n' + name + ' UTF-8\n'
+    try:
+        if updated != original:
+            atomic_write(LOCALE_GEN, updated)
+            run('locale-gen', timeout=120)
+        run('localectl', 'set-locale', 'LANG=' + language, 'LC_MESSAGES=' + language,
+            'LC_CTYPE=' + language, 'LC_COLLATE=' + language,
+            *[category + '=' + region for category in ('LC_TIME', 'LC_NUMERIC', 'LC_MONETARY',
+              'LC_MEASUREMENT', 'LC_PAPER', 'LC_ADDRESS', 'LC_TELEPHONE', 'LC_NAME', 'LC_IDENTIFICATION')])
+    except (RuntimeError, subprocess.TimeoutExpired):
+        if updated != original:
+            atomic_write(LOCALE_GEN, original)
+        raise
+
+
+def configure_servers(value: str) -> None:
+    servers = validate_servers(value)
+    if not timesyncd_available():
+        raise ValueError('NTP server settings require systemd-timesyncd without another active NTP service')
+    if os.geteuid() != 0:
+        run('pkexec', HELPER, 'servers', ' '.join(servers), timeout=180)
+        return
+    original = NTP_CONF.read_text() if NTP_CONF.exists() else None
+    was_active = active('systemd-timesyncd.service')
+    try:
+        if servers:
+            atomic_write(NTP_CONF, '[Time]\nNTP=\nNTP=' + ' '.join(servers) + '\n')
+        elif NTP_CONF.exists():
+            NTP_CONF.unlink()
+        if was_active:
+            run('systemctl', 'restart', 'systemd-timesyncd.service')
+    except (RuntimeError, subprocess.TimeoutExpired):
+        if original is not None:
+            atomic_write(NTP_CONF, original)
+        elif NTP_CONF.exists():
+            NTP_CONF.unlink()
+        if was_active:
+            run('systemctl', 'restart', 'systemd-timesyncd.service', check=False)
+        raise
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if args == ['--json']:
+        try:
+            result = state()
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+            result = {'available': False, 'error': str(error), 'timezones': [], 'locales': []}
+        print(json.dumps(result, separators=(',', ':')))
+        return 0
+    if len(args) == 2 and args[0] == 'timezone':
+        if args[1] not in run('timedatectl', 'list-timezones').splitlines():
+            raise ValueError('Choose a valid time zone')
+        run('timedatectl', 'set-timezone', args[1], timeout=180)
+    elif len(args) == 2 and args[0] == 'ntp' and args[1] in {'on', 'off'}:
+        run('timedatectl', 'set-ntp', 'true' if args[1] == 'on' else 'false', timeout=180)
+    elif len(args) == 2 and args[0] == 'time':
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', args[1]):
+            raise ValueError('Use YYYY-MM-DD HH:MM:SS')
+        datetime.strptime(args[1], '%Y-%m-%d %H:%M:%S')
+        if properties(run('timedatectl', 'show')).get('NTP') == 'yes':
+            raise ValueError('Turn automatic time off before setting the clock manually')
+        run('timedatectl', 'set-time', args[1], timeout=180)
+    elif len(args) == 3 and args[0] == 'locale':
+        apply_locales(args[1], args[2])
+    elif len(args) == 2 and args[0] == 'servers':
+        configure_servers(args[1])
+    else:
+        raise ValueError('Usage: time-region-adapter --json|timezone ZONE|ntp on|off|time DATETIME|locale LANGUAGE REGION|servers SERVERS')
+    print('Language and region saved. Sign out to apply them to all applications.' if args[0] == 'locale' else 'Time settings updated')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)

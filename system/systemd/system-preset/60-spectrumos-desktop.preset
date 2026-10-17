@@ -1,0 +1,2 @@
+enable bluetooth.service
+enable sddm.service

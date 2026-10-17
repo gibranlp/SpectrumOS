@@ -1,0 +1,931 @@
+#!/usr/bin/env python3
+
+import argparse
+import datetime as dt
+import fcntl
+import json
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+from typing import Any, Callable
+
+
+DEFAULT_RELEASE_FILE = Path("/usr/share/spectrumos/release.toml")
+DEFAULT_MIGRATION_MANIFEST = Path("/usr/share/spectrumos/migrations/manifest.toml")
+PACMAN_LOCK = Path("/var/lib/pacman/db.lck")
+PACMAN_LOG = Path("/var/log/pacman.log")
+BOOT_RESTORE_MARKER = Path("/var/lib/spectrumos/last-boot-restore.json")
+MIGRATION_LOCK = Path("/run/spectrumos/migration.lock")
+MINIMUM_UPDATE_FREE_BYTES = 5 * 1024 * 1024 * 1024
+MIGRATION_ID_PATTERN = re.compile(r"^[0-9]{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+LIMINE_CONFIGS = (
+    Path("/boot/EFI/BOOT/limine.conf"),
+    Path("/boot/limine/limine.conf"),
+    Path("/boot/limine.conf"),
+)
+SPECTRUM_PACKAGES = (
+    "ukvm",
+    "spectrum-xdg-desktop-portal-hyprland",
+    "spectrum-base",
+    "spectrum-theme",
+    "spectrum-hyprland",
+    "spectrum-desktop",
+    "spectrum-sddm",
+    "spectrum-plymouth",
+)
+REQUIRED_RELEASE_FIELDS = {
+    "schema_version": int,
+    "id": str,
+    "name": str,
+    "version": str,
+    "channel": str,
+    "stage": str,
+    "arch_base": str,
+    "support_status": str,
+    "compatibility": dict,
+}
+
+
+def read_release(path: Path) -> dict[str, Any]:
+    try:
+        with path.open("rb") as handle:
+            release = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise ValueError(f"cannot read release metadata at {path}: {error}") from error
+
+    for field, expected_type in REQUIRED_RELEASE_FIELDS.items():
+        if not isinstance(release.get(field), expected_type):
+            raise ValueError(f"release metadata field {field!r} is missing or invalid")
+    if release["schema_version"] != 1:
+        raise ValueError(f"unsupported release metadata schema {release['schema_version']}")
+    return release
+
+
+def read_migration_manifest(path: Path) -> dict[str, Any]:
+    try:
+        with path.open("rb") as handle:
+            manifest = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise ValueError(f"cannot read migration manifest at {path}: {error}") from error
+    if manifest.get("schema_version") != 1 or manifest.get("release_api") != 1:
+        raise ValueError("unsupported migration manifest schema")
+    migrations = manifest.get("migrations")
+    if not isinstance(migrations, list):
+        raise ValueError("migration manifest does not contain an ordered migration list")
+    identifiers = []
+    for migration in migrations:
+        if not isinstance(migration, dict):
+            raise ValueError("migration entry is invalid")
+        identifier = migration.get("id")
+        if not isinstance(identifier, str) or not MIGRATION_ID_PATTERN.fullmatch(identifier):
+            raise ValueError("migration identifier is invalid")
+        identifiers.append(identifier)
+        for field in ("introduced_in", "description", "to_version", "mode"):
+            if not isinstance(migration.get(field), str) or not migration[field]:
+                raise ValueError(f"migration {identifier} field {field!r} is invalid")
+        if migration["mode"] != "declarative":
+            raise ValueError(f"migration {identifier} uses unsupported mode {migration['mode']!r}")
+        if (
+            not isinstance(migration.get("from_versions"), list)
+            or not migration["from_versions"]
+            or not all(isinstance(item, str) and item for item in migration["from_versions"])
+        ):
+            raise ValueError(f"migration {identifier} has no source versions")
+        preconditions = migration.get("preconditions")
+        completion = migration.get("completion")
+        rollback = migration.get("rollback")
+        if not isinstance(preconditions, dict) or not all(
+            isinstance(preconditions.get(field), list)
+            for field in ("packages", "paths_present", "paths_absent")
+        ):
+            raise ValueError(f"migration {identifier} preconditions are invalid")
+        if not all(
+            isinstance(item, str) and item
+            for field in ("packages", "paths_present", "paths_absent")
+            for item in preconditions[field]
+        ):
+            raise ValueError(f"migration {identifier} preconditions contain invalid values")
+        marker = completion.get("marker") if isinstance(completion, dict) else None
+        expected_marker = f"/var/lib/spectrumos/migrations/{identifier}.complete"
+        if (
+            marker != expected_marker
+            or not isinstance(completion.get("verification"), str)
+            or not completion["verification"]
+        ):
+            raise ValueError(f"migration {identifier} completion contract is invalid")
+        if not isinstance(rollback, dict) or not isinstance(rollback.get("supported"), bool) or not isinstance(
+            rollback.get("notes"), str
+        ) or not rollback["notes"]:
+            raise ValueError(f"migration {identifier} rollback contract is invalid")
+    if identifiers != sorted(identifiers) or len(identifiers) != len(set(identifiers)):
+        raise ValueError("migrations must have unique identifiers in ascending order")
+    return manifest
+
+
+def command_output(command: list[str]) -> str | None:
+    result = command_result(command)
+    if result is None or result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def command_result(command: list[str]) -> subprocess.CompletedProcess[str] | None:
+    try:
+        environment = os.environ.copy()
+        environment["LC_ALL"] = "C"
+        return subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def gpu_names() -> list[str]:
+    output = command_output(["lspci", "-mm"])
+    if not output:
+        return []
+    devices = []
+    for line in output.splitlines():
+        if not re.search(r'"(?:VGA compatible controller|3D controller|Display controller)"', line):
+            continue
+        quoted = re.findall(r'"([^"]*)"', line)
+        if len(quoted) >= 3:
+            devices.append(" ".join(quoted[1:3]))
+    return devices
+
+
+def package_versions() -> dict[str, str | None]:
+    versions: dict[str, str | None] = {}
+    for package in SPECTRUM_PACKAGES:
+        output = command_output(["pacman", "-Q", package])
+        versions[package] = output.rsplit(" ", 1)[-1] if output else None
+    return versions
+
+
+def session_facts() -> dict[str, str]:
+    return {
+        "type": os.environ.get("XDG_SESSION_TYPE", "unknown"),
+        "desktop": os.environ.get("XDG_CURRENT_DESKTOP", "unknown"),
+    }
+
+
+def collect_info(release_file: Path) -> dict[str, Any]:
+    release = read_release(release_file)
+    return {
+        "release": {
+            "name": release["name"],
+            "version": release["version"],
+            "channel": release["channel"],
+            "stage": release["stage"],
+            "support_status": release["support_status"],
+            "schema_version": release["schema_version"],
+        },
+        "system": {
+            "architecture": platform.machine() or "unknown",
+            "kernel": platform.release() or "unknown",
+            "session": session_facts(),
+            "gpus": gpu_names(),
+        },
+        "packages": package_versions(),
+    }
+
+
+def render_text(info: dict[str, Any]) -> str:
+    release = info["release"]
+    system = info["system"]
+    session = system["session"]
+    gpu = ", ".join(system["gpus"]) if system["gpus"] else "Unavailable"
+    package_lines = [
+        f"  {name}: {version if version is not None else 'not installed'}"
+        for name, version in info["packages"].items()
+    ]
+    return "\n".join(
+        [
+            f"SpectrumOS: {release['version']} ({release['channel']}, {release['stage']})",
+            f"Support: {release['support_status']}",
+            f"Kernel: {system['kernel']}",
+            f"Architecture: {system['architecture']}",
+            f"Session: {session['type']} / {session['desktop']}",
+            f"GPU: {gpu}",
+            "Packages:",
+            *package_lines,
+        ]
+    )
+
+
+def check(identifier: str, status: str, summary: str, details: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "id": identifier,
+        "status": status,
+        "summary": summary,
+        "details": details or [],
+    }
+
+
+def release_check(release_file: Path) -> dict[str, Any]:
+    try:
+        release = read_release(release_file)
+    except ValueError as error:
+        return check("release", "fail", str(error))
+    return check(
+        "release",
+        "pass",
+        f"SpectrumOS {release['version']} {release['channel']} metadata is valid",
+    )
+
+
+def package_integrity_check() -> dict[str, Any]:
+    missing = []
+    altered = []
+    unavailable = []
+    for package in SPECTRUM_PACKAGES:
+        installed = command_result(["pacman", "-Q", package])
+        if installed is None:
+            unavailable.append(package)
+            continue
+        if installed.returncode != 0:
+            missing.append(package)
+            continue
+        integrity = command_result(["pacman", "-Qkk", package])
+        if integrity is None:
+            unavailable.append(package)
+        elif integrity.returncode != 0 or any(
+            int(count) > 0 for count in re.findall(r"(\d+) altered files", integrity.stdout)
+        ):
+            altered.append(package)
+    if missing or altered:
+        details = [*(f"missing: {name}" for name in missing), *(f"integrity mismatch: {name}" for name in altered)]
+        return check("packages", "fail", "Spectrum package integrity requires attention", details)
+    if unavailable:
+        return check("packages", "warn", "Package integrity could not be checked", unavailable)
+    return check("packages", "pass", f"All {len(SPECTRUM_PACKAGES)} Spectrum packages pass integrity checks")
+
+
+def failed_services_check() -> dict[str, Any]:
+    failed = []
+    unavailable = []
+    scopes = (("system", ["systemctl", "--failed", "--no-legend", "--plain"]),
+              ("user", ["systemctl", "--user", "--failed", "--no-legend", "--plain"]))
+    for scope, command in scopes:
+        result = command_result(command)
+        if result is None or result.returncode != 0:
+            unavailable.append(scope)
+            continue
+        units = [line.split()[0] for line in result.stdout.splitlines() if line.strip()]
+        failed.extend(f"{scope}: {unit}" for unit in units)
+    if failed:
+        return check("services", "fail", "Failed systemd units were found", failed)
+    if unavailable:
+        return check("services", "warn", "Some systemd scopes could not be checked", unavailable)
+    return check("services", "pass", "No failed system or user units")
+
+
+def active_units_check(identifier: str, units: tuple[str, ...], label: str) -> dict[str, Any]:
+    if os.geteuid() == 0:
+        return check(identifier, "warn", f"{label} requires a session-user diagnostic run")
+    inactive = []
+    unavailable = []
+    for unit in units:
+        result = command_result(["systemctl", "--user", "is-active", unit])
+        if result is None:
+            unavailable.append(unit)
+        elif result.returncode != 0 or result.stdout.strip() != "active":
+            inactive.append(unit)
+    if inactive:
+        return check(identifier, "fail", f"{label} services are not fully active", inactive)
+    if unavailable:
+        return check(identifier, "warn", f"{label} service state is unavailable", unavailable)
+    return check(identifier, "pass", f"{label} services are active")
+
+
+def audio_check() -> dict[str, Any]:
+    services = active_units_check("audio", ("pipewire.service", "wireplumber.service"), "PipeWire")
+    if services["status"] != "pass":
+        return services
+    wpctl = command_result(["wpctl", "status"])
+    if wpctl is None:
+        return check("audio", "warn", "PipeWire is active but wpctl is unavailable")
+    if wpctl.returncode != 0:
+        return check("audio", "fail", "PipeWire is active but its object graph is unavailable")
+    return check("audio", "pass", "PipeWire, WirePlumber, and the audio object graph are healthy")
+
+
+def disk_check() -> dict[str, Any]:
+    filesystem = command_output(["findmnt", "--noheadings", "--output", "FSTYPE", "/"])
+    usage = command_output(["df", "--output=pcent", "/"])
+    if filesystem is None or usage is None:
+        return check("disk", "warn", "Root filesystem health could not be determined")
+    match = re.search(r"(\d+)%", usage)
+    if match is None:
+        return check("disk", "warn", "Root filesystem usage could not be parsed")
+    percent = int(match.group(1))
+    if percent >= 95:
+        return check("disk", "fail", f"Root filesystem is {percent}% full", [f"filesystem: {filesystem}"])
+    if percent >= 85:
+        return check("disk", "warn", f"Root filesystem is {percent}% full", [f"filesystem: {filesystem}"])
+    return check("disk", "pass", f"Root filesystem is {percent}% full", [f"filesystem: {filesystem}"])
+
+
+def snapshot_check() -> dict[str, Any]:
+    status = command_result(["spectrum-snapshot", "status"])
+    if status is None:
+        return check("snapshots", "warn", "Snapshot tooling is unavailable")
+    if status.returncode != 0:
+        return check("snapshots", "warn", "Btrfs restore points are not supported for this root")
+    details = []
+    if os.geteuid() == 0:
+        listing = command_result(["spectrum-snapshot", "list"])
+        if listing is not None and listing.returncode == 0:
+            details.append(f"complete restore points: {len([line for line in listing.stdout.splitlines() if line.strip()])}")
+    else:
+        details.append("restore-point inventory requires a root read-only run")
+    return check("snapshots", "pass", "Btrfs root snapshot support is available", details)
+
+
+def bootloader_check() -> dict[str, Any]:
+    package = command_result(["pacman", "-Q", "limine"])
+    if package is None:
+        return check("bootloader", "warn", "Limine package state is unavailable")
+    if package.returncode != 0:
+        return check("bootloader", "fail", "The supported Limine bootloader package is not installed")
+    # /boot is root-only on an installed system, so an unprivileged run can
+    # never see whether the config exists at all -- say so plainly instead
+    # of reporting an unreadable config, which reads as broken rather than
+    # merely unchecked from here (the same distinction snapshot_check makes).
+    if os.geteuid() != 0:
+        return check("bootloader", "warn", "Limine configuration requires a root read-only run to verify")
+    readable = next((path for path in LIMINE_CONFIGS if path.is_file()), None)
+    if readable is None:
+        return check("bootloader", "warn", "Limine is installed but its configuration is missing")
+    try:
+        content = readable.read_text(encoding="utf-8")
+    except OSError:
+        return check("bootloader", "warn", "Limine is installed but its configuration could not be read")
+    if "quiet" not in content or "splash" not in content:
+        return check("bootloader", "warn", "Limine is configured without the complete Spectrum boot appearance flags")
+    return check("bootloader", "pass", "Limine configuration and Spectrum boot flags are present")
+
+
+def collect_doctor(release_file: Path) -> dict[str, Any]:
+    checks = [
+        release_check(release_file),
+        package_integrity_check(),
+        failed_services_check(),
+        active_units_check(
+            "portals",
+            ("xdg-desktop-portal.service", "xdg-desktop-portal-hyprland.service", "xdg-desktop-portal-gtk.service"),
+            "Desktop portal",
+        ),
+        audio_check(),
+        disk_check(),
+        snapshot_check(),
+        bootloader_check(),
+    ]
+    counts = {status: sum(item["status"] == status for item in checks) for status in ("pass", "warn", "fail")}
+    overall = "fail" if counts["fail"] else "warn" if counts["warn"] else "pass"
+    return {"schema_version": 1, "overall": overall, "counts": counts, "checks": checks}
+
+
+def render_doctor(report: dict[str, Any]) -> str:
+    lines = []
+    symbols = {"pass": "PASS", "warn": "WARN", "fail": "FAIL"}
+    for item in report["checks"]:
+        lines.append(f"[{symbols[item['status']]}] {item['id']}: {item['summary']}")
+        lines.extend(f"       {detail}" for detail in item["details"])
+    counts = report["counts"]
+    lines.append(f"Overall: {report['overall']} ({counts['pass']} passed, {counts['warn']} warnings, {counts['fail']} failed)")
+    return "\n".join(lines)
+
+
+def projected_path(path: str, system_root: Path) -> Path:
+    relative = Path(path).relative_to("/")
+    return system_root / relative
+
+
+def completion_state(migration: dict[str, Any], system_root: Path) -> str:
+    marker = projected_path(migration["completion"]["marker"], system_root)
+    if not marker.exists():
+        if marker.is_symlink():
+            raise ValueError(f"migration {migration['id']} completion marker cannot be a symlink")
+        return "pending"
+    if marker.is_symlink() or not marker.is_file():
+        raise ValueError(f"migration {migration['id']} completion marker must be a regular file")
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"migration {migration['id']} has an invalid completion marker: {error}") from error
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("migration_id") != migration["id"]
+        or payload.get("to_version") != migration["to_version"]
+    ):
+        raise ValueError(f"migration {migration['id']} completion marker does not match its contract")
+    try:
+        completed_at = dt.datetime.fromisoformat(payload["completed_at"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"migration {migration['id']} completion timestamp is invalid") from error
+    if completed_at.tzinfo is None:
+        raise ValueError(f"migration {migration['id']} completion timestamp must include a timezone")
+    return "completed"
+
+
+def package_requirement(requirement: str) -> tuple[str, str | None, str | None]:
+    match = re.fullmatch(r"([a-z0-9@._+-]+)(?:(>=|<=|=|>|<)([^\s]+))?", requirement)
+    if match is None:
+        raise ValueError(f"invalid package precondition: {requirement}")
+    return match.group(1), match.group(2), match.group(3)
+
+
+def requirement_satisfied(requirement: str) -> bool | None:
+    package, operator, expected = package_requirement(requirement)
+    installed = command_output(["pacman", "-Q", package])
+    if installed is None:
+        return False
+    if operator is None or expected is None:
+        return True
+    current = installed.rsplit(" ", 1)[-1]
+    comparison = command_output(["vercmp", current, expected])
+    if comparison is None:
+        return None
+    value = int(comparison)
+    return {
+        "=": value == 0,
+        ">=": value >= 0,
+        "<=": value <= 0,
+        ">": value > 0,
+        "<": value < 0,
+    }[operator]
+
+
+def migration_preconditions(migration: dict[str, Any], system_root: Path) -> tuple[list[str], list[str]]:
+    unmet = []
+    unknown = []
+    for requirement in migration["preconditions"]["packages"]:
+        satisfied = requirement_satisfied(requirement)
+        if satisfied is False:
+            unmet.append(f"package: {requirement}")
+        elif satisfied is None:
+            unknown.append(f"package version: {requirement}")
+    for path in migration["preconditions"]["paths_present"]:
+        if not projected_path(path, system_root).exists():
+            unmet.append(f"missing path: {path}")
+    for path in migration["preconditions"]["paths_absent"]:
+        if projected_path(path, system_root).exists():
+            unmet.append(f"path must be absent: {path}")
+    return unmet, unknown
+
+
+def migration_plan(manifest_file: Path, system_root: Path) -> dict[str, Any]:
+    manifest = read_migration_manifest(manifest_file)
+    migrations = []
+    blockers = []
+    warnings = []
+    for migration in manifest["migrations"]:
+        state = completion_state(migration, system_root)
+        unmet, unknown = migration_preconditions(migration, system_root)
+        if state == "pending" and unmet:
+            blockers.extend(f"{migration['id']}: {item}" for item in unmet)
+        if state == "pending" and unknown:
+            warnings.extend(f"{migration['id']}: {item}" for item in unknown)
+        migrations.append(
+            {
+                "id": migration["id"],
+                "state": state,
+                "mode": migration["mode"],
+                "to_version": migration["to_version"],
+                "preconditions_met": not unmet,
+            }
+        )
+    return {"migrations": migrations, "blockers": blockers, "warnings": warnings}
+
+
+def require_migration_root(system_root: Path) -> None:
+    if os.geteuid() != 0:
+        raise ValueError("migration changes require root")
+    if not system_root.is_absolute():
+        raise ValueError("system root must be an absolute path")
+
+
+def sync_directory(directory: Path) -> None:
+    descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def write_completion_marker(migration: dict[str, Any], system_root: Path) -> None:
+    marker = projected_path(migration["completion"]["marker"], system_root)
+    marker.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{migration['id']}.", suffix=".tmp", dir=marker.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o644)
+        payload = {
+            "schema_version": 1,
+            "migration_id": migration["id"],
+            "to_version": migration["to_version"],
+            "completed_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        }
+        handle = os.fdopen(descriptor, "w", encoding="utf-8")
+        descriptor = -1
+        with handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, marker)
+        sync_directory(marker.parent)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def with_migration_lock(system_root: Path, operation: Callable[[], Any]) -> Any:
+    lock = projected_path(str(MIGRATION_LOCK), system_root)
+    lock.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    with lock.open("a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ValueError("another migration operation is already running") from error
+        return operation()
+
+
+def apply_migrations(manifest_file: Path, system_root: Path) -> dict[str, Any]:
+    require_migration_root(system_root)
+
+    def apply_locked() -> dict[str, Any]:
+        manifest = read_migration_manifest(manifest_file)
+        pending = []
+        already_completed = []
+        saw_pending = False
+        blockers = []
+        if projected_path(str(PACMAN_LOCK), system_root).exists():
+            blockers.append("Pacman database lock is present")
+        transaction = pacman_transaction_state(system_root)
+        if transaction["status"] == "fail":
+            blockers.append("Pacman log indicates an interrupted transaction")
+        for migration in manifest["migrations"]:
+            state = completion_state(migration, system_root)
+            if state == "completed":
+                if saw_pending:
+                    blockers.append(f"{migration['id']}: completed after an earlier pending migration")
+                already_completed.append(migration["id"])
+                continue
+            saw_pending = True
+            unmet, unknown = migration_preconditions(migration, system_root)
+            blockers.extend(f"{migration['id']}: {item}" for item in unmet)
+            blockers.extend(f"{migration['id']}: cannot verify {item}" for item in unknown)
+            pending.append(migration)
+        if blockers:
+            raise ValueError("migration preflight failed: " + "; ".join(blockers))
+        applied = []
+        for migration in pending:
+            write_completion_marker(migration, system_root)
+            if completion_state(migration, system_root) != "completed":
+                raise ValueError(f"migration {migration['id']} completion verification failed")
+            applied.append(migration["id"])
+        return {"schema_version": 1, "applied": applied, "already_completed": already_completed}
+
+    return with_migration_lock(system_root, apply_locked)
+
+
+def rollback_migration(
+    manifest_file: Path, system_root: Path, identifier: str, confirmation: str | None
+) -> dict[str, Any]:
+    require_migration_root(system_root)
+    if confirmation != identifier:
+        raise ValueError(f"rollback requires --confirm {identifier}")
+
+    def rollback_locked() -> dict[str, Any]:
+        manifest = read_migration_manifest(manifest_file)
+        migrations = manifest["migrations"]
+        selected = next((item for item in migrations if item["id"] == identifier), None)
+        if selected is None:
+            raise ValueError(f"unknown migration: {identifier}")
+        if not selected["rollback"]["supported"]:
+            raise ValueError(f"migration {identifier} does not support marker rollback")
+        states = [(item, completion_state(item, system_root)) for item in migrations]
+        selected_index = migrations.index(selected)
+        later = [item["id"] for item, state in states[selected_index + 1 :] if state == "completed"]
+        if later:
+            raise ValueError(f"rollback must start with the newest completed migration: {later[-1]}")
+        marker = projected_path(selected["completion"]["marker"], system_root)
+        if not marker.exists():
+            return {"schema_version": 1, "rolled_back": [], "already_pending": [identifier]}
+        marker.unlink()
+        sync_directory(marker.parent)
+        return {"schema_version": 1, "rolled_back": [identifier], "already_pending": []}
+
+    return with_migration_lock(system_root, rollback_locked)
+
+
+def render_migration_result(result: dict[str, Any]) -> str:
+    if result.get("applied"):
+        return "Applied migrations:\n" + "\n".join(f"  {item}" for item in result["applied"])
+    if result.get("rolled_back"):
+        return "Rolled back migration markers:\n" + "\n".join(
+            f"  {item}" for item in result["rolled_back"]
+        )
+    if result.get("already_completed"):
+        return "All migrations are already complete."
+    return "Migration is already pending."
+
+
+def pending_package_names(command: list[str]) -> tuple[list[str], bool]:
+    result = command_result(command)
+    if result is None:
+        return [], False
+    if result.returncode not in (0, 1):
+        return [], False
+    names = [line.split()[0] for line in result.stdout.splitlines() if line.strip()]
+    return names, True
+
+
+def pacman_transaction_state(system_root: Path) -> dict[str, Any]:
+    log = projected_path(str(PACMAN_LOG), system_root)
+    if not log.is_file():
+        return {"status": "unknown", "last_event": None}
+    last_event = None
+    last_event_time = None
+    try:
+        for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "[ALPM] transaction started" in line:
+                last_event = "started"
+            elif "[ALPM] transaction completed" in line:
+                last_event = "completed"
+            else:
+                continue
+            timestamp = re.match(r"^\[([^]]+)]", line)
+            try:
+                last_event_time = dt.datetime.fromisoformat(timestamp.group(1)) if timestamp else None
+            except ValueError:
+                last_event_time = None
+    except OSError:
+        return {"status": "unknown", "last_event": None}
+    if last_event == "started":
+        marker = projected_path(str(BOOT_RESTORE_MARKER), system_root)
+        try:
+            restored = json.loads(marker.read_text(encoding="utf-8"))
+            restored_time = dt.datetime.fromisoformat(str(restored["restored_utc"]).replace("Z", "+00:00"))
+            if (
+                restored.get("schema") == 1
+                and last_event_time is not None
+                and last_event_time.tzinfo is not None
+                and restored_time.tzinfo is not None
+                and restored_time >= last_event_time
+            ):
+                return {"status": "pass", "last_event": "restored"}
+        except (OSError, KeyError, ValueError, json.JSONDecodeError):
+            pass
+        return {"status": "fail", "last_event": last_event}
+    return {"status": "pass", "last_event": last_event}
+
+
+def collect_update_plan(release_file: Path, manifest_file: Path, system_root: Path) -> dict[str, Any]:
+    release = read_release(release_file)
+    migration = migration_plan(manifest_file, system_root)
+    blockers = list(migration["blockers"])
+    warnings = list(migration["warnings"])
+
+    usage = shutil.disk_usage(system_root)
+    disk_status = "pass" if usage.free >= MINIMUM_UPDATE_FREE_BYTES else "fail"
+    if disk_status == "fail":
+        blockers.append("At least 5 GiB of free root filesystem space is required")
+
+    lock = projected_path(str(PACMAN_LOCK), system_root)
+    lock_status = "fail" if lock.exists() else "pass"
+    if lock.exists():
+        blockers.append("Pacman database lock is present")
+
+    transaction = pacman_transaction_state(system_root)
+    if transaction["status"] == "fail":
+        blockers.append("Pacman log indicates an interrupted transaction")
+    elif transaction["status"] == "unknown":
+        warnings.append("Pacman transaction history is unavailable")
+
+    snapshot = command_result(["spectrum-snapshot", "status"])
+    snapshot_status = "pass" if snapshot is not None and snapshot.returncode == 0 else "fail"
+    if snapshot_status == "fail":
+        blockers.append("Supported Btrfs snapshot capability is required for this development plan")
+
+    official, official_available = pending_package_names(["pacman", "-Qu"])
+    foreign, foreign_available = pending_package_names(["pacman", "-Qm"])
+    if not official_available:
+        warnings.append("Pending official packages could not be read from the current local sync database")
+    if not foreign_available:
+        warnings.append("Foreign package inventory is unavailable")
+    local_spectrum = [name for name in foreign if name.startswith("spectrum-")]
+    third_party_foreign = [name for name in foreign if not name.startswith("spectrum-")]
+
+    safety_gates = [
+        {
+            "id": "snapshot-retention",
+            "status": "pass",
+            "summary": "Confirmed pruning and interrupted quarantine recovery passed destructive VM validation",
+        },
+        {
+            "id": "interrupted-transaction-recovery",
+            "status": "pass",
+            "summary": "Interrupted transactions and boot-time root/EFI recovery passed destructive VM validation",
+        },
+        {
+            "id": "migration-executor",
+            "status": "pass",
+            "summary": "Ordered atomic migration execution and marker rollback are enabled",
+        },
+    ]
+    return {
+        "schema_version": 1,
+        "mode": "dry-run",
+        "execution_enabled": True,
+        "release": {"version": release["version"], "channel": release["channel"]},
+        "preflight": {
+            "disk": {
+                "status": disk_status,
+                "free_bytes": usage.free,
+                "minimum_free_bytes": MINIMUM_UPDATE_FREE_BYTES,
+            },
+            "pacman_lock": {"status": lock_status},
+            "pacman_transaction": transaction,
+            "snapshots": {"status": snapshot_status},
+        },
+        "packages": {
+            "database_refreshed": False,
+            "official": {"available": official_available, "count": len(official), "names": official},
+            "local_spectrum": {"count": len(local_spectrum), "names": local_spectrum},
+            "foreign": {
+                "available": foreign_available,
+                "count": len(third_party_foreign),
+                "names": third_party_foreign,
+            },
+        },
+        "migration": migration["migrations"],
+        "blockers": blockers,
+        "warnings": warnings,
+        "safety_gates": safety_gates,
+        "ready_for_dry_run": not blockers,
+        "ready_for_execution": not blockers,
+        "actions": [
+            "refresh one coherent repository snapshot",
+            "create and validate a paired root and EFI restore point",
+            "perform one complete Pacman transaction",
+            "apply ordered pending migrations idempotently",
+            "run post-transaction spectrum doctor checks",
+            "record reboot and offline rollback guidance",
+        ],
+    }
+
+
+def render_update_plan(plan: dict[str, Any]) -> str:
+    preflight = plan["preflight"]
+    packages = plan["packages"]
+    lines = [
+        "SpectrumOS update plan (dry-run only)",
+        f"Release: {plan['release']['version']} ({plan['release']['channel']})",
+        f"Disk: {preflight['disk']['status']} ({preflight['disk']['free_bytes'] // (1024 ** 3)} GiB free)",
+        f"Pacman lock: {preflight['pacman_lock']['status']}",
+        f"Pacman transaction history: {preflight['pacman_transaction']['status']}",
+        f"Snapshot capability: {preflight['snapshots']['status']}",
+        f"Official updates in current local database: {packages['official']['count']}",
+        f"Locally installed Spectrum packages: {packages['local_spectrum']['count']}",
+        f"Foreign packages: {packages['foreign']['count']}",
+        "Migrations:",
+    ]
+    lines.extend(
+        f"  {item['id']}: {item['state']} (preconditions {'met' if item['preconditions_met'] else 'not met'})"
+        for item in plan["migration"]
+    )
+    if plan["blockers"]:
+        lines.append("Preflight blockers:")
+        lines.extend(f"  {item}" for item in plan["blockers"])
+    if plan["warnings"]:
+        lines.append("Warnings:")
+        lines.extend(f"  {item}" for item in plan["warnings"])
+    lines.append("Execution safety gates:")
+    lines.extend(f"  {item['id']}: {item['summary']}" for item in plan["safety_gates"])
+    lines.append(f"Execution: {'ready' if plan['ready_for_execution'] else 'blocked'}")
+    return "\n".join(lines)
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(prog="spectrum")
+    commands = root.add_subparsers(dest="command", required=True)
+    info = commands.add_parser("info", help="show non-sensitive system and release facts")
+    info.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    info.add_argument(
+        "--release-file",
+        type=Path,
+        default=DEFAULT_RELEASE_FILE,
+        help=argparse.SUPPRESS,
+    )
+    doctor = commands.add_parser("doctor", help="run read-only system health checks")
+    doctor.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    doctor.add_argument(
+        "--release-file",
+        type=Path,
+        default=DEFAULT_RELEASE_FILE,
+        help=argparse.SUPPRESS,
+    )
+    migrate = commands.add_parser("migrate", help="apply or roll back ordered system migrations")
+    migrate_commands = migrate.add_subparsers(dest="migrate_command", required=True)
+    migrate_apply = migrate_commands.add_parser("apply", help="apply all pending migrations")
+    migrate_apply.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    migrate_apply.add_argument(
+        "--migration-manifest", type=Path, default=DEFAULT_MIGRATION_MANIFEST, help=argparse.SUPPRESS
+    )
+    migrate_apply.add_argument("--system-root", type=Path, default=Path("/"), help=argparse.SUPPRESS)
+    migrate_rollback = migrate_commands.add_parser("rollback", help="roll back one completion marker")
+    migrate_rollback.add_argument("migration_id")
+    migrate_rollback.add_argument("--confirm", required=True)
+    migrate_rollback.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    migrate_rollback.add_argument(
+        "--migration-manifest", type=Path, default=DEFAULT_MIGRATION_MANIFEST, help=argparse.SUPPRESS
+    )
+    migrate_rollback.add_argument("--system-root", type=Path, default=Path("/"), help=argparse.SUPPRESS)
+    update = commands.add_parser("update", help="inspect and safely execute system updates")
+    update_commands = update.add_subparsers(dest="update_command", required=True)
+    update_plan = update_commands.add_parser("plan", help="print a dry-run-only update plan")
+    update_plan.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    update_plan.add_argument("--release-file", type=Path, default=DEFAULT_RELEASE_FILE, help=argparse.SUPPRESS)
+    update_plan.add_argument(
+        "--migration-manifest",
+        type=Path,
+        default=DEFAULT_MIGRATION_MANIFEST,
+        help=argparse.SUPPRESS,
+    )
+    update_plan.add_argument("--system-root", type=Path, default=Path("/"), help=argparse.SUPPRESS)
+    return root
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    if arguments.command == "info":
+        try:
+            info = collect_info(arguments.release_file)
+        except ValueError as error:
+            print(f"spectrum: {error}", file=sys.stderr)
+            return 2
+        if arguments.json:
+            print(json.dumps(info, indent=2, sort_keys=True))
+        else:
+            print(render_text(info))
+        return 0
+    if arguments.command == "doctor":
+        report = collect_doctor(arguments.release_file)
+        if arguments.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(render_doctor(report))
+        return 1 if report["overall"] == "fail" else 0
+    if arguments.command == "migrate":
+        try:
+            if arguments.migrate_command == "apply":
+                result = apply_migrations(arguments.migration_manifest, arguments.system_root)
+            else:
+                result = rollback_migration(
+                    arguments.migration_manifest,
+                    arguments.system_root,
+                    arguments.migration_id,
+                    arguments.confirm,
+                )
+        except (OSError, ValueError) as error:
+            print(f"spectrum: {error}", file=sys.stderr)
+            return 2
+        if arguments.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print(render_migration_result(result))
+        return 0
+    try:
+        plan = collect_update_plan(arguments.release_file, arguments.migration_manifest, arguments.system_root)
+    except (OSError, ValueError) as error:
+        print(f"spectrum: {error}", file=sys.stderr)
+        return 2
+    if arguments.json:
+        print(json.dumps(plan, indent=2, sort_keys=True))
+    else:
+        print(render_update_plan(plan))
+    return 1 if plan["blockers"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

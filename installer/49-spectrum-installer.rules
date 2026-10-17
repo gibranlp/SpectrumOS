@@ -1,0 +1,14 @@
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/local/lib/spectrumos/spectrum-installer-backend" &&
+        subject.user == "spectrum" && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});
+
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 &&
+        subject.user == "spectrum" && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

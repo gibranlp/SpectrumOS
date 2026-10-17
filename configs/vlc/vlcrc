@@ -1,0 +1,6 @@
+# SpectrumOS default VLC preferences.
+# VLC fills in every other key from its compiled-in defaults; only the
+# settings we deliberately override need to be listed here.
+[qt]
+# Always open the Qt interface in minimal view (no menu bar/toolbars).
+qt-minimal-view=1

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (($# == 0)); then
+    selected=$(printf '%s\n' 'Lock' 'Suspend' 'Log out' 'Restart' 'Power off' | /usr/lib/spectrumos/spectrum-shell-picker session --dmenu --prompt 'Session' || true)
+    case $selected in
+        Lock) set -- lock ;;
+        Suspend) set -- run suspend ;;
+        'Log out') set -- run logout ;;
+        Restart) set -- run reboot ;;
+        'Power off') set -- run poweroff ;;
+        '') exit 0 ;;
+    esac
+fi
+
+case ${1:-} in
+    lock) systemd-run --user --collect --quiet --unit="spectrum-lock-$$" -- hyprlock -c "$HOME/.cache/spectrumos/theme/current/hyprlock.conf" >/dev/null ;;
+    run)
+        case ${2:-} in
+            suspend) systemctl suspend ;;
+            logout) uwsm stop ;;
+            reboot) systemctl reboot ;;
+            poweroff) systemctl poweroff ;;
+            *) exit 2 ;;
+        esac
+        ;;
+    *) exit 2 ;;
+esac

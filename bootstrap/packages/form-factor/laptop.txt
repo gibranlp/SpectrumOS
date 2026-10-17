@@ -1,0 +1,2 @@
+# Un solo gestor de perfiles evita conflictos entre herramientas de energía.
+power-profiles-daemon

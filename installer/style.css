@@ -1,0 +1,13 @@
+window, window.csd, window.csd decoration { box-shadow: none; margin: 0; }
+window { background: #__BACKGROUND__; color: #__FOREGROUND__; }
+.installer-shell { background: #__BACKGROUND__; padding: 16px; }
+.hero-title { font-size: 24px; font-weight: 800; }
+.step-title { font-size: 23px; font-weight: 750; }
+.muted { color: #__MUTED__; }
+.warning { background: alpha(#__ERROR__, 0.18); border-radius: 12px; padding: 14px; color: #__FOREGROUND__; }
+button { background: #__SURFACE__; color: #__FOREGROUND__; border-radius: 9px; }
+.accent { background: #__ACCENT__; color: #__BACKGROUND__; font-weight: 700; }
+.install-button { background: #__ACCENT_ALT__; color: #__BACKGROUND__; font-weight: 800; }
+entry, dropdown { background: #__SURFACE__; color: #__FOREGROUND__; border-radius: 9px; }
+progressbar trough { min-height: 12px; border-radius: 8px; background: #__SURFACE__; }
+progressbar progress { min-height: 12px; border-radius: 8px; background: #__ACCENT__; }

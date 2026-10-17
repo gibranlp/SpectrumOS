@@ -1,0 +1,12 @@
+[Unit]
+Description=Synchronize SpectrumOS wallpaper and colors to Limine
+ConditionPathExists=/var/lib/spectrumos/appearance/current.png
+# Cada wallpaper o cambio de tema dispara este oneshot vía el .path que lo activa; una racha
+# legítima de cambios rápidos (probar varios fondos seguidos) puede superar el limite de
+# arranques por defecto de systemd y dejar el sync deshabilitado hasta un reset-failed manual.
+# El script es idempotente y barato, asi que aqui no hace falta limitar la tasa de arranques.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/spectrumos/limine-appearance-sync

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SpectrumDrop link opener
+Comment=Open a link received from a nearby Apple device
+Exec=/usr/bin/spectrumdrop open-link %f
+MimeType=application/x-mswinurl;application/x-webloc;
+NoDisplay=true
+Terminal=false

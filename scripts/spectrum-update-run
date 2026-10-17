@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Conserva la confirmación en terminal y deja que el hook de pacman cree el respaldo.
+set -uo pipefail
+# No usa set -e para ejecutar el diagnóstico incluso cuando falla la actualización.
+
+mode=${1:-all}
+
+if ! command -v spectrum >/dev/null 2>&1; then
+    printf 'spectrum: the spectrum CLI is not installed.\n' >&2
+    exit 1
+fi
+
+case $mode in
+    official|aur|all) ;;
+    *)
+        printf 'spectrum-update-run: unknown mode %s (expected official, aur, or all)\n' "$mode" >&2
+        exit 2
+        ;;
+esac
+
+lock_dir=${XDG_RUNTIME_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}}/spectrumos
+mkdir -p -m 0700 -- "$lock_dir" || exit 1
+exec 9>"$lock_dir/update.lock"
+if ! flock -n 9; then
+    printf 'Another SpectrumOS update window is active. Finish or close it first.\n' >&2
+    exit 1
+fi
+
+printf 'SpectrumOS safe update -- %s\n\n' "$mode"
+printf '== Preflight (spectrum update plan) ==\n'
+spectrum update plan
+plan_status=$?
+if [ "$plan_status" -ne 0 ]; then
+    printf '\nPreflight reported blockers above; not proceeding.\n'
+    exit 1
+fi
+
+printf '\nA pre-upgrade restore point is created automatically before any package changes.\n'
+read -r -p 'Continue with the update? [y/N] ' confirm
+case $confirm in
+    y|Y|yes|YES) ;;
+    *)
+        printf 'Cancelled; nothing was changed.\n'
+        exit 0
+        ;;
+esac
+
+printf '\n== Recheck before package changes ==\n'
+if ! spectrum update plan; then
+    printf '\nThe system changed or preflight is blocked; not proceeding.\n'
+    exit 1
+fi
+
+printf '\n== Update (%s) ==\n' "$mode"
+case $mode in
+    official)
+        sudo pacman -Syu
+        ;;
+    aur)
+        if ! command -v paru >/dev/null 2>&1; then
+            printf 'paru is not installed; cannot update AUR packages.\n' >&2
+            exit 1
+        fi
+        printf 'AUR updates include a full system upgrade to keep packages compatible.\n'
+        paru -Syu
+        ;;
+    all)
+        # Actualiza repositorios y AUR juntos para evitar actualizaciones parciales.
+        if command -v paru >/dev/null 2>&1; then
+            paru -Syu
+        else
+            printf 'paru is unavailable; AUR packages will be skipped.\n'
+            sudo pacman -Syu
+        fi
+        ;;
+esac
+update_status=$?
+
+if [ "$update_status" -eq 0 ]; then
+    printf '\n== Ordered migrations ==\n'
+    sudo spectrum migrate apply
+    migration_status=$?
+else
+    migration_status=0
+fi
+
+flatpak_status=0
+if [ "$mode" = all ] && [ "$update_status" -eq 0 ] && [ "$migration_status" -eq 0 ] && command -v flatpak >/dev/null 2>&1; then
+    printf '\n== Flatpak apps and runtimes ==\n'
+    flatpak update --system
+    flatpak_status=$?
+    flatpak update --user
+    user_flatpak_status=$?
+    if [ "$flatpak_status" -eq 0 ]; then
+        flatpak_status=$user_flatpak_status
+    fi
+fi
+
+printf '\n== Post-update check (spectrum doctor) ==\n'
+spectrum doctor
+doctor_status=$?
+
+if [ "$update_status" -ne 0 ]; then
+    printf '\nThe update did not complete successfully (exit %s).\n' "$update_status"
+elif [ "$migration_status" -ne 0 ]; then
+    printf '\nThe package update completed, but ordered migrations failed (exit %s).\n' "$migration_status"
+elif [ "$flatpak_status" -ne 0 ]; then
+    printf '\nSystem packages updated, but Flatpak updates failed (exit %s).\n' "$flatpak_status"
+elif [ "$doctor_status" -ne 0 ]; then
+    printf '\nThe update completed, but spectrum doctor reports problems above.\n'
+else
+    printf '\nUpdate complete and healthy.\n'
+fi
+
+if [ "$update_status" -ne 0 ]; then
+    exit "$update_status"
+fi
+if [ "$migration_status" -ne 0 ]; then
+    exit "$migration_status"
+fi
+if [ "$flatpak_status" -ne 0 ]; then
+    exit "$flatpak_status"
+fi
+exit "$doctor_status"

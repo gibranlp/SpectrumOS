@@ -1,0 +1,9 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = spectrum-hyprland
+
+[Action]
+Description = Reloading the completed Hyprland configuration...
+When = PostTransaction
+Exec = /usr/lib/spectrumos/hyprland-update-guard finish

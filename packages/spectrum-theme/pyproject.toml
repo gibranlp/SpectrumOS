@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spectrum-theme"
+version = "1.0.0"
+description = "Reference implementation of the SpectrumOS2 semantic theme renderer"
+requires-python = ">=3.11"
+license = "MIT"
+
+[project.scripts]
+spectrum-theme = "spectrum_theme.cli:main"
+
+[tool.setuptools.package-data]
+spectrum_theme = ["palettes/*.toml"]
+
+[tool.unittest]
+start-directory = "tests"

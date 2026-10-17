@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = spectrum-desktop
+
+[Action]
+Description = Updating SpectrumOS desktop defaults and removing retired widgets...
+When = PostTransaction
+Exec = /usr/lib/spectrumos/spectrum-desktop-cleanup

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+import hashlib
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def build(repository):
+    recipe = ROOT / "packages/ukvm/PKGBUILD"
+    text = recipe.read_text()
+    revision = re.search(r"^_revision=([0-9a-f]{40})$", text, re.M).group(1)
+    version = re.search(r"^pkgver=([\w.]+)$", text, re.M).group(1)
+    output = ROOT / "repo/sources" / f"ukvm-{version}-{revision}.tar.zst"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as temporary:
+        archive = Path(temporary) / "source.tar"
+        with archive.open("wb") as stream:
+            subprocess.run(["git", "-C", str(repository), "archive", "--format=tar", f"--prefix=UKVM-{revision}/", revision], stdout=stream, check=True)
+        result = subprocess.run(["zstd", "-19", "-T1", "-q", "-c", str(archive)], check=True, capture_output=True).stdout
+    checksum = hashlib.sha256(result).hexdigest()
+    expected = re.search(r"sha256sums=\('([0-9a-f]{64})'\)", text)
+    if expected and expected.group(1) != checksum:
+        raise ValueError("Generated UKVM source differs from the pinned checksum; refusing to overwrite it.")
+    if output.exists() and output.read_bytes() != result:
+        raise ValueError("An immutable UKVM archive already exists with different contents.")
+    if not output.exists():
+        output.write_bytes(result)
+    link = ROOT / "packages/ukvm" / output.name
+    if link.is_symlink():
+        if link.readlink() != Path("../../repo/sources") / output.name:
+            raise ValueError("Refusing to replace an unrelated UKVM source link.")
+        link.unlink()
+    if link.exists():
+        if not link.is_file() or hashlib.sha256(link.read_bytes()).hexdigest() != checksum:
+            raise ValueError("The package source path contains an unrelated archive.")
+    else:
+        os.link(output, link)
+    print(f"{checksum}  {output.name}")
+
+
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) != 2:
+            raise ValueError("Usage: build-ukvm-source UKVM_REPOSITORY (maintainer-only immutable source export)")
+        build(Path(sys.argv[1]))
+    except (OSError, ValueError, AttributeError, subprocess.SubprocessError) as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)

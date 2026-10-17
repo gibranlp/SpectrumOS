@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=SpectrumOS
+Description=Adaptive SpectrumOS login theme
+Author=Gibran Ortega and SpectrumOS contributors
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=2.0
+Website=https://spectrumos.dev
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=spectrumos
+Theme-API=2.11

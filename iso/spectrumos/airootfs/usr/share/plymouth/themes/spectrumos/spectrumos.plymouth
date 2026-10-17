@@ -1,0 +1,9 @@
+[Plymouth Theme]
+Name=spectrumos
+Description=SpectrumOS Plymouth Theme
+Comment=created By Gibranlp
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/spectrumos
+ScriptFile=/usr/share/plymouth/themes/spectrumos/spectrumos.script

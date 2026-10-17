@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import ctypes
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "spectrumos/shell.json"
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/spectrumos-{os.getuid()}") / "spectrumos"
+BACKEND = Path(__file__).resolve().parent
+
+
+def run(*args):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=8, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return subprocess.CompletedProcess(args, 1, "", str(error))
+
+
+def enabled():
+    try:
+        return json.loads(CONFIG.read_text()).get("gaming_enabled") is True
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def animation_state():
+    result = run("hyprctl", "-j", "getoption", "animations:enabled")
+    if result.returncode:
+        raise RuntimeError("Could not read Hyprland animation settings.")
+    data = json.loads(result.stdout)
+    value = data.get("bool", data.get("int"))
+    if value not in (True, False, 0, 1):
+        raise RuntimeError("Invalid Hyprland animation settings.")
+    return bool(value)
+
+
+def set_animations(value):
+    result = run("hyprctl", "eval", "hl.config({ animations = { enabled = " + str(value).lower() + " } })")
+    if result.returncode or "error" in result.stdout.lower():
+        raise RuntimeError("Could not change Hyprland animations.")
+
+
+def power_state():
+    result = run(str(BACKEND / "performance-mode"), "--json")
+    try:
+        value = json.loads(result.stdout)
+        return value if isinstance(value, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+class GamingSession:
+    def __init__(self):
+        self.previous_animations = None
+        self.performance_owned = False
+        self.registered = False
+        self.library = None
+        self.previous_power = {}
+
+    def start(self):
+        self.previous_animations = animation_state()
+        try:
+            set_animations(False)
+            # El cliente permanece registrado mientras el perfil está activo, aunque no haya un juego abierto.
+            self.library = ctypes.CDLL("libgamemode.so.0")
+            for name in ("request_start", "request_end", "query_status"):
+                function = getattr(self.library, "real_gamemode_" + name)
+                function.argtypes = []
+                function.restype = ctypes.c_int
+            self.previous_power = power_state()
+            result = run(str(BACKEND / "performance-mode"), "--game-start")
+            if result.returncode:
+                raise RuntimeError("Could not activate the performance profile.")
+            self.performance_owned = True
+            if self.previous_power.get("available") and "performance" in self.previous_power.get("modes", []):
+                if power_state().get("mode") != "performance":
+                    if run(str(BACKEND / "performance-mode"), "--set", "performance").returncode:
+                        raise RuntimeError("Could not activate the performance profile.")
+            if self.library.real_gamemode_request_start() < 0:
+                raise RuntimeError("GameMode rejected the Gaming profile. Check the GameMode service.")
+            self.registered = True
+            if self.library.real_gamemode_query_status() != 2:
+                raise RuntimeError("GameMode registration could not be verified.")
+        except Exception:
+            self.stop()
+            raise
+
+    def maintain(self):
+        if animation_state():
+            set_animations(False)
+        if self.library.real_gamemode_query_status() != 2:
+            self.registered = False
+            if self.library.real_gamemode_request_start() < 0:
+                raise RuntimeError("GameMode disconnected and could not be reactivated.")
+            self.registered = True
+
+    def stop(self):
+        errors = []
+        if self.registered:
+            if self.library.real_gamemode_request_end() < 0:
+                errors.append("Could not release GameMode.")
+            self.registered = False
+        if self.performance_owned:
+            if run(str(BACKEND / "performance-mode"), "--game-end").returncode:
+                errors.append("Could not restore the performance profile.")
+            self.performance_owned = False
+            # Una cuenta antigua de hooks no debe impedir restaurar el perfil de esta sesión.
+            if self.previous_power.get("available") and self.library.real_gamemode_query_status() == 0:
+                previous = self.previous_power.get("mode")
+                if previous in ("balanced", "power-saver", "performance") and power_state().get("mode") != previous:
+                    if run(str(BACKEND / "performance-mode"), "--set", previous).returncode:
+                        errors.append("Could not restore the previous power profile.")
+        if self.previous_animations is not None:
+            try:
+                set_animations(self.previous_animations)
+                self.previous_animations = None
+            except RuntimeError as error:
+                errors.append(str(error))
+        return " ".join(errors)
+
+
+def main():
+    if sys.argv[1:]:
+        print("Usage: spectrum-gaming-session", file=sys.stderr)
+        return 2
+    RUNTIME.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (RUNTIME / "gaming-session.lock").open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 0
+        stopping = False
+
+        def shutdown(signum, frame):
+            nonlocal stopping
+            stopping = True
+
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+        parent = os.getppid()
+        session = None
+        last_status = None
+        retry_at = 0
+        try:
+            while not stopping and os.getppid() == parent:
+                status = {"active": False, "error": ""}
+                wanted = enabled()
+                if wanted and session is None and time.monotonic() >= retry_at:
+                    candidate = GamingSession()
+                    try:
+                        candidate.start()
+                        session = candidate
+                    except (OSError, RuntimeError, ValueError, AttributeError) as error:
+                        status["error"] = str(error)
+                        retry_at = time.monotonic() + 10
+                elif not wanted and session is not None:
+                    status["error"] = session.stop()
+                    session = None
+                if session is not None:
+                    try:
+                        session.maintain()
+                        status["active"] = True
+                    except (RuntimeError, ValueError) as error:
+                        status["error"] = str(error)
+                elif wanted and status["error"] == "" and last_status:
+                    status = last_status
+                if status != last_status:
+                    print(json.dumps(status), flush=True)
+                    last_status = status
+                time.sleep(1)
+        finally:
+            if session is not None:
+                error = session.stop()
+                if error:
+                    print(json.dumps({"active": False, "error": error}), flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

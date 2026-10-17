@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_dir=${XDG_CONFIG_HOME:-$HOME/.config}/spectrumos
+state_file=$config_dir/keyboard-layout
+generated_file=$config_dir/keyboard-layout.lua
+layout=us
+
+[[ ! -f $state_file ]] || layout=$(<"$state_file")
+case $layout in
+    us|us-intl|latam|es|us,latam|us-intl,latam|us-intl,es) ;;
+    *) layout=us ;;
+esac
+
+label() {
+    case $layout in
+        us) printf 'English (US)' ;;
+        us-intl) printf 'English (US, international accents)' ;;
+        latam) printf 'Spanish (Latin America)' ;;
+        es) printf 'Spanish (Spain)' ;;
+        us,latam) printf 'English (US) + Spanish (Latin America)' ;;
+        us-intl,latam) printf 'US International + Spanish (Latin America)' ;;
+        us-intl,es) printf 'US International + Spanish (Spain)' ;;
+    esac
+}
+
+apply_layout() {
+    local layouts options temporary_state temporary_config variants
+    case $layout in
+        us-intl) layouts=us; variants=intl; options= ;;
+        us-intl,latam) layouts=us,latam; variants=intl,; options=grp:alt_shift_toggle ;;
+        us-intl,es) layouts=us,es; variants=intl,; options=grp:alt_shift_toggle ;;
+        *) layouts=$layout; variants=; [[ $layout == *,* ]] && options=grp:alt_shift_toggle || options= ;;
+    esac
+    mkdir -p -- "$config_dir"
+    temporary_state=$(mktemp "$config_dir/.keyboard-layout.XXXXXX")
+    temporary_config=$(mktemp "$config_dir/.keyboard-layout.lua.XXXXXX")
+    printf '%s\n' "$layout" > "$temporary_state"
+    printf '%s\n' \
+        'hl.config({' \
+        '    input = {' \
+        "        kb_layout = \"$layouts\"," \
+        "        kb_variant = \"$variants\"," \
+        "        kb_options = \"$options\"," \
+        '    },' \
+        '})' > "$temporary_config"
+    mv -f -- "$temporary_state" "$state_file"
+    mv -f -- "$temporary_config" "$generated_file"
+    hyprctl reload config-only >/dev/null
+    notify-send --app-name="SpectrumOS" --expire-time=2200 "Keyboard layout updated" "$(label)"
+}
+
+case ${1:-status} in
+    --status|status) printf '%s\n' "$(label)" ;;
+    --json) printf '{"id":"%s","label":"%s","multiple":%s}\n' "$layout" "$(label)" "$([[ $layout == *,* ]] && printf true || printf false)" ;;
+    --set)
+        layout=${2:-}
+        case $layout in us|us-intl|latam|es|us,latam|us-intl,latam|us-intl,es) apply_layout ;; *) exit 2 ;; esac
+        ;;
+    --select)
+        case ${2:-} in
+            'English (US)') layout=us ;;
+            'English (US, international accents)') layout=us-intl ;;
+            'Spanish (Latin America)') layout=latam ;;
+            'Spanish (Spain)') layout=es ;;
+            'English (US) + Spanish (Latin America)') layout=us,latam ;;
+            'US International + Spanish (Latin America)') layout=us-intl,latam ;;
+            'US International + Spanish (Spain)') layout=us-intl,es ;;
+            *) exit 2 ;;
+        esac
+        apply_layout
+        ;;
+    --next) hyprctl switchxkblayout all next >/dev/null ;;
+    *) exit 2 ;;
+esac

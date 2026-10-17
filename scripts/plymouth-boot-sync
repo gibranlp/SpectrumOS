@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import re
+import shutil
+import tempfile
+
+
+LIMINE_CANDIDATES = (
+    Path("/boot/EFI/BOOT/limine.conf"),
+    Path("/boot/limine/limine.conf"),
+    Path("/boot/limine.conf"),
+)
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Enable the supported SpectrumOS Plymouth boot path")
+    parser.add_argument("--mkinitcpio", type=Path, default=Path("/etc/mkinitcpio.conf"))
+    parser.add_argument("--limine-config", type=Path)
+    parser.add_argument(
+        "--nvidia", action="store_true",
+        help="Also add the nvidia DRM kernel modules and modeset cmdline flags Plymouth needs "
+             "to draw its splash on an NVIDIA GPU (proprietary/open driver, discrete or hybrid)",
+    )
+    parser.add_argument("--check", action="store_true")
+    return parser.parse_args()
+
+
+def atomic_write(path: Path, content: str) -> None:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as target:
+            target.write(content)
+            target.flush()
+            os.fsync(target.fileno())
+        os.chmod(temporary, path.stat().st_mode & 0o777)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def with_plymouth_hook(content: str) -> str:
+    match = re.search(r"(?m)^HOOKS=\(([^)]*)\)", content)
+    if match is None:
+        raise SystemExit("mkinitcpio configuration has no HOOKS array")
+    hooks = match.group(1).split()
+    if "plymouth" not in hooks:
+        anchors = ("kms", "consolefont", "filesystems")
+        position = next((hooks.index(anchor) for anchor in anchors if anchor in hooks), len(hooks))
+        hooks.insert(position, "plymouth")
+    return content[:match.start()] + "HOOKS=(" + " ".join(hooks) + ")" + content[match.end():]
+
+
+def with_cmdline_flags(content: str, flags: tuple[str, ...]) -> str:
+    updated: list[str] = []
+    for line in content.splitlines():
+        if re.match(r"^\s+cmdline:\s*", line):
+            prefix, parameters = line.split(":", 1)
+            words = parameters.split()
+            for flag in flags:
+                if flag not in words:
+                    words.append(flag)
+            line = f"{prefix}: {' '.join(words)}"
+        updated.append(line)
+    return "\n".join(updated).rstrip() + "\n"
+
+
+def with_splash_flags(content: str) -> str:
+    return with_cmdline_flags(content, ("quiet", "splash"))
+
+
+# nvidia_drm.modeset=1 is what lets the nvidia DRM device expose the atomic/KMS
+# interfaces Plymouth (and Hyprland) need; nvidia_drm.fbdev=1 additionally gives
+# it an fbdev-emulation framebuffer so Plymouth's renderer has something to draw
+# on before userspace comes up, instead of a blank screen for the whole splash.
+# Both are the standard fix documented for "Plymouth doesn't show with NVIDIA".
+def with_nvidia_modeset_flags(content: str) -> str:
+    return with_cmdline_flags(content, ("nvidia_drm.modeset=1", "nvidia_drm.fbdev=1"))
+
+
+# mkinitcpio's own "kms" hook only autodetects in-tree DRM drivers (i915,
+# amdgpu, nouveau, ...); the out-of-tree nvidia/nvidia-open-dkms modules are
+# never picked up by it, so they have to be listed explicitly to load early
+# enough for Plymouth's splash (or a hybrid laptop's dGPU) to see them at all.
+def with_nvidia_modules(content: str) -> str:
+    match = re.search(r"(?m)^MODULES=\(([^)]*)\)", content)
+    if match is None:
+        raise SystemExit("mkinitcpio configuration has no MODULES array")
+    modules = match.group(1).split()
+    for module in ("nvidia", "nvidia_modeset", "nvidia_uvm", "nvidia_drm"):
+        if module not in modules:
+            modules.append(module)
+    return content[:match.start()] + "MODULES=(" + " ".join(modules) + ")" + content[match.end():]
+
+
+def main() -> int:
+    options = arguments()
+    limine = options.limine_config or next((path for path in LIMINE_CANDIDATES if path.is_file()), None)
+    if not options.mkinitcpio.is_file():
+        raise SystemExit(f"mkinitcpio configuration is missing: {options.mkinitcpio}")
+    if limine is None or not limine.is_file():
+        raise SystemExit("No Limine configuration was found")
+
+    mkinitcpio_content = with_plymouth_hook(options.mkinitcpio.read_text(encoding="utf-8"))
+    limine_content = with_splash_flags(limine.read_text(encoding="utf-8"))
+    if options.nvidia:
+        mkinitcpio_content = with_nvidia_modules(mkinitcpio_content)
+        limine_content = with_nvidia_modeset_flags(limine_content)
+    if options.check:
+        if mkinitcpio_content != options.mkinitcpio.read_text(encoding="utf-8"):
+            reason = "Plymouth is missing from the mkinitcpio hooks"
+            reason += " or its nvidia modules" if options.nvidia else ""
+            raise SystemExit(reason)
+        if limine_content != limine.read_text(encoding="utf-8"):
+            reason = "Limine kernel entries are missing quiet or splash"
+            reason += " or the nvidia modeset flags" if options.nvidia else ""
+            raise SystemExit(reason)
+        return 0
+
+    for path, content in ((options.mkinitcpio, mkinitcpio_content), (limine, limine_content)):
+        backup = path.with_suffix(path.suffix + ".spectrumos-backup")
+        if not backup.exists():
+            shutil.copy2(path, backup)
+        if content != path.read_text(encoding="utf-8"):
+            atomic_write(path, content)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

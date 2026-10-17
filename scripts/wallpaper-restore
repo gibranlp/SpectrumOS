@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/theme
+wallpaper=${SPECTRUM_DEFAULT_WALLPAPER:-$HOME/Pictures/Wallpapers/S30.png}
+
+if [[ -r $state_dir/last-wallpaper ]]; then
+    IFS= read -r remembered < "$state_dir/last-wallpaper"
+    [[ -f $remembered ]] && wallpaper=$remembered
+fi
+
+# last-rendered-wallpaper is whatever image theme-menu last actually handed to awww --
+# the original wallpaper, or its gowall-converted counterpart when a color scheme is
+# active. Preferring it here keeps the login/session-start background consistent with
+# what was on screen at logout instead of reverting to the untouched original.
+if [[ -r $state_dir/last-rendered-wallpaper ]]; then
+    IFS= read -r rendered < "$state_dir/last-rendered-wallpaper"
+    [[ -f $rendered ]] && wallpaper=$rendered
+fi
+
+if [[ ! -f $wallpaper ]]; then
+    wallpaper=/usr/share/backgrounds/spectrumos/S30.png
+fi
+
+for _ in {1..50}; do
+    if awww query >/dev/null 2>&1; then
+        exec awww img "$wallpaper" --transition-type none
+    fi
+    sleep 0.1
+done
+
+printf 'Spectrum wallpaper daemon did not become ready.\n' >&2
+exit 1

@@ -1,0 +1,29 @@
+post_install() {
+    _spectrumos_install_boot_restore
+}
+
+post_upgrade() {
+    _spectrumos_prepare_boot_restore
+    _spectrumos_refresh_boot_entry
+}
+
+# La primera instalación prepara el preset porque el hook todavía no existía
+# cuando Pacman planeó la transacción.
+_spectrumos_install_boot_restore() {
+    _spectrumos_prepare_boot_restore
+    _spectrumos_refresh_boot_entry
+}
+
+_spectrumos_prepare_boot_restore() {
+    if [ -x usr/lib/spectrumos/spectrumos-build-rescue-image ]; then
+        usr/lib/spectrumos/spectrumos-build-rescue-image --dry-run || true
+    fi
+}
+
+# Arch reconstruye los presets desde su hook post-transacción, después de que
+# cualquier paquete del kernel haya regresado a disco.
+_spectrumos_refresh_boot_entry() {
+    if [ -x usr/lib/spectrumos/limine-recovery-entry ]; then
+        usr/lib/spectrumos/limine-recovery-entry || true
+    fi
+}

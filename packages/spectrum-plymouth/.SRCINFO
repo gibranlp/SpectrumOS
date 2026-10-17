@@ -1,0 +1,15 @@
+pkgbase = spectrum-plymouth
+	pkgdesc = Animated Plymouth boot theme for SpectrumOS
+	pkgver = 1.0.0
+	pkgrel = 2
+	url = https://spectrum.gibranlp.dev
+	arch = any
+	license = MIT
+	depends = plymouth
+	depends = python
+	options = !strip
+	options = !debug
+	source = spectrumos-source-1.0.0-a66ae26d50893c89.tar.zst
+	sha256sums = 7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162
+
+pkgname = spectrum-plymouth

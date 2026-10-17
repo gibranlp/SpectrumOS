@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = pipewire
+Target = pipewire-alsa
+Target = pipewire-jack
+Target = pipewire-pulse
+Target = wireplumber
+
+[Action]
+Description = Restarting PipeWire and WirePlumber for active SpectrumOS sessions...
+When = PostTransaction
+Exec = /usr/lib/spectrumos/pipewire-restart

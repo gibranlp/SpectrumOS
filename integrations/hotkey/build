@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project=${1:?Usage: build PROJECT OUTPUT}
+output=${2:?Usage: build PROJECT OUTPUT}
+flags_text=$(pkg-config --cflags --libs wayland-client xkbcommon)
+read -r -a flags <<< "$flags_text"
+staging=$(mktemp -d)
+trap 'rm -rf -- "$staging"' EXIT
+wayland-scanner client-header "$project/integrations/hotkey/virtual-keyboard-unstable-v1.xml" "$staging/virtual-keyboard.h"
+wayland-scanner private-code "$project/integrations/hotkey/virtual-keyboard-unstable-v1.xml" "$staging/virtual-keyboard.c"
+cc -std=c11 -O2 -Wall -Wextra -Werror -I "$staging" "$project/integrations/hotkey/keyboard.c" "$staging/virtual-keyboard.c" "${flags[@]}" -o "$output"

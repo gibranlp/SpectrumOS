@@ -1,0 +1,365 @@
+#!/usr/bin/env python3
+import json
+import fcntl
+from contextlib import contextmanager
+import os
+from pathlib import Path
+import re
+import selectors
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from urllib.parse import urlsplit, unquote
+
+NODE = re.compile(r"[0-9a-f]{64}\Z")
+MAX_RECORD = 262144
+
+
+def executable():
+    override = os.environ.get("SPECTRUM_UKVM_BINARY")
+    if override:
+        return override if Path(override).is_file() and os.access(override, os.X_OK) else None
+    system = Path("/usr/bin/ukvm")
+    if system.is_file() and os.access(system, os.X_OK):
+        return str(system)
+    found = shutil.which("ukvm")
+    local = Path.home() / ".local/bin/ukvm"
+    return found or (str(local) if local.is_file() and os.access(local, os.X_OK) else None)
+
+
+def state_path():
+    return Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos/ukvm-ui.json"
+
+
+def pending():
+    try:
+        return json.loads(state_path().read_text()).get("apply_pending") is True
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, AttributeError):
+        return True
+
+
+def save_pending(value):
+    path = state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(f".{os.getpid()}.tmp")
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        json.dump({"apply_pending": value}, stream)
+    os.replace(temp, path)
+
+
+@contextmanager
+def operation_lock(required):
+    if not required:
+        yield
+        return
+    path = state_path().with_name("ukvm-commands.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o600), "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise OSError("Another UKVM frontend operation is in progress. Finish or cancel it before retrying.") from exc
+        yield
+
+
+def failure(command, code, message):
+    return {"schema_version": 1, "command": command, "ok": False, "data": None,
+            "error": {"code": code, "message": message}}
+
+
+def emit(record, binary):
+    print(json.dumps(dict(record, integration_version=1, installed=binary is not None,
+                          apply_pending=pending()), ensure_ascii=True), flush=True)
+
+
+def validate(record, command, streaming=False):
+    if not isinstance(record, dict) or record.get("schema_version") != 1:
+        raise ValueError("Unsupported UKVM JSON schema. Install UKVM M16 or newer with schema v1 support.")
+    if record.get("command") != command:
+        raise ValueError("UKVM returned a response for another command.")
+    if streaming and command == "send" and record.get("event") != "result":
+        if record.get("event") not in ("started", "progress") or not isinstance(record.get("data"), dict):
+            raise ValueError("Invalid file-transfer event.")
+        data = record["data"]
+        if not re.fullmatch(r"[0-9a-f]{32}", str(data.get("id", ""))) or not NODE.fullmatch(str(data.get("peer_id", ""))) or data.get("direction") != "send" or data.get("state") not in ("connecting", "transferring", "verifying", "completed") or any(type(data.get(key)) is not int or data[key] < 0 for key in ("bytes", "total_bytes")) or data["bytes"] > data["total_bytes"]:
+            raise ValueError("Invalid file-transfer progress.")
+    elif streaming and record.get("event") != "result":
+        if record.get("event") not in ("connecting", "listening", "discovery_unavailable", "confirmation_required"):
+            raise ValueError("Unknown UKVM pairing event; ceremony cancelled safely.")
+        if not isinstance(record.get("data"), dict):
+            raise ValueError("Invalid UKVM pairing event data.")
+    elif not isinstance(record.get("ok"), bool) or (record["ok"] and not isinstance(record.get("data"), dict)) or (not record["ok"] and not isinstance(record.get("error"), dict)):
+        raise ValueError("Incomplete UKVM result envelope.")
+    return record
+
+
+def arguments(args):
+    if not isinstance(args, list) or not args or not all(isinstance(a, str) and "\x00" not in a for a in args):
+        raise ValueError("Expected a UKVM argument array.")
+    if args in [["files", "status"], ["status"], ["peers"], ["doctor"], ["discover"], ["layout"], ["apply"], ["pair", "status"]]:
+        return args
+    if args in [["authorization", "status"], ["authorization", "reset", "--yes"]]:
+        return args
+    if args == ["setup", "--local"] or (len(args) == 4 and args[:3] == ["setup", "--local", "--name"] and 1 <= len(args[3]) <= 63 and not any(ord(c) < 32 or ord(c) == 127 for c in args[3])):
+        return args
+    if len(args) == 2 and args[0] == "service" and args[1] in ("install", "enable", "disable", "start", "stop", "restart", "status"):
+        return args
+    if len(args) == 3 and args[:2] == ["files", "cancel"] and re.fullmatch(r"[0-9a-f]{32}", args[2]):
+        return args
+    if len(args) == 2 and args[0] == "remote" and NODE.fullmatch(args[1]):
+        return args
+    if len(args) == 3 and args[:2] == ["peer", "permissions"] and NODE.fullmatch(args[2]):
+        return args
+    if len(args) == 4 and args[0] == "peer" and args[1] in ("allow", "deny") and NODE.fullmatch(args[2]) and args[3] in ("control-this-node", "share-clipboard", "receive-files", "view-screen"):
+        return args
+    if len(args) == 3 and args[0] == "unpair" and NODE.fullmatch(args[1]) and args[2] == "--yes":
+        return args
+    if len(args) == 4 and args[:2] == ["layout", "remove"] and NODE.fullmatch(args[2]) and args[3] == "--yes":
+        return args
+    if len(args) == 5 and args[:2] == ["layout", "remove-position"] and args[4] == "--yes" and all(re.fullmatch(r"-?\d+", value) for value in args[2:4]):
+        return args
+    if len(args) == 5 and args[0] == "layout":
+        if args[1] == "place":
+            x, y, peer = args[2:]
+        elif args[1] == "move":
+            peer, x, y = args[2:]
+        else:
+            raise ValueError("Unsupported layout action.")
+        if NODE.fullmatch(peer) and re.fullmatch(r"-?\d+", x) and re.fullmatch(r"-?\d+", y):
+            return args
+    raise ValueError("Unsupported UKVM operation; use the documented frontend contract.")
+
+
+def command_name(args):
+    return args[0]
+
+
+def request(args, binary):
+    args = arguments(args)
+    name = command_name(args)
+    if not binary:
+        return failure(name, "not_installed", "UniversalKVM is not installed. Install the SpectrumOS ukvm package, then refresh.")
+    if name == "remote":
+        process = subprocess.Popen([binary, *args], stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, start_new_session=True)
+        return {"schema_version": 1, "command": "remote", "ok": True,
+                "data": {"launched": True, "pid": process.pid}, "error": None}
+    mutates = args[0] in ("unpair", "setup") or (args[0] == "layout" and len(args) > 1) or (args[0] == "peer" and args[1] in ("allow", "deny") and args[-1] not in ("share-clipboard", "receive-files", "view-screen"))
+    if mutates:
+        save_pending(True)
+    try:
+        result = subprocess.run([binary, *args, "--json"], capture_output=True, text=True, timeout=65 if args[0] in ("apply", "service", "authorization") else 20)
+        try:
+            record = validate(json.loads(result.stdout), name)
+        except (ValueError, TypeError) as exc:
+            return failure(name, "invalid_response", f"{exc} Update UKVM if this executable predates M16. No terminal output was interpreted.")
+        if result.returncode != 0 and record["ok"]:
+            return failure(name, "interrupted", "UKVM exited unsuccessfully after a success record. Refresh before retrying.")
+        if args == ["apply"] and record["ok"] and record["data"].get("applied") is True:
+            save_pending(False)
+        return record
+    except subprocess.TimeoutExpired:
+        return failure(name, "timeout", "UKVM command timed out. Refresh health before retrying; saved changes may require Apply.")
+
+
+def pairing(args, binary):
+    if not binary:
+        emit(dict(failure("pair", "not_installed", "Install UKVM M16 or newer before pairing."), event="result"), binary)
+        return 1
+    if args and (len(args) not in (1, 3) or args[0].startswith("-") or "\x00" in args[0] or (len(args) == 3 and (args[1] != "--expected-node-id" or not NODE.fullmatch(args[2])))):
+        raise ValueError("Invalid pairing endpoint or expected identity.")
+    process = subprocess.Popen([binary, "pair", *args, "--json"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ, "out")
+    selector.register(process.stderr, selectors.EVENT_READ, "err")
+    selector.register(sys.stdin, selectors.EVENT_READ, "in")
+    buffers = {"out": b"", "in": b""}
+    offer = None
+    result = None
+    approved = False
+    offer_seen = False
+    previous = {}
+
+    def interrupted(signum, frame):
+        raise InterruptedError("Pairing cancelled. Refresh peers and pairing recovery state before retrying.")
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        previous[sig] = signal.signal(sig, interrupted)
+    try:
+        deadline = time.monotonic() + 95
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Pairing expired. Both machines must explicitly approve within the ceremony timeout.")
+            for key, _ in selector.select(min(remaining, 1)):
+                kind = key.data
+                chunk = os.read(key.fd, 8192)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    if kind == "in" and process.stdin and not process.stdin.closed:
+                        process.stdin.close()
+                    if kind in buffers and buffers[kind]:
+                        raise ValueError("Interrupted pairing record.")
+                    continue
+                if kind == "err":
+                    continue
+                buffers[kind] += chunk
+                if len(buffers[kind]) > (4096 if kind == "in" else MAX_RECORD):
+                    raise ValueError("Pairing record exceeds the safe size limit.")
+                while b"\n" in buffers[kind]:
+                    line, buffers[kind] = buffers[kind].split(b"\n", 1)
+                    record = json.loads(line)
+                    if kind == "out":
+                        validate(record, "pair", streaming=True)
+                        if record.get("event") == "confirmation_required":
+                            data = record["data"]
+                            if offer_seen or not NODE.fullmatch(str(data.get("remote_node_id", ""))) or not isinstance(data.get("verification_code"), str) or not data["verification_code"]:
+                                raise ValueError("Invalid or repeated verification offer.")
+                            offer = data
+                            offer_seen = True
+                        if record.get("event") == "result":
+                            if result is not None:
+                                raise ValueError("Repeated pairing result.")
+                            result = record
+                        else:
+                            emit(record, binary)
+                    else:
+                        if not offer or set(record) != {"accept", "remote_node_id", "verification_code"} or type(record["accept"]) is not bool or any(record[k] != offer[k] for k in ("remote_node_id", "verification_code")):
+                            raise ValueError("Stale or mismatched pairing approval rejected. No trust was automatically approved.")
+                        approved = record["accept"]
+                        if approved:
+                            save_pending(True)
+                        process.stdin.write(line + b"\n")
+                        process.stdin.flush()
+                        offer = None
+            if process.poll() is not None and not any(key.data in ("out", "err") for key in selector.get_map().values()):
+                break
+        exit_code = process.wait(timeout=3)
+        if result is None or (exit_code != 0 and result.get("ok")):
+            raise ValueError("Pairing ended without a successful final result. Refresh peers and recovery state.")
+        if result.get("ok") and not approved:
+            raise ValueError("Pairing claimed success without explicit verification approval.")
+        if result.get("ok"):
+            save_pending(True)
+        emit(result, binary)
+        return 0 if result.get("ok") else 1
+    except (ValueError, OSError, TimeoutError, InterruptedError, subprocess.TimeoutExpired) as exc:
+        emit(dict(failure("pair", "pairing_interrupted", str(exc)), event="result"), binary)
+        return 1
+    finally:
+        selector.close()
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+        for stream in (process.stdin, process.stdout, process.stderr):
+            stream.close()
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+
+
+def send_paths(selection):
+    if not isinstance(selection, dict) or set(selection) != {"peer", "paths"} or not NODE.fullmatch(str(selection["peer"])):
+        raise ValueError("Select a trusted computer before sending files.")
+    paths = selection["paths"]
+    if not isinstance(paths, list) or not 1 <= len(paths) <= 64:
+        raise ValueError("Select between 1 and 64 local paths.")
+    result = []
+    for value in paths:
+        if not isinstance(value, str) or len(value) > 16384:
+            raise ValueError("Invalid local file selection.")
+        url = urlsplit(value)
+        if url.scheme != "file" or url.netloc not in ("", "localhost") or url.query or url.fragment:
+            raise ValueError("Only local file-picker selections can be sent.")
+        path = unquote(url.path, errors="strict")
+        if not path.startswith("/") or "\x00" in path:
+            raise ValueError("Invalid local file selection.")
+        result.append(path)
+    return [*result, selection["peer"]]
+
+
+def transfer(selection, binary):
+    args = send_paths(selection)
+    if not binary:
+        emit(dict(failure("send", "not_installed", "Install UKVM M20 or newer to send files."), event="result"), binary)
+        return 1
+    process = subprocess.Popen([binary, "send", *args, "--json"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+    previous = {}
+    result = None
+    def interrupted(signum, frame):
+        raise InterruptedError("Transfer cancelled. Check receiver history before retrying if it was already finalizing.")
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        previous[sig] = signal.signal(sig, interrupted)
+    try:
+        while True:
+            line = process.stdout.readline(MAX_RECORD + 1)
+            if not line:
+                break
+            if len(line) > MAX_RECORD or not line.endswith(b"\n"):
+                raise ValueError("Invalid or oversized transfer status record.")
+            record = json.loads(line)
+            validate(record, "send", streaming=True)
+            if result is not None:
+                raise ValueError("Transfer emitted data after its result.")
+            if record.get("event") == "result":
+                result = record
+            else:
+                emit(record, binary)
+        code = process.wait(timeout=3)
+        if result is None or (code != 0 and result.get("ok")):
+            raise ValueError("Transfer ended without confirmed success. Check receiver history before retrying.")
+        emit(result, binary)
+        return 0 if result["ok"] else 1
+    except (OSError, ValueError, InterruptedError, subprocess.TimeoutExpired) as exc:
+        emit(dict(failure("send", "transfer_failed", str(exc)), event="result"), binary)
+        return 1
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        process.stdout.close()
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+def main():
+    binary = executable()
+    try:
+        if len(sys.argv) == 3 and sys.argv[1] == "send":
+            return transfer(json.loads(sys.argv[2]), binary)
+        if len(sys.argv) >= 2 and sys.argv[1] == "pair":
+            with operation_lock(binary is not None):
+                return pairing(sys.argv[2:], binary)
+        if len(sys.argv) != 3 or sys.argv[1] != "request":
+            raise ValueError("Usage: ukvm-adapter request JSON_ARRAY | pair [ENDPOINT [--expected-node-id ID]]")
+        args = arguments(json.loads(sys.argv[2]))
+        mutation = args[0] in ("apply", "unpair", "setup") or (args[0] == "authorization" and args[1] == "reset") or (args[0] == "layout" and len(args) > 1) or (args[0] == "peer" and args[1] != "permissions") or (args[0] == "service" and args[1] != "status")
+        with operation_lock(binary is not None and mutation):
+            record = request(args, binary)
+        emit(record, binary)
+        return 0 if record["ok"] else 1
+    except (ValueError, OSError) as exc:
+        record = failure("integration", "integration_error", str(exc))
+        if len(sys.argv) > 1 and sys.argv[1] in ("pair", "send"):
+            record.update(command=sys.argv[1], event="result")
+        emit(record, binary)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,2 @@
+# Microcódigo para procesadores Intel.
+intel-ucode

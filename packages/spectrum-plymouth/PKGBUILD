@@ -1,0 +1,29 @@
+pkgname=spectrum-plymouth
+pkgver=1.0.0
+pkgrel=2
+pkgdesc="Animated Plymouth boot theme for SpectrumOS"
+arch=(any)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=(plymouth python)
+options=(!strip !debug)
+_source_revision=a66ae26d50893c89
+_source_root="spectrumos-source-$pkgver"
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
+sha256sums=('7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162')
+
+package() {
+    local _project="$srcdir/$_source_root"
+    local theme="$pkgdir/usr/share/plymouth/themes/spectrumos"
+    install -d -m 0755 "$theme" "$pkgdir/usr/lib/spectrumos" \
+        "$pkgdir/usr/lib/systemd/system/plymouth-quit.service.d" \
+        "$pkgdir/usr/share/licenses/$pkgname"
+    cp -r "$_project/configs/plymouth/themes/spectrumos/." "$theme/"
+    find "$theme" -type d -exec chmod 0755 {} +
+    find "$theme" -type f -exec chmod 0644 {} +
+    install -m 0755 "$_project/scripts/plymouth-boot-sync" \
+        "$pkgdir/usr/lib/spectrumos/plymouth-boot-sync"
+    install -m 0644 "$_project/system/systemd/system/plymouth-quit.service.d/20-spectrumos-duration.conf" \
+        "$pkgdir/usr/lib/systemd/system/plymouth-quit.service.d/20-spectrumos-duration.conf"
+    install -m 0644 "$_project/packages/$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

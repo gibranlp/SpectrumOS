@@ -1,0 +1,342 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import socket
+import subprocess
+import sys
+import time
+
+
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "spectrumos"
+STATE_FILE = CONFIG_DIR / "workspace-layout.json"
+# Las reglas de espacios y las de pantallas tienen archivos separados para no sobrescribirse.
+HYPRLAND_WORKSPACES_FILE = CONFIG_DIR / "hyprland-workspaces.lua"
+
+
+def run(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(arguments, check=False, capture_output=True, text=True, timeout=3)
+
+
+def monitors() -> list[dict]:
+    result = run("hyprctl", "-j", "monitors")
+    if result.returncode != 0:
+        raise ConnectionError(result.stderr or "Hyprland monitor query failed")
+    return [row for row in json.loads(result.stdout or "[]") if row.get("name") not in {None, "", "FALLBACK"} and not row.get("disabled")]
+
+
+def stable_monitors(attempts: int = 10, delay: float = 0.3) -> list[dict]:
+    # Espera a que coincidan los conectores para no guardar una enumeración incompleta.
+    previous: list[dict] | None = None
+    for _ in range(attempts):
+        current = monitors()
+        if previous is not None and monitor_names(current) == monitor_names(previous):
+            return current
+        previous = current
+        time.sleep(delay)
+    return previous or []
+
+
+def monitor_names(rows: list[dict]) -> frozenset[str]:
+    return frozenset(str(row["name"]) for row in rows)
+
+
+class ShellRecovery:
+    def __init__(self) -> None:
+        self.absent_since: float | None = None
+        self.present_since: float | None = None
+        self.paused = False
+        self.topology: frozenset[str] = frozenset()
+
+    def update(self, rows: list[dict]) -> bool:
+        now = time.monotonic()
+        names = monitor_names(rows)
+        if not names:
+            self.present_since = None
+            self.topology = names
+            if self.absent_since is None:
+                self.absent_since = now
+            if not self.paused and now - self.absent_since >= 3:
+                if run("systemctl", "--user", "is-active", "--quiet", "spectrum-shell.service").returncode == 0:
+                    self.paused = run("systemctl", "--user", "stop", "--no-block", "spectrum-shell.service").returncode == 0
+            return False
+        self.absent_since = None
+        if names != self.topology or self.present_since is None:
+            self.topology = names
+            self.present_since = now
+            return False
+        if self.paused and now - self.present_since >= 3:
+            status = run("systemctl", "--user", "show", "--property=ActiveState", "--value", "spectrum-shell.service")
+            if status.returncode == 0 and status.stdout.strip() in {"inactive", "failed"}:
+                if run("systemctl", "--user", "start", "--no-block", "spectrum-shell.service").returncode == 0:
+                    self.paused = False
+                    return True
+        return False
+
+
+def clients() -> list[dict]:
+    result = run("hyprctl", "-j", "clients")
+    return json.loads(result.stdout or "[]") if result.returncode == 0 else []
+
+
+def workspaces() -> list[dict]:
+    result = run("hyprctl", "-j", "workspaces")
+    return json.loads(result.stdout or "[]") if result.returncode == 0 else []
+
+
+def write_workspace_rules(commands: list[str]) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = HYPRLAND_WORKSPACES_FILE.with_name(f".{HYPRLAND_WORKSPACES_FILE.name}.tmp")
+    temporary.write_text("\n".join(commands) + "\n", encoding="utf-8")
+    os.replace(temporary, HYPRLAND_WORKSPACES_FILE)
+
+
+def stored_primary(available: set[str]) -> str:
+    value = read_state().get("primary", "")
+    return value if value in available else ""
+
+
+def read_state() -> dict:
+    try:
+        value = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def write_state(value: dict) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = STATE_FILE.with_suffix(".tmp")
+    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, STATE_FILE)
+
+
+def choose_primary(rows: list[dict]) -> str:
+    available = {str(row.get("name", "")) for row in rows}
+    saved = stored_primary(available)
+    if saved:
+        return saved
+    workspace_one = next((row for row in rows if row.get("activeWorkspace", {}).get("id") == 1), None)
+    focused = next((row for row in rows if row.get("focused")), None)
+    selected = workspace_one or focused or (rows[0] if rows else {})
+    return str(selected.get("name", ""))
+
+
+def workspace_monitors(rows: list[dict], primary: str) -> dict[int, str]:
+    names = [str(row["name"]) for row in rows]
+    if not primary:
+        return {}
+    preferred = read_state().get("workspace_monitors", {})
+    preferred = preferred if isinstance(preferred, dict) else {}
+    result = {workspace: primary for workspace in range(1, 7)}
+    for offset, name in enumerate((name for name in names if name != primary), start=1):
+        if offset <= 5:
+            result[7 - offset] = name
+    for workspace in range(1, 7):
+        name = preferred.get(str(workspace))
+        if name in names:
+            result[workspace] = name
+    for name in names:
+        if name in result.values():
+            continue
+        donors = [workspace for workspace in range(6, 0, -1) if list(result.values()).count(result[workspace]) > 1]
+        if donors:
+            workspace = max(donors, key=lambda candidate: (str(candidate) not in preferred, candidate))
+            result[workspace] = name
+    return result
+
+
+def display_assignments(rows: list[dict], mapping: dict[int, str]) -> dict[str, str]:
+    return {
+        str(row["name"]): ", ".join(str(workspace) for workspace in range(1, 7) if mapping.get(workspace) == row["name"]) or "—"
+        for row in rows
+    }
+
+
+def apply() -> dict[str, str]:
+    rows = stable_monitors()
+    primary = choose_primary(rows)
+    mapping = workspace_monitors(rows, primary)
+    assignments = display_assignments(rows, mapping)
+    if not primary:
+        return assignments
+    commands = []
+    for workspace in range(1, 7):
+        commands.append(
+            f'hl.workspace_rule({{ workspace = "{workspace}", monitor = {json.dumps(mapping[workspace])}, persistent = true }})'
+        )
+    write_workspace_rules(commands)
+    run("hyprctl", "eval", "; ".join(commands))
+
+    focused_row = next((row for row in rows if row.get("focused")), {})
+    focused_workspace = int(focused_row.get("activeWorkspace", {}).get("id", 1))
+    existing = workspaces()
+    for workspace in existing:
+        workspace_id = int(workspace.get("id", 0))
+        if not 1 <= workspace_id <= 6:
+            continue
+        target = mapping[workspace_id]
+        if workspace.get("monitor") != target:
+            run("hyprctl", "dispatch", "moveworkspacetomonitor", f"{workspace_id} {target}")
+
+    # La persistencia conserva espacios existentes; los faltantes se crean y se restaura el enfoque.
+    existing_ids = {int(row.get("id", 0)) for row in existing}
+    missing = [ws for ws in range(1, 7) if ws not in existing_ids]
+    for ws in missing:
+        run("hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {ws} }})")
+    if missing:
+        run("hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {focused_workspace} }})")
+
+    for client in clients():
+        workspace_id = int(client.get("workspace", {}).get("id", 0))
+        address = str(client.get("address", ""))
+        if (workspace_id == 0 or workspace_id > 6) and address:
+            target_workspace = 1 if workspace_id == 0 else 6
+            run(
+                "hyprctl",
+                "dispatch",
+                f'hl.dsp.window.move({{ workspace = {target_workspace}, window = "address:{address}", silent = true }})',
+            )
+
+    for row in rows:
+        name = str(row["name"])
+        active = int(row.get("activeWorkspace", {}).get("id", 0))
+        owned = [workspace for workspace in range(1, 7) if mapping[workspace] == name]
+        if owned and active not in owned:
+            run("hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {owned[0]} }})")
+    if 1 <= focused_workspace <= 6:
+        run("hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {focused_workspace} }})")
+    return assignments
+
+
+def assignments() -> dict[str, str]:
+    rows = monitors()
+    primary = choose_primary(rows)
+    return display_assignments(rows, workspace_monitors(rows, primary))
+
+
+def save_primary(name: str) -> None:
+    if name not in {str(row.get("name", "")) for row in monitors()}:
+        raise SystemExit("Unknown monitor")
+    state = read_state()
+    state["primary"] = name
+    write_state(state)
+    apply()
+
+
+def save_workspace(workspace: int, name: str) -> None:
+    rows = monitors()
+    names = {str(row.get("name", "")) for row in rows}
+    if workspace not in range(1, 7) or name not in names:
+        raise SystemExit("Unknown workspace or monitor")
+    mapping = workspace_monitors(rows, choose_primary(rows))
+    source = mapping[workspace]
+    if source != name and list(mapping.values()).count(source) <= 1:
+        raise SystemExit("Assign another workspace to that display first")
+    state = read_state()
+    preferred = state.get("workspace_monitors", {})
+    preferred = preferred if isinstance(preferred, dict) else {}
+    preferred[str(workspace)] = name
+    state["workspace_monitors"] = preferred
+    write_state(state)
+    apply()
+
+
+def event_socket() -> Path | None:
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "hypr"
+    signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+    preferred = runtime / signature / ".socket2.sock"
+    if signature and preferred.is_socket():
+        return preferred
+    result = run("hyprctl", "instances", "-j")
+    try:
+        instances = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        instances = []
+    for instance in instances:
+        candidate = runtime / str(instance.get("instance", "")) / ".socket2.sock"
+        if candidate.is_socket():
+            return candidate
+    return next((candidate for candidate in runtime.glob("*/.socket2.sock") if candidate.is_socket()), None)
+
+
+def is_monitor_event(event: str) -> bool:
+    name = event.partition(">>")[0]
+    return name in {"monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2"}
+
+
+def is_extra_workspace_event(event: str) -> bool:
+    name, _, payload = event.partition(">>")
+    if name not in {"createworkspace", "createworkspacev2", "movewindow", "movewindowv2"}:
+        return False
+    parts = payload.split(",")
+    workspace = parts[0] if name.startswith("createworkspace") else parts[1] if len(parts) > 1 else ""
+    try:
+        return int(workspace) > 6
+    except ValueError:
+        return False
+
+
+def watch() -> None:
+    # La recuperación vive fuera de Qt para poder reiniciarlo aunque se quede atorado sin pantallas.
+    recovery = ShellRecovery()
+    while True:
+        path = event_socket()
+        if path is None:
+            time.sleep(1)
+            continue
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.connect(str(path))
+                connection.settimeout(1)
+                apply()
+                buffered = ""
+                next_probe = 0.0
+                while True:
+                    now = time.monotonic()
+                    if now >= next_probe:
+                        if recovery.update(monitors()):
+                            apply()
+                        next_probe = now + (1 if recovery.absent_since is not None or recovery.paused else 15)
+                    try:
+                        chunk = connection.recv(8192)
+                    except socket.timeout:
+                        continue
+                    if not chunk:
+                        break
+                    buffered += chunk.decode("utf-8", errors="replace")
+                    lines = buffered.split("\n")
+                    buffered = lines.pop()
+                    if any(is_monitor_event(line) or is_extra_workspace_event(line) for line in lines):
+                        next_probe = 0.0
+                        time.sleep(0.35)
+                        apply()
+        except (ConnectionError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            recovery.absent_since = None
+            recovery.present_since = None
+            time.sleep(1)
+
+
+def main() -> None:
+    arguments = sys.argv[1:]
+    if arguments == ["--apply"]:
+        apply()
+    elif arguments == ["--watch"]:
+        watch()
+    elif arguments == ["--json"]:
+        rows = monitors()
+        primary = choose_primary(rows)
+        mapping = workspace_monitors(rows, primary)
+        print(json.dumps({"assignments": display_assignments(rows, mapping), "primary": primary, "workspace_monitors": mapping}))
+    elif len(arguments) == 2 and arguments[0] == "--primary":
+        save_primary(arguments[1])
+    elif len(arguments) == 3 and arguments[0] == "--workspace":
+        save_workspace(int(arguments[1]), arguments[2])
+    else:
+        raise SystemExit("Usage: workspace-layout --apply|--watch|--json|--primary MONITOR|--workspace NUMBER MONITOR")
+
+
+if __name__ == "__main__":
+    main()

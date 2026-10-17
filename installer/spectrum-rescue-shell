@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+show_welcome() {
+    cat <<'WELCOME'
+SpectrumOS rescue system
+Opening this live terminal does not change any disks.
+
+Check disks and mounts:    lsblk -f    and    findmnt
+Connect to the network:    nmtui
+Open the recovery menu:    spectrum-recovery
+  The menu offers chroot access, snapshots, Limine repair and disk checks.
+  Check the root disk, EFI partition and restore point before repairing.
+
+Installation stopped?     findmnt -R /mnt/spectrumos
+Starting the erase-disk installer again repartitions the destination.
+Full recovery guide:      spectrum-rescue-shell --guide
+Close this terminal:      exit
+
+WELCOME
+}
+
+show_guide() {
+    cat <<'GUIDE'
+SpectrumOS rescue system
+
+Use this guide from the SpectrumOS live environment. No disks are changed on open.
+
+Start with these checks:
+  lsblk -f                         Show disks, filesystems and labels
+  findmnt                          Show mounted filesystems
+  nmcli general status             Check the live network connection
+  nmtui                            Connect to Wi-Fi or Ethernet
+
+For guided recovery, run:
+  spectrum-recovery
+
+The recovery menu can open an installed system with arch-chroot, list and restore
+SpectrumOS snapshots, repair Limine, and show disk/SMART information. Check the
+selected root disk, EFI partition and restore point before choosing a repair.
+Type exit to leave a chroot or root shell and return to the recovery menu.
+
+Inside the installed system's chroot, common repair commands include:
+  pacman -Q spectrum-desktop        Check the installed desktop package
+  pacman -Syu                       Update packages (requires internet)
+  mkinitcpio -P                     Regenerate installed kernel images
+  passwd YOUR_USERNAME             Reset the password for your account
+These commands apply to the installed system only after entering its chroot.
+
+If an installation stopped:
+  findmnt -R /mnt/spectrumos        Check whether its target is still mounted
+Keep the installer error output. A stopped installation is not necessarily
+bootable. Starting the erase-disk installer again repartitions the destination.
+
+Show this guide again: spectrum-rescue-shell --guide
+Close this live terminal: exit
+
+GUIDE
+}
+
+case ${1:-} in
+    '')
+        show_welcome
+        exec bash -i
+        ;;
+    --guide|-h|--help) show_guide ;;
+    *) printf 'Usage: %s [--guide]\n' "$0" >&2; exit 2 ;;
+esac

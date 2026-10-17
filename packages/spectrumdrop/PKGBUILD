@@ -1,0 +1,48 @@
+pkgname=spectrumdrop
+pkgver=1.0.0
+pkgrel=4
+pkgdesc='SpectrumOS native nearby file transfer with a maintained AWDL backend'
+arch=(x86_64)
+url='https://spectrum.gibranlp.dev'
+license=(MIT GPL-3.0-or-later GPL-2.0-only ISC)
+depends=(bash python python-libarchive-c keyutils openssl systemd polkit iproute2 iputils iw util-linux procps-ng libnotify xdg-utils wl-clipboard python-gobject libpcap libev libnl networkmanager python-pillow python-zeroconf python-ifaddr bluez python-dbus)
+makedepends=(cmake gcc gtest)
+conflicts=(omdrop omdrop-owl brcmfmac-awdl-dkms)
+replaces=(omdrop omdrop-owl)
+install=spectrumdrop.install
+options=(!debug)
+_source_revision=a66ae26d50893c89
+_source_root="spectrumos-source-$pkgver"
+source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
+sha256sums=('7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162')
+
+build() {
+    "$srcdir/$_source_root/integrations/spectrumdrop/build" "$srcdir/$_source_root" "$srcdir/build"
+}
+
+check() {
+    cd "$srcdir/$_source_root"
+    bash -n integrations/spectrumdrop/runtime/bin/spectrumdrop integrations/spectrumdrop/runtime/radio/spectrumdrop-radio
+    python -m compileall -q integrations/spectrumdrop/runtime
+    integrations/spectrumdrop/runtime/bin/spectrumdrop --version
+    PYTHONPATH=integrations/spectrumdrop/tests python -m unittest test_receiver_limits test_receiver_protocol test_receiver_port test_contacts_policy test_identity_vectors test_exclusive
+    python -m unittest tests.test_spectrumdrop tests.test_spectrumdrop_native.NativeSpectrumDropTests
+}
+
+package() {
+    local project="$srcdir/$_source_root/integrations/spectrumdrop" lib="$pkgdir/usr/lib/spectrumos/spectrumdrop"
+    install -d "$lib" "$pkgdir/usr/bin"
+    cp -a "$project/runtime/." "$lib/"
+    find "$lib" -type d -name __pycache__ -prune -exec rm -rf {} +
+    install -d "$pkgdir/usr/share/spectrumdrop/source"
+    cp -a "$project/awdl" "$pkgdir/usr/share/spectrumdrop/source/"
+    install -m755 "$srcdir/build/daemon/owl" "$lib/radio/owl"
+    ln -s /usr/lib/spectrumos/spectrumdrop/bin/spectrumdrop "$pkgdir/usr/bin/spectrumdrop"
+    install -Dm644 "$project/packaging/org.spectrumos.spectrumdrop.policy" "$pkgdir/usr/share/polkit-1/actions/org.spectrumos.spectrumdrop.policy"
+    install -Dm644 "$project/packaging/99-spectrumdrop-unmanaged.conf" "$pkgdir/usr/lib/NetworkManager/conf.d/99-spectrumdrop-unmanaged.conf"
+    install -Dm644 "$project/packaging/netmojo.spectrumdrop-links.desktop" "$pkgdir/usr/share/applications/netmojo.spectrumdrop-links.desktop"
+    install -d "$pkgdir/usr/share/licenses/$pkgname"
+    install -m644 "$project"/licenses/* "$pkgdir/usr/share/licenses/$pkgname/"
+    install -Dm644 "$project/PROVENANCE.md" "$pkgdir/usr/share/doc/$pkgname/PROVENANCE.md"
+    install -Dm644 "$srcdir/$_source_root/docs/spectrumdrop.md" "$pkgdir/usr/share/doc/$pkgname/spectrumos.md"
+}

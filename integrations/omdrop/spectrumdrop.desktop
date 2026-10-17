@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SpectrumDrop
+Comment=Send and receive files with nearby Apple devices
+Exec=/usr/lib/spectrumos/spectrum-shell-open spectrumdrop
+Icon=folder-publicshare
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=AirDrop;Share;Files;

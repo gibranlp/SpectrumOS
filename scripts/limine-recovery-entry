@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Add the "Restore Last Good Snapshot" Limine entry, once, idempotently.
+
+Points at the dedicated rescue UKI built by spectrumos-build-rescue-image
+(never the default kernel image), reuses the cmdline of the first existing
+"/SpectrumOS" entry for its root=/rootflags, and adds
+spectrumos.restore=latest so system/initcpio/hooks/spectrumos-restore picks
+whatever the newest complete restore point is at boot time -- this file
+never needs regenerating as restore points come and go.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import re
+import tempfile
+
+
+CONFIG_CANDIDATES = (
+    Path("/boot/EFI/BOOT/limine.conf"),
+    Path("/boot/limine/limine.conf"),
+    Path("/boot/limine.conf"),
+)
+RECOVERY_ENTRY_NAME = "/SpectrumOS (Restore Last Good Snapshot)"
+RESTORE_FLAG = "spectrumos.restore=latest"
+RESCUE_UKI_PATH = "boot():/EFI/Linux/spectrumos-rescue.efi"
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Add the SpectrumOS boot-time restore entry to Limine")
+    parser.add_argument("--config", type=Path)
+    return parser.parse_args()
+
+
+def atomic_write(path: Path, content: str) -> None:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as target:
+            target.write(content)
+            target.flush()
+            os.fsync(target.fileno())
+        os.chmod(temporary, path.stat().st_mode & 0o777)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def parse_entries(content: str) -> list[list[str]]:
+    entries: list[list[str]] = []
+    for line in content.splitlines():
+        if line.startswith("/"):
+            entries.append([line])
+        elif entries and (line.startswith((" ", "\t"))):
+            entries[-1].append(line)
+    return entries
+
+
+def source_entry(entries: list[list[str]]) -> list[str]:
+    for entry in entries:
+        if entry[0].startswith("/SpectrumOS (") or entry[0] == "/SpectrumOS":
+            return entry
+    raise SystemExit("No existing /SpectrumOS boot entry to base the restore entry on")
+
+
+def build_recovery_entry(source: list[str]) -> list[str]:
+    """Builds the recovery entry from an existing entry's block.
+
+    The rescue image built by spectrumos-build-rescue-image is always a
+    self-contained UKI, regardless of whether the source entry it's cloned
+    from is one too -- a fresh install's default entry is the classic split
+    kernel (`protocol: linux` + a separate `module_path:` initramfs), which
+    is not loadable the same way. `protocol`/`path`/`module_path` are
+    therefore always replaced/dropped outright rather than carried over,
+    so the generated entry is never a mix of the two forms; only `cmdline`
+    (root=/rootflags for this install) is reused, with the restore flag
+    appended.
+    """
+    lines = [RECOVERY_ENTRY_NAME, "    protocol: efi", f"    path: {RESCUE_UKI_PATH}"]
+    for line in source[1:]:
+        if re.match(r"^\s*(protocol|path|module_path):", line):
+            continue
+        if re.match(r"^\s*cmdline:", line):
+            key, _, value = line.partition(":")
+            lines.append(f"{key}: {value.strip()} {RESTORE_FLAG}")
+        else:
+            lines.append(line)
+    return lines
+
+
+def main() -> int:
+    options = arguments()
+    config = options.config or next((path for path in CONFIG_CANDIDATES if path.is_file()), None)
+    if config is None or not config.is_file():
+        raise SystemExit("No Limine configuration was found")
+
+    content = config.read_text(encoding="utf-8")
+    if RECOVERY_ENTRY_NAME in content:
+        return 0
+
+    entries = parse_entries(content)
+    source = source_entry(entries)
+    recovery = build_recovery_entry(source)
+
+    updated = content.rstrip() + "\n\n" + "\n".join(recovery) + "\n"
+    atomic_write(config, updated)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wave_mode=false
+if (($# == 1)) && [[ $1 == --wave ]]; then
+    wave_mode=true
+elif (($# != 0)); then
+    printf 'Usage: %s [--wave]\n' "$0" >&2
+    exit 2
+fi
+
+config=$(mktemp /tmp/spectrum-waybar-cava.XXXXXX)
+bars=14
+max_range=7
+framerate=20
+noise_reduction=77
+if $wave_mode; then
+    bars=40
+    max_range=100
+    framerate=60
+    noise_reduction=35
+fi
+printf '%s\n' \
+    '[general]' \
+    "bars = $bars" \
+    "framerate = $framerate" \
+    '[input]' \
+    'method = pipewire' \
+    'source = auto' \
+    '[output]' \
+    'method = raw' \
+    'data_format = ascii' \
+    "ascii_max_range = $max_range" \
+    'bar_delimiter = 32' \
+    '[smoothing]' \
+    "noise_reduction = $noise_reduction" > "$config"
+
+if ! $wave_mode; then
+symbols=(' ' '▂' '▃' '▄' '▅' '▆' '▇' '█')
+palette_file=${XDG_CACHE_HOME:-$HOME/.cache}/spectrumos/theme/current/palette.json
+mapfile -t palette_colors < <(python - "$palette_file" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+fallback = ("#76b7ff", "#c49aff")
+try:
+    roles = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["roles"]
+    colors = (roles["accent"], roles["accent_alt"])
+    if not all(re.fullmatch(r"#[0-9A-Fa-f]{6}", color) for color in colors):
+        raise ValueError
+except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+    colors = fallback
+print(*colors, sep="\n")
+PY
+)
+accent=${palette_colors[0]:-#76b7ff}
+accent_alt=${palette_colors[1]:-#c49aff}
+accent_hex=${accent#\#}
+accent_alt_hex=${accent_alt#\#}
+accent_r=$((16#${accent_hex:0:2}))
+accent_g=$((16#${accent_hex:2:2}))
+accent_b=$((16#${accent_hex:4:2}))
+accent_alt_r=$((16#${accent_alt_hex:0:2}))
+accent_alt_g=$((16#${accent_alt_hex:2:2}))
+accent_alt_b=$((16#${accent_alt_hex:4:2}))
+colors=()
+for ((index = 0; index < bars; index++)); do
+    inverse=$((bars - 1 - index))
+    red=$(((accent_r * inverse + accent_alt_r * index) / (bars - 1)))
+    green=$(((accent_g * inverse + accent_alt_g * index) / (bars - 1)))
+    blue=$(((accent_b * inverse + accent_alt_b * index) / (bars - 1)))
+    printf -v color '#%02x%02x%02x' "$red" "$green" "$blue"
+    colors+=("$color")
+done
+fi
+
+coproc CAVA_PROCESS { exec cava -p "$config"; }
+cava_pid=$CAVA_PROCESS_PID
+exec {cava_output}<&"${CAVA_PROCESS[0]}"
+cleanup() {
+    exec {cava_output}<&- 2>/dev/null || true
+    kill "$cava_pid" 2>/dev/null || true
+    wait "$cava_pid" 2>/dev/null || true
+    rm -f -- "$config"
+}
+trap cleanup EXIT TERM INT PIPE
+
+while IFS= read -r line <&"$cava_output"; do
+    if $wave_mode; then
+        printf '%s\n' "$line" 2>/dev/null || exit 0
+        continue
+    fi
+    output=
+    index=0
+    for value in $line; do
+        if [[ $value =~ ^[0-7]$ && $index -lt $bars ]]; then
+            output+="<span foreground=\"${colors[$index]}\">${symbols[$value]}</span>"
+            ((index += 1))
+        fi
+    done
+    printf '%s\n' "$output" 2>/dev/null || exit 0
+done

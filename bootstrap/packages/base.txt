@@ -1,0 +1,19 @@
+# Base intencional de repositorios oficiales. Un paquete por línea.
+base
+btrfs-progs
+exfatprogs
+git
+linux-firmware
+limine
+mkinitcpio
+neovim
+openssh
+pacman-contrib
+plymouth
+sudo
+thefuck
+zram-generator
+zsh
+zsh-autosuggestions
+zsh-completions
+zsh-syntax-highlighting

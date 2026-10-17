@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (($# > 1)) || { (($# == 1)) && [[ $1 != --repo ]]; }; then
+    printf 'Usage: %s [--repo]\n' "$0" >&2
+    exit 2
+fi
+
+if (($# == 1)); then
+    config_dir=$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")/../configs/spectrum-shell")
+    SPECTRUM_SHELL_BACKEND_DIR=$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")")
+    export SPECTRUM_SHELL_BACKEND_DIR
+else
+    config_dir=/usr/share/spectrumos/spectrum-shell
+fi
+
+[[ -f $config_dir/shell.qml ]] || { printf 'SpectrumShell configuration is missing: %s\n' "$config_dir" >&2; exit 1; }
+if [[ -r /etc/profile.d/flatpak.sh ]]; then
+    export XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    source /etc/profile.d/flatpak.sh
+fi
+
+exec qs --path "$config_dir" --no-duplicate

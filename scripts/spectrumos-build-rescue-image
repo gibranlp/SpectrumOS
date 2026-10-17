@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Build the SpectrumOS rescue UKI as a completely separate image.
+
+This never edits /etc/mkinitcpio.conf and never rebuilds the default kernel
+images. It copies the live mkinitcpio config to a private one, inserts
+spectrumos-restore into that private copy only, and points a dedicated
+preset at it, so `mkinitcpio -p spectrumos-rescue` only ever produces
+/boot/EFI/Linux/spectrumos-rescue.efi. A bug in the rescue hook can
+therefore only break the rescue entry, never a normal boot.
+"""
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+CONFIG_CANDIDATES = (
+    Path("/boot/EFI/BOOT/limine.conf"),
+    Path("/boot/limine/limine.conf"),
+    Path("/boot/limine.conf"),
+)
+RESCUE_CONFIG = Path("/etc/mkinitcpio-spectrumos-rescue.conf")
+RESCUE_PRESET = Path("/etc/mkinitcpio.d/spectrumos-rescue.preset")
+RESCUE_CMDLINE = Path("/etc/kernel/cmdline-spectrumos-rescue")
+RESCUE_UKI = Path("/boot/EFI/Linux/spectrumos-rescue.efi")
+# A UKI-style entry (this machine's own layout: one .efi per kernel variant, e.g.
+# arch-linux-zen.efi) or the classic split kernel+initramfs entry
+# spectrum-installer-backend actually writes on a fresh install (`path:
+# .../vmlinuz-linux`, no per-variant suffix, no arch- prefix) -- the UKI pattern alone
+# never matched a real installed system, only this machine's own already-customized one.
+UKI_NAME_PATTERN = re.compile(r"path:\s*boot\(\):/EFI/Linux/arch-([a-z0-9._-]+)\.efi")
+CLASSIC_NAME_PATTERN = re.compile(r"path:\s*\S*/vmlinuz-([a-z0-9._-]+)")
+HOOKS_PATTERN = re.compile(r"^HOOKS=\((.*)\)\s*$")
+RESTORE_FLAG = "spectrumos.restore=latest"
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Build the SpectrumOS rescue UKI")
+    parser.add_argument("--limine-config", type=Path)
+    parser.add_argument("--mkinitcpio-config", type=Path, default=Path("/etc/mkinitcpio.conf"))
+    parser.add_argument(
+        "--register-hook", type=Path, default=Path("/usr/lib/spectrumos/mkinitcpio-register-hook")
+    )
+    parser.add_argument("--dry-run", action="store_true", help="write the config/preset but do not run mkinitcpio")
+    return parser.parse_args()
+
+
+def detect_kernel_name(limine_config_text: str) -> str:
+    match = UKI_NAME_PATTERN.search(limine_config_text) or CLASSIC_NAME_PATTERN.search(limine_config_text)
+    if not match:
+        raise SystemExit("Could not find an existing SpectrumOS boot entry to base the rescue kernel on")
+    return match.group(1)
+
+
+def detect_cmdline(limine_config_text: str) -> str:
+    in_spectrum_entry = False
+    for line in limine_config_text.splitlines():
+        if line.startswith("/"):
+            in_spectrum_entry = line == "/SpectrumOS" or line.startswith("/SpectrumOS (")
+            continue
+        if in_spectrum_entry and re.match(r"^\s*cmdline:", line):
+            cmdline = line.split(":", 1)[1].strip()
+            if not cmdline:
+                break
+            if RESTORE_FLAG not in cmdline.split():
+                cmdline = f"{cmdline} {RESTORE_FLAG}"
+            return cmdline
+    raise SystemExit("Could not find the installed SpectrumOS kernel command line")
+
+
+def runtime_compatible_config(content: str) -> str:
+    lines = content.splitlines()
+    for index, line in enumerate(lines):
+        match = HOOKS_PATTERN.match(line)
+        if not match:
+            continue
+        names: list[str] = []
+        for name in match.group(1).split():
+            replacements = ("udev",) if name == "systemd" else (
+                ("keymap", "consolefont") if name == "sd-vconsole" else (name,)
+            )
+            for replacement in replacements:
+                if replacement not in names:
+                    names.append(replacement)
+        if "udev" not in names:
+            raise SystemExit("The rescue image needs either the udev or systemd mkinitcpio hook")
+        lines[index] = f"HOOKS=({' '.join(names)})"
+        return "\n".join(lines) + "\n"
+    raise SystemExit("No single-line HOOKS=(...) array was found")
+
+
+def render_preset(kernel_name: str) -> str:
+    return "\n".join(
+        [
+            f'ALL_config="{RESCUE_CONFIG}"',
+            f'ALL_kver="/boot/vmlinuz-{kernel_name}"',
+            "PRESETS=('default')",
+            f'default_uki="{RESCUE_UKI}"',
+            f'default_options="--cmdline {RESCUE_CMDLINE}"',
+            "",
+        ]
+    )
+
+
+def main() -> int:
+    options = arguments()
+    limine_config = options.limine_config or next((path for path in CONFIG_CANDIDATES if path.is_file()), None)
+    if limine_config is None or not limine_config.is_file():
+        print("spectrumos-build-rescue-image: no Limine configuration was found", file=sys.stderr)
+        return 1
+    if not options.mkinitcpio_config.is_file():
+        print(f"spectrumos-build-rescue-image: {options.mkinitcpio_config} is missing", file=sys.stderr)
+        return 1
+
+    limine_content = limine_config.read_text(encoding="utf-8")
+    kernel_name = detect_kernel_name(limine_content)
+    RESCUE_CONFIG.write_text(
+        runtime_compatible_config(options.mkinitcpio_config.read_text(encoding="utf-8")),
+        encoding="utf-8",
+    )
+    RESCUE_CMDLINE.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    RESCUE_CMDLINE.write_text(detect_cmdline(limine_content) + "\n", encoding="utf-8")
+    subprocess.run(
+        [
+            str(options.register_hook),
+            "spectrumos-restore",
+            "--before",
+            "filesystems",
+            "--config",
+            str(RESCUE_CONFIG),
+        ],
+        check=True,
+    )
+    RESCUE_PRESET.write_text(render_preset(kernel_name), encoding="utf-8")
+
+    if options.dry_run:
+        return 0
+    subprocess.run(["mkinitcpio", "-p", "spectrumos-rescue"], check=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
