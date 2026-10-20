@@ -124,6 +124,40 @@ Weather is disabled by default to avoid implicit IP geolocation. Add a location 
 
 Renderers do not restart applications. The theme frontend reloads Hyprland, Kitty, Dunst, and Waybar only after a complete generation has activated.
 
+## Legion Pro 7 lighting
+
+`appearance-sync --apply` also runs `/usr/lib/spectrumos/legion-rgb-sync`.
+It detects Lenovo machine type `83F5`, product `Legion Pro 7 16IAX10H`, and
+USB HID controller `048d:c197` with usage page `ff89`. Other machines are skipped.
+Keyboard and lid use `accent`; the 28 perimeter LEDs use `accent_alt` from the
+active `palette.json`. Brightness, the selected lighting profile, and the logo
+on/off setting are preserved, including lights deliberately left off.
+
+All wallpaper frontends converge on `theme-menu` and its `apply_generation`
+step: the gallery, mode/variant/scheme selection, Super+W, Super+R, random theme,
+previous theme, panel actions, and Thunar's wallpaper action. That step calls
+`appearance-sync`; session startup and explicit appearance reapplication call it
+as well. Generation/render previews alone do not change hardware. Failed theme
+extraction never reaches the lighting apply step. Lighting errors are bounded
+to three seconds and reported on stderr without failing desktop appearance sync.
+Concurrent lighting updates are serialized and read the active palette after
+acquiring the lock so an older invocation cannot restore stale colors.
+
+The packaged `70-spectrumos-legion-rgb.rules` grants the active local session
+access through logind's `uaccess`; no root process, sudo prompt, extra group, or
+external checkout is needed during theme changes. After installing the rule on
+an existing session, run `sudo udevadm control --reload-rules` and
+`sudo udevadm trigger --subsystem-match=hidraw --action=change`.
+
+Check detection/access with `/usr/lib/spectrumos/legion-rgb-sync --status` and
+reapply with `/usr/lib/spectrumos/legion-rgb-sync --apply`. To opt out, create
+`~/.config/spectrumos/legion-rgb.disabled`; removing it re-enables synchronization.
+The minimal stdlib HID implementation follows the Spectrum effect format in
+[LenovoLegionToolkit's Native.cs](https://github.com/BartoszCichecki/LenovoLegionToolkit/blob/master/LenovoLegionToolkit.Lib/Native.cs),
+including the unpadded effect report length modulo 255. Zone addresses match the
+[Legion Spectrum Control](https://github.com/alstergee/legion-spectrum-control)
+layout tested on this model.
+
 ## Extractor boundary
 
 Wallpaper extraction is not embedded in the renderer. The first adapter invokes Matugen in dry-run JSON mode and maps its Material roles into schema-v1 TOML. Success and warning deliberately retain Spectrum's stable fallback colors because Matugen does not produce those semantic states. Consumer renderers remain unaware of Matugen.

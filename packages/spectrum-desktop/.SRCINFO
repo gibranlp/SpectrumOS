@@ -1,7 +1,7 @@
 pkgbase = spectrum-desktop
 	pkgdesc = Integrated SpectrumOS desktop frontends and visual defaults
 	pkgver = 1.0.0
-	pkgrel = 19
+	pkgrel = 20
 	url = https://spectrum.gibranlp.dev
 	arch = x86_64
 	license = MIT

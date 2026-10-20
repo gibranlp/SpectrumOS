@@ -547,8 +547,21 @@ def sync_qt_font_size(size: int) -> None:
     ensure_qt_font(CONFIG_HOME / "qt6ct/qt6ct.conf", size, defaults)
 
 
+def sync_legion_rgb() -> None:
+    helper = Path(__file__).resolve().with_name("legion-rgb-sync")
+    try:
+        result = subprocess.run(
+            (str(helper), "--apply"), capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode:
+            print(result.stderr.strip(), file=sys.stderr)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"Legion RGB sync: {error}", file=sys.stderr)
+
+
 def apply() -> str:
     metadata = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))
+    sync_legion_rgb()
     variant = metadata.get("variant", "dark")
     theme = ensure_gtk_theme(variant)
     for version in ("3", "4"):

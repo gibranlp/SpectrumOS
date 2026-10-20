@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import array
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import struct
+import sys
+
+
+DMI = Path('/sys/class/dmi/id')
+HIDRAW = Path('/sys/class/hidraw')
+DEV = Path('/dev')
+CACHE = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache'))
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+CURRENT = CACHE / 'spectrumos/theme/current'
+REPORT_SIZE = 960
+KEYBOARD = [
+    0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008,
+    0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x000e, 0x000f, 0x0010,
+    0x0011, 0x0012, 0x0013, 0x0014, 0x0016, 0x0017, 0x0018, 0x0019,
+    0x001a, 0x001b, 0x001c, 0x001d, 0x001e, 0x001f, 0x0020, 0x0021,
+    0x0022, 0x0026, 0x0027, 0x0028, 0x0029, 0x0038, 0x0040, 0x0042,
+    0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0048, 0x0049, 0x004a,
+    0x004b, 0x004c, 0x004d, 0x004e, 0x004f, 0x0050, 0x0051, 0x0055,
+    0x0058, 0x0059, 0x005a, 0x005b, 0x005c, 0x005d, 0x005f, 0x0068,
+    0x006a, 0x006d, 0x006e, 0x006f, 0x0070, 0x0071, 0x0072, 0x0073,
+    0x0074, 0x0075, 0x0076, 0x0077, 0x0079, 0x007b, 0x007c, 0x007f,
+    0x0080, 0x0082, 0x0083, 0x0087, 0x0088, 0x008d, 0x008e, 0x0090,
+    0x0092, 0x0096, 0x0097, 0x0098, 0x009a, 0x009b, 0x009c, 0x009d,
+    0x009f, 0x00a1, 0x00a3, 0x00a5, 0x00a7,
+]
+PERIMETER = [*range(0x03e9, 0x03fb), *range(0x01f5, 0x01ff)]
+LOGO = [0x05dd]
+
+
+def supported() -> bool:
+    try:
+        return (
+            (DMI / 'sys_vendor').read_text().strip().upper() == 'LENOVO'
+            and (DMI / 'product_name').read_text().strip() == '83F5'
+            and (DMI / 'product_version').read_text().strip() == 'Legion Pro 7 16IAX10H'
+        )
+    except OSError:
+        return False
+
+
+def device() -> Path | None:
+    if not supported():
+        return None
+    for node in sorted(HIDRAW.glob('hidraw*')):
+        try:
+            values = dict(line.split('=', 1) for line in (node / 'device/uevent').read_text().splitlines() if '=' in line)
+            if values.get('HID_ID', '').upper() != '0003:0000048D:0000C197':
+                continue
+            if b'\x06\x89\xff' in (node / 'device/report_descriptor').read_bytes():
+                return DEV / node.name
+        except OSError:
+            continue
+    return None
+
+
+def rgb(value: str) -> bytes:
+    if not isinstance(value, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', value):
+        raise ValueError('Invalid lighting palette color')
+    return bytes.fromhex(value[1:])
+
+
+def palette_colors() -> tuple[bytes, bytes]:
+    roles = json.loads((CURRENT / 'palette.json').read_text())['roles']
+    return rgb(roles['accent']), rgb(roles['accent_alt'])
+
+
+def effect(number: int, color: bytes, keys: list[int]) -> bytes:
+    header = bytes([number, 6, 1, 11, 2, 0, 3, 0, 4, 0, 5, 2, 6, 0])
+    return header + b'\x01' + color + bytes([len(keys)]) + struct.pack('<' + 'H' * len(keys), *keys)
+
+
+def report(profile: int, accent: bytes, alternate: bytes) -> bytes:
+    if profile not in range(7):
+        raise ValueError('Invalid Spectrum lighting profile')
+    payload = bytes([profile, 1, 1])
+    payload += effect(1, accent, KEYBOARD)
+    payload += effect(2, alternate, PERIMETER)
+    payload += effect(3, accent, LOGO)
+    # El firmware espera el tamaño sin relleno módulo 255, igual que LenovoLegionToolkit.
+    data = bytes([7, 0xcb, (4 + len(payload)) % 255, 3]) + payload
+    if len(data) > REPORT_SIZE:
+        raise ValueError('Spectrum lighting report is too large')
+    return data.ljust(REPORT_SIZE, b'\0')
+
+
+def set_feature(handle, data: bytes) -> None:
+    buffer = array.array('B', data.ljust(REPORT_SIZE, b'\0'))
+    fcntl.ioctl(handle, 0xC0004806 | (REPORT_SIZE << 16), buffer)
+
+
+def get_profile(handle) -> int:
+    set_feature(handle, bytes([7, 0xca, 0xc0, 3]))
+    buffer = array.array('B', [7] + [0] * (REPORT_SIZE - 1))
+    fcntl.ioctl(handle, 0xC0004807 | (REPORT_SIZE << 16), buffer)
+    return buffer[4]
+
+
+def apply() -> bool:
+    if (CONFIG / 'spectrumos/legion-rgb.disabled').exists():
+        return False
+    node = device()
+    if node is None:
+        return False
+    directory = CACHE / 'spectrumos/theme'
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / 'legion-rgb.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        # La paleta se lee después del bloqueo para no restaurar colores de una generación anterior.
+        accent, alternate = palette_colors()
+        with node.open('rb+', buffering=0) as handle:
+            set_feature(handle, report(get_profile(handle), accent, alternate))
+    return True
+
+
+def main() -> int:
+    try:
+        if sys.argv[1:] == ['--status']:
+            node = device()
+            print(json.dumps({
+                'supported': supported(),
+                'device': str(node) if node else None,
+                'writable': node is not None and os.access(node, os.R_OK | os.W_OK),
+                'enabled': not (CONFIG / 'spectrumos/legion-rgb.disabled').exists(),
+            }))
+        elif not sys.argv[1:] or sys.argv[1:] == ['--apply']:
+            apply()
+        else:
+            print('Usage: legion-rgb-sync [--apply|--status]', file=sys.stderr)
+            return 2
+        return 0
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'Legion RGB sync: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
