@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+from urllib.parse import urlsplit
+
+STATE = Path(os.environ.get('XDG_STATE_HOME') or Path.home()/'.local/state')/'spectrumos/stable-updates'
+DATABASE = Path(os.environ.get('XDG_CACHE_HOME') or Path.home()/'.cache')/'spectrumos/stable-updates/database'
+
+
+def run(*args, env=None, timeout=20):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env, check=False)
+
+
+def read_state():
+    try:
+        state = json.loads((STATE/'status.json').read_text())
+        if isinstance(state, dict):
+            return state
+    except (OSError, ValueError):
+        pass
+    return {'packages': [], 'checked_at': 0, 'eligible': False, 'error': '', 'last_notified': ''}
+
+
+def save_state(state):
+    STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporary = STATE/'status.tmp'
+    temporary.write_text(json.dumps(state)+'\n')
+    temporary.chmod(0o600)
+    temporary.replace(STATE/'status.json')
+
+
+def stable_configured():
+    result = run('pacman-conf', '--repo', 'spectrumos', 'Server')
+    if result.returncode:
+        return False
+    servers = [urlsplit(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+    return bool(servers) and all(url.scheme == 'https' and url.hostname == 'spectrum.gibranlp.dev'
+                                 and url.path.startswith('/repo/stable/') for url in servers)
+
+
+def available_updates():
+    DATABASE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    env = dict(os.environ, CHECKUPDATES_DB=str(DATABASE))
+    # checkupdates sincroniza y verifica las bases en caché, sin tocar las bases del sistema.
+    result = run('checkupdates', '--nocolor', env=env, timeout=180)
+    if result.returncode not in (0, 2):
+        raise RuntimeError('Could not refresh package repositories. Check your connection and repository configuration.')
+    if result.returncode == 2:
+        return []
+    catalog = run('pacman', '--dbpath', str(DATABASE), '-Sl', 'spectrumos')
+    if catalog.returncode:
+        raise RuntimeError('Could not read the refreshed SpectrumOS repository.')
+    stable = {}
+    for line in catalog.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 3 and fields[0] == 'spectrumos':
+            stable[fields[1]] = fields[2]
+    updates = []
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) == 4 and fields[2] == '->' and stable.get(fields[0]) == fields[3]:
+            updates.append({'name': fields[0], 'installed': fields[1], 'available': fields[3]})
+    return sorted(updates, key=lambda item: item['name'])
+
+
+def fingerprint(packages):
+    return hashlib.sha256(json.dumps([(p['name'], p['available']) for p in packages], separators=(',', ':')).encode()).hexdigest()
+
+
+def notify(packages):
+    count = len(packages)
+    noun = 'update is' if count == 1 else 'updates are'
+    result = run('notify-send', '--app-name=SpectrumOS Updates', '--icon=system-software-update',
+                 '--expire-time=15000', '--hint=string:x-spectrumos-kind:stable-updates',
+                 'Fresh loot on Stable', f'{count} SpectrumOS package {noun} ready.\nOpen Updates to review and install.')
+    return result.returncode == 0
+
+
+def check():
+    state = read_state()
+    state['last_attempt'] = int(time.time())
+    try:
+        state['eligible'] = stable_configured()
+        state['packages'] = available_updates() if state['eligible'] else []
+        state['checked_at'] = int(time.time())
+        state['error'] = ''
+        packages = state['packages']
+        if not packages:
+            state['last_notified'] = ''
+        elif fingerprint(packages) != state.get('last_notified'):
+            if notify(packages):
+                state['last_notified'] = fingerprint(packages)
+    except (OSError, subprocess.TimeoutExpired, RuntimeError) as error:
+        state['error'] = str(error)
+    save_state(state)
+    return state
+
+
+def main():
+    if sys.argv[1:] == ['--status']:
+        print(json.dumps(read_state()))
+        return 0
+    if sys.argv[1:] != ['--check']:
+        print('Usage: spectrum-update-check --check|--status', file=sys.stderr)
+        return 2
+    STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (STATE/'check.lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(json.dumps(read_state()))
+            return 0
+        print(json.dumps(check()))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

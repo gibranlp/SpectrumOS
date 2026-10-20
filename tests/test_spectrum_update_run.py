@@ -179,7 +179,10 @@ exit 0
         self.assertIn('mainMod .. " + U"', bindings)
         self.assertIn('spectrum-shell-open updates', bindings)
         self.assertIn('updatePanel.refresh()', shell)
-        self.assertIn('updatePanel.expanded = opening', shell)
+        self.assertIn('function openUpdates(): void', shell)
+        self.assertIn('updatePanel.expanded = true', shell)
+        self.assertIn('if (updatePanel.expanded) updatePanel.expanded = false;', shell)
+        self.assertIn('openOnFocused("openUpdates")', shell)
         self.assertIn('backendDir + "/spectrum-update-run"', panel)
         self.assertIn('enabled: panel.ready && !planProcess.running', panel)
 

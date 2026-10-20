@@ -1,5 +1,6 @@
 local mainMod = "SUPER"
 local windowActions = require("window-actions")
+hl.bind(mainMod .. " + SHIFT + U", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open app-store"))
 hl.bind(mainMod .. " + F10", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open bar"))
 
 -- Aplicaciones y sesión
@@ -37,6 +38,7 @@ hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-o
 hl.bind("CTRL + ALT + Pause", hl.dsp.exec_cmd("/usr/lib/spectrumos/hotkey-adapter stop-all"))
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open spectrumdrop"))
 hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open hotkey"))
+hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open favorites"))
 hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open shortcuts"))
 hl.bind(mainMod .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/bin/spectrum-ukvm"))
 hl.bind(mainMod .. " + U", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open updates"))

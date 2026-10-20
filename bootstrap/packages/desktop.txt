@@ -1,8 +1,11 @@
 # Hardware-independent Wayland/Hyprland desktop and general applications.
+base-devel
+cmake
 ffmpeg
 fastfetch
 gamemode
 flatpak
+python-gobject
 evolution
 brightnessctl
 ddcutil

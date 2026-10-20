@@ -1,11 +1,15 @@
 import QtQuick
 import QtQuick.Layouts
+import "NotificationStyle.js" as NotificationStyle
 
 ShellSurface {
     id: card
     attachRight: true
     required property var theme
     required property var notification
+    readonly property var palette: NotificationStyle.palette(notification,theme.colors)
+    readonly property var actionList: JSON.parse(notification.actionsJson || "[]")
+    signal actionInvoked(string identifier)
     property bool revealed: true
     required property bool presented
     onRevealedChanged: {
@@ -31,10 +35,13 @@ ShellSurface {
 
     height: content.implicitHeight + 28
     radius: 18
-    color: theme.colors.surface
+    color: card.palette.background
+
+    KeyboardAction {anchors.fill:parent;onActivated:card.activated()}
 
     RowLayout {
         id: content
+        z:1
         x: 14
         y: 14
         width: card.width - 28
@@ -45,7 +52,7 @@ ShellSurface {
             Layout.preferredWidth: 38
             Layout.preferredHeight: 38
             radius: 11
-            color: card.theme.colors.surface_alt
+            color: card.palette.alternate
             Image {
                 id: appIcon
                 anchors.centerIn: parent
@@ -59,7 +66,7 @@ ShellSurface {
                 anchors.centerIn: parent
                 visible: appIcon.status !== Image.Ready
                 text: ""
-                color: card.theme.colors.accent
+                color: card.palette.accent
                 font { family: card.theme.fontFamily; pixelSize: 27 }
             }
         }
@@ -71,7 +78,7 @@ ShellSurface {
                 Layout.fillWidth: true
                 text: card.notification.appName || "SpectrumOS"
                 elide: Text.ElideRight
-                color: card.theme.colors.accent
+                color: card.palette.accent
                 font { family: card.theme.fontFamily; pixelSize: Math.max(8, card.theme.fontSize - 1); bold: true }
             }
             Text {
@@ -81,7 +88,7 @@ ShellSurface {
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
                 elide: Text.ElideRight
-                color: card.theme.colors.foreground
+                color: card.palette.foreground
                 font { family: card.theme.fontFamily; pixelSize: card.theme.fontSize + 1; bold: true }
             }
             Text {
@@ -90,13 +97,32 @@ ShellSurface {
                 text: card.notification.body
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
-                maximumLineCount: 2
+                maximumLineCount: card.palette.persistent ? 5 : 2
                 elide: Text.ElideRight
-                color: card.theme.colors.muted
+                color: card.palette.muted
                 font { family: card.theme.fontFamily; pixelSize: card.theme.fontSize }
+            }
+            Flow {
+                Layout.fillWidth:true
+                visible:card.actionList.length>0
+                spacing:6
+                Repeater {
+                    objectName:"notification-actions"
+                    model:card.actionList
+                    ShellButton {
+                        required property var modelData
+                        objectName:"notification-action-"+modelData.identifier
+                        label:modelData.text
+                        enabled:!card.notification.actionBusy
+                        fontFamily:card.theme.fontFamily
+                        fontSize:card.theme.fontSize
+                        backgroundColor:card.palette.accent
+                        foregroundColor:card.palette.background
+                        onClicked:card.actionInvoked(modelData.identifier)
+                    }
+                }
             }
         }
     }
 
-    KeyboardAction { anchors.fill: parent; onActivated: card.activated() }
 }

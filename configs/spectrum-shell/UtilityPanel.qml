@@ -25,6 +25,8 @@ PanelWindow {
     property bool questlineRestorePending: false
     property string questlineDraftKey: ""
     property bool questlineLoaded: false
+    property var questlineDueTarget: null
+    property bool questlineDueReady: false
     property bool questlinePendingNewTask: false
     property bool questlinePendingNewScroll: false
     property bool questlineQuickScrollPicker: false
@@ -117,6 +119,7 @@ PanelWindow {
         return Array.from({ length: offset + count }, (_, index) => index < offset ? 0 : index - offset + 1);
     }
     readonly property var shortcuts: [
+        { combo: "Super + Shift + U", action: "App Store", command: [backendDir + "/spectrum-shell-open", "app-store"] },
         { combo: "Super + Shift + G", action: "Appearance", command: [backendDir + "/spectrum-shell-open", "appearance"] },
         { combo: "Super + Shift + E", action: "AppImage Manager", command: [backendDir + "/spectrum-shell-open", "appimages"] },
         { combo: "Super + D", action: "Applications", command: [backendDir + "/spectrum-shell-launcher"] },
@@ -133,6 +136,7 @@ PanelWindow {
         { combo: "Ctrl + Space", action: "Dismiss latest notification", command: [backendDir + "/spectrum-shell-open", "dismiss-notification"] },
         { combo: "Super + Shift + O", action: "Displays", command: [backendDir + "/spectrum-shell-open", "displays"] },
         { combo: "Super + V", action: "Emoji picker", command: [backendDir + "/spectrum-shell-open", "emoji"] },
+        { combo: "Super + Shift + V", action: "Favorites", command: [backendDir + "/spectrum-shell-open", "favorites"] },
         { combo: "Super + E", action: "Files", command: ["uwsm", "app", "--", "thunar"] },
         { combo: "Super + S", action: "Find files", command: [backendDir + "/spectrum-shell-open", "search"] },
         { combo: "Super + F10", action: "Focus shell bar", command: [backendDir + "/spectrum-shell-open", "bar"] },
@@ -222,6 +226,7 @@ PanelWindow {
             generatePassword();
         if (name === "calendar")
             calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        questlineDueTarget = null;
         if (name === "questline") {
             questlinePendingNewTask = false;
             questlinePendingNewScroll = false;
@@ -236,6 +241,48 @@ PanelWindow {
             Qt.callLater(() => query.forceActiveFocus());
         if (name === "emoji")
             emojiDelay.restart();
+    }
+
+    function openQuestlineDueItem(taskId, stepId): void {
+        open("questline");
+        questlineRestorePending = false;
+        questlineDueReady = false;
+        questlineDueTarget = {taskId: taskId, stepId: stepId};
+    }
+    function continueQuestlineDueItem(): void {
+        if (!questlineDueTarget || !questlineDueReady || !questlineWorkspace.ready) return;
+        const target = questlineDueTarget;
+        questlineDueTarget = null;
+        const task = (questline.tasks || []).find(item => item.id === target.taskId);
+        const step = target.stepId ? (questline.steps || []).find(item => item.id === target.stepId && item.parent_task_id === target.taskId && !item.completed) : null;
+        if (!questline.available || !task || (target.stepId && !step)) {
+            questlineError = "This due item is no longer available. Refresh the dashboard calendar.";
+            return;
+        }
+        rememberQuestline();
+        questlineWorkspace.flush();
+        questlineRestoring = true;
+        questlineTab = "Tasks";
+        syncQuestlineCampaign(task.project_id || "");
+        questlineSelected = task;
+        questlineStepParent = null;
+        questlineStepSelected = null;
+        questlineEditing = false;
+        questlineDraftKey = "";
+        questlineQuickScrollPicker = false;
+        questlineDeleteTarget = null;
+        questlinePendingId = "";
+        questlineError = "";
+        questlineMessage = "";
+        questlineRestoring = false;
+        rememberQuestline();
+        if (step) {
+            const draft = questlineWorkspace.drafts["Steps:" + step.id];
+            if (draft && draft.view) restoreQuestline("Tasks", draft.view);
+            else beginQuestlineStepEdit(step);
+        } else {
+            Qt.callLater(() => { questlineDetailFlick.contentY = 0; questlineItemList.positionViewAtIndex(questlineItems().findIndex(item => item.id === task.id), ListView.Contain); });
+        }
     }
 
     function openQuestlineNewTask(): void {
@@ -280,7 +327,7 @@ PanelWindow {
         if (!campaigns.some(campaign => campaign.id === projectId)) return;
         switchQuestlineTab("Scrolls");
         questlineQuickScrollPicker = false;
-        questlineScrollProjectId = projectId;
+        syncQuestlineCampaign(projectId);
         beginQuestlineEdit(null);
         questlineTitle.text = "Quick note · " + Qt.formatDateTime(new Date(),"yyyy-MM-dd HH:mm");
         rememberQuestline();
@@ -328,6 +375,7 @@ PanelWindow {
         if (questlineTab === "Tasks") return questlineTasks.items;
         if (questlineTab === "Scrolls") return (questline.scrolls || []).filter(item => (item.project_id || "") === questlineScrollProjectId);
         if (questlineTab === "Treasury") return questlineTreasury.items;
+        if (questlineTab === "Chronicles") return (questline.chronicles || []).filter(item => item.project_id === questlineCampaignId);
         if (questlineTab === "Sidequests") return questline.sidequests || [];
         return [];
     }
@@ -336,21 +384,27 @@ PanelWindow {
         return questlineSelected && questlineTab === "Tasks" ? (questline.steps || []).filter(step => step.parent_task_id === questlineSelected.id) : [];
     }
 
-    function questlineScrollProjects() {
-        const projects = [];
-        const seen = new Set();
-        for (const scroll of questline.scrolls || []) {
-            const id = scroll.project_id || "";
-            if (!seen.has(id)) {
-                seen.add(id);
-                projects.push({ id: id, name: scroll.campaign || "Unfiled" });
-            }
+    function questlineProjects() {
+        const projects = new Map();
+        for (const campaign of questline.campaigns || []) projects.set(campaign.id,{id:campaign.id,name:campaign.name});
+        for (const item of (questline.tasks || []).concat(questline.scrolls || [],questline.entries || [],questline.accounts || [],questline.chronicles || [])) {
+            const id = item.project_id || item.campaign_id || "";
+            if (!projects.has(id)) projects.set(id,{id:id,name:item.campaign || "Unfiled"});
         }
-        return projects.sort((a, b) => a.name.localeCompare(b.name));
+        return Array.from(projects.values()).sort((a,b)=>a.name.localeCompare(b.name));
     }
 
-    function selectQuestlineTaskProject(id): void {
+    function syncQuestlineCampaign(id): void {
         questlineCampaignId = id;
+        questlineTreasuryCampaignId = id;
+        questlineScrollProjectId = id;
+    }
+
+    function selectQuestlineProject(id): void {
+        rememberQuestline();
+        questlineEditing = false;
+        questlineDraftKey = "";
+        syncQuestlineCampaign(id);
         questlineSelected = null;
         questlineStepParent = null;
         questlineStepSelected = null;
@@ -359,26 +413,13 @@ PanelWindow {
         questlineError = "";
         questlineMessage = "";
         selectQuestlineItem();
-        if (id)
-            Quickshell.execDetached([backendDir + "/spectrum-shell-tools", "questline-campaign", id]);
+        rememberQuestline();
+        if (id) Quickshell.execDetached([backendDir + "/spectrum-shell-tools", "questline-campaign", id]);
     }
 
-    function selectQuestlineTreasuryProject(id): void {
-        questlineTreasuryCampaignId = id;
-        questlineSelected = null;
-        questlineDeleteTarget = null;
-        questlinePendingId = "";
-        questlineError = "";
-        questlineMessage = "";
-        selectQuestlineItem();
-    }
-
-    function selectQuestlineScrollProject(id): void {
-        questlineScrollProjectId = id;
-        questlineSelected = null;
-        questlineDeleteTarget = null;
-        selectQuestlineItem();
-    }
+    function selectQuestlineTaskProject(id): void { selectQuestlineProject(id); }
+    function selectQuestlineTreasuryProject(id): void { selectQuestlineProject(id); }
+    function selectQuestlineScrollProject(id): void { selectQuestlineProject(id); }
 
     function selectQuestlineItem(): void {
         const items = questlineItems();
@@ -403,7 +444,7 @@ PanelWindow {
         questlineEditing = true;
         questlineCalendarOpen = false;
         questlineError = "";
-        questlineTitle.text = item ? item.title : "";
+        questlineTitle.text = item ? item.title : questlineTab === "Chronicles" ? Qt.formatDate(new Date(), "yyyy-MM-dd") : "";
         questlineBody.text = item ? (questlineTab === "Scrolls" ? item.markdown_content : item.description || "") : "";
         questlineDate.text = item && item.due_date ? item.due_date : "";
         questlineAmount.text = item && item.amount_minor ? (item.amount_minor / 100).toFixed(2) : "";
@@ -413,15 +454,12 @@ PanelWindow {
         questlineEntryStatus = item && item.status ? item.status : "Planned";
         const campaigns = (questline.campaigns || []).filter(c => !c.is_shared);
         const campaignId = item ? (item.project_id || item.campaign_id) : questlineTab === "Scrolls" ? questlineScrollProjectId : questlineTab === "Treasury" ? questlineTreasuryCampaignId : questlineCampaignId;
-        if (item) {
-            if (questlineTab === "Tasks") questlineCampaignId = campaignId || "";
-            else if (questlineTab === "Scrolls") questlineScrollProjectId = campaignId || "";
-            else if (questlineTab === "Treasury") questlineTreasuryCampaignId = campaignId || "";
-        }
         questlineCampaignIndex = Math.max(0, campaigns.findIndex(c => c.id === campaignId));
         questlineEditCampaignId = campaigns.length ? campaigns[questlineCampaignIndex].id : "";
+        if (["Tasks","Scrolls","Treasury","Chronicles"].includes(questlineTab)) syncQuestlineCampaign(item ? campaignId || "" : questlineEditCampaignId);
         questlineRestoring = false;
         rememberQuestline(!!item);
+        if (questlineTab === "Chronicles") Qt.callLater(() => questlineBody.forceActiveFocus());
     }
 
     function beginQuestlineStepEdit(step): void {
@@ -454,22 +492,21 @@ PanelWindow {
         questlineCalendarOpen = false;
     }
 
-    function selectQuestlineCampaign(): void {
+    function selectQuestlineCampaign(id = ""): void {
         const campaigns = (questline.campaigns || []).filter(c => !c.is_shared);
         if (!campaigns.length) return;
-        questlineCampaignIndex = (questlineCampaignIndex + 1) % campaigns.length;
+        const index = id ? campaigns.findIndex(c => c.id === id) : (questlineCampaignIndex + 1) % campaigns.length;
+        if (index < 0) return;
+        questlineCampaignIndex = index;
         questlineEditCampaignId = campaigns[questlineCampaignIndex].id;
-        if (questlineTab === "Treasury")
-            questlineTreasuryCampaignId = campaigns[questlineCampaignIndex].id;
-        if (questlineTab === "Tasks") {
-            questlineCampaignId = campaigns[questlineCampaignIndex].id;
-            Quickshell.execDetached([backendDir + "/spectrum-shell-tools", "questline-campaign", questlineCampaignId]);
-        }
+        syncQuestlineCampaign(questlineEditCampaignId);
+        rememberQuestline();
+        if (questlineEditCampaignId) Quickshell.execDetached([backendDir + "/spectrum-shell-tools", "questline-campaign", questlineEditCampaignId]);
     }
 
     function questlineDraftPayload() {
         const kind = questlineStepParent ? "step" : questlineTab === "Tasks" ? "task"
-            : questlineTab === "Scrolls" ? "scroll" : questlineTab === "Sidequests" ? "sidequest" : "entry";
+            : questlineTab === "Chronicles" ? "chronicle" : questlineTab === "Scrolls" ? "scroll" : questlineTab === "Sidequests" ? "sidequest" : "entry";
         const selected = questlineStepParent ? questlineStepSelected : questlineSelected;
         const payload = {action:(selected ? "update_" : "create_") + kind,title:questlineTitle.text.trim()};
         let reason = "";
@@ -492,6 +529,9 @@ PanelWindow {
         } else if (kind === "scroll") {
             payload.content = questlineBody.text;
             if (!payload.content.trim() || payload.content.trim().length > 100000) reason = "Add scroll content (up to 100,000 characters).";
+        } else if (kind === "chronicle") {
+            payload.content = questlineBody.text;
+            if (!payload.content.trim() || Array.from(payload.content.trim()).length > 255) reason = "Add chronicle content (up to 255 characters).";
         } else if (kind === "sidequest") {
             payload.description = questlineBody.text;
             payload.frequency = questlineSidequestFrequency;
@@ -532,8 +572,16 @@ PanelWindow {
     function restoreQuestline(tab, suppliedView = null): void {
         if (!questlineWorkspace.ready) return;
         questlineRestoring = true;
-        questlineTab = ["Overview","Tasks","Sidequests","Scrolls","Treasury","Tree","Focus","Hero"].includes(tab) ? tab : "Overview";
-        const view = suppliedView || questlineWorkspace.views[questlineTab] || {};
+        questlineTab = ["Overview","Tasks","Scrolls","Treasury","Chronicles","Tree","Focus","Hero","Sidequests","Sync"].includes(tab) ? tab : "Overview";
+        let view = suppliedView || questlineWorkspace.views[questlineTab] || {};
+        const campaignTab = ["Tasks","Scrolls","Treasury","Chronicles"].includes(questlineTab);
+        if (campaignTab) {
+            const projects = questlineProjects();
+            const requested = suppliedView ? questlineWorkspace.projectForView(questlineTab,view) : questlineWorkspace.selectedProjectId;
+            const project = projects.find(c=>c.id===requested) || projects.find(c=>c.id===questlineCampaignId) || projects[0] || {id:""};
+            if (!suppliedView && questlineWorkspace.projectForView(questlineTab,view)!==project.id) view = {};
+            syncQuestlineCampaign(project.id);
+        }
         questlineSelected = view.selected || null;
         questlineQuickScrollPicker = !!view.quickScrollPicker;
         questlineEditing = !!view.editing;
@@ -546,9 +594,6 @@ PanelWindow {
             else questlineSelected = Object.assign({},questlineSelected || {},{id:draft.payload.id});
         }
         questlineDeleteTarget = null;
-        questlineCampaignId = view.campaignId === undefined ? questlineCampaignId : view.campaignId;
-        questlineTreasuryCampaignId = view.treasuryCampaignId === undefined ? questlineTreasuryCampaignId : view.treasuryCampaignId;
-        questlineScrollProjectId = view.scrollProjectId === undefined ? questlineScrollProjectId : view.scrollProjectId;
         questlineEditCampaignId = (draft && draft.payload.project_id) || view.editCampaignId || "";
         const campaigns = (questline.campaigns || []).filter(c => !c.is_shared);
         questlineCampaignIndex = Math.max(0,campaigns.findIndex(item => item.id === questlineEditCampaignId));
@@ -609,22 +654,26 @@ PanelWindow {
     Connections {
         target: panel.questlineWorkspace
         function onReadyChanged() {
+            if(panel.questlineWorkspace.ready && panel.questline.profile_key)panel.questlineWorkspace.bindProfile(panel.questline.profile_key);
+            if (panel.questlineDueTarget) { panel.continueQuestlineDueItem(); return; }
             if (panel.questlinePendingNewScroll) { panel.continueQuestlineQuickScroll(); return; }
             if (panel.questlineWorkspace.ready && panel.questlineLoaded && panel.questlineRestorePending) {
                 panel.restoreQuestline(panel.questlineWorkspace.activeTab);
                 panel.questlineRestorePending = false;
             }
         }
+        function onProfileChanged() {
+            panel.questlineRestoring=true;
+            panel.questlineEditing=false;panel.questlineSelected=null;panel.questlineStepParent=null;panel.questlineStepSelected=null;
+            panel.questlineDraftKey="";panel.questlineDeleteTarget=null;panel.questlineQuickScrollPicker=false;panel.questlineTab="Sync";
+            panel.questlineRestoring=false;panel.refreshQuestline();
+        }
         function onSaved(key, id) {
             if (panel.questlineDraftKey === key && panel.questlineEditing && panel.expanded && panel.page === "questline" && id) {
                 if (panel.questlineStepParent) panel.questlineStepSelected = Object.assign({},panel.questlineStepSelected || {},{id:id});
                 else panel.questlineSelected = Object.assign({},panel.questlineSelected || {},{id:id});
                 const draft = panel.questlineWorkspace.drafts[key];
-                if (draft && draft.payload.project_id) {
-                    if (panel.questlineTab === "Scrolls") panel.questlineScrollProjectId = draft.payload.project_id;
-                    else if (panel.questlineTab === "Treasury") panel.questlineTreasuryCampaignId = draft.payload.project_id;
-                    else if (panel.questlineTab === "Tasks") panel.questlineCampaignId = draft.payload.project_id;
-                }
+                if (draft && draft.payload.project_id) panel.syncQuestlineCampaign(draft.payload.project_id);
                 panel.rememberQuestline();
             }
             panel.refreshQuestline();
@@ -635,6 +684,8 @@ PanelWindow {
     property bool questlineCompletionPending: false
 
     function runQuestlineAction(payload): void {
+        if(questlineWorkspace.externalActions>0 || questlineWorkspace.blocked){questlineError="Wait for the current operation to finish.";return;}
+        if(questline.profile_key)payload.profile_key=questline.profile_key;
         if (!questlineActionProcess.running && !panel.questlineWorkspace.busy) {
             questlineError = "";
             const step = (questline.steps || []).find(item => item.id === payload.id);
@@ -666,7 +717,7 @@ PanelWindow {
         stdout: StdioCollector { onStreamFinished: {
             const saved = text.trim();
             if (!panel.questlineCampaignId && saved) {
-                panel.questlineCampaignId = saved;
+                panel.syncQuestlineCampaign(saved);
                 if (panel.questlineEditing && !panel.questlineSelected && panel.questlineTab === "Tasks") {
                     const campaigns = (panel.questline.campaigns || []).filter(c => !c.is_shared);
                     panel.questlineCampaignIndex = Math.max(0, campaigns.findIndex(c => c.id === saved));
@@ -706,13 +757,15 @@ PanelWindow {
         stdout: StdioCollector { onStreamFinished: {
             try {
                 panel.questline = JSON.parse(text);
+                if(panel.questline.profile_key)panel.questlineWorkspace.bindProfile(panel.questline.profile_key);
                 panel.questlineLoaded = true;
-                panel.questlineCampaignId = questlineTasks.resolveCampaign(panel.questlineCampaignId);
-                panel.questlineTreasuryCampaignId = questlineTreasury.resolveCampaign(panel.questlineTreasuryCampaignId);
-                const projects = panel.questlineScrollProjects();
-                if (projects.length && !projects.some(project => project.id === panel.questlineScrollProjectId))
-                    panel.questlineScrollProjectId = projects[0].id;
-                if (!panel.questline.available)
+                const projects = panel.questlineProjects();
+                const project = projects.find(c=>c.id===panel.questlineWorkspace.selectedProjectId) || projects.find(c=>c.id===panel.questlineCampaignId) || projects[0] || {id:""};
+                if (!panel.questlineEditing) panel.syncQuestlineCampaign(project.id);
+                if (panel.questlineDueTarget) {
+                    panel.questlineDueReady = true;
+                    panel.continueQuestlineDueItem();
+                } else if (!panel.questline.available)
                     panel.questlineEditing = false;
                 else if (panel.questlinePendingNewScroll) {
                     panel.continueQuestlineQuickScroll();
@@ -727,7 +780,12 @@ PanelWindow {
                 } else if (!panel.questlineEditing)
                     panel.selectQuestlineItem();
             }
-            catch (error) { panel.questline = { available: false, installed: false, error: "Could not read Questline status." }; panel.questlineLoaded = true; }
+            catch (error) {
+                panel.questline = { available: false, installed: false, error: "Could not read Questline status." };
+                panel.questlineLoaded = true;
+                panel.questlineDueReady = true;
+                panel.continueQuestlineDueItem();
+            }
         } }
     }
 
@@ -1001,6 +1059,7 @@ PanelWindow {
 
     ShellSurface {
         id: frame
+        enabled: !panel.questlineWorkspace.incomingProfileKey
         transform: ShellMotion {
             id: motion
             surface: frame
@@ -1038,12 +1097,20 @@ PanelWindow {
 
             RowLayout {
                 Layout.fillWidth: true
+                QuestlineCharacterHeader {
+                    objectName: "questline-character-header"
+                    Layout.fillWidth: true
+                    visible: panel.page === "questline" && !!panel.questline.hero
+                    theme: panel.theme
+                    hero: panel.questline.hero || null
+                }
                 Text {
+                    visible: panel.page !== "questline" || !panel.questline.hero
                     text: panel.page === "spectrumdrop" ? "SpectrumDrop" : panel.page === "hotkey" ? "HotKey" : panel.page === "search" ? "Files" : panel.page === "calculator" ? "Calculator" : panel.page === "password" ? "Password generator" : panel.page === "shortcuts" ? "Keyboard shortcuts" : panel.page === "emoji" ? "Emoji" : panel.page === "focus" ? "Focus timer" : panel.page === "calendar" ? "Calendar" : panel.page === "questline" ? "Questline" : panel.page === "color" ? "Color picker" : "Updates"
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + (panel.page === "questline" ? 10 : 5); bold: true }
                 }
-                Item { Layout.fillWidth: true }
+                Item { Layout.fillWidth: true; visible: panel.page !== "questline" || !panel.questline.hero }
                 ShellButton {
                     label: "✕"
                     fontFamily: panel.theme.fontFamily
@@ -1430,12 +1497,14 @@ PanelWindow {
             }
             Flow {
                 Layout.fillWidth: true
-                visible: panel.page === "questline" && panel.questline.available
+                visible: panel.page === "questline" && (panel.questline.available || panel.questline.installed)
                 spacing: 6
                 Repeater {
-                    model: ["Overview", "Tasks", "Sidequests", "Scrolls", "Treasury", "Tree", "Focus", "Hero"]
+                    objectName:"questline-tabs"
+                    model: panel.questline.available ? ["Overview", "Tasks", "Scrolls", "Treasury", "Chronicles", "Tree", "Focus", "Hero", "Sidequests", "Sync"] : ["Sync"]
                     ShellButton {
                         required property string modelData
+                        objectName: "questline-tab-" + modelData
                         label: modelData
                         fontFamily: panel.theme.fontFamily
                         fontSize: panel.theme.fontSize
@@ -1445,6 +1514,20 @@ PanelWindow {
                             panel.switchQuestlineTab(modelData);
                         }
                     }
+                }
+            }
+            QuestlineCampaignBar {
+                objectName:"questline-campaign-bar"
+                Layout.fillWidth:true
+                Layout.minimumWidth:0
+                visible:panel.page==="questline" && panel.questline.available && ["Tasks","Scrolls","Treasury","Chronicles"].includes(panel.questlineTab) && (!panel.questlineEditing || (panel.questlineTab==="Tasks" && panel.questlineSelected===null && panel.questlineStepParent===null)) && !panel.questlineQuickScrollPicker
+                enabled:!panel.questlineEditing || !panel.questlineWorkspace.busy
+                theme:panel.theme
+                campaigns:panel.questlineEditing ? (panel.questline.campaigns || []).filter(c=>!c.is_shared).slice().sort((a,b)=>a.name.localeCompare(b.name)) : panel.questlineProjects()
+                selectedId:panel.questlineEditing ? panel.questlineEditCampaignId : panel.questlineCampaignId
+                onChosen:campaignId=> {
+                    if (panel.questlineEditing) panel.selectQuestlineCampaign(campaignId);
+                    else panel.selectQuestlineProject(campaignId);
                 }
             }
             ColumnLayout {
@@ -1508,9 +1591,10 @@ PanelWindow {
                 Layout.fillWidth: true
                 visible: panel.page === "questline" && panel.questline.available && !panel.questlineEditing && !panel.questlineQuickScrollPicker && panel.questlineTab !== "Tree" && panel.questlineTab !== "Overview" && panel.questlineTab !== "Focus" && panel.questlineTab !== "Hero"
                 ShellButton {
-                    visible: ["Tasks", "Sidequests", "Scrolls", "Treasury"].includes(panel.questlineTab)
-                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available)
-                    label: panel.questlineTab === "Sidequests" ? "+ New sidequest" : panel.questlineTab === "Scrolls" ? "+ New scroll" : panel.questlineTab === "Treasury" ? "+ New entry" : "+ New task"
+                    visible: ["Tasks", "Sidequests", "Scrolls", "Treasury", "Chronicles"].includes(panel.questlineTab)
+                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available)
+                    objectName: "questline-new-item"
+                    label: panel.questlineTab === "Chronicles" ? "+ New chronicle" : panel.questlineTab === "Sidequests" ? "+ New sidequest" : panel.questlineTab === "Scrolls" ? "+ New scroll" : panel.questlineTab === "Treasury" ? "+ New entry" : "+ New task"
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
                     backgroundColor: panel.theme.colors.accent
@@ -1518,8 +1602,9 @@ PanelWindow {
                     onClicked: panel.beginQuestlineEdit(null)
                 }
                 ShellButton {
-                    visible: panel.questlineSelected !== null && ["Tasks", "Sidequests", "Scrolls", "Treasury"].includes(panel.questlineTab)
-                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available)
+                    visible: panel.questlineSelected !== null && ["Tasks", "Sidequests", "Scrolls", "Treasury", "Chronicles"].includes(panel.questlineTab)
+                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available)
+                    objectName: "questline-edit-item"
                     label: "Edit"
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
@@ -1529,7 +1614,7 @@ PanelWindow {
                 }
                 ShellButton {
                     visible: panel.questlineSelected !== null && ["Tasks", "Sidequests", "Scrolls"].includes(panel.questlineTab)
-                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy
+                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy
                     label: "Delete"
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
@@ -1540,7 +1625,7 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
                 ShellButton {
                     visible: panel.questlineSelected !== null && ["Tasks", "Sidequests"].includes(panel.questlineTab)
-                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy && (panel.questlineTab !== "Sidequests" || (!!panel.questlineSelected && panel.questlineSelected.completion_count < panel.questlineSelected.daily_target))
+                    enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy && (panel.questlineTab !== "Sidequests" || (!!panel.questlineSelected && panel.questlineSelected.completion_count < panel.questlineSelected.daily_target))
                     label: panel.questlineTab === "Sidequests" ? "Complete sidequest" : "Complete task"
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
@@ -1605,12 +1690,12 @@ PanelWindow {
                 visible: panel.page === "questline" && panel.questlineEditing
                 spacing: 10
                 Text {
-                    text: panel.questlineStepParent ? (panel.questlineStepSelected ? "Edit step" : "New step for " + panel.questlineStepParent.title) : (panel.questlineSelected ? "Edit " : "New ") + (panel.questlineTab === "Sidequests" ? "sidequest" : panel.questlineTab === "Scrolls" ? "scroll" : panel.questlineTab === "Treasury" ? "treasury entry" : "task")
+                    text: panel.questlineStepParent ? (panel.questlineStepSelected ? "Edit step" : "New step for " + panel.questlineStepParent.title) : (panel.questlineSelected ? "Edit " : "New ") + (panel.questlineTab === "Chronicles" ? "chronicle" : panel.questlineTab === "Sidequests" ? "sidequest" : panel.questlineTab === "Scrolls" ? "scroll" : panel.questlineTab === "Treasury" ? "treasury entry" : "task")
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 3; bold: true }
                 }
                 ShellButton {
-                    visible: panel.questlineSelected === null && panel.questlineStepParent === null && panel.questlineTab !== "Sidequests"
+                    visible: panel.questlineSelected === null && panel.questlineStepParent === null && panel.questlineTab !== "Sidequests" && panel.questlineTab !== "Tasks"
                     label: {
                         const campaigns = (panel.questline.campaigns || []).filter(c => !c.is_shared);
                         return campaigns.length ? "Campaign: " + campaigns[panel.questlineCampaignIndex % campaigns.length].name + "  ›" : "No active campaign";
@@ -1621,7 +1706,20 @@ PanelWindow {
                     foregroundColor: panel.theme.colors.foreground
                     onClicked: panel.selectQuestlineCampaign()
                 }
+                Text {
+                    visible: panel.questlineTab === "Tasks" && panel.questlineSelected === null && panel.questlineStepParent === null && !(panel.questline.campaigns || []).some(c=>!c.is_shared)
+                    text: "No active campaign"
+                    color: panel.theme.colors.muted
+                    font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                }
+                Text {
+                    visible: panel.questlineTab === "Chronicles"
+                    text: questlineTitle.text + " · " + Array.from(questlineBody.text.trim()).length + "/255"
+                    color: panel.theme.colors.muted
+                    font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                }
                 Rectangle {
+                    visible: panel.questlineTab !== "Chronicles"
                     Layout.fillWidth: true; implicitHeight: 44; radius: 8; color: panel.theme.colors.background
                     TextInput {
                         activeFocusOnTab: true
@@ -1928,7 +2026,7 @@ PanelWindow {
                         theme: panel.theme
                         onItemChosen: item => {
                             panel.switchQuestlineTab("Tasks");
-                            panel.questlineCampaignId = item.project_id || "";
+                            panel.selectQuestlineProject(item.project_id || "");
                             panel.questlineSelected = item;
                         }
                     }
@@ -1941,7 +2039,7 @@ PanelWindow {
                         theme: panel.theme
                         onItemChosen: item => {
                             panel.switchQuestlineTab("Scrolls");
-                            panel.questlineScrollProjectId = item.project_id || "";
+                            panel.selectQuestlineProject(item.project_id || "");
                             panel.questlineSelected = item;
                         }
                     }
@@ -1954,7 +2052,7 @@ PanelWindow {
                         theme: panel.theme
                         onItemChosen: item => {
                             panel.switchQuestlineTab("Treasury");
-                            panel.questlineTreasuryCampaignId = item.campaign_id || "";
+                            panel.selectQuestlineProject(item.campaign_id || "");
                             panel.questlineSelected = item;
                         }
                     }
@@ -1974,26 +2072,15 @@ PanelWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        visible: !panel.questline.tree || !panel.questline.tree.bonsai_html
+                        visible: !panel.questline.tree || !panel.questline.tree.bonsai_rows || !panel.questline.tree.bonsai_rows.length
                         text: "Questline's current tree renderer is unavailable."
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                     }
-                    Flickable {
+                    QuestlineTree {
                         anchors { fill: parent; margins: 16 }
-                        visible: !!panel.questline.tree && !!panel.questline.tree.bonsai_html
-                        contentWidth: Math.max(width, bonsaiText.implicitWidth)
-                        contentHeight: Math.max(height, bonsaiText.implicitHeight)
-                        clip: true
-                        Text {
-                            id: bonsaiText
-                            x: Math.max(0, (parent.width - implicitWidth) / 2)
-                            y: Math.max(0, (parent.height - implicitHeight) / 2)
-                            textFormat: Text.RichText
-                            text: panel.questline.tree ? panel.questline.tree.bonsai_html || "" : ""
-                            color: panel.theme.colors.foreground
-                            font { family: "monospace"; pixelSize: Math.min(32, Math.max(16, (frame.width - 340) / 35)) }
-                        }
+                        rows: panel.questline.tree ? panel.questline.tree.bonsai_rows || [] : []
+                        foreground: panel.theme.colors.foreground
                     }
                 }
 
@@ -2074,56 +2161,8 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: panel.page === "questline" && panel.questline.available && panel.questlineTab !== "Tree" && panel.questlineTab !== "Overview" && panel.questlineTab !== "Focus" && panel.questlineTab !== "Hero" && !panel.questlineEditing && !panel.questlineQuickScrollPicker
+                visible: panel.page === "questline" && panel.questline.available && panel.questlineTab !== "Tree" && panel.questlineTab !== "Overview" && panel.questlineTab !== "Focus" && panel.questlineTab !== "Hero" && panel.questlineTab !== "Sync" && !panel.questlineEditing && !panel.questlineQuickScrollPicker
                 spacing: 14
-
-                Rectangle {
-                    visible: ["Scrolls", "Tasks", "Treasury"].includes(panel.questlineTab)
-                    Layout.preferredWidth: visible ? 250 : 0
-                    Layout.fillHeight: true
-                    radius: 16
-                    color: panel.theme.colors.background
-                    ColumnLayout {
-                        anchors { fill: parent; margins: 12 }
-                        spacing: 10
-                        Text {
-                            text: panel.questlineTab === "Scrolls" ? "Projects" : "Campaigns"
-                            color: panel.theme.colors.foreground
-                            font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 2; bold: true }
-                        }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            spacing: 7
-                            model: panel.questlineTab === "Tasks" ? questlineTasks.projects : panel.questlineTab === "Treasury" ? questlineTreasury.projects : panel.questlineScrollProjects()
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: ListView.view.width
-                                height: 64
-                                radius: 10
-                                color: (panel.questlineTab === "Tasks" ? panel.questlineCampaignId : panel.questlineTab === "Treasury" ? panel.questlineTreasuryCampaignId : panel.questlineScrollProjectId) === modelData.id ? Qt.tint(panel.theme.colors.surface_alt, Qt.rgba(panel.theme.colors.accent.r, panel.theme.colors.accent.g, panel.theme.colors.accent.b, 0.35)) : panel.theme.colors.surface_alt
-                                Text {
-                                    anchors { fill: parent; margins: 10 }
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                    text: modelData.name + (panel.questlineTab !== "Scrolls" ? "  ·  " + modelData.count : "")
-                                    color: panel.theme.colors.foreground
-                                    font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 1 }
-                                }
-                                KeyboardAction {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onActivated: {
-                                        if (panel.questlineTab === "Tasks") panel.selectQuestlineTaskProject(parent.modelData.id);
-                                        else if (panel.questlineTab === "Treasury") panel.selectQuestlineTreasuryProject(parent.modelData.id);
-                                        else panel.selectQuestlineScrollProject(parent.modelData.id);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
 
                 Rectangle {
                     visible: panel.questlineTab === "Treasury"
@@ -2207,7 +2246,7 @@ PanelWindow {
                         Text {
                             Layout.fillWidth: true
                             visible: panel.questlineItems().length === 0
-                            text: "Nothing here yet. Use the New button above to get started."
+                            text: panel.questlineTab === "Chronicles" ? "No chronicles in this campaign yet." : "Nothing here yet. Use the New button above to get started."
                             wrapMode: Text.Wrap
                             color: panel.theme.colors.muted
                             font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
@@ -2239,7 +2278,7 @@ PanelWindow {
                                     Text {
                                         width: parent.width
                                         elide: Text.ElideRight
-                                        text: panel.questlineTab === "Treasury" ? modelData.entry_type + "  ·  " + modelData.currency_code + " " + (modelData.amount_minor / 100).toFixed(2) : panel.questlineTab === "Sidequests" ? modelData.frequency + " · " + modelData.completion_count + "/" + modelData.daily_target + " today · " + modelData.reward_xp + " XP" : (modelData.campaign || "Unfiled") + (modelData.due_date ? "  ·  " + modelData.due_date : "")
+                                        text: panel.questlineTab === "Chronicles" ? (modelData.author_username || modelData.campaign || "Unfiled") : panel.questlineTab === "Treasury" ? modelData.entry_type + "  ·  " + modelData.currency_code + " " + (modelData.amount_minor / 100).toFixed(2) : panel.questlineTab === "Sidequests" ? modelData.frequency + " · " + modelData.completion_count + "/" + modelData.daily_target + " today · " + modelData.reward_xp + " XP" : (modelData.campaign || "Unfiled") + (modelData.due_date ? "  ·  " + modelData.due_date : "")
                                         color: panel.theme.colors.muted
                                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 1 }
                                     }
@@ -2283,7 +2322,7 @@ PanelWindow {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: !panel.questlineSelected ? "Choose a row to see its details." : panel.questlineTab === "Sidequests" ? panel.questlineSelected.frequency + " · " + panel.questlineSelected.completion_count + "/" + panel.questlineSelected.daily_target + " today · " + panel.questlineSelected.reward_xp + " XP per completion" : panel.questlineSelected.campaign || "Unfiled"
+                            text: !panel.questlineSelected ? "Choose a row to see its details." : panel.questlineTab === "Chronicles" ? panel.questlineSelected.campaign + (panel.questlineSelected.author_username ? " · " + panel.questlineSelected.author_username : "") : panel.questlineTab === "Sidequests" ? panel.questlineSelected.frequency + " · " + panel.questlineSelected.completion_count + "/" + panel.questlineSelected.daily_target + " today · " + panel.questlineSelected.reward_xp + " XP per completion" : panel.questlineSelected.campaign || "Unfiled"
                             color: panel.theme.colors.muted
                             font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                         }
@@ -2335,6 +2374,7 @@ PanelWindow {
                             Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                             Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                                 id: detailText
+                                objectName: "questline-detail-text"
                                 width: parent.width
                                 readOnly: true
                                 selectByMouse: true
@@ -2448,6 +2488,19 @@ PanelWindow {
                         }
                     }
                 }
+            }
+
+            QuestlineSync {
+                objectName:"questline-sync"
+                visible:panel.page==="questline" && panel.questlineTab==="Sync" && !panel.questlineEditing
+                active:visible && panel.expanded
+                Layout.fillWidth:true
+                Layout.fillHeight:true
+                theme:panel.theme
+                backendDir:panel.backendDir
+                workspace:panel.questlineWorkspace
+                onRefreshRequested:panel.refreshQuestline()
+                onProfileRestored:panel.refreshQuestline()
             }
 
             QuestlineHero {

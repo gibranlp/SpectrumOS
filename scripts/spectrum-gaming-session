@@ -126,6 +126,111 @@ class GamingSession:
         return " ".join(errors)
 
 
+
+def game_active():
+    library = ctypes.CDLL("libgamemode.so.0")
+    query = library.real_gamemode_query_status
+    query.argtypes = []
+    query.restype = ctypes.c_int
+    value = query()
+    if value < 0:
+        raise RuntimeError("Could not query GameMode.")
+    return value > 0
+
+
+def publish_status(status):
+    temporary = RUNTIME / "gaming-status.tmp"
+    temporary.write_text(json.dumps(status) + "\n")
+    temporary.chmod(0o600)
+    temporary.replace(RUNTIME / "gaming-status.json")
+    print(json.dumps(status), flush=True)
+
+
+class AutomaticGamingSession:
+    def __init__(self):
+        self.previous_animations = None
+
+    def start(self):
+        self.previous_animations = animation_state()
+        try:
+            set_animations(False)
+        except Exception:
+            self.stop()
+            raise
+
+    def maintain(self):
+        if animation_state():
+            set_animations(False)
+
+    def stop(self):
+        if self.previous_animations is not None:
+            try:
+                set_animations(self.previous_animations)
+                self.previous_animations = None
+            except RuntimeError as error:
+                return str(error)
+        return ""
+
+
+class GamingController:
+    def __init__(self):
+        self.manual = None
+        self.automatic = None
+        self.retry_at = 0
+
+    def update(self, wanted):
+        status = {"active": False, "automatic": False, "detected": False, "error": ""}
+        try:
+            if wanted and self.automatic is not None:
+                error = self.automatic.stop()
+                if error:
+                    raise RuntimeError(error)
+                self.automatic = None
+            if not wanted and self.manual is not None:
+                error = self.manual.stop()
+                self.manual = None
+                self.retry_at = 0
+                if error:
+                    raise RuntimeError(error)
+            # La detección automática nunca registra un cliente: así no se mantiene viva a sí misma.
+            detected = game_active() if self.manual is None else True
+            status["detected"] = detected
+            if not detected:
+                (RUNTIME / "gaming-auto-suppressed").unlink(missing_ok=True)
+            automatic_wanted = not wanted and detected and not (RUNTIME / "gaming-auto-suppressed").exists()
+            if not automatic_wanted and self.automatic is not None:
+                error = self.automatic.stop()
+                if error:
+                    raise RuntimeError(error)
+                self.automatic = None
+                self.retry_at = 0
+            if wanted and self.manual is None and time.monotonic() >= self.retry_at:
+                candidate = GamingSession()
+                candidate.start()
+                self.manual = candidate
+            elif automatic_wanted and self.automatic is None and time.monotonic() >= self.retry_at:
+                candidate = AutomaticGamingSession()
+                candidate.start()
+                self.automatic = candidate
+            current = self.manual or self.automatic
+            if current is not None:
+                current.maintain()
+                status["active"] = True
+                status["automatic"] = self.automatic is not None
+        except (OSError, RuntimeError, ValueError, AttributeError) as error:
+            status["error"] = str(error)
+            self.retry_at = time.monotonic() + 10
+            # Una falla temporal del bus no debe alternar los perfiles de los monitores.
+            status["active"] = self.manual is not None or self.automatic is not None
+            status["automatic"] = self.automatic is not None
+        return status
+
+    def stop(self):
+        errors = [session.stop() for session in (self.manual, self.automatic) if session is not None]
+        self.manual = self.automatic = None
+        return " ".join(error for error in errors if error)
+
+
 def main():
     if sys.argv[1:]:
         print("Usage: spectrum-gaming-session", file=sys.stderr)
@@ -145,41 +250,18 @@ def main():
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
         parent = os.getppid()
-        session = None
+        controller = GamingController()
         last_status = None
-        retry_at = 0
         try:
             while not stopping and os.getppid() == parent:
-                status = {"active": False, "error": ""}
-                wanted = enabled()
-                if wanted and session is None and time.monotonic() >= retry_at:
-                    candidate = GamingSession()
-                    try:
-                        candidate.start()
-                        session = candidate
-                    except (OSError, RuntimeError, ValueError, AttributeError) as error:
-                        status["error"] = str(error)
-                        retry_at = time.monotonic() + 10
-                elif not wanted and session is not None:
-                    status["error"] = session.stop()
-                    session = None
-                if session is not None:
-                    try:
-                        session.maintain()
-                        status["active"] = True
-                    except (RuntimeError, ValueError) as error:
-                        status["error"] = str(error)
-                elif wanted and status["error"] == "" and last_status:
-                    status = last_status
+                status = controller.update(enabled())
                 if status != last_status:
-                    print(json.dumps(status), flush=True)
+                    publish_status(status)
                     last_status = status
                 time.sleep(1)
         finally:
-            if session is not None:
-                error = session.stop()
-                if error:
-                    print(json.dumps({"active": False, "error": error}), flush=True)
+            error = controller.stop()
+            publish_status({"active": False, "automatic": False, "detected": False, "error": error})
     return 0
 
 

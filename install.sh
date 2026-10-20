@@ -505,7 +505,7 @@ phase_system() {
         font-family-menu performance-mode resource-monitor session-menu spectrum-update-run window-pin-toggle spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session \
         waybar-workspace-icons \
         spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder \
-        application-adapter appimage-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action stash-open spectrum-focus; do
+        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus; do
         run sudo install -m 0755 "$PROJECT_ROOT/scripts/$desktop_script" "/usr/lib/spectrumos/$desktop_script"
     done
     run sudo install -m 0644 "$PROJECT_ROOT/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
@@ -514,12 +514,16 @@ phase_system() {
         /usr/share/libalpm/hooks/91-spectrumos-browser-defaults.hook
     run sudo /usr/lib/spectrumos/spectrum-browser-defaults
     run sudo install -Dm 0644 "$PROJECT_ROOT/integrations/omdrop/spectrumdrop.desktop" /usr/share/applications/spectrumdrop.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-favorites.desktop" /usr/share/applications/spectrum-favorites.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-appimages.desktop" /usr/share/applications/spectrum-appimages.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-app-store.desktop" /usr/share/applications/spectrum-app-store.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/configs/app-store/paru.conf" /usr/share/spectrumos/app-store/paru.conf
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/org.spectrumos.app-store.policy" /usr/share/polkit-1/actions/org.spectrumos.app-store.policy
     run sudo install -Dm 0644 "$PROJECT_ROOT/integrations/stash/stash.desktop" /usr/share/applications/stash.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/autostart/spectrum-kdeconnect-indicator.desktop" /etc/xdg/autostart/spectrum-kdeconnect-indicator.desktop
     run sudo install -m 0755 "$PROJECT_ROOT/integrations/questline/spectrum-focus" /usr/lib/spectrumos/questline-focus
     local user_service
-    for user_service in spectrum-hotkey.service spectrum-resource-monitor.service spectrum-shell.service spectrum-workspace-layout.service; do
+    for user_service in spectrum-hotkey.service spectrum-resource-monitor.service spectrum-shell.service spectrum-questline-notifications.service spectrum-questline-sync.service spectrum-workspace-layout.service; do
         run sudo install -m 0644 "$PROJECT_ROOT/system/systemd/user/$user_service" "/usr/lib/systemd/user/$user_service"
     done
     for source in "$PROJECT_ROOT"/packages/spectrum-theme/src/spectrum_theme/*.py; do

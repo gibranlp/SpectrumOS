@@ -11,6 +11,7 @@ from datetime import date, timedelta
 import sqlite3
 import unittest
 import uuid
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,6 +98,44 @@ class QuestlineAccountTests(unittest.TestCase):
         self.assertEqual(len(snapshot["entries"]), 41)
         self.assertEqual(snapshot["entries"][-1]["campaign"], "Older campaign")
         self.assertEqual(snapshot["entries"][0]["id"], "40")
+
+
+class QuestlineChronicleTests(unittest.TestCase):
+    def test_daily_logs_keep_campaign_content_author_and_full_history(self):
+        with sqlite3.connect(":memory:") as connection:
+            connection.row_factory = sqlite3.Row
+            connection.executescript("""
+                CREATE TABLE projects (id TEXT, name TEXT);
+                CREATE TABLE journal_entries (id TEXT, project_id TEXT, entry_date TEXT,
+                                             content TEXT, created_at TEXT, author_username TEXT);
+                INSERT INTO projects VALUES ('alpha', 'Alpha'), ('beta', 'Beta');
+            """)
+            for index in range(41):
+                connection.execute("INSERT INTO journal_entries VALUES (?, ?, ?, ?, ?, ?)",
+                                   (str(index), "beta" if index == 0 else "alpha", "2026-10-19",
+                                    "Daily log\nSecond line", f"2026-10-19T12:00:{index:02}", "Igor"))
+            items = ADAPTER.chronicles(connection)
+            self.assertEqual(len(items), 41)
+            self.assertEqual(items[0]["id"], "40")
+            self.assertEqual(items[-1]["project_id"], "beta")
+            self.assertEqual(items[-1]["campaign"], "Beta")
+            self.assertEqual(items[0]["description"], "Daily log\nSecond line")
+            self.assertEqual(items[0]["author_username"], "Igor")
+            self.assertEqual(items[0]["title"], "2026-10-19")
+
+    def test_older_profiles_without_journals_or_authors_remain_readable(self):
+        with sqlite3.connect(":memory:") as connection:
+            connection.row_factory = sqlite3.Row
+            self.assertEqual(ADAPTER.chronicles(connection), [])
+            connection.executescript("""
+                CREATE TABLE projects (id TEXT, name TEXT);
+                CREATE TABLE journal_entries (id TEXT, project_id TEXT, entry_date TEXT,
+                                             content TEXT, created_at TEXT);
+                INSERT INTO journal_entries VALUES ('log', 'missing', '2026-10-19', 'Log', '2026-10-19');
+            """)
+            item = ADAPTER.chronicles(connection)[0]
+            self.assertEqual(item["author_username"], "")
+            self.assertEqual(item["campaign"], "Unfiled")
 
 
 class QuestlineBinarySelectionTests(unittest.TestCase):
@@ -189,6 +228,26 @@ class QuestlineSidequestTests(unittest.TestCase):
         self.assertEqual(items[1]["reward_xp"], 20)
         connection.execute("DROP TABLE ritual_history")
         self.assertTrue(all(item["completion_count"] == 0 for item in ADAPTER.sidequests(connection)))
+
+
+class QuestlineTreeTests(unittest.TestCase):
+    def test_tree_canvas_receives_colored_rows_with_blank_vertical_padding_removed(self):
+        rows = [[{"text": "   ", "color": None}],
+                [{"text": " *", "color": "#00ff00"}, {"text": "|", "color": None}],
+                [{"text": "   ", "color": None}]]
+        result = subprocess.CompletedProcess([], 0, json.dumps({"rows": rows}), "")
+        tree = {"growth": 42, "stage": 3, "health": 80}
+        with patch.object(ADAPTER.subprocess, "run", return_value=result) as run:
+            ADAPTER.render_tree("/usr/bin/questline", tree)
+        self.assertEqual(tree["bonsai_rows"], [rows[1]])
+        request = json.loads(run.call_args.args[0][2])
+        self.assertEqual(request, {"rows": 25, "cols": 60, "seed": 42, "stage": 3, "health": 80})
+
+    def test_missing_tree_renderer_does_not_create_canvas_content(self):
+        tree = {"growth": 0, "stage": 1, "health": 100}
+        with patch.object(ADAPTER.subprocess, "run", side_effect=OSError("unavailable")):
+            ADAPTER.render_tree("/usr/bin/questline", tree)
+        self.assertNotIn("bonsai_rows", tree)
 
 
 if __name__ == "__main__":

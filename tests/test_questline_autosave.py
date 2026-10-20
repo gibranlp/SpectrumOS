@@ -17,7 +17,7 @@ class QuestlineAutosaveTests(unittest.TestCase):
         self.storage=Path(self.temporary.name)
         self.env=dict(os.environ,QUESTLINE_STORAGE_DIR=str(self.storage))
         self.db=self.storage/'questline.db';self.db.touch()
-        result=subprocess.run([str(BINARY),'shell-action','{}'],env=self.env,capture_output=True,text=True,timeout=20)
+        result=subprocess.run([str(BINARY),'shell-action','{"action":"status"}'],env=self.env,capture_output=True,text=True,timeout=20)
         self.assertNotEqual(result.returncode,0)
         self.campaign=str(uuid.uuid4());now=datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db) as db:
@@ -67,5 +67,32 @@ class QuestlineAutosaveTests(unittest.TestCase):
         self.assertEqual(self.scalar('SELECT COUNT(*) FROM ledger_entries'),1)
         self.assertEqual(self.scalar('SELECT amount_minor FROM ledger_entries'),1500)
         self.assertEqual(self.scalar('SELECT entry_type FROM ledger_entries'),'Income')
+    def test_chronicle_retry_keeps_one_entry_and_rewards_once(self):
+        request={'action':'create_chronicle','project_id':self.campaign,'content':'First daily log','autosave':True,'autosave_id':str(uuid.uuid4())}
+        first=self.action(request)
+        xp=self.scalar('SELECT xp FROM users')
+        request['content']='Updated daily log'
+        second=self.action(request)
+        self.assertEqual(first['id'],second['id'])
+        self.assertEqual(self.scalar('SELECT COUNT(*) FROM journal_entries'),1)
+        self.assertEqual(self.scalar('SELECT content FROM journal_entries'),'Updated daily log')
+        self.assertEqual(self.scalar('SELECT author_username FROM journal_entries'),'Widget Test')
+        self.assertEqual(self.scalar('SELECT visibility FROM journal_entries'),'Private')
+        self.assertEqual(self.scalar('SELECT xp FROM users'),xp)
+        request.update(action='update_chronicle',id=first['id'],content='Edited again')
+        self.action(request)
+        self.assertEqual(self.scalar('SELECT content FROM journal_entries'),'Edited again')
+        self.assertEqual(self.scalar('SELECT xp FROM users'),xp)
+        self.assertGreater(self.scalar("SELECT COUNT(*) FROM sync_log WHERE entity_type='journal_entry'"),0)
+    def test_chronicle_rejects_invalid_content_campaign_and_stale_profile(self):
+        base={'action':'create_chronicle','project_id':self.campaign,'content':'A valid log'}
+        for override in ({'content':''},{'content':'x'*256},{'project_id':str(uuid.uuid4())},{'profile_key':'another-profile'}):
+            result=subprocess.run([str(BINARY),'shell-action',json.dumps(dict(base,**override))],env=self.env,capture_output=True,text=True,timeout=20)
+            self.assertNotEqual(result.returncode,0)
+        self.assertEqual(self.scalar('SELECT COUNT(*) FROM journal_entries'),0)
+        with sqlite3.connect(self.db) as db:db.execute('UPDATE projects SET is_shared=1')
+        result=subprocess.run([str(BINARY),'shell-action',json.dumps(base)],env=self.env,capture_output=True,text=True,timeout=20)
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(self.scalar('SELECT COUNT(*) FROM journal_entries'),0)
 
 if __name__=='__main__':unittest.main()

@@ -7,6 +7,10 @@ ColumnLayout {
     required property var theme
     required property var device
     property bool output: true
+    property var audioNode: (theme.audioNodes || []).find(node => node.name === device.name && !node.isStream && node.isSink === output && node.audio) || null
+    readonly property bool volumeAvailable: !!(audioNode && audioNode.ready && audioNode.audio)
+    property int previewPercent: -1
+    readonly property bool dragging: slider.pressed
     spacing: 3
     ShellButton {
         Layout.fillWidth: true
@@ -33,20 +37,15 @@ ColumnLayout {
         Controls.Slider {
             id: slider
             objectName: "device-volume"
-            property bool editing: false
             Layout.fillWidth: true
             implicitHeight: 30
             from: 0; to: 100; stepSize: 1
             enabled: !control.theme.actionBusy && typeof control.device.volume_percent === "number"
             Accessible.name: control.device.label + " volume"
-            Binding { target: slider; property: "value"; value: control.device.volume_percent || 0; when: !slider.pressed && !control.theme.actionBusy; restoreMode: Binding.RestoreNone }
-            function applyVolume() {
-                control.theme.runAction([control.theme.backend("control-adapter"), "audio", control.output ? "output-volume" : "input-volume", String(control.device.id), String(Math.round(value))]);
-            }
-            onMoved: if (!pressed) applyVolume()
-            onPressedChanged: {
-                if (pressed) editing = true;
-                else if (editing) { editing = false; applyVolume(); }
+            Binding { target: slider; property: "value"; value: control.volumeAvailable ? Math.round(control.audioNode.audio.volume * 100) : control.previewPercent >= 0 ? control.previewPercent : control.device.volume_percent || 0; when: !slider.pressed && !control.theme.actionBusy && !control.theme.audioVolumeBusy; restoreMode: Binding.RestoreNone }
+            onMoved: {
+                control.previewPercent = Math.round(value);
+                control.theme.setAudioVolume(control.output ? "sink" : "source", control.device.name, control.previewPercent);
             }
             background: Rectangle {
                 x: slider.leftPadding; y: slider.topPadding + slider.availableHeight / 2 - 3
@@ -62,7 +61,8 @@ ColumnLayout {
             }
         }
         Text {
-            text: control.device.volume || "—"
+            objectName: "device-volume-label"
+            text: typeof control.device.volume_percent === "number" ? Math.round(slider.value) + "%" : "—"
             color: control.theme.colors.muted
             font { family: control.theme.fontFamily; pixelSize: control.theme.fontSize - 1 }
         }

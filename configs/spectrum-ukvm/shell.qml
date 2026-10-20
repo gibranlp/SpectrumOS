@@ -18,7 +18,8 @@ ShellRoot {
     readonly property int fontSize: widgetTheme.fontSize
     property var preferences: ({})
     readonly property string barProfile: (preferences.bar_profiles || {})[openScreen ? openScreen.name : ""] || preferences.bar_profile || "standard"
-    readonly property bool gamingActive: preferences.gaming_enabled === true
+    property var gamingStatus: ({})
+    readonly property bool gamingActive: preferences.gaming_enabled === true || gamingStatus.automatic === true
     readonly property bool animationsEnabled: !gamingActive
     readonly property int topInset: gamingActive ? 0 : preferences.bar_position === "top" && barProfile !== "minimal" ? 34 : 8
     readonly property int leftInset: gamingActive ? 0 : preferences.bar_position !== "top" && barProfile !== "minimal" ? 52 : 0
@@ -49,6 +50,12 @@ ShellRoot {
         watchChanges: true
         onFileChanged: reload()
         onTextChanged: { try { root.preferences = JSON.parse(text()); } catch (e) {} }
+    }
+    FileView {
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/spectrumos/gaming-status.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onTextChanged: { try { root.gamingStatus = JSON.parse(text()); } catch (e) {} }
     }
     UkvmState { id: state; active: root.expanded; adapter: root.backendDir + "/ukvm-adapter" }
     PanelWindow {

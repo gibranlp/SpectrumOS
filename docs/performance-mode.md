@@ -20,7 +20,7 @@ Every notification names only the mode that just turned on ("Performance mode ac
 
 ## Auto-enable for games
 
-Rather than SpectrumOS trying to recognize individual games itself, this hooks into [GameMode](https://github.com/FeralInteractive/gamemode) (`gamemode`, already in `bootstrap/packages/gaming.txt`) — the de facto standard Linux mechanism games (most Steam/Proton titles out of the box, `gamemoderun` launch wrapper, or `libgamemodeauto` preload for others) already request when they start and release when they exit.
+SpectrumOS hooks into [GameMode](https://github.com/FeralInteractive/gamemode) (`gamemode`, included in `bootstrap/packages/gaming.txt`). Games and launchers can request it through native integration, a launcher's GameMode option, `gamemoderun`, or `libgamemodeauto`. Steam and Proton do not guarantee that every title requests GameMode automatically.
 
 `appearance-sync`'s `ensure_gamemode_hook()` manages a marked block in `~/.config/gamemode.ini`'s `[custom]` section (self-healing on every `appearance-sync --apply`, the same pattern as its GTK/Vencord integrations — edits outside the block are preserved):
 
@@ -30,6 +30,13 @@ start=/usr/lib/spectrumos/performance-mode --game-start
 end=/usr/lib/spectrumos/performance-mode --game-end
 ```
 
-`--game-start`/`--game-end` use a reference count (`.../spectrumos/performance-mode/game-count`), not a flag: GameMode's hooks fire per client process, so two overlapping games (or a game plus another GameMode-aware app) are handled correctly — only the *first* arrival remembers whatever mode was active (`.../spectrumos/performance-mode/pre-game-mode`) and switches to Performance; only the *last* departure restores it. A manual toggle mid-game is respected the same way a manual pick always is — it just becomes what gets restored once every game has exited. Each notifies only when it actually changes the mode: a game starting while Performance is already active (or ending back into whatever mode is already current) is a no-op and stays silent rather than repeating a toast for nothing.
+`--game-start`/`--game-end` use a reference count (`.../spectrumos/performance-mode/game-count`) for Spectrum power requests. GameMode calls its custom hooks when its overall session starts and ends; manual Gaming also acquires a separate Spectrum request. The first Spectrum request remembers the previous mode (`.../spectrumos/performance-mode/pre-game-mode`) and selects Performance; the final request restores the saved mode. Multiple external clients keep GameMode active until the last one exits. Power notifications appear only when the selected mode actually changes. A manual power selection during the session changes the current mode; the final release still restores the mode saved at the beginning.
 
 GameMode is now a required desktop dependency for the SpectrumShell Gaming profile. The shell holds a registered client for the duration of that profile, and games can register their own clients independently. Gaming also requests the available Performance power mode and restores its prior mode when no other GameMode clients remain. The Gaming helper verifies the real registration and reports activation failures in Control Center. Hook reference-count updates are serialized to handle concurrent clients. See [SpectrumShell Gaming](spectrum-shell.md#gaming-profile) for profile behavior and validation limits.
+
+
+## Automatic bar profile
+
+SpectrumShell observes the real GameMode status and temporarily uses the Gaming bar profile while an external GameMode client is active. It does not infer gaming from Performance mode and does not create an extra GameMode client for this automatic override. Saved global and per-monitor profiles remain unchanged; the last client exiting restores them. Manual Gaming still owns its own GameMode registration. An explicit bar-profile selection or Leave Gaming suspends automatic activation until the current GameMode session ends. UKVM reads the same private runtime status.
+
+For games that do not request GameMode themselves, configure their launcher to use GameMode or set a Steam game's launch options to `gamemoderun %command%`. Simply opening Steam does not guarantee a GameMode request. When diagnosing missed power changes, check `gamemoded -s`: if Performance was already selected, there is no new power-mode notification. A stale `game-count` from an interrupted older session can also block the existing power hook's restore; only reset it after verifying GameMode has no clients and manual Gaming is off.

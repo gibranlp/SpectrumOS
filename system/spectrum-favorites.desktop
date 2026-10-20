@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Favorites
+Comment=Your favorite portals, categories, and default browser
+Exec=/usr/lib/spectrumos/spectrum-shell-open favorites
+Icon=bookmarks
+Terminal=false
+Categories=Network;Utility;
+Keywords=Bookmarks;Favorites;Links;URLs;Browser;

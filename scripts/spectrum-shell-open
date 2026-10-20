@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (($# < 1 || $# > 2)); then
-    printf 'Usage: %s {bar|dashboard|control|appearance|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|calendar|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
+    printf 'Usage: %s {bar|dashboard|control|appearance|favorites|app-store|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|calendar|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
     exit 2
 fi
 
@@ -11,7 +11,9 @@ case $1 in
     dashboard) method=toggleDashboard; fallback=none ;;
     control) method=toggleControlCenter; fallback=home ;;
     appearance) method=openControlPage; method_arg=Appearance; fallback=appearance ;;
+    favorites) method=toggleFavorites; fallback=none ;;
     appimages) method=toggleAppImages; fallback=none ;;
+    app-store) method=toggleAppStore; fallback=none ;;
     more) method=toggleBarExtras; fallback=none ;;
     typography) method=toggleTypography; fallback=none ;;
     mouse) method=toggleMouse; fallback=none ;;

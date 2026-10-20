@@ -8,6 +8,7 @@ import Quickshell.Services.SystemTray
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import Quickshell.Services.Notifications
+import "NotificationStyle.js" as NotificationStyle
 import Quickshell.Wayland
 
 ShellRoot {
@@ -26,14 +27,18 @@ ShellRoot {
     property var overview: ({ hostname: "SpectrumOS", load: "…", memory: "…", disk: "…", audio: "…", uptime: "…", brightness: { available: false, percent: 0 }, font_size: "13px", font_family: "jetbrains-mono", font_families: [] })
     property var network: ({ available: false, wifi_enabled: false, connection_type: "none", status: "Checking network…", ethernet: { connected: false }, wifi: { connected: false } })
     property var audioDevices: ({ available: false, sinks: [], sources: [] })
+    readonly property var audioNodes: Pipewire.nodes.values.filter(node => node.audio && !node.isStream)
+    readonly property var volumeNode: Pipewire.defaultAudioSink
     readonly property bool volumeAvailable: !!(Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.ready && Pipewire.defaultAudioSink.audio)
     readonly property int volumePercent: volumeAvailable ? Math.round(Pipewire.defaultAudioSink.audio.volume * 100) : 0
     readonly property bool volumeMuted: volumeAvailable && Pipewire.defaultAudioSink.audio.muted
-    PwObjectTracker { objects: Pipewire.defaultAudioSink ? [Pipewire.defaultAudioSink] : [] }
+    PwObjectTracker { objects: shell.audioNodes }
     readonly property var media: mediaState.state
     readonly property var mediaPlayers: mediaState.choices
     readonly property bool mediaChoiceRequired: mediaState.choiceRequired
     readonly property string mediaPendingAction: mediaState.pendingAction
+    AudioVolumeManager { id: audioVolume; onFailed: message => shell.actionError = message }
+    readonly property bool audioVolumeBusy: audioVolume.busy
     MediaState { id: mediaState; onChoiceRequested: shell.openOnFocused("showMediaChooser") }
 
     function selectMediaPlayer(id): void { mediaState.selectPlayer(id); }
@@ -80,6 +85,8 @@ ShellRoot {
     property bool desktopLogoEnabled: true
     property string desktopLogoCorner: "bottom-right"
     property bool igorGreetingPending: false
+    FavoritesManager { id: sharedFavorites; theme: shell }
+    AppStoreManager { id: sharedAppStore; theme: shell; viewing: bars.instances.some(bar => bar.appStoreOpen) }
     QuestlineWorkspace { id: sharedQuestlineWorkspace; backendDir: shell.backendDir }
     property bool igorMeetingPreview: false
     Timer {
@@ -103,7 +110,12 @@ ShellRoot {
     property bool widgetBounceEnabled: true
     property string barPosition: "left"
     property string barStyle: "full"
-    property bool gamingActive: false
+    StableUpdateMonitor { id: stableUpdateMonitor; backendDir: shell.backendDir }
+    readonly property var stableUpdates: stableUpdateMonitor.status
+    readonly property bool checkingStableUpdates: stableUpdateMonitor.checking
+    function checkStableUpdates(): void { stableUpdateMonitor.refresh(); }
+    property bool gamingRequested: false
+    readonly property bool gamingActive: gamingRequested || gamingStatus.automatic === true
     property var gamingStatus: ({ active: false, error: "" })
     readonly property bool animationsEnabled: !gamingActive
     property string barProfile: "standard"
@@ -129,28 +141,68 @@ ShellRoot {
         actionsSupported: true
         imageSupported: true
         persistenceSupported: true
-        onNotification: notification => {
-            notification.tracked = true;
-            if (notification.appName !== "Spectrum Volume")
-                shell.notificationHistory = [{
-                    notification: notification,
-                    appName: notification.appName,
-                    summary: notification.summary,
-                    body: notification.body,
-                    actions: []
-                }, ...shell.notificationHistory].slice(0, 50);
-            if (notification.appName !== "Spectrum Volume")
-                shell.toastNotifications.append({
-                    toastId: ++shell.nextToastId,
-                    notificationId: notification.id,
-                    expiresAt: Date.now() + 5000,
-                    appName: notification.appName,
-                    iconSource: shell.notificationIcon(notification),
-                    summary: notification.summary,
-                    body: notification.body
-                });
-            while (shell.toastNotifications.count > 10)
-                shell.toastNotifications.remove(0);
+        onNotification:notification=>shell.acceptNotification(notification)
+    }
+    QuestlineNotificationActions {
+        id:questlineNotificationActions
+        backendDir:shell.backendDir
+        onFinished:(job,result)=> {
+            shell.setNotificationBusy(job.notificationId,false);
+            if (job.action!=="drink_water") return;
+            if (result.error) {
+                for(let i=0;i<toastModel.count;i++) if(toastModel.get(i).notificationId===job.notificationId) toastModel.setProperty(i,"body",toastModel.get(i).body+"\n"+result.error);
+                return;
+            }
+            const item=Array.from(notificationServer.trackedNotifications.values).find(item=>item.id===job.notificationId);
+            if(item)item.dismiss();
+        }
+    }
+    function setNotificationBusy(id,busy): void {
+        for(let i=0;i<toastModel.count;i++) if(toastModel.get(i).notificationId===id) toastModel.setProperty(i,"actionBusy",busy);
+    }
+    function removeNotificationToasts(id): void {
+        for(let i=toastModel.count-1;i>=0;i--) if(toastModel.get(i).notificationId===id) toastModel.remove(i);
+    }
+    function invokeNotificationAction(id,identifier): void {
+        const item=Array.from(notificationServer.trackedNotifications.values).find(item=>item.id===id);
+        if(!item)return;
+        if(identifier==="spectrum-open-updates" && NotificationStyle.isStableUpdate(item)) {
+            openOnFocused("openUpdates");
+            item.dismiss();
+        } else if(identifier==="questline-drink" && NotificationStyle.kind(item)==="hydration") {
+            setNotificationBusy(id,true);
+            questlineNotificationActions.enqueue("drink_water",id,NotificationStyle.token(item));
+        } else {
+            const action=Array.from(item.actions || []).find(action=>action.identifier===identifier);
+            if(action)action.invoke();
+        }
+    }
+    function acceptNotification(notification): void {
+        notification.tracked=true;
+        if(notification.appName==="Spectrum Volume")return;
+        const kind=NotificationStyle.kind(notification);
+        const token=NotificationStyle.token(notification);
+        const id=notification.id;
+        if(kind.startsWith("hydration")) {
+            for(const old of Array.from(notificationServer.trackedNotifications.values)) {
+                if(old.id!==id && NotificationStyle.kind(old)==="hydration") old.expire();
+            }
+        }
+        removeNotificationToasts(id);
+        const actions=JSON.stringify(NotificationStyle.actions(notification));
+        shell.notificationHistory=[{notification:notification,notificationId:id,appName:notification.appName,summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actions:[]},...shell.notificationHistory.filter(item=>item.notificationId!==id)].slice(0,50);
+        const persistent=NotificationStyle.palette(notification,shell.colors).persistent || notification.expireTimeout===0;
+        const timeout=notification.expireTimeout>0 ? notification.expireTimeout : 5000;
+        toastModel.append({toastId:++shell.nextToastId,notificationId:id,expiresAt:persistent?0:Date.now()+timeout,appName:notification.appName,iconSource:shell.notificationIcon(notification),summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actionsJson:actions,actionBusy:false});
+        notification.closed.connect(reason=> {
+            shell.removeNotificationToasts(id);
+            if(kind==="hydration" && reason!==NotificationCloseReason.Expired) questlineNotificationActions.enqueue("dismiss_hydration_reminder",id,token);
+        });
+        while(toastModel.count>10) {
+            let removable=-1;
+            for(let i=0;i<toastModel.count;i++)if(toastModel.get(i).expiresAt>0){removable=i;break;}
+            if(removable<0)break;
+            toastModel.remove(removable);
         }
     }
 
@@ -258,6 +310,8 @@ ShellRoot {
             actionProcess.exec(command);
         }
     }
+
+    function setAudioVolume(kind, target, percent): void { actionError = ""; audioVolume.setVolume(kind, target, percent); }
 
     function cyclePerformanceMode(): void {
         const modes = performance.modes || ["power-saver", "balanced", "performance"];
@@ -550,7 +604,7 @@ ShellRoot {
         stdout: StdioCollector { onStreamFinished: {
             try {
                 const state = JSON.parse(text);
-                shell.gamingActive = state.gaming_enabled === true;
+                shell.gamingRequested = state.gaming_enabled === true;
                 shell.barStyle = state.bar_style || "full";
                 shell.barPosition = state.bar_position === "top" ? "top" : "left";
                 shell.barProfile = state.bar_profile || "standard";
@@ -985,6 +1039,8 @@ ShellRoot {
         function toggleBluetooth(): void { shell.openWidgetOnFocused("bluetooth"); }
         function toggleTypography(): void { shell.openWidgetOnFocused("typography"); }
         function toggleAppImages(): void { shell.openWidgetOnFocused("appimages"); }
+        function toggleAppStore(): void { shell.openOnFocused("toggleAppStore"); }
+        function appStoreStatus(): string { return JSON.stringify({page:sharedAppStore.page,results:sharedAppStore.results.length,error:sharedAppStore.error,jobs:sharedAppStore.jobs.map(job=>({id:job.id,active:job.active,phase:job.phase})),panels:bars.instances.map(bar=>({monitor:bar.screen.name,expanded:bar.appStoreOpen}))}); }
         function toggleMouse(): void { shell.openWidgetOnFocused("mouse"); }
         function toggleDisplays(): void { shell.openWidgetOnFocused("displays"); }
         function previewScreensaver(effect: string): bool { return screensaver.preview(effect); }
@@ -1009,6 +1065,8 @@ ShellRoot {
                 bars.instances[0].toggleLauncher();
         }
 
+        function toggleFavorites(): void { shell.openOnFocused("toggleFavorites"); }
+        function favoritesStatus(): string { return JSON.stringify({ready:sharedFavorites.ready,busy:sharedFavorites.busy,favorites:sharedFavorites.favorites.length,categories:sharedFavorites.categories.length,defaultBrowser:sharedFavorites.defaultBrowser,panels:bars.instances.map(bar=>({monitor:bar.screen.name,expanded:bar.favoritesOpen}))}); }
         function toggleControlCenter(): void { shell.openOnFocused("toggleControlCenter"); }
         function openControlPage(page: string): void {
             for (const instance of bars.instances) {
@@ -1068,6 +1126,9 @@ ShellRoot {
         function setDesktopLogoCorner(corner: string): void { shell.setDesktopLogoCorner(corner); }
         function setBarLeft(): void { shell.setBarPosition("left"); }
         function leaveGaming(): void { shell.leaveGaming(); }
+        function stableUpdateState(): string { return JSON.stringify({checking: shell.checkingStableUpdates, status: shell.stableUpdates}); }
+        function checkStableUpdates(): void { shell.checkStableUpdates(); }
+        function updatesState(): string { return JSON.stringify(bars.instances.map(bar => ({monitor: bar.screen.name, expanded: bar.updatesOpen}))); }
         function gamingState(): string {
             return JSON.stringify({
                 enabled: shell.gamingActive,
@@ -1108,7 +1169,7 @@ ShellRoot {
             implicitHeight: islandStats.visible ? Math.max(34, Math.ceil(islandStats.implicitHeight) + 8) : 34
             exclusionMode: ExclusionMode.Ignore
             color: shell.barStyle === "islands" ? "transparent" : shell.colors.surface
-            mask: BarInputRegion { backdrop: topIslands; islands: shell.barStyle === "islands" }
+            mask: BarInputRegion { backdrop: topIslands; islands: shell.barStyle === "islands"; hoverTarget: dashboardBarHover }
             anchors { top: true; left: true; right: true }
             visible: bar.barVisible && shell.barPosition === "top"
 
@@ -1123,6 +1184,8 @@ ShellRoot {
             readonly property bool widgetOpen: barWidget.expanded
             readonly property string widgetPage: barWidget.page
             readonly property bool dashboardOpen: dashboard.expanded
+            readonly property bool favoritesOpen: favoritesPanel.expanded
+            readonly property bool appStoreOpen: appStorePanel.expanded
             readonly property bool controlCenterOpen: controlCenter.expanded
             ShellFrame {
                 id: shellFrame
@@ -1160,7 +1223,8 @@ ShellRoot {
                 }
             }
 
-            readonly property bool igorSuppressed: shell.gamingActive || shell.recording.active || shell.audioRecording.active || audioRecorderPanel.expanded || barWidget.expanded || controlCenter.expanded || appLauncher.expanded || dashboard.expanded || screenshotPanel.expanded || recorderPanel.expanded || updatePanel.expanded || utilityPanel.expanded || notificationCenter.expanded || sessionRail.expanded || wallpaperBrowser.expanded || pickerPanel.visible || notificationToast.visible
+            readonly property bool updatesOpen: updatePanel.expanded
+            readonly property bool igorSuppressed: shell.gamingActive || shell.recording.active || shell.audioRecording.active || audioRecorderPanel.expanded || barWidget.expanded || controlCenter.expanded || favoritesPanel.expanded || appStorePanel.expanded || appLauncher.expanded || dashboard.expanded || screenshotPanel.expanded || recorderPanel.expanded || updatePanel.expanded || utilityPanel.expanded || notificationCenter.expanded || sessionRail.expanded || wallpaperBrowser.expanded || pickerPanel.visible || notificationToast.visible
 
             DesktopBranding {
                 targetScreen: bar.screen
@@ -1207,6 +1271,8 @@ ShellRoot {
                 keyboardActive = false;
                 barWidget.expanded = false;
                 controlCenter.expanded = false;
+                favoritesPanel.expanded = false;
+                appStorePanel.expanded = false;
                 notificationCenter.expanded = false;
                 sessionRail.expanded = false;
                 dashboard.expanded = false;
@@ -1262,14 +1328,15 @@ ShellRoot {
             function toggleBarExtras(): void { toggleBarWidget("extras"); }
             function toggleHotKey(): void { openUtility("hotkey"); }
             function toggleShortcuts(): void { openUtility("shortcuts"); }
+            function openUpdates(): void {
+                closeSidePanels();
+                appLauncher.expanded = false;
+                updatePanel.refresh();
+                updatePanel.expanded = true;
+            }
             function toggleUpdates(): void {
-                const opening = !updatePanel.expanded;
-                if (opening) {
-                    closeSidePanels();
-                    appLauncher.expanded = false;
-                    updatePanel.refresh();
-                }
-                updatePanel.expanded = opening;
+                if (updatePanel.expanded) updatePanel.expanded = false;
+                else openUpdates();
             }
             function toggleFocusTimer(): void { openUtility("focus"); }
             function toggleEmoji(): void { openUtility("emoji"); }
@@ -1295,15 +1362,18 @@ ShellRoot {
             }
             function toggleColorHistory(): void { openUtility("color"); }
 
+            function openDashboard(): void {
+                if (dashboard.expanded) return;
+                closeSidePanels();
+                appLauncher.expanded = false;
+                wallpaperBrowser.expanded = false;
+                shell.refreshControls();
+                dashboard.expanded = true;
+            }
+
             function toggleDashboard(): void {
-                const opening = !dashboard.expanded;
-                if (opening) {
-                    closeSidePanels();
-                    appLauncher.expanded = false;
-                    wallpaperBrowser.expanded = false;
-                    shell.refreshControls();
-                }
-                dashboard.expanded = opening;
+                if (dashboard.expanded) dashboard.expanded = false;
+                else openDashboard();
             }
 
             function toggleScreenshot(): void {
@@ -1338,6 +1408,18 @@ ShellRoot {
                 recorderPanel.expanded = opening;
                 if (opening && !recorderProcess.running)
                     recorderProcess.running = true;
+            }
+
+            function toggleAppStore(): void {
+                const opening = !appStorePanel.expanded;
+                if (opening) { closeSidePanels(); appLauncher.expanded = false; wallpaperBrowser.expanded = false; }
+                appStorePanel.expanded = opening;
+            }
+
+            function toggleFavorites(): void {
+                const opening = !favoritesPanel.expanded;
+                if (opening) { closeSidePanels(); appLauncher.expanded = false; wallpaperBrowser.expanded = false; }
+                favoritesPanel.expanded = opening;
             }
 
             function toggleControlCenter(): void {
@@ -1428,6 +1510,15 @@ ShellRoot {
 
             Dashboard {
                 id: dashboard
+                questline: utilityPanel.questline
+                questlineLoaded: utilityPanel.questlineLoaded
+                onRefreshDueDates: utilityPanel.refreshQuestline()
+                onDueItemRequested: (taskId, stepId) => {
+                    bar.closeSidePanels();
+                    appLauncher.expanded = false;
+                    wallpaperBrowser.expanded = false;
+                    utilityPanel.openQuestlineDueItem(taskId, stepId);
+                }
                 targetScreen: bar.screen
                 theme: shell
                 weather: shell.weather
@@ -1438,7 +1529,6 @@ ShellRoot {
                     switch (action) {
                     case "time": bar.toggleBarWidget("time"); break;
                     case "weather": bar.toggleBarWidget("weather"); break;
-                    case "questline": bar.toggleQuestline(); break;
                     case "mediaPrevious": shell.controlMedia("previous"); break;
                     case "mediaToggle": shell.controlMedia("toggle"); break;
                     case "mediaNext": shell.controlMedia("next"); break;
@@ -1488,38 +1578,6 @@ ShellRoot {
                 }
             }
 
-            PanelWindow {
-                id: dashboardHover
-                visible: !shell.gamingActive
-                readonly property bool coversNotch: shell.barPosition === "left" && bar.barProfile === "multimedia"
-                screen: bar.screen
-                anchors { top: true; left: true; right: true }
-                implicitHeight: coversNotch ? 34 : 6
-                exclusionMode: ExclusionMode.Ignore
-                WlrLayershell.layer: WlrLayer.Overlay
-                color: "transparent"
-                focusable: false
-                mask: Region { item: hoverArea }
-
-                Timer {
-                    id: hoverTimer
-                    interval: 180
-                    onTriggered: {
-                        if (hoverArea.containsMouse && !dashboard.expanded)
-                            bar.toggleDashboard();
-                    }
-                }
-
-                MouseArea {
-                    id: hoverArea
-                    x: (dashboardHover.width + bar.barLeftInset - width) / 2
-                    width: dashboardHover.coversNotch ? dashboardHover.width * 0.2 : 260
-                    height: parent.height
-                    hoverEnabled: true
-                    onEntered: hoverTimer.restart()
-                    onExited: hoverTimer.stop()
-                }
-            }
 
             SessionRail {
                 id: sessionRail
@@ -1542,10 +1600,10 @@ ShellRoot {
 
             UtilityPanel {
                 onSpectrumDropReturnRequested: {
-                    if (!barWidget.expanded && !controlCenter.expanded && !notificationCenter.expanded
+                    if (!barWidget.expanded && !controlCenter.expanded && !favoritesPanel.expanded && !notificationCenter.expanded
                         && !appLauncher.expanded && !sessionRail.expanded && !wallpaperBrowser.expanded
                         && !dashboard.expanded && !screenshotPanel.expanded && !recorderPanel.expanded
-                        && !audioRecorderPanel.expanded && !updatePanel.expanded)
+                        && !audioRecorderPanel.expanded && !updatePanel.expanded && !appStorePanel.expanded)
                         utilityPanel.expanded = true;
                 }
                 onQuestlineCompleted: igorRoutine.celebrate()
@@ -1560,6 +1618,26 @@ ShellRoot {
                 topInset: bar.panelTopInset
                 onFocusAction: action => shell.runAction([shell.backend("spectrum-focus"), action])
                 onFocusStart: request => shell.runAction([shell.backend("spectrum-focus"), "start", JSON.stringify(request)])
+            }
+
+            AppStorePanel {
+                id: appStorePanel
+                screen: bar.screen
+                theme: shell
+                manager: sharedAppStore
+                topInset: bar.panelTopInset
+                sideInset: bar.panelLeftInset
+                onCloseRequested: expanded = false
+            }
+
+            FavoritesPanel {
+                id: favoritesPanel
+                screen: bar.screen
+                theme: shell
+                manager: sharedFavorites
+                topInset: bar.panelTopInset
+                sideInset: bar.panelLeftInset
+                onCloseRequested: expanded = false
             }
 
             ControlCenter {
@@ -1634,6 +1712,8 @@ ShellRoot {
                     shell.notificationHistory = shell.notificationHistory.filter(entry =>
                         entry !== item && entry.notification !== item);
                 }
+                onQuestlineDrinkRequested:item=>shell.invokeNotificationAction(item.id,"questline-drink")
+                onUpdatesRequested:item=>shell.invokeNotificationAction(item.id,"spectrum-open-updates")
                 onToggleDoNotDisturb: shell.doNotDisturb = !shell.doNotDisturb
             }
 
@@ -1665,9 +1745,10 @@ ShellRoot {
                             width: toastStack.width
                             onActivated: bar.toggleNotifications()
                             onDismissed: shell.removeToast(model.toastId)
+                            onActionInvoked:identifier=>shell.invokeNotificationAction(model.notificationId,identifier)
                             Timer {
                                 interval: Math.max(1, toastCard.model.expiresAt - Date.now())
-                                running: toastCard.revealed
+                                running: toastCard.revealed && toastCard.model.expiresAt>0
                                 onTriggered: toastCard.revealed = false
                             }
                         }
@@ -1689,6 +1770,19 @@ ShellRoot {
                         barNavigation.moveDirection(event.key);
                         event.accepted = true;
                     }
+                }
+
+                DashboardHoverTarget {
+                    id: dashboardBarHover
+                    anchors { top: parent.top; bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
+                    width: Math.min(260, parent.width)
+                    targetScreen: bar.screen
+                    barPosition: shell.barPosition
+                    barProfile: bar.barProfile
+                    barVisible: bar.barVisible
+                    leftInset: bar.barLeftInset
+                    dashboardOpen: dashboard.expanded
+                    onOpenRequested: bar.openDashboard()
                 }
 
                 BarIslands {
@@ -2054,6 +2148,8 @@ ShellRoot {
                 barPosition: shell.barPosition
                 onExtraRequested: action => {
                     if (action === "spectrumdrop") bar.toggleSpectrumDrop();
+                    else if (action === "favorites") bar.toggleFavorites();
+                    else if (action === "app-store") bar.toggleAppStore();
                     else if (action === "control") bar.toggleControlCenter();
                     else if (action === "session") bar.toggleSession();
                     else bar.toggleBarWidget(action);

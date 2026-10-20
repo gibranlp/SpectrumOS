@@ -21,6 +21,7 @@ PanelWindow {
     property string planError: ""
 
     function refresh(): void {
+        if (theme.checkStableUpdates) theme.checkStableUpdates();
         if (planProcess.running)
             return;
         ready = false;
@@ -132,6 +133,18 @@ PanelWindow {
             Text {
                 Layout.fillWidth: true
                 text: "Update Arch and SpectrumOS packages together. Update everything also includes AUR packages when Paru is installed, plus system and user Flatpak apps."
+                wrapMode: Text.Wrap
+                color: panel.theme.colors.muted
+                font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+            }
+            Text {
+                Layout.fillWidth: true
+                text: panel.theme.checkingStableUpdates ? "Checking Stable…"
+                    : panel.theme.stableUpdates && panel.theme.stableUpdates.error ? "Stable check unavailable. Try Check again."
+                    : !panel.theme.stableUpdates || !panel.theme.stableUpdates.checked_at ? "Stable check runs shortly."
+                    : !panel.theme.stableUpdates.eligible ? "Stable notifications require the SpectrumOS Stable repository."
+                    : panel.theme.stableUpdates.packages.length ? panel.theme.stableUpdates.packages.length + " SpectrumOS package update(s) ready on Stable."
+                    : "SpectrumOS packages are up to date on Stable."
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.muted
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }

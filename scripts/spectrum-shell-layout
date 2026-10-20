@@ -18,6 +18,16 @@ def read_config(path):
     return data if isinstance(data, dict) else {}
 
 
+def set_automatic_override(suppressed):
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/spectrumos-{os.getuid()}") / "spectrumos"
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    marker = runtime / "gaming-auto-suppressed"
+    if suppressed:
+        marker.touch(mode=0o600)
+    else:
+        marker.unlink(missing_ok=True)
+
+
 def main():
     path = config_path()
     data = read_config(path)
@@ -52,6 +62,8 @@ def main():
         if sys.argv[1] in ("set-logo", "set-bounce", "set-gaming"):
             key = {"set-logo": "desktop_logo_enabled", "set-bounce": "widget_bounce_enabled", "set-gaming": "gaming_enabled"}[sys.argv[1]]
             data[key] = sys.argv[2] == "on"
+            if key == "gaming_enabled":
+                set_automatic_override(sys.argv[2] == "off")
         else:
             data["desktop_logo_corner"] = sys.argv[2]
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +111,7 @@ def main():
         else:
             data["gaming_enabled"] = False
             data["bar_profile"] = sys.argv[2]
+        set_automatic_override(sys.argv[2] != "gaming")
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(json.dumps(data, indent=2) + "\n")

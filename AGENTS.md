@@ -19,3 +19,8 @@ These instructions apply to the entire repository and must be read before making
 
 - Deploy completed SpectrumOS changes to this PC as part of the task, then verify the installed files and affected running service or generated configuration.
 - This standing preference authorizes local deployment of requested fixes. Keep the ISO build restriction above in force.
+
+## Shell widget stacking
+
+- Widgets must emerge from behind the bar and frame throughout opening, closing, and bounce animations; they must not cover the bar or intercept its controls.
+- Keep ordinary widget panels on `WlrLayer.Top` beneath the bars and `ShellFrame` on `WlrLayer.Overlay`. Reuse the shared shell motion and attachment geometry for both bar orientations.

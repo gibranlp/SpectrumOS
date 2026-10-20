@@ -1,0 +1,117 @@
+#!/usr/bin/python3 -I
+import fcntl
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+NAME = re.compile(r'[A-Za-z0-9@_+][A-Za-z0-9@._+\-]*\Z')
+
+
+def valid_name(value):
+    if len(value) > 200 or not NAME.fullmatch(value):
+        raise ValueError('Invalid package identity.')
+    return value
+
+
+def target(value):
+    parts = value.split('/')
+    if len(parts) not in (1, 2):
+        raise ValueError('Invalid repository package.')
+    return '/'.join(valid_name(part) for part in parts)
+
+
+def bridge_arguments(args):
+    # Paru conserva la resolución; aquí se limita la operación elevada y se restauran las confirmaciones.
+    flags, targets, operation = [], [], None
+    index = 0
+    while index < len(args):
+        value = args[index]
+        if value == '--':
+            targets.extend(args[index+1:])
+            break
+        if value in ('--config', '--color'):
+            index += 1
+            if index >= len(args) or (value == '--config' and args[index] != '/etc/pacman.conf') or (value == '--color' and args[index] not in ('never', 'auto', 'always')):
+                raise ValueError('Unsupported Pacman configuration.')
+        elif value in ('--noconfirm', '--confirm'):
+            pass
+        elif value in ('--asdeps', '--asexplicit', '--needed'):
+            flags.append(value)
+        elif value in ('-S', '-Su', '-Syu', '-U', '-D', '--sync', '--upgrade', '--database'):
+            if operation is not None:
+                raise ValueError('Only one package operation is allowed.')
+            operation = {'--sync': '-S', '--upgrade': '-U', '--database': '-D'}.get(value, value)
+        elif value.startswith('-'):
+            raise ValueError('Unsupported Pacman option: '+value)
+        else:
+            targets.append(value)
+        index += 1
+    if operation is None or not targets or len(targets) > 300:
+        raise ValueError('A package operation and targets are required.')
+    if operation == '-U':
+        normalized = []
+        for value in targets:
+            path = Path(value)
+            if not path.is_absolute() or not path.is_file() or not re.search(r'\.pkg\.tar\.(?:zst|xz|gz)$', path.name):
+                raise ValueError('Only existing local package archives are supported.')
+            normalized.append(str(path.resolve()))
+        targets = normalized
+    else:
+        targets = [target(value) for value in targets]
+    if operation.startswith('-S'):
+        operation = '-Syu'
+    if operation == '-D' and any(value not in ('--asdeps', '--asexplicit') for value in flags):
+        raise ValueError('Only package installation reasons can be changed.')
+    return [operation, '--color', 'never', '--confirm', *flags, '--', *targets]
+
+
+def execute(args):
+    if not args:
+        raise ValueError('No installation operation was provided.')
+    terminal = args[0] == 'terminal-official'
+    if args[0] in ('official', 'terminal-official') and len(args) in (1, 2):
+        command = ['-Syu', '--needed', '--confirm', '--color', 'never']
+        if len(args) == 2:
+            command += ['--', target(args[1])]
+        upgrade = True
+    elif args[0] == 'bridge':
+        command = bridge_arguments(args[1:])
+        upgrade = command[0] == '-Syu'
+    else:
+        raise ValueError('Unsupported installation operation.')
+    if os.geteuid() != 0:
+        raise ValueError('Desktop authentication is required.')
+    environment = {'PATH': '/usr/bin:/bin', 'HOME': '/root', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'TERM': 'dumb'}
+    if not terminal:
+        print('SPECTRUM_APP_STORE_AUTHENTICATED', flush=True)
+    descriptor = os.open('/run/lock/spectrum-package.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    if os.fstat(descriptor).st_uid != 0:
+        os.close(descriptor)
+        raise ValueError('The shared package lock has an unexpected owner.')
+    with os.fdopen(descriptor, 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if upgrade:
+            result = subprocess.run(['/usr/bin/spectrum', 'update', 'plan'], env=environment, check=False)
+            if result.returncode:
+                return result.returncode
+        result = subprocess.run(['/usr/bin/pacman', *command], env=environment, check=False)
+        if result.returncode:
+            return result.returncode
+        if not terminal:
+            print('SPECTRUM_APP_STORE_PACKAGES_COMMITTED', flush=True)
+        if upgrade:
+            result = subprocess.run(['/usr/bin/spectrum', 'migrate', 'apply'], env=environment, check=False)
+            if result.returncode:
+                print('Packages committed, but SpectrumOS migrations need attention.', flush=True)
+                return 3
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(execute(sys.argv[1:]))
+    except Exception as error:
+        print('App Store: '+str(error), file=sys.stderr)
+        raise SystemExit(1)

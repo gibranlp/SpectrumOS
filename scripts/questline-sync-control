@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+import json
+import datetime
+import uuid
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+def emit(value):
+    print(json.dumps(value),flush=True)
+
+
+def read_request():
+    raw=sys.stdin.readline(64*1024+1)
+    if len(raw)>64*1024:raise ValueError('Sync request is too large.')
+    value=json.loads(raw) if raw.strip() else dict(cancel=True)
+    if not isinstance(value,dict):raise ValueError('Invalid Sync request.')
+    return value
+
+
+def services():
+    if os.environ.get('QUESTLINE_STORAGE_DIR'):
+        return dict(active='custom profile',enabled='not managed')
+    result={}
+    for key,verb in [('active','is-active'),('enabled','is-enabled')]:
+        try:
+            p=subprocess.run(['systemctl','--user',verb,'spectrum-questline-sync.service'],capture_output=True,text=True,timeout=3)
+            result[key]=p.stdout.strip() or 'unavailable'
+        except (OSError,subprocess.SubprocessError):result[key]='unavailable'
+    return result
+
+
+def export_destination():
+    folder=Path.home()/'Downloads'
+    try:
+        result=subprocess.run(['xdg-user-dir','DOWNLOAD'],capture_output=True,text=True,timeout=5)
+        configured=Path(result.stdout.strip())
+        if result.returncode==0 and result.stdout.strip() and configured.is_absolute():folder=configured
+    except (OSError,subprocess.SubprocessError):pass
+    folder.mkdir(parents=True,exist_ok=True)
+    stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S')
+    return str(folder/('questline-profile-'+stamp+'-'+uuid.uuid4().hex+'.json'))
+
+
+def choose_restore():
+    args=['zenity','--file-selection','--title=Restore Questline backup',
+          '--file-filter=Questline backups | *.db *.json .questline-export','--file-filter=All files | *']
+    folder=Path(os.environ.get('QUESTLINE_STORAGE_DIR') or Path.home()/'.config/questline')/'backups'
+    if folder.is_dir():args+=['--filename='+str(folder)+'/']
+    result=subprocess.run(args,capture_output=True,text=True,timeout=600)
+    if result.returncode==1:return None
+    if result.returncode:raise ValueError('The file chooser could not open.')
+    return result.stdout.strip() or None
+
+
+def preserve_drafts():
+    state=Path(os.environ.get('XDG_STATE_HOME') or Path.home()/'.local/state')/'spectrumos/questline-widget.json'
+    if not state.exists():return None
+    folder=state.parent/'questline-draft-backups';folder.mkdir(parents=True,exist_ok=True,mode=0o700)
+    target=folder/('before-restore-'+str(time.time_ns())+'.json')
+    fd=os.open(target,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+    with os.fdopen(fd,'wb') as output:output.write(state.read_bytes());output.flush();os.fsync(output.fileno())
+    return str(target)
+
+
+def main():
+    request=read_request();action=request.get('action')
+    if action=='copy_transfer':
+        code=request.get('transfer_code','')
+        if not isinstance(code,str) or not code or len(code)>256:raise ValueError('No Transfer Code to copy.')
+        subprocess.run(['wl-copy'],input=code,text=True,check=True,timeout=5)
+        emit(dict(ok=True,message='Transfer Code copied. Keep it private.'));return
+    configured=os.environ.get('SPECTRUM_QUESTLINE_BINARY')
+    local=Path.home()/'.local/bin/questline'
+    binary=configured or (str(local) if local.is_file() and os.access(local,os.X_OK) else shutil.which('questline'))
+    if not binary:raise ValueError('Questline is not installed.')
+    capability=subprocess.run([binary,'--help'],capture_output=True,text=True,timeout=5)
+    if capability.returncode or 'sync-json' not in capability.stdout:raise ValueError('Update Questline to use Sync and profile controls.')
+    if action=='export_profile' and not request.get('path'):
+        request['path']=export_destination()
+    if action=='restore_backup' and not request.get('path'):
+        selected=choose_restore()
+        if not selected:emit(dict(ok=True,cancelled=True,message='File selection canceled'));return
+        request['path']=selected
+    process=subprocess.Popen([binary,'sync-json'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,bufsize=1)
+    try:
+        process.stdin.write(json.dumps(request)+'\n');process.stdin.flush();request={}
+        for line in process.stdout:
+            value=json.loads(line)
+            if value.get('status') is not None:value['status']['service']=services()
+            emit(value)
+            if value.get('phase')=='preview':
+                decision=read_request()
+                if decision.get('confirm')==value.get('token') and action in ('restore_identity','restore_backup','restore_cloud'):preserve_drafts()
+                process.stdin.write(json.dumps(decision)+'\n');process.stdin.flush()
+        if process.wait(timeout=5):raise ValueError('Questline could not complete this operation. Your saved data has been preserved.')
+    finally:
+        process.stdin.close()
+        if process.poll() is None:process.terminate();process.wait(timeout=10)
+
+
+if __name__=='__main__':
+    try:main()
+    except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:emit(dict(ok=False,error=str(exc)));sys.exit(1)

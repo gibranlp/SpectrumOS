@@ -3,6 +3,8 @@ import QtQuick
 Item {
     id: store
     property bool ready: false
+    property string profileKey: ""
+    signal profileChanged()
     property string activeTab: "Overview"
     property string selectedProjectId: ""
     property var views: ({})
@@ -18,9 +20,10 @@ Item {
     signal saved(string key, string id)
 
     function copy(value) { return JSON.parse(JSON.stringify(value)); }
-    function snapshot() { return {version:1,activeTab:activeTab,selectedProjectId:selectedProjectId,views:views,drafts:drafts,inFlight:inFlight}; }
+    function snapshot() { return {version:1,profile_key:profileKey,activeTab:activeTab,selectedProjectId:selectedProjectId,views:views,drafts:drafts,inFlight:inFlight}; }
     function restore(data): void {
         if (data && data.version === 1) {
+            profileKey=data.profile_key || "";
             views = data.views || {};
             drafts = data.drafts || {};
             activeTab = data.activeTab || "Overview";
@@ -35,10 +38,27 @@ Item {
         ready = true;
         debounce.restart();
     }
+    function bindProfile(key): void {applyProfileKey(key);}
+    function applyProfileKey(key): void {
+        if(!ready || !key || key===profileKey)return;
+        const replaced=!!profileKey || key.split(":").slice(1).join(":").length>0;
+        if(replaced) {drafts={};views={};selectedProjectId="";inFlight=null;activeTab="Sync";}
+        else {
+            const next=copy(drafts);
+            for(const id of Object.keys(next)) {
+                const row=next[id];const saved=row.saved===JSON.stringify(row.payload);
+                row.payload.profile_key=key;
+                if(saved)row.saved=JSON.stringify(row.payload);
+            }
+            drafts=next;
+        }
+        profileKey=key;changed();
+        if(replaced)profileChanged();
+    }
     function projectForView(tab, view) {
         if (view.quickScrollPicker) return "";
-        if (view.editing && ["Tasks","Scrolls","Treasury"].includes(tab) && view.editCampaignId) return view.editCampaignId;
-        if (tab === "Tasks") return view.campaignId;
+        if (view.editing && ["Tasks","Scrolls","Treasury","Chronicles"].includes(tab) && view.editCampaignId) return view.editCampaignId;
+        if (tab === "Tasks" || tab === "Chronicles") return view.campaignId;
         if (tab === "Scrolls") return view.scrollProjectId;
         if (tab === "Treasury") return view.treasuryCampaignId;
         if (tab === "Focus" && view.focus) return view.focus.projectId;
@@ -59,6 +79,7 @@ Item {
         const next = copy(drafts);
         const previous = next[key];
         payload = copy(payload);
+        if(profileKey)payload.profile_key=profileKey;
         if (previous && previous.payload.id) {
             payload.id = previous.payload.id;
             payload.action = payload.action.replace("create_", "update_");

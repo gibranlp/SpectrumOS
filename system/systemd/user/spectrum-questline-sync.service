@@ -1,0 +1,14 @@
+[Unit]
+Description=Questline encrypted profile and Favorites synchronization
+PartOf=graphical-session.target spectrum-shell.service
+After=spectrum-shell.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/spectrumos/questline-sync
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=15
+
+[Install]
+WantedBy=graphical-session.target

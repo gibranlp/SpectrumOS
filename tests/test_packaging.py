@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import re
 import shutil
 import tempfile
 import unittest
@@ -180,6 +181,21 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("configs/nvim/{init.lua,lazy-lock.json,lazyvim.json,stylua.toml}", pkgbuild)
         self.assertIn("configs/nvim/colors/spectrum.lua", pkgbuild)
 
+    def test_desktop_frontend_install_loop_ships_app_store_helpers(self):
+        recipe = (ROOT / "packages/spectrum-desktop/PKGBUILD").read_text()
+        body = recipe.split("package() {", 1)[1]
+        loop = re.search(r"    for script in .*?    done", body, re.S)
+        self.assertIsNotNone(loop)
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary)
+            script = 'set -eu\n_project=$1\npkgdir=$2\ninstall -d "$pkgdir/usr/lib/spectrumos"\n' + loop.group()
+            subprocess.run(["bash", "-c", script, "package-frontends", str(ROOT), str(package)], check=True)
+            for name in ("app-store-adapter", "app-store-privileged", "app-store-paru-bridge"):
+                installed = package / "usr/lib/spectrumos" / name
+                self.assertTrue(installed.is_file(), name)
+                self.assertEqual(installed.read_bytes(), (ROOT / "scripts" / name).read_bytes())
+                self.assertTrue(installed.stat().st_mode & 0o111)
+
     def test_hyprland_package_contains_hardware_profile_assets(self):
         pkgbuild = (ROOT / "packages" / "spectrum-hyprland" / "PKGBUILD").read_text(encoding="utf-8")
 
@@ -209,7 +225,8 @@ class PackagingTests(unittest.TestCase):
             self.assertNotIn("$startdir/../..", recipe)
 
         desktop = recipes[1]
-        self.assertIn('questline-$_questline_version-linux-x86_64::https://github.com/gibranlp/Questline-cli/releases/download/', desktop)
+        self.assertRegex(desktop, r'questline-[0-9.]+-spectrum-[^:\s"]+\.tar\.zst::https://spectrum\.gibranlp\.dev/sources/')
+        self.assertNotIn("'SKIP'", desktop)
         self.assertIn('usr/bin/questline', desktop)
 
     def test_desktop_packages_shared_font_registry_without_dunst_override(self):

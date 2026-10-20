@@ -1,0 +1,718 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import concurrent.futures
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import queue
+import re
+import runpy
+import select
+import shlex
+import shutil
+import socket
+import subprocess
+import sys
+import termios
+import threading
+import time
+import uuid
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+BACKEND = Path(__file__).resolve().parent
+PACKAGE = re.compile(r'[A-Za-z0-9@_+][A-Za-z0-9@._+\-]*\Z')
+REF = re.compile(r'app/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2,}/[A-Za-z0-9_]+/[A-Za-z0-9_.-]+\Z')
+ANSI = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)')
+DISCOVER_REFS = {'org.mozilla.firefox', 'org.videolan.VLC', 'org.gimp.GIMP', 'org.inkscape.Inkscape',
+                 'org.blender.Blender', 'org.kde.krita', 'org.libreoffice.LibreOffice',
+                 'com.obsproject.Studio', 'org.mozilla.Thunderbird', 'org.audacityteam.Audacity',
+                 'org.kde.kdenlive', 'com.spotify.Client', 'com.valvesoftware.Steam'}
+
+
+def directory():
+    return Path(os.environ.get('XDG_STATE_HOME') or Path.home()/'.local/state')/'spectrumos/app-store'
+
+
+def atomic(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporary = path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        json.dump(data, stream, ensure_ascii=False)
+    temporary.replace(path)
+
+
+def run(*args, timeout=25):
+    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
+                            env=dict(os.environ, LC_ALL='C.UTF-8'), check=False)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip()[:1000] or f'{args[0]} returned {result.returncode}.')
+    return result.stdout
+
+
+def identifier(value):
+    if not isinstance(value, str) or len(value) > 200 or not PACKAGE.fullmatch(value):
+        raise ValueError('Invalid package or repository identity.')
+    return value
+
+
+def installations():
+    import gi
+    gi.require_version('Flatpak', '1.0')
+    from gi.repository import Flatpak
+    return [('user', Flatpak.Installation.new_user(None))] + [
+        ('system' if item.get_id() in (None, 'default') else item.get_id(), item)
+        for item in Flatpak.get_system_installations(None)]
+
+
+def scope_args(scope):
+    if scope == 'user':
+        return ['--user']
+    if scope == 'system':
+        return ['--system']
+    return ['--installation='+identifier(scope)]
+
+
+def installed_packages():
+    return dict(line.split(' ', 1) for line in run('pacman', '-Q').splitlines() if ' ' in line)
+
+
+def official_search(query, installed=False):
+    versions = installed_packages()
+    if installed:
+        names = run('pacman', '-Qqe').splitlines()
+        names = [name for name in names if query.casefold() in name.casefold()][:100]
+        if not names:
+            return []
+        output = run('pacman', '-Qi', '--', *names)
+        blocks = re.split(r'\n\s*\n', output)
+        result = []
+        for block in blocks:
+            fields = parse_fields(block)
+            if 'Name' in fields:
+                name = fields['Name']
+                result.append(dict(source='pacman', repository='installed', name=name,
+                                   title=name, version=fields.get('Version', ''),
+                                   description=fields.get('Description', ''), installed=True))
+        return result
+    pattern = re.escape(query) if query else '^(firefox|chromium|vlc|gimp|inkscape|blender|krita|libreoffice-fresh|obs-studio|thunderbird|audacity|kdenlive)$'
+    process = subprocess.run(['pacman', '-Ss', '--', pattern], capture_output=True, text=True,
+                             timeout=20, env=dict(os.environ, LC_ALL='C.UTF-8'))
+    if process.returncode not in (0, 1):
+        raise RuntimeError(process.stderr.strip()[:1000] or 'Could not read package repositories.')
+    rows = []
+    for line in process.stdout.splitlines():
+        if line and not line[0].isspace():
+            parts = line.split()
+            repo, name = parts[0].split('/', 1)
+            rows.append(dict(source='pacman', repository=repo, name=name, title=name,
+                             version=parts[1], installed=name in versions, description=''))
+        elif rows:
+            rows[-1]['description'] += line.strip()+' '
+    return rows[:100]
+
+
+def parse_fields(text):
+    fields = {}
+    key = ''
+    for line in text.splitlines():
+        if ' : ' in line and not line.startswith(' '):
+            key, value = line.split(' : ', 1)
+            key = key.strip()
+            fields[key] = value.strip()
+        elif key and line.startswith(' '):
+            fields[key] += ' '+line.strip()
+    return fields
+
+
+def aur_rpc(kind, value):
+    params = {'v': '5', 'type': kind}
+    params['arg[]' if kind == 'info' else 'arg'] = value
+    if kind == 'search':
+        params['by'] = 'name-desc'
+    cache_root = Path(os.environ.get('XDG_CACHE_HOME') or Path.home()/'.cache')/'spectrumos/app-store/aur'
+    cache = cache_root/(hashlib.sha256(urlencode(params).encode()).hexdigest()+'.json')
+    try:
+        if time.time()-cache.stat().st_mtime < 120:
+            return json.loads(cache.read_text())
+    except (OSError, ValueError):
+        pass
+    request = Request('https://aur.archlinux.org/rpc/?'+urlencode(params),
+                      headers={'User-Agent': 'SpectrumOS-App-Store/1.0'})
+    with urlopen(request, timeout=18) as response:
+        raw = response.read(4_000_001)
+    if len(raw) > 4_000_000:
+        raise RuntimeError('AUR response is too large. Use a more specific search.')
+    data = json.loads(raw)
+    if data.get('error'):
+        raise RuntimeError(data['error'])
+    results = data.get('results', [])
+    atomic(cache, results)
+    try:
+        for old in sorted(cache_root.glob('*.json'), key=lambda item:item.stat().st_mtime, reverse=True)[40:]:
+            old.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return results
+
+
+def aur_search(query):
+    if len(query) < 2:
+        return []
+    versions = installed_packages()
+    return [dict(source='aur', repository='AUR', name=item['Name'], title=item['Name'],
+                 version=item['Version'], description=item.get('Description') or '',
+                 maintainer=item.get('Maintainer') or 'Unmaintained',
+                 homepage=item.get('URL') or '', installed=item['Name'] in versions)
+            for item in aur_rpc('search', query)[:100]]
+
+
+def flatpak_search(query, installed=False):
+    rows = []
+    for scope, installation in installations():
+        refs = {ref.format_ref(): ref for ref in installation.list_installed_refs(None)
+                if ref.format_ref().startswith('app/')}
+        if installed:
+            for ref, item in refs.items():
+                title = item.get_appdata_name() or item.get_name()
+                if query.casefold() not in (title+' '+ref).casefold():
+                    continue
+                rows.append(dict(source='flatpak', scope=scope, remote=item.get_origin(), ref=ref,
+                                 name=item.get_name(), title=title, version=item.get_appdata_version() or '',
+                                 description=item.get_appdata_summary() or '', installed=True))
+        else:
+            output = run('flatpak', 'search', *scope_args(scope),
+                         '--columns=application:f,name:f,description:f,version:f,branch:f,remotes:f',
+                         '--', query, timeout=45)
+            for line in output.splitlines():
+                parts = line.split('\t')
+                if len(parts) != 6:
+                    continue
+                name, title, description, version, branch, remotes = parts
+                if not query and name not in DISCOVER_REFS:
+                    continue
+                ref = f'app/{name}/{platform.machine()}/{branch}'
+                if not REF.fullmatch(ref):
+                    continue
+                for remote in remotes.split(','):
+                    remote = remote.strip()
+                    if remote:
+                        rows.append(dict(source='flatpak', scope=scope, remote=remote, ref=ref,
+                                         name=name, title=title, description=description,
+                                         version=version, installed=ref in refs and refs[ref].get_origin() == remote))
+    return rows[:100]
+
+
+def enrich_installed(rows):
+    for row in rows:
+        row['launchable'] = False
+        row['icon'] = row['name']
+    if not any(row.get('installed') for row in rows):
+        return
+    import gi
+    gi.require_version('Gio', '2.0')
+    from gi.repository import Gio
+    catalog = runpy.run_path(str(BACKEND/'application-adapter'))['applications']()
+    desktop_files = {}
+    for item in catalog:
+        info = Gio.DesktopAppInfo.new(item['desktop_id'])
+        if info and item.get('source') not in ('Flatpak', 'AppImage'):
+            desktop_files[info.get_filename()] = item
+    owners = {}
+    if desktop_files:
+        output = subprocess.run(['pacman', '-Qo', '--', *desktop_files], capture_output=True,
+                                text=True, timeout=10, env=dict(os.environ, LC_ALL='C.UTF-8')).stdout
+        for line in output.splitlines():
+            match = re.fullmatch(r'(.+) is owned by (\S+) \S+', line)
+            if match:
+                owners.setdefault(match[2], desktop_files[match[1]])
+    for row in rows:
+        if not row.get('installed'):
+            continue
+        if row['source'] == 'flatpak':
+            row['launchable'] = Gio.DesktopAppInfo.new(row['name']+'.desktop') is not None
+        elif row['name'] in owners:
+            app = owners[row['name']]
+            row.update(launchable=True, title=app['name'], icon=app['icon'])
+
+
+def search(payload):
+    query = str(payload.get('query', '')).strip()[:120]
+    source = payload.get('source', 'all')
+    installed = payload.get('installed', False) is True
+    tasks = {}
+    rows, errors = [], []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        if source in ('all', 'pacman') and shutil.which('pacman'):
+            tasks[pool.submit(official_search, query, installed)] = 'System packages'
+        if source in ('all', 'aur') and not installed:
+            tasks[pool.submit(aur_search, query)] = 'AUR'
+        if source in ('all', 'flatpak') and shutil.which('flatpak'):
+            tasks[pool.submit(flatpak_search, query, installed)] = 'Flatpak'
+        for future in concurrent.futures.as_completed(tasks):
+            try:
+                rows.extend(future.result())
+            except Exception as error:
+                errors.append(tasks[future]+': '+str(error))
+    enrich_installed(rows)
+    for row in rows:
+        row['key'] = hashlib.sha256(json.dumps(row, sort_keys=True).encode()).hexdigest()[:24]
+        row['label'] = (row.get('repository', '') if row['source'] != 'flatpak'
+                        else f"{row['remote']} · {row['scope']}")
+    rows.sort(key=lambda item: (query.casefold() not in (item['name'].casefold(), item['title'].casefold()),
+                                item['source'] == 'aur', item['title'].casefold(), item.get('scope') != 'user'))
+    return dict(ok=True, results=rows, warnings=errors,
+                backends={name: bool(shutil.which(name)) for name in ('pacman', 'paru', 'flatpak')})
+
+
+def validate_target(target):
+    source = target.get('source')
+    if source in ('pacman', 'aur'):
+        identifier(target.get('name'))
+        if source == 'pacman':
+            identifier(target.get('repository'))
+            if target['repository'] == 'installed':
+                raise ValueError('This installed package is not an installation target.')
+    elif source == 'flatpak':
+        identifier(target.get('remote'))
+        scope_args(target.get('scope'))
+        if not isinstance(target.get('ref'), str) or not REF.fullmatch(target['ref']):
+            raise ValueError('Invalid Flatpak reference.')
+    else:
+        raise ValueError('Unknown application source.')
+    return target
+
+
+def details(target):
+    if target.get('source') == 'pacman':
+        identifier(target.get('name'))
+        installed = target.get('repository') == 'installed'
+        arg = target['name'] if installed else identifier(target.get('repository'))+'/'+target['name']
+        text = run('pacman', '-Qi' if installed else '-Si', '--', arg)
+    elif target.get('source') == 'aur':
+        identifier(target.get('name'))
+        matches = aur_rpc('info', target['name'])
+        if not matches:
+            raise ValueError('This package is no longer available on the AUR.')
+        item = matches[0]
+        text = '\n'.join(f'{key}: {item.get(key) or "Not provided"}' for key in
+                         ('Name', 'Version', 'Description', 'Maintainer', 'URL', 'License', 'Depends', 'MakeDepends', 'OutOfDate'))
+        text += '\n\nCommunity build scripts run as your user. Review the build files before approving installation.'
+    else:
+        validate_target(target)
+        text = run('flatpak', 'remote-info', *scope_args(target['scope']),
+                   '--', target['remote'], target['ref'], timeout=30)
+    return dict(ok=True, detail=text)
+
+
+def job_path(job_id):
+    if not isinstance(job_id, str) or not re.fullmatch('[a-f0-9]{32}', job_id):
+        raise ValueError('Invalid installation job.')
+    return directory()/job_id
+
+
+def socket_path(job_id):
+    job_path(job_id)
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR') or f'/tmp/spectrum-app-store-{os.getuid()}')
+    folder = runtime/'spectrumos/app-store'
+    folder.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if folder.stat().st_uid != os.getuid() or folder.stat().st_mode & 0o077:
+        raise ValueError('The App Store runtime directory must be private and owned by your user.')
+    return folder/(job_id+'.sock')
+
+
+def jobs():
+    output = []
+    for path in sorted(directory().glob('*/status.json'), key=lambda p: p.stat().st_mtime, reverse=True)[:8]:
+        try:
+            item = json.loads(path.read_text())
+            if item.get('mode') == 'terminal':
+                try:
+                    with (path.parent/'terminal.log').open('rb') as transcript:
+                        transcript.seek(max(0, os.fstat(transcript.fileno()).st_size-100_000))
+                        item['log'] = ANSI.sub('', transcript.read().decode('utf-8', errors='replace')).replace('\r\n', '\n').replace('\r', '\n')
+                except OSError:
+                    pass
+            if item.get('active'):
+                pid = item.get('pid', 0)
+                try:
+                    alive = Path(f'/proc/{pid}/stat').read_text().split()[21] == item.get('processStart')
+                except (OSError, IndexError):
+                    alive = False
+                if not alive:
+                    item.update(active=False, phase='interrupted', prompt=None,
+                                message='The installation worker stopped. Check installed state before retrying.')
+            output.append(item)
+        except (OSError, ValueError):
+            continue
+    return output
+
+
+def start(target):
+    validate_target(target)
+    if target['source'] == 'aur' and not shutil.which('paru'):
+        raise ValueError('Paru is not installed. Install Paru before using AUR packages.')
+    directory().mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (directory()/'start.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if any(job.get('active') for job in jobs()):
+            raise ValueError('An App Store installation is already active. Open Activity to continue.')
+        job_id = uuid.uuid4().hex
+        path = job_path(job_id)
+        atomic(path/'request.json', target)
+        (path/'terminal.log').touch(mode=0o600, exist_ok=False)
+        state_home = os.environ.get('XDG_STATE_HOME') or str(Path.home()/'.local/state')
+        cache_home = os.environ.get('XDG_CACHE_HOME') or str(Path.home()/'.cache')
+        command = shlex.join([str(BACKEND/'app-store-adapter'), 'terminal', job_id])
+        launcher_path = path/'launcher.log'
+        launcher_path.touch(mode=0o600, exist_ok=False)
+        with launcher_path.open('w') as launcher_log:
+            launcher = subprocess.Popen([
+                'uwsm', 'app', '--', '/usr/bin/env', 'XDG_STATE_HOME='+state_home, 'XDG_CACHE_HOME='+cache_home,
+                'kitty', '--hold', '--title', 'App Store · '+target.get('name', 'Installation'),
+                '-e', '/usr/bin/script', '--quiet', '--return', '--flush', '--log-out', str(path/'terminal.log'),
+                '--command', command], stdin=subprocess.DEVNULL, stdout=launcher_log, stderr=launcher_log,
+                start_new_session=True, close_fds=True)
+        deadline = time.monotonic()+8
+        while not (path/'status.json').exists() and time.monotonic() < deadline:
+            if launcher.poll() not in (None, 0):
+                raise RuntimeError(launcher_path.read_text().strip()[:1000] or 'The installation terminal could not be opened.')
+            time.sleep(.05)
+        if not (path/'status.json').exists():
+            raise RuntimeError('The installation terminal did not start. No automatic retry was attempted.')
+    return dict(ok=True, jobId=job_id)
+
+
+def request(job_id, data):
+    client = socket.socket(socket.AF_UNIX)
+    client.settimeout(10)
+    client.connect(str(socket_path(job_id)))
+    with client, client.makefile('rwb') as stream:
+        stream.write(json.dumps(data).encode()+b'\n')
+        stream.flush()
+        return json.loads(stream.readline(1_000_000))
+
+
+def question(text):
+    clean = ANSI.sub('', text).replace('\r', '\n')
+    tail = clean.rstrip().split('\n')[-1].strip()
+    if re.search(r'\[[Yy]/[Nn]\]\s*[:?]?\s*$', tail):
+        return dict(kind='confirm', text=tail)
+    if re.search(r'(?:Enter a (?:number|selection)|(?:default|Default)\s*[:=]).*[:>]\s*$', tail):
+        return dict(kind='selection', text=tail)
+    return None
+
+
+class Job:
+    def __init__(self, job_id):
+        self.path = job_path(job_id)
+        self.target = validate_target(json.loads((self.path/'request.json').read_text()))
+        self.state = dict(id=job_id, target=self.target, active=True, phase='preparing',
+                          message='Preparing installation…', log='', prompt=None, pid=os.getpid(),
+                          processStart=Path('/proc/self/stat').read_text().split()[21], started=int(time.time()))
+        self.lock = threading.RLock()
+        self.answers = queue.Queue()
+        self.save()
+
+    def save(self, **patch):
+        with self.lock:
+            self.state.update(patch)
+            atomic(self.path/'status.json', self.state)
+
+    def append(self, text):
+        with self.lock:
+            self.save(log=(self.state['log']+ANSI.sub('', text).replace('\r\n', '\n').replace('\r', '\n'))[-100_000:])
+
+    def ask(self, prompt):
+        token = uuid.uuid4().hex
+        self.save(prompt=dict(prompt, token=token), phase='question', message='Your confirmation is needed.')
+        answer = self.answers.get()
+        system_flatpak = self.target['source'] == 'flatpak' and self.target['scope'] != 'user'
+        self.save(prompt=None, phase='authentication' if system_flatpak else 'working',
+                  message='Installing; the desktop may request authentication.' if system_flatpak else 'Installation is running…')
+        return answer
+
+    def client(self, connection):
+        with connection, connection.makefile('rwb') as stream:
+            try:
+                data = json.loads(stream.readline(1_000_000))
+                if data.get('action') == 'answer':
+                    with self.lock:
+                        prompt = self.state.get('prompt')
+                        if not prompt or data.get('token') != prompt['token']:
+                            raise ValueError('This question has already changed. Refresh Activity.')
+                        answer = data.get('answer')
+                        if prompt['kind'] in ('confirm', 'review'):
+                            if answer not in ('y', 'n'):
+                                raise ValueError('Choose Yes or No.')
+                        elif not isinstance(answer, str) or not re.fullmatch(r'[0-9 ,\-]{0,80}', answer):
+                            raise ValueError('Enter only the selection numbers shown above.')
+                        self.save(prompt=None)
+                        self.answers.put(answer)
+                    result = dict(ok=True)
+                elif data.get('action') == 'review':
+                    text = review_files(Path(data['directory']))
+                    answer = self.ask(dict(kind='review', text='Review AUR build files and changes', body=text))
+                    result = dict(ok=answer == 'y')
+                elif data.get('action') == 'authentication':
+                    self.save(phase='authentication', message='Complete the desktop authentication dialog.')
+                    result = dict(ok=True)
+                else:
+                    raise ValueError('Unknown job action.')
+            except Exception as error:
+                result = dict(ok=False, error=str(error))
+            stream.write(json.dumps(result).encode()+b'\n')
+            stream.flush()
+
+    def serve(self, server):
+        while self.state['active']:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            threading.Thread(target=self.client, args=(connection,), daemon=True).start()
+
+    def command(self, argv, authentication=False):
+        import pty
+        master, slave = pty.openpty()
+        settings = termios.tcgetattr(slave)
+        settings[3] &= ~termios.ECHO
+        termios.tcsetattr(slave, termios.TCSANOW, settings)
+        environment = dict(os.environ, LC_ALL='C.UTF-8', TERM='dumb', NO_COLOR='1',
+                           SPECTRUM_APP_STORE_JOB=self.state['id'])
+        if argv[0] == 'paru':
+            environment['PARU_CONF'] = '/usr/share/spectrumos/app-store/paru.conf'
+        self.save(phase='authentication' if authentication else 'working',
+                  message='Complete the desktop authentication dialog.' if authentication else 'Installation is running…')
+        process = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave, env=environment, close_fds=True)
+        os.close(slave)
+        pending = ''
+        last_output = time.monotonic()
+        decoder = __import__('codecs').getincrementaldecoder('utf-8')(errors='replace')
+        try:
+            while True:
+                readable, _, _ = select.select([master], [], [], .25)
+                if readable:
+                    try:
+                        chunk = os.read(master, 32768)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    text = decoder.decode(chunk)
+                    last_output = time.monotonic()
+                    if 'SPECTRUM_APP_STORE_AUTHENTICATED' in text:
+                        self.save(phase='working', message='Installing packages…')
+                        text = text.replace('SPECTRUM_APP_STORE_AUTHENTICATED', '')
+                    if 'SPECTRUM_APP_STORE_PACKAGES_COMMITTED' in text:
+                        self.save(systemChanged=True)
+                        text = text.replace('SPECTRUM_APP_STORE_PACKAGES_COMMITTED', 'Package transaction completed.')
+                    self.append(text)
+                    pending = (pending+text)[-8000:]
+                elif pending:
+                    prompt = question(pending)
+                    if prompt:
+                        answer = self.ask(prompt)
+                        os.write(master, (answer+'\n').encode())
+                        pending = ''
+                    elif time.monotonic()-last_output > 15 and not self.state.get('prompt'):
+                        self.save(message='Still working. If a source is waiting on an unsupported question, inspect the details; no response will be sent automatically.')
+                if process.poll() is not None and not readable:
+                    break
+        finally:
+            os.close(master)
+        return process.wait()
+
+    def execute(self):
+        self.path.mkdir(mode=0o700, exist_ok=True)
+        server = socket.socket(socket.AF_UNIX)
+        try:
+            control = socket_path(self.state['id'])
+            server.bind(str(control))
+            os.chmod(control, 0o600)
+            server.listen(8)
+            threading.Thread(target=self.serve, args=(server,), daemon=True).start()
+        except Exception as error:
+            self.save(active=False, phase='failed', message='Could not start installation control: '+str(error))
+            server.close()
+            return
+        try:
+            lock_dir = Path(os.environ.get('XDG_RUNTIME_DIR') or directory())/'spectrumos'
+            lock_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with (lock_dir/'update.lock').open('w') as update_lock:
+                fcntl.flock(update_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                source = self.target['source']
+                if source in ('pacman', 'aur'):
+                    self.append(run('spectrum', 'update', 'plan'))
+                    self.append('\nSystem packages require a complete system upgrade. Review the resolved package list before approving.\n')
+                    args = ['pkexec', '--disable-internal-agent', '/usr/lib/spectrumos/app-store-privileged', 'official']
+                    if source == 'pacman':
+                        args += [self.target['repository']+'/'+self.target['name']]
+                    code = self.command(args, authentication=True)
+                    if code:
+                        if code in (3, 4) and self.state.get('systemChanged'):
+                            raise RuntimeError('System packages were committed, but '+('migrations' if code == 3 else 'the health check')+' need attention. No later AUR build was started.')
+                        raise RuntimeError(f'System transaction did not complete (exit {code}). Review the details below.')
+                    if source == 'aur':
+                        self.append('\nSystem upgrade completed. Preparing the AUR build as your user.\n')
+                        code = self.command(['paru', '-S', '--needed', '--review', '--rebuild', '--noremovemake', '--nosudoloop', '--nouseask',
+                                             '--', 'aur/'+self.target['name']])
+                        if code:
+                            raise RuntimeError(f'System upgrade completed; AUR installation did not complete (exit {code}).')
+                    run('pacman', '-Q', '--', self.target['name'])
+                    health = subprocess.run(['spectrum', 'doctor'], capture_output=True, text=True, timeout=90)
+                    self.append('\nSystem health check:\n'+health.stdout+health.stderr)
+                    if health.returncode:
+                        self.save(healthWarning=True)
+                else:
+                    self.append('Review the Flatpak permissions and dependencies before approving.\n')
+                    code = self.command(['flatpak', 'install', *scope_args(self.target['scope']),
+                                         '--', self.target['remote'], self.target['ref']])
+                    if code:
+                        raise RuntimeError(f'Flatpak installation did not complete (exit {code}).')
+                    installation = next(item for scope, item in installations() if scope == self.target['scope'])
+                    if not any(item.format_ref() == self.target['ref'] and item.get_origin() == self.target['remote']
+                               for item in installation.list_installed_refs(None)):
+                        raise RuntimeError('The selected Flatpak is not installed from the selected remote. The operation may have been declined.')
+                self.save(phase='complete-with-warnings' if self.state.get('healthWarning') else 'complete',
+                          message='Installation completed; the system health check needs attention. Review Details below.' if self.state.get('healthWarning')
+                          else 'Installation completed. Refresh Installed to see the result.')
+        except BlockingIOError:
+            self.save(phase='failed', message='Another SpectrumOS update or store installation is active.')
+        except KeyboardInterrupt:
+            self.save(phase='interrupted', message='Installation interrupted. Check installed state before retrying.')
+        except Exception as error:
+            self.save(phase='failed', message=str(error))
+        finally:
+            self.save(active=False, prompt=None, finished=int(time.time()))
+            server.close()
+            control.unlink(missing_ok=True)
+
+
+class TerminalJob(Job):
+    def __init__(self, job_id):
+        super().__init__(job_id)
+        self.save(mode='terminal')
+
+    def save(self, **patch):
+        super().save(**patch)
+        if patch.get('phase') in ('complete', 'complete-with-warnings', 'failed', 'interrupted'):
+            print('\n'+self.state['message'], flush=True)
+
+    def append(self, text):
+        super().append(text)
+        print(text, end='', flush=True)
+
+    def command(self, argv, authentication=False):
+        environment = dict(os.environ, LC_ALL='C.UTF-8')
+        if argv[0] == 'pkexec':
+            argv = ['sudo', '/usr/lib/spectrumos/app-store-privileged', 'terminal-official', *argv[4:]]
+        elif argv[0] == 'paru':
+            if environment.get('PARU_CONF') == '/usr/share/spectrumos/app-store/paru.conf':
+                environment.pop('PARU_CONF')
+            index = argv.index('--')
+            argv = argv[:index]+['--sudo', '/usr/bin/sudo', '--sudoflags', '']+argv[index:]
+        elif argv[0] == 'flatpak' and self.target['scope'] != 'user':
+            argv = ['sudo', '/usr/bin/flatpak', *argv[1:]]
+        self.save(phase='terminal', message='Follow the installation terminal for passwords, confirmations and progress.')
+        code = subprocess.run(argv, env=environment, check=False).returncode
+        if argv[0] == 'sudo' and '/usr/lib/spectrumos/app-store-privileged' in argv and code in (0, 3):
+            self.save(systemChanged=True)
+        return code
+
+
+def review_files(directory):
+    if not directory.is_dir():
+        raise ValueError('The AUR review directory is unavailable.')
+    files = []
+    for root, folders, names in os.walk(directory, followlinks=True):
+        worktree = Path(root)
+        if (worktree/'.git').exists():
+            # La vista de Paru enlaza el clon; sólo los archivos versionados pertenecen a la revisión.
+            tracked = run('git', '-C', str(worktree), 'ls-files', '-z').split('\0')
+            files.extend(worktree/name for name in tracked if name)
+            folders[:] = []
+            continue
+        depth = len(Path(root).relative_to(directory).parts)
+        folders[:] = [name for name in folders if name != '.git'] if depth < 4 else []
+        files.extend(Path(root)/name for name in names)
+        if len(files) > 200:
+            raise ValueError('The AUR review contains too many files.')
+    files.sort()
+    if not files or len(files) > 200:
+        raise ValueError('The AUR review contains no files or too many files to review safely.')
+    chunks = []
+    size = 0
+    for path in files:
+        if not path.is_file() or path.stat().st_size > 700_000:
+            raise ValueError('An AUR review file is too large or unsupported.')
+        with path.open('rb') as stream:
+            data = stream.read(700_001)
+        size += len(data)
+        if size > 700_000:
+            raise ValueError('The AUR review is too large for this widget. Installation was stopped.')
+        chunks.append('\n=== '+str(path.relative_to(directory))+' ===\n'+data.decode('utf-8', errors='replace'))
+    return ''.join(chunks)
+
+
+def launch(target):
+    import gi
+    gi.require_version('Gio', '2.0')
+    from gi.repository import Gio
+    catalog = runpy.run_path(str(BACKEND/'application-adapter'))['applications']()
+    if target.get('source') == 'flatpak':
+        validate_target(target)
+        refs = next(item for scope, item in installations() if scope == target['scope']).list_installed_refs(None)
+        if not any(item.format_ref() == target['ref'] for item in refs):
+            raise ValueError('This Flatpak is not installed in the selected scope.')
+        app = Gio.DesktopAppInfo.new(target['name']+'.desktop')
+        if app is None:
+            raise ValueError('This package does not provide a launchable application.')
+        run('uwsm', 'app', '--', 'flatpak', 'run', *scope_args(target['scope']), target['ref'])
+    else:
+        name = identifier(target.get('name'))
+        files = set(run('pacman', '-Qlq', '--', name).splitlines())
+        app = next((item for item in catalog if (info := Gio.DesktopAppInfo.new(item['desktop_id']))
+                    and info.get_filename() in files), None)
+        if not app:
+            raise ValueError('This package does not provide a launchable application.')
+        run(str(BACKEND/'application-adapter'), 'launch', app['token'])
+    return dict(ok=True)
+
+
+def main(action, payload):
+    if action == 'search':
+        return search(payload)
+    if action == 'details':
+        return details(payload['target'])
+    if action == 'start':
+        return start(payload['target'])
+    if action == 'jobs':
+        return dict(ok=True, jobs=jobs())
+    if action == 'answer':
+        return request(payload['id'], dict(action='answer', token=payload['token'], answer=payload['answer']))
+    if action == 'launch':
+        return launch(payload['target'])
+    raise ValueError('Unknown App Store action.')
+
+
+if __name__ == '__main__':
+    try:
+        if len(sys.argv) == 3 and sys.argv[1] == 'worker':
+            Job(sys.argv[2]).execute()
+        elif len(sys.argv) == 3 and sys.argv[1] == 'terminal':
+            job = TerminalJob(sys.argv[2])
+            job.execute()
+            sys.exit(1 if job.state['phase'] in ('failed', 'interrupted') else 0)
+        elif len(sys.argv) == 2:
+            print(json.dumps(main(sys.argv[1], json.loads(sys.stdin.readline(100_000) or '{}'))))
+        else:
+            raise ValueError('Usage: app-store-adapter ACTION')
+    except Exception as error:
+        print(json.dumps(dict(ok=False, error=str(error))))
+        sys.exit(1)

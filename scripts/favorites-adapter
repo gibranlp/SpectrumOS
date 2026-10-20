@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+import configparser
+from concurrent.futures import ThreadPoolExecutor
+import fcntl
+import hashlib
+from html.parser import HTMLParser
+import io
+import json
+import math
+import os
+from pathlib import Path
+import re
+import runpy
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import Request, HTTPRedirectHandler, build_opener
+import uuid
+
+TOP = 'top'
+UNCATEGORIZED = 'uncategorized'
+LIMIT = 10000
+
+def directory():
+    return Path(os.environ.get('XDG_STATE_HOME') or Path.home()/'.local/state')/'spectrumos/favorites'
+
+def cache_directory():
+    return Path(os.environ.get('XDG_CACHE_HOME') or Path.home()/'.cache')/'spectrumos/favorites'
+
+def atomic(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix='.'+path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(data); stream.flush(); os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+def clean(value, limit=200):
+    if not isinstance(value, str): raise ValueError('Expected text.')
+    if len(value)>limit or any(ord(c)<32 for c in value): raise ValueError('Text is too long or contains control characters.')
+    return value.strip()
+
+def valid_url(value):
+    value=clean(value,4096)
+    parsed=urlsplit(value)
+    if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError('Use an http:// or https:// URL without embedded credentials.')
+    try: parsed.port
+    except ValueError: raise ValueError('Invalid URL port.')
+    if any(c.isspace() for c in value) or '\\' in value: raise ValueError('The URL contains invalid characters.')
+    return urlunsplit((parsed.scheme.lower(),parsed.netloc.lower(),parsed.path or '/',parsed.query,parsed.fragment))
+
+def initial():
+    return dict(version=1,categories=[dict(id=UNCATEGORIZED,name='Uncategorized')],favorites=[],view=dict(category=TOP,search='',editor='',draft={}))
+
+def read():
+    path=directory()/'favorites.json'
+    if not path.exists(): return initial()
+    value=json.loads(path.read_text())
+    if value.get('version')!=1 or not all(isinstance(value.get(k),list) for k in ('categories','favorites')) or not isinstance(value.get('view'),dict):
+        raise ValueError('Favorites data is invalid. Your existing file has been preserved.')
+    return value
+
+def find(items, identifier):
+    return next((item for item in items if item['id']==identifier),None)
+
+def counter(value):
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0: return 0
+    return min(int(value),2**53-1)
+
+def save_favorite(state, draft):
+    identifier=clean(draft.get('id',''))
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,100}',identifier): raise ValueError('Invalid favorite identifier.')
+    title=clean(draft.get('title','')); url=valid_url(draft.get('url',''))
+    if not title: raise ValueError('Add a title for this favorite.')
+    category=draft.get('category',UNCATEGORIZED)
+    if not find(state['categories'],category): raise ValueError('Choose an existing category.')
+    duplicate=next((f for f in state['favorites'] if f['url']==url and f['id']!=identifier),None)
+    if duplicate: raise ValueError('This URL is already in Favorites. Edit the existing favorite instead.')
+    existing=find(state['favorites'],identifier)
+    if existing:
+        existing.update(title=title,url=url,category=category)
+    else:
+        if len(state['favorites'])>=LIMIT: raise ValueError('Favorites is limited to 10,000 links.')
+        state['favorites'].append(dict(id=identifier,title=title,url=url,category=category,clickCount=0))
+
+def save_category(state,draft):
+    identifier=clean(draft.get('id','')); name=clean(draft.get('name',''),80)
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,100}',identifier) or identifier in (TOP,UNCATEGORIZED): raise ValueError('This category cannot be edited.')
+    if not name or name.casefold()=='top': raise ValueError('Choose a category name other than TOP.')
+    if any(c['name'].casefold()==name.casefold() and c['id']!=identifier for c in state['categories']): raise ValueError('A category with this name already exists.')
+    item=find(state['categories'],identifier)
+    if item: item['name']=name
+    else:
+        if len(state['categories'])>=300: raise ValueError('Favorites is limited to 300 categories.')
+        state['categories'].append(dict(id=identifier,name=name))
+
+def view_save(state,payload):
+    view=payload.get('view',{})
+    category=view.get('category',TOP)
+    if category!=TOP and not find(state['categories'],category): category=TOP
+    editor=view.get('editor','')
+    if editor not in ('','favorite','category'): raise ValueError('Invalid editor.')
+    draft=view.get('draft',{})
+    if not isinstance(draft,dict): raise ValueError('Invalid draft.')
+    allowed=('id','title','url','category') if editor=='favorite' else ('id','name')
+    draft={k:clean(draft.get(k,''),4096 if k=='url' else 200) for k in allowed} if editor else {}
+    state['view']=dict(category=category,search=clean(view.get('search',''),200),editor=editor,draft=draft)
+    if 'baseVersion' in view:
+        version=view['baseVersion']
+        if version is not None:version=clean(version,200)
+        state['view']['baseVersion']=version
+    error=''
+    if editor:
+        try:
+            if editor=='favorite': save_favorite(state,draft)
+            else: save_category(state,draft)
+        except ValueError as exc: error=str(exc)
+    return error
+
+def folder_category(parts):
+    name=' / '.join(' '.join(str(part).split()) for part in parts if part and str(part).strip()) or 'Uncategorized'
+    return name if len(name)<=80 else name[:68]+'…'+hashlib.sha256(name.encode()).hexdigest()[:10]
+
+
+class BookmarkHTML(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.folders=[];self.pending='';self.capture='';self.text=[];self.href='';self.links=[];self.saw_list=False
+    def handle_starttag(self,tag,attrs):
+        if tag=='h3':self.capture='folder';self.text=[]
+        elif tag=='dl':
+            self.saw_list=True
+            if len(self.folders)>=64:raise ValueError('Bookmark folder nesting exceeds 64 levels.')
+            self.folders.append(self.pending);self.pending=''
+        elif tag=='a':
+            self.capture='link';self.text=[];self.href=dict(attrs).get('href','') or ''
+    def handle_data(self,data):
+        if self.capture:self.text.append(data)
+    def handle_endtag(self,tag):
+        if tag=='h3' and self.capture=='folder':
+            self.pending=' '.join(''.join(self.text).split());self.capture=''
+        elif tag=='dl':
+            if self.folders:self.folders.pop()
+        elif tag=='a' and self.capture=='link':
+            if len(self.links)>=LIMIT:raise ValueError('The import must contain at most 10,000 bookmarks.')
+            self.links.append(dict(title=' '.join(''.join(self.text).split())[:200],url=self.href,category=folder_category(self.folders),clickCount=0))
+            self.capture=''
+
+
+def browser_json_links(document):
+    if isinstance(document.get('roots'),dict):
+        roots=list(document['roots'].values())
+    elif document.get('type')=='text/x-moz-place-container' or document.get('root')=='placesRoot':
+        roots=document.get('children',[])
+    else:return None
+    links=[];pending=[(node,[],0) for node in reversed(roots)]
+    while pending:
+        node,folders,depth=pending.pop()
+        if not isinstance(node,dict):continue
+        if depth>64:raise ValueError('Bookmark folder nesting exceeds 64 levels.')
+        if len(links)>LIMIT:raise ValueError('The import must contain at most 10,000 bookmarks.')
+        if isinstance(node.get('children'),list):
+            if node.get('root')=='tagsFolder':continue
+            name=node.get('name') or node.get('title') or ''
+            path=folders+[name] if name else folders
+            pending.extend((child,path,depth+1) for child in reversed(node['children']))
+        elif node.get('type') in ('text/x-moz-place-separator',) or node.get('typeCode')==3:continue
+        elif node.get('uri') or node.get('url'):
+            links.append(dict(title=str(node.get('title') or node.get('name') or '')[:200],url=node.get('uri') or node.get('url'),category=folder_category(folders),clickCount=0))
+    return links
+
+
+def load_import(path):
+    path=Path(path).expanduser()
+    if path.stat().st_size>10*1024*1024:raise ValueError('Choose a bookmark HTML or JSON file smaller than 10 MiB.')
+    raw=path.read_bytes()
+    if raw.startswith(b'mozLz40\0'):raise ValueError('For compressed Firefox backups, use Firefox’s Export Bookmarks to HTML, then import that HTML file.')
+    text=raw.decode('utf-8-sig')
+    if text.lstrip().startswith('<'):
+        parser=BookmarkHTML();parser.feed(text);parser.close()
+        if not parser.saw_list:raise ValueError('Choose a browser bookmark HTML export, not a regular webpage.')
+        links=parser.links
+    else:
+        try:document=json.loads(text)
+        except RecursionError:raise ValueError("Bookmark folder nesting is too deep.")
+        if isinstance(document,dict) and isinstance(document.get('personal'),dict):links=document['personal'].get('links')
+        elif isinstance(document,dict) and document.get('format')=='spectrum-favorites':links=document.get('links')
+        elif isinstance(document,list):links=document
+        elif isinstance(document,dict):links=browser_json_links(document)
+        else:links=None
+    if not isinstance(links,list) or len(links)>LIMIT:raise ValueError('Choose a supported browser bookmark export or Favorites JSON with at most 10,000 links.')
+    result=[];invalid=0
+    for link in links:
+        try:
+            if not isinstance(link,dict):raise ValueError('Invalid link.')
+            result.append(dict(title=clean(link.get('title','')) or urlsplit(valid_url(link.get('url',''))).hostname,
+                url=valid_url(link.get('url','')),category=clean(link.get('category') or 'Uncategorized',80),clickCount=counter(link.get('clickCount',0))))
+        except (ValueError,TypeError):invalid+=1
+    return result,invalid
+
+
+def import_links(state,links):
+    added=0;existing=0
+    for link in links:
+        item=next((f for f in state['favorites'] if f['url']==link['url']),None)
+        if item:
+            item['clickCount']=max(item['clickCount'],link['clickCount']);existing+=1;continue
+        name=link['category']
+        if name.casefold()=='top': name='Imported TOP'
+        category=next((c for c in state['categories'] if c['name'].casefold()==name.casefold()),None)
+        if category is None:
+            category=dict(id=uuid.uuid4().hex,name=name)
+            save_category(state,category)
+        if len(state['favorites'])>=LIMIT: raise ValueError('The import exceeds the 10,000 favorite limit.')
+        state['favorites'].append(dict(id=uuid.uuid4().hex,title=link['title'],url=link['url'],category=category['id'],clickCount=link['clickCount']))
+        added+=1
+    return added,existing
+
+def choose(save=False):
+    args=['zenity','--file-selection','--title='+('Export Favorites' if save else 'Import Favorites'),*(['--file-filter=JSON | *.json'] if save else ['--file-filter=Bookmarks and Favorites | *.html *.htm *.json *.HTML *.HTM *.JSON','--file-filter=Browser bookmarks | *.html *.htm *.HTML *.HTM','--file-filter=JSON | *.json *.JSON']),'--file-filter=All files | *']
+    if save: args+=['--save','--confirm-overwrite','--filename=favorites.json']
+    result=subprocess.run(args,capture_output=True,text=True,timeout=300)
+    if result.returncode==1:return None
+    if result.returncode:raise ValueError('The file chooser could not open.')
+    return result.stdout.strip() or None
+
+def browser_catalog():
+    module=runpy.run_path(str(Path(__file__).with_name('application-adapter')))
+    candidates={item['desktop_id']:item for item in module['applications']()}
+    browsers=[]
+    for desktop_id,path in module['desktop_files']():
+        item=candidates.pop(desktop_id,None)
+        if not item:continue
+        parser=configparser.ConfigParser(interpolation=None,strict=False)
+        try:
+            parser.read(path,encoding='utf-8');entry=parser['Desktop Entry']
+            mimes=entry.get('MimeType','').split(';');categories=entry.get('Categories','').split(';')
+            if not (any(m in mimes for m in ('x-scheme-handler/http','x-scheme-handler/https')) or 'WebBrowser' in categories):continue
+            browsers.append(dict(id=desktop_id,name=item['name'],icon=item['icon']))
+        except (OSError,ValueError,configparser.Error,KeyError):continue
+    defaults={}
+    for mime in ('x-scheme-handler/http','x-scheme-handler/https','text/html'):
+        result=subprocess.run(['xdg-mime','query','default',mime],capture_output=True,text=True,timeout=10)
+        defaults[mime]=result.stdout.strip() if result.returncode==0 else ''
+    return dict(browsers=browsers,defaultBrowser=defaults['x-scheme-handler/https'],httpBrowser=defaults['x-scheme-handler/http'],htmlBrowser=defaults['text/html'])
+
+def set_browser(identifier):
+    catalog=browser_catalog()
+    if not any(b['id']==identifier for b in catalog['browsers']):raise ValueError('Choose an installed browser.')
+    previous={'x-scheme-handler/http':catalog['httpBrowser'],'x-scheme-handler/https':catalog['defaultBrowser'],'text/html':catalog.get('htmlBrowser','')}
+    try:
+        for mime in ('x-scheme-handler/http','x-scheme-handler/https','text/html'):
+            subprocess.run(['xdg-mime','default',identifier,mime],check=True,capture_output=True,timeout=15)
+        subprocess.run(['xdg-settings','set','default-web-browser',identifier],capture_output=True,timeout=15)
+        result=browser_catalog()
+        if result['defaultBrowser']!=identifier or result['httpBrowser']!=identifier:raise ValueError('The desktop did not accept the browser change.')
+        return result
+    except (ValueError,subprocess.SubprocessError):
+        for mime,old in previous.items():
+            if old:subprocess.run(['xdg-mime','default',old,mime],capture_output=True,timeout=15)
+        raise
+
+def icon_key(url):
+    p=urlsplit(url);origin=urlunsplit((p.scheme,p.netloc,'','',''))
+    return origin,hashlib.sha256(origin.encode()).hexdigest()
+
+def icon_path(url):
+    _,key=icon_key(url);path=cache_directory()/(key+'.png')
+    return path.as_uri() if path.is_file() else ''
+
+class IconRedirect(HTTPRedirectHandler):
+    def redirect_request(self,req,fp,code,msg,headers,newurl):
+        valid_url(newurl)
+        return super().redirect_request(req,fp,code,msg,headers,newurl)
+
+def urlopen(request,timeout):
+    return build_opener(IconRedirect()).open(request,timeout=timeout)
+
+def fetch_icon(url):
+    origin,key=icon_key(url);folder=cache_directory();folder.mkdir(parents=True,exist_ok=True,mode=0o700)
+    target=folder/(key+'.png');stamp=folder/(key+'.checked')
+    if target.exists() or (stamp.exists() and time.time()-stamp.stat().st_mtime<86400):return
+    try:
+        from PIL import Image
+        with urlopen(Request(origin+'/favicon.ico',headers={'User-Agent':'SpectrumOS-Favorites/1.0'}),timeout=3) as response:
+            valid_url(response.url)
+            data=response.read(512*1024+1)
+        if len(data)>512*1024:raise ValueError('Icon too large.')
+        with Image.open(io.BytesIO(data)) as image:
+            if image.width*image.height>1024*1024:raise ValueError('Icon too large.')
+            image.thumbnail((64,64));converted=io.BytesIO();image.convert('RGBA').save(converted,format='PNG')
+        atomic(target,converted.getvalue())
+    except Exception:
+        pass
+    atomic(stamp,b'')
+
+def decorate(state):
+    result=dict(state)
+    result['favorites']=[dict(f,icon=icon_path(f['url']),host=urlsplit(f['url']).netloc) for f in state['favorites']]
+    return result
+
+def questline_binary():
+    configured=os.environ.get('SPECTRUM_FAVORITES_QUESTLINE')
+    if configured=='disabled':return None
+    if configured:return configured
+    storage=Path(os.environ.get('QUESTLINE_STORAGE_DIR') or Path(os.environ.get('XDG_CONFIG_HOME') or Path.home()/'.config')/'questline')
+    if not (storage/'questline.db').is_file():return None
+    local=Path.home()/'.local/bin/questline'
+    binary=str(local) if local.is_file() and os.access(local,os.X_OK) else shutil.which('questline')
+    if not binary:return None
+    try:
+        result=subprocess.run([binary,'--help'],capture_output=True,text=True,timeout=3)
+        return binary if result.returncode==0 and 'favorites-json' in result.stdout else None
+    except (OSError,subprocess.SubprocessError):return None
+
+def questline_request(binary,payload):
+    try:
+        result=subprocess.run([binary,'favorites-json'],input=json.dumps(payload),capture_output=True,text=True,timeout=15)
+    except (OSError,subprocess.SubprocessError) as exc:
+        raise ValueError('Questline is unavailable. Your saved Favorites have been preserved.') from exc
+    if result.returncode:
+        raise ValueError(result.stderr.strip().removeprefix('Error: ') or 'Questline could not save Favorites.')
+    try:
+        state=json.loads(result.stdout)
+        if not all(isinstance(state.get(key),list) for key in ('favorites','categories')) or not isinstance(state.get('questlineAccount'),str):raise ValueError()
+        return state
+    except (ValueError,TypeError):raise ValueError('Could not read Questline Favorites. Your existing data has been preserved.')
+
+def questline_snapshot(binary,local):
+    shared=questline_request(binary,dict(action='snapshot',legacy=local))
+    view=json.loads(json.dumps(local['view']))
+    if local.get('questlineAccount') and local['questlineAccount']!=shared['questlineAccount']:
+        view=initial()['view']
+    elif not local.get('questlineAccount'):
+        names={c['id']:c['name'] for c in local['categories']}
+        def category(identifier):
+            name=names.get(identifier,'').casefold()
+            return next((c['id'] for c in shared['categories'] if c['name'].casefold()==name),'uncategorized')
+        if view.get('category')!='top':view['category']=category(view.get('category'))
+        draft=view.get('draft',{})
+        if view.get('editor')=='favorite':
+            draft['category']=category(draft.get('category'))
+            old=find(local['favorites'],draft.get('id'))
+            new=next((f for f in shared['favorites'] if old and f['url']==valid_url(old['url'])),None)
+            if new:draft['id']=new['id']
+        elif view.get('editor')=='category':draft['id']=category(draft.get('id'))
+        kind='favorite' if view.get('editor')=='favorite' else 'favorite_category'
+        view['baseVersion']=shared.get('_versions',{}).get(kind+':'+draft.get('id',''))
+    if view.get('category')!='top' and not find(shared['categories'],view.get('category')):view['category']='uncategorized'
+    return dict(local,**shared,view=view)
+
+def questline_save(binary,before,state,action,payload):
+    baseline=json.loads(json.dumps(before))
+    if action=='view-save' and state['view'].get('editor'):
+        view=state['view'];kind='favorite' if view['editor']=='favorite' else 'favorite_category'
+        key=kind+':'+view['draft'].get('id','')
+        if 'baseVersion' in payload.get('view',{}):baseline.setdefault('_versions',{})[key]=view.get('baseVersion')
+    try:
+        shared=questline_request(binary,dict(action='apply',account=before['questlineAccount'],before=baseline,after=state,countMode='visit' if action=='open' else 'minimum'))
+    except ValueError as exc:
+        if action!='view-save':raise
+        preserved=dict(before,view=state['view'])
+        atomic(directory()/'favorites.json',json.dumps(preserved,ensure_ascii=False).encode())
+        return preserved,str(exc)
+    view=state['view']
+    if view.get('editor'):
+        kind='favorite' if view['editor']=='favorite' else 'favorite_category'
+        view['baseVersion']=shared.get('_versions',{}).get(kind+':'+view['draft'].get('id',''))
+    return dict(state,**shared,view=view),''
+
+def main(action,payload):
+    if action in ('choose-import','choose-export'):
+        selected=choose(action=='choose-export')
+        if not selected:return dict(ok=True,cancelled=True)
+        payload=dict(payload,path=selected);action='import-preview' if action=='choose-import' else 'export'
+    directory().mkdir(parents=True,exist_ok=True,mode=0o700)
+    with (directory()/'.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        state=read();changed=False;extra={};message=''
+        local=json.loads(json.dumps(state))
+        binary=questline_binary()
+        if binary:
+            state=questline_snapshot(binary,state)
+        elif state.get('questlineAccount'):
+            raise ValueError('This Favorites collection belongs to Questline. Install or restore the compatible Questline CLI before editing it.')
+        before=json.loads(json.dumps(state))
+        if action=='status':pass
+        elif action=='view-save':
+            extra['draftError']=view_save(state,payload);changed=True
+        elif action=='favorite-delete':
+            identifier=payload.get('id');state['favorites']=[f for f in state['favorites'] if f['id']!=identifier]
+            if state['view'].get('draft',{}).get('id')==identifier:state['view'].update(editor='',draft={})
+            changed=True
+        elif action=='favorite-move':
+            item=find(state['favorites'],payload.get('id'));category=payload.get('category')
+            if not item:raise ValueError('This favorite no longer exists.')
+            if category==TOP or not find(state['categories'],category):raise ValueError('Drop onto an existing category. TOP is an automatic view.')
+            item['category']=category
+            if state['view'].get('editor')=='favorite' and state['view'].get('draft',{}).get('id')==item['id']:
+                state['view']['draft']['category']=category
+            message='Favorite moved to '+find(state['categories'],category)['name']+'.';changed=True
+        elif action=='category-delete':
+            identifier=payload.get('id')
+            if identifier in (TOP,UNCATEGORIZED) or not find(state['categories'],identifier):raise ValueError('This category cannot be deleted.')
+            if any(f['category']==identifier for f in state['favorites']):raise ValueError('Move or delete all favorites before deleting this category.')
+            state['categories']=[c for c in state['categories'] if c['id']!=identifier]
+            state['view']=dict(category=UNCATEGORIZED,search='',editor='',draft={});changed=True
+        elif action=='open':
+            item=find(state['favorites'],payload.get('id'))
+            if not item:raise ValueError('This favorite no longer exists.')
+            environment=dict(os.environ);environment.pop('BROWSER',None)
+            process=subprocess.Popen(['uwsm','app','--','gio','open',valid_url(item['url'])],env=environment,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+            try: code=process.wait(timeout=2)
+            except subprocess.TimeoutExpired: code=0
+            if code:raise ValueError('The default browser could not open this link. Check the browser selector below.')
+            item['clickCount']=counter(item['clickCount']+1);changed=True
+        elif action=='import-preview':
+            links,invalid=load_import(payload['path']);known={f['url'] for f in state['favorites']};new={f['url'] for f in links}-known
+            extra['preview']=dict(path=str(Path(payload['path']).expanduser()),valid=len(links),invalid=invalid,added=len(new),existing=len(links)-len(new))
+        elif action=='import-apply':
+            links,invalid=load_import(payload['path']);added,existing=import_links(state,links);changed=True
+            message=f'Imported {added} favorites; {existing} duplicates merged; {invalid} invalid links skipped.'
+        elif action=='export':
+            categories={c['id']:c['name'] for c in state['categories']}
+            links=[dict(title=f['title'],url=f['url'],category=categories.get(f['category'],'Uncategorized'),clickCount=f['clickCount']) for f in state['favorites']]
+            path=Path(payload['path']).expanduser()
+            if path.resolve()==(directory()/'favorites.json').resolve():raise ValueError('Choose a different export filename from the live data file.')
+            atomic(path,json.dumps(dict(format='spectrum-favorites',version=1,links=links),ensure_ascii=False,indent=2).encode());message='Favorites exported.'
+        elif action=='browsers':extra.update(browser_catalog())
+        elif action=='browser-set':extra.update(set_browser(payload.get('id')));message='Default browser updated for web links and HTML.'
+        elif action=='icons':
+            urls=list({icon_key(f['url'])[0]:f['url'] for f in state['favorites']}.values())
+            fcntl.flock(lock,fcntl.LOCK_UN)
+            with ThreadPoolExecutor(max_workers=5) as pool:list(pool.map(fetch_icon,urls))
+            return dict(ok=True,icons={f['id']:icon_path(f['url']) for f in state['favorites']})
+        else:raise ValueError('Unknown Favorites action.')
+        if binary and changed:
+            state,sync_error=questline_save(binary,before,state,action,payload)
+            if sync_error:extra['draftError']=sync_error
+        if changed or (binary and state!=local):atomic(directory()/'favorites.json',json.dumps(state,ensure_ascii=False).encode())
+        return dict(ok=True,state=decorate(state),message=message,**extra)
+
+if __name__=='__main__':
+    try:
+        raw=sys.stdin.readline(1024*1024+1)
+        if len(raw)>1024*1024:raise ValueError('Request too large.')
+        payload=json.loads(raw) if raw.strip() else {}
+        if not isinstance(payload,dict) or len(sys.argv)!=2:raise ValueError('Invalid Favorites request.')
+        print(json.dumps(main(sys.argv[1],payload),ensure_ascii=False))
+    except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as exc:
+        print(json.dumps(dict(ok=False,error=str(exc))));sys.exit(1)

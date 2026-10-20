@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "NotificationStyle.js" as NotificationStyle
 import Quickshell
 import Quickshell.Wayland
 
@@ -17,6 +18,8 @@ PanelWindow {
     signal clearHistory()
     signal dismissHistory(var item)
     signal toggleDoNotDisturb()
+    signal questlineDrinkRequested(var notification)
+    signal updatesRequested(var notification)
 
     readonly property var visibleItems: {
         const active = Array.from(notificationModel.values).filter(item => item.appName !== "Spectrum Volume");
@@ -114,13 +117,16 @@ PanelWindow {
                 Layout.fillHeight: true
                 clip: true
                 spacing: 8
+                objectName:"notification-center-items"
                 model: center.visibleItems
                 delegate: Rectangle {
+                    id:noticeEntry
                     required property var modelData
+                    readonly property var palette:NotificationStyle.palette(modelData,center.theme.colors)
                     width: ListView.view.width
                     height: entry.implicitHeight + 24
                     radius: 10
-                    color: center.theme.colors.surface_alt
+                    color: noticeEntry.palette.kind ? noticeEntry.palette.background : center.theme.colors.surface_alt
                     ColumnLayout {
                         id: entry
                         anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
@@ -129,7 +135,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             Text {
                                 text: modelData.appName || "Application"
-                                color: center.theme.colors.accent
+                                color: noticeEntry.palette.accent
                                 font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize - 2; bold: true }
                             }
                             Item { Layout.fillWidth: true }
@@ -137,8 +143,8 @@ PanelWindow {
                                 label: "✕"
                                 fontFamily: center.theme.fontFamily
                                 fontSize: center.theme.fontSize - 2
-                                backgroundColor: center.theme.colors.surface
-                                foregroundColor: center.theme.colors.foreground
+                                backgroundColor: noticeEntry.palette.alternate
+                                foregroundColor: noticeEntry.palette.foreground
                                 onClicked: {
                                     center.dismissHistory(modelData);
                                     if (modelData.dismiss) modelData.dismiss();
@@ -149,7 +155,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             text: modelData.summary
                             wrapMode: Text.Wrap
-                            color: center.theme.colors.foreground
+                            color: noticeEntry.palette.foreground
                             font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize; bold: true }
                         }
                         Text {
@@ -158,8 +164,28 @@ PanelWindow {
                             textFormat: Text.PlainText
                             wrapMode: Text.Wrap
                             visible: text.length > 0
-                            color: center.theme.colors.muted
+                            color: noticeEntry.palette.muted
                             font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize - 1 }
+                        }
+                        ShellButton {
+                            objectName:"notification-center-drink"
+                            visible:noticeEntry.palette.kind==="hydration" && !!modelData.dismiss
+                            label:"Drink"
+                            fontFamily:center.theme.fontFamily
+                            fontSize:center.theme.fontSize
+                            backgroundColor:noticeEntry.palette.accent
+                            foregroundColor:noticeEntry.palette.background
+                            onClicked:center.questlineDrinkRequested(modelData)
+                        }
+                        ShellButton {
+                            objectName: "notification-center-open-updates"
+                            visible: NotificationStyle.isStableUpdate(modelData)
+                            label: "Open Updates"
+                            fontFamily: center.theme.fontFamily
+                            fontSize: center.theme.fontSize
+                            backgroundColor: noticeEntry.palette.accent
+                            foregroundColor: noticeEntry.palette.background
+                            onClicked: center.updatesRequested(modelData)
                         }
                         Flow {
                             Layout.fillWidth: true
@@ -171,8 +197,8 @@ PanelWindow {
                                     label: modelData.text
                                     fontFamily: center.theme.fontFamily
                                     fontSize: center.theme.fontSize - 2
-                                    backgroundColor: center.theme.colors.accent
-                                    foregroundColor: center.theme.colors.background
+                                    backgroundColor: noticeEntry.palette.accent
+                                    foregroundColor: noticeEntry.palette.background
                                     onClicked: modelData.invoke()
                                 }
                             }

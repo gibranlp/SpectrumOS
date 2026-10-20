@@ -767,10 +767,10 @@ pacman() { printf '%s\\n' "$TEST_OWNER"; }
         self.assertIn('systemctl enable --now transmission-daemon.service', installer)
         self.assertIn('transmission-remote --download-dir "$transmission_download_dir"', installer)
         self.assertNotIn('/usr/share/spectrumos/eww', installer)
-        self.assertIn(
-            'spectrum-resource-monitor.service spectrum-shell.service spectrum-workspace-layout.service',
-            installer,
-        )
+        service_loop = next(line for line in installer.splitlines() if 'for user_service in ' in line)
+        for service in ('spectrum-resource-monitor.service', 'spectrum-shell.service',
+                        'spectrum-questline-notifications.service', 'spectrum-workspace-layout.service'):
+            self.assertIn(service, service_loop)
         self.assertNotIn("spectrum-network-ui.service", installer)
         self.assertNotIn('$PROJECT_ROOT/vendor/eww', installer)
         self.assertIn('Preserving existing zsh entrypoint', installer)

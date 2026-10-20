@@ -5,7 +5,43 @@ QuestlineDrafts {
     id: workspace
     required property string backendDir
     property int externalActions: 0
-    blocked: externalActions > 0
+    property string incomingProfileKey:""
+    property string archiveSnapshot:""
+    property bool archiveFailed:false
+    blocked: externalActions > 0 || incomingProfileKey.length>0 || archiveFailed
+    function bindProfile(key):void {
+        if(!ready || !key || key===profileKey)return;
+        if(incomingProfileKey){incomingProfileKey=key;return;}
+        const replaces=!!profileKey || key.split(":").slice(1).join(":").length>0;
+        if(replaces && Object.keys(drafts).length>0){
+            incomingProfileKey=key;archiveSnapshot=JSON.stringify(snapshot());archiveFailed=false;
+            archiveProcess.exec([backendDir+"/questline-widget-state","archive"]);
+        }else applyProfileKey(key);
+    }
+    Process {
+        id:archiveProcess
+        stdinEnabled:true
+        onStarted:write(workspace.archiveSnapshot+"\n")
+        onExited:(code,status)=>{
+            if(code!==0 && workspace.incomingProfileKey){
+                workspace.incomingProfileKey="";workspace.archiveFailed=true;
+                workspace.storageError="Could not preserve the old profile's drafts. Your drafts are kept; refresh to retry.";
+            }
+        }
+        stdout:StdioCollector {onStreamFinished:{
+            try{
+                const result=JSON.parse(text);
+                if(!result.ok)throw new Error(result.error||"Archive failed");
+                const key=workspace.incomingProfileKey;
+                workspace.incomingProfileKey="";workspace.archiveSnapshot="";workspace.archiveFailed=false;
+                if(workspace.storageError.startsWith("Could not preserve"))workspace.storageError="";
+                workspace.applyProfileKey(key);
+            }catch(error){
+                workspace.incomingProfileKey="";workspace.archiveFailed=true;
+                workspace.storageError="Could not preserve the old profile's drafts. Your drafts are kept; refresh to retry.";
+            }
+        }}
+    }
     property bool loading: true
     property bool persistencePending: false
     property string writingSnapshot: ""

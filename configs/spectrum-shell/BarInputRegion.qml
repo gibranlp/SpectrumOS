@@ -6,6 +6,7 @@ import Quickshell
 Region {
     id: region
     required property var backdrop
+    property var hoverTarget: null
     property bool islands: true
     width: islands ? 0 : backdrop.width
     height: islands ? 0 : backdrop.height
@@ -21,4 +22,5 @@ Region {
     Region { x: region.fourth.x; y: region.fourth.y; width: region.fourth.width; height: region.fourth.height }
     Region { x: region.fifth.x; y: region.fifth.y; width: region.fifth.width; height: region.fifth.height }
     Region { x: region.sixth.x; y: region.sixth.y; width: region.sixth.width; height: region.sixth.height }
+    Region { item: region.hoverTarget }
 }

@@ -16,9 +16,11 @@ PanelWindow {
     property bool expanded: false
     property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
     property string currentDate: Qt.formatDateTime(new Date(), "ddd, d MMMM")
-    property date calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    readonly property int calendarOffset: (calendarMonth.getDay() + 6) % 7
-    readonly property int daysInMonth: new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate()
+    property var questline: ({available: false})
+    property bool questlineLoaded: false
+    signal refreshDueDates()
+    signal dueItemRequested(string taskId, string stepId)
+    onExpandedChanged: if (expanded) { dueCalendar.today = new Date(); refreshDueDates(); }
     signal actionRequested(string action)
 
     screen: targetScreen
@@ -36,6 +38,13 @@ PanelWindow {
             dashboard.currentTime = Qt.formatDateTime(new Date(), "HH:mm");
             dashboard.currentDate = Qt.formatDateTime(new Date(), "ddd, d MMMM");
         }
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: dashboard.expanded
+        onTriggered: { dueCalendar.today = new Date(); dashboard.refreshDueDates(); }
     }
 
     MouseArea {
@@ -58,7 +67,7 @@ PanelWindow {
         attachTop: true
         topAttachmentHeight: dashboard.theme.barStyle === "islands" && dashboard.theme.barPosition === "top"
             ? Math.max(0, y - 8) : 0
-        width: Math.min(560, dashboard.width - 32)
+        width: Math.min(680, dashboard.width - dashboard.leftInset - 32)
         height: Math.min(content.implicitHeight + 48, dashboard.height - dashboard.topInset - 8)
         x: (dashboard.width + dashboard.leftInset - width) / 2
         y: dashboard.topInset
@@ -102,7 +111,7 @@ PanelWindow {
                         font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize + 1 }
                         KeyboardAction {
                             anchors.fill: parent
-                            onActivated: dashboard.calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                            onActivated: dueCalendar.showToday()
                         }
                     }
                 }
@@ -113,16 +122,20 @@ PanelWindow {
                         id: weatherContent
                         anchors.fill: parent
                         Text {
+                            Layout.fillWidth: true
                             text: dashboard.weather.icon + "  " + dashboard.weather.temperature
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
                             color: dashboard.theme.colors.foreground
-                            font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize + 12; bold: true }
+                            font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize + 34; bold: true }
                         }
                         Text {
                             Layout.fillWidth: true
                             text: dashboard.weather.location || "Weather"
+                            horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
                             color: dashboard.theme.colors.muted
-                            font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize }
+                            font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize + 1 }
                         }
                     }
                     KeyboardAction {
@@ -207,86 +220,14 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: dashboard.theme.colors.surface_alt }
 
-            Rectangle {
+            QuestlineCalendar {
+                id: dueCalendar
+                objectName: "dashboard-calendar"
                 Layout.fillWidth: true
-                Layout.preferredWidth: 1
-                implicitHeight: 270
-                radius: 16
-                color: dashboard.theme.colors.surface_alt
-                ColumnLayout {
-                    anchors { fill: parent; margins: 14 }
-                    spacing: 5
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            Layout.fillWidth: true
-                            text: Qt.formatDateTime(dashboard.calendarMonth, "MMMM yyyy")
-                            color: dashboard.theme.colors.foreground
-                            font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize; bold: true }
-                        }
-                        ShellButton {
-                            label: "‹"
-                            fontFamily: dashboard.theme.fontFamily
-                            fontSize: dashboard.theme.fontSize
-                            backgroundColor: dashboard.theme.colors.surface
-                            foregroundColor: dashboard.theme.colors.foreground
-                            onClicked: dashboard.calendarMonth = new Date(dashboard.calendarMonth.getFullYear(), dashboard.calendarMonth.getMonth() - 1, 1)
-                        }
-                        ShellButton {
-                            label: "›"
-                            fontFamily: dashboard.theme.fontFamily
-                            fontSize: dashboard.theme.fontSize
-                            backgroundColor: dashboard.theme.colors.surface
-                            foregroundColor: dashboard.theme.colors.foreground
-                            onClicked: dashboard.calendarMonth = new Date(dashboard.calendarMonth.getFullYear(), dashboard.calendarMonth.getMonth() + 1, 1)
-                        }
-                    }
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 7
-                        rowSpacing: 2
-                        columnSpacing: 2
-                        Repeater {
-                            model: ["M", "T", "W", "T", "F", "S", "S"]
-                            Text {
-                                required property string modelData
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignHCenter
-                                text: modelData
-                                color: dashboard.theme.colors.muted
-                                font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize - 2 }
-                            }
-                        }
-                        Repeater {
-                            model: 42
-                            Rectangle {
-                                required property int index
-                                readonly property int day: index - dashboard.calendarOffset + 1
-                                readonly property bool isToday: day === new Date().getDate() && dashboard.calendarMonth.getMonth() === new Date().getMonth() && dashboard.calendarMonth.getFullYear() === new Date().getFullYear()
-                                Layout.fillWidth: true
-                                implicitHeight: 27
-                                radius: 7
-                                color: isToday ? dashboard.theme.colors.accent : "transparent"
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: parent.day > 0 && parent.day <= dashboard.daysInMonth ? String(parent.day) : ""
-                                    color: parent.isToday ? dashboard.theme.colors.background : dashboard.theme.colors.foreground
-                                    font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize - 2 }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            ShellButton {
-                Layout.fillWidth: true
-                label: "Questline"
-                fontFamily: dashboard.theme.fontFamily
-                fontSize: dashboard.theme.fontSize
-                backgroundColor: dashboard.theme.colors.surface_alt
-                foregroundColor: dashboard.theme.colors.foreground
-                onClicked: dashboard.actionRequested("questline")
+                theme: dashboard.theme
+                questline: dashboard.questline
+                loaded: dashboard.questlineLoaded
+                onItemRequested: (taskId, stepId) => dashboard.dueItemRequested(taskId, stepId)
             }
 
         }

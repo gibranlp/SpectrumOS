@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=App Store
+Comment=Find and install system, AUR and Flatpak applications
+Exec=/usr/lib/spectrumos/spectrum-shell-open app-store
+Icon=system-software-install
+Categories=System;PackageManager;
+Terminal=false

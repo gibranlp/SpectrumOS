@@ -17,12 +17,15 @@ Item {
         property var commands: []
         function changeBrightness(operation, device) { commands = commands.concat([[operation, device]]); }
         function backend(name) { return "/usr/lib/spectrumos/" + name; }
+        function setAudioVolume(kind, target, percent) { commands = commands.concat([[kind, target, percent]]); }
         function runAction(command) { commands = commands.concat([command]); }
     }
+    QtObject { id: fakeAudio; property real volume: 0.42; property bool muted: false }
+    QtObject { id: fakeNode; property bool ready: true; property var audio: fakeAudio }
     Shell.AudioDeviceControl {
         id: audio
-        y: 100; width: 400; theme: theme
-        device: ({id: 17, label: "Headset", default: false, volume_percent: 42, volume: "42%", muted: false})
+        y: 100; width: 400; theme: theme; audioNode: fakeNode
+        device: ({id: 17, label: "Headset", name:"test-output", default: false, volume_percent: 42, volume: "42%", muted: false})
     }
     Shell.ConnectionIpControl {
         id: network
@@ -40,7 +43,7 @@ Item {
         function init() {
             theme.commands = []; theme.actionBusy = false; theme.brightnessBusy = false;
             theme.brightness = {devices: [{id: "backlight:apple", name: "apple_backlight", available: true, percent: 50, error: ""}], error: ""}; dismissals = 0; dismissal.active = false;
-            audio.output = true;
+            audio.output = true; fakeAudio.volume = 0.42; fakeNode.ready = true;
             network.profile = {uuid: "profile-uuid", name: "Work", type: "wifi", ipv4_enabled: true, ipv6_enabled: true};
         }
         function test_brightnessReadbackAndTarget() {
@@ -76,8 +79,33 @@ Item {
             const slider = findChild(audio, "device-volume");
             tryCompare(slider, "value", 42);
             slider.forceActiveFocus(); keyClick(Qt.Key_Right);
-            compare(theme.commands.length, 1);
-            compare(theme.commands[0], [theme.backend("control-adapter"), "audio", "output-volume", "17", "43"]);
+            compare(theme.commands[0], ["sink", "test-output", 43]);
+        }
+        function test_volumeChangesWhilePointerIsHeld() {
+            const slider = findChild(audio, "device-volume");
+            mousePress(slider, slider.width * 0.3, slider.height / 2);
+            mouseMove(slider, slider.width * 0.7, slider.height / 2, 30);
+            verify(slider.pressed);
+            verify(theme.commands[theme.commands.length - 1][2] > 60);
+            compare(findChild(audio, "device-volume-label").text, Math.round(slider.value) + "%");
+            verify(slider.enabled);
+            const count = theme.commands.length;
+            const finalValue = slider.value;
+            mouseRelease(slider, slider.width * 0.7, slider.height / 2);
+            compare(theme.commands.length, count);
+            compare(theme.commands[count - 1][2], Math.round(finalValue));
+        }
+        function test_inputVolumeAndExternalChanges() {
+            audio.output = false;
+            const slider = findChild(audio, "device-volume");
+            fakeAudio.volume = 0.26;
+            tryCompare(slider, "value", 26);
+            slider.forceActiveFocus(); keyClick(Qt.Key_Right);
+            compare(theme.commands[0], ["source", "test-output", 27]);
+            fakeNode.ready = false;
+            verify(slider.enabled);
+            slider.forceActiveFocus(); keyClick(Qt.Key_Right);
+            compare(theme.commands[theme.commands.length - 1][0], "source");
         }
         function test_inputMuteTargetsDevice() {
             audio.output = false; mouseClick(findChild(audio, "device-mute"));

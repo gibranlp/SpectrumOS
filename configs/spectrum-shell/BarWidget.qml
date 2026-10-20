@@ -17,6 +17,15 @@ PanelWindow {
     property int panelLeftInset: theme.panelLeftInset
     property int panelTopInset: theme.panelTopInset
     property bool expanded: false
+    property int previewMasterVolume: -1
+    readonly property bool draggingVolume: volumeSlider.pressed || deviceDragging(outputDevices) || deviceDragging(inputDevices)
+    function deviceDragging(repeater): bool {
+        for (let index = 0; index < repeater.count; index++) {
+            const item = repeater.itemAt(index);
+            if (item && item.dragging) return true;
+        }
+        return false;
+    }
     signal extraRequested(string action)
     property string pendingSsid: ""
     onExpandedChanged: if (!expanded && page === "audio") theme.dismissMediaChoice()
@@ -83,6 +92,9 @@ PanelWindow {
         MouseArea { anchors.fill: parent }
 
         Flickable {
+            objectName: "audio-scroll"
+            interactive: !widget.draggingVolume
+            flickableDirection: Flickable.VerticalFlick
             anchors.fill: parent
             anchors.margins: 22
             clip: true
@@ -371,7 +383,8 @@ PanelWindow {
                     }
                     Controls.Slider {
                         id: volumeSlider
-                        property bool editing: false
+                        objectName: "master-volume"
+                        enabled: widget.theme.volumeAvailable || !!widget.theme.audioDevices.available
                         Layout.fillWidth: true
                         implicitHeight: 32
                         from: 0
@@ -385,17 +398,10 @@ PanelWindow {
                             visible: volumeSlider.activeFocus
                         }
                         onMoved: {
-                            if (!pressed)
-                                widget.theme.runAction([widget.theme.backend("volume"), "set", String(Math.round(value)), "--quiet"]);
+                            widget.previewMasterVolume = Math.round(value);
+                            widget.theme.setAudioVolume("sink", "@DEFAULT_SINK@", widget.previewMasterVolume);
                         }
-                        Binding { target: volumeSlider; property: "value"; value: widget.theme.volumePercent; when: !volumeSlider.pressed }
-                        onPressedChanged: {
-                            if (pressed) editing = true;
-                            else if (editing) {
-                                editing = false;
-                                widget.theme.runAction([widget.theme.backend("volume"), "set", String(Math.round(value)), "--quiet"]);
-                            }
-                        }
+                        Binding { target: volumeSlider; property: "value"; value: widget.theme.volumeAvailable ? widget.theme.volumePercent : widget.previewMasterVolume >= 0 ? widget.previewMasterVolume : parseInt(widget.theme.audioDevices.volume) || 0; when: !volumeSlider.pressed && !widget.theme.audioVolumeBusy; restoreMode: Binding.RestoreNone }
                         background: Rectangle {
                             x: volumeSlider.leftPadding
                             y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
@@ -420,7 +426,7 @@ PanelWindow {
                         }
                     }
                     Text {
-                        text: widget.theme.volumeAvailable ? widget.theme.volumePercent + "%" : "—"
+                        text: volumeSlider.enabled ? Math.round(volumeSlider.value) + "%" : "—"
                         color: widget.theme.colors.foreground
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                     }
@@ -432,6 +438,8 @@ PanelWindow {
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
                 Repeater {
+                    id: outputDevices
+                    objectName: "audio-output-devices"
                     model: widget.page === "audio" ? widget.theme.audioDevices.sinks || [] : []
                     AudioDeviceControl {
                         required property var modelData
@@ -448,6 +456,8 @@ PanelWindow {
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
                 Repeater {
+                    id: inputDevices
+                    objectName: "audio-input-devices"
                     model: widget.page === "audio" ? widget.theme.audioDevices.sources || [] : []
                     AudioDeviceControl {
                         required property var modelData

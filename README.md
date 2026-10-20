@@ -67,9 +67,12 @@ Projects become **Campaigns**, tasks become **Quests**, and notes become **Scrol
 
 Run `questline` for the terminal adventure, or press **Super + Shift + Q** for its native shell widget:
 
-- Overview, Tasks, Sidequests, Scrolls, Treasury, Tree, Focus, and Hero views.
+- Overview, Tasks, Scrolls, Treasury, Tree, Focus, Hero, and Sidequests views.
+- Horizontal campaign buttons share the same selection across Tasks, Scrolls and Treasury.
 - Create and edit work from the desktop, with **autosave and restored navigation** when you close and reopen the widget.
 - Press **Super + Shift + N** for a quick Scroll in your selected project. No project selected? Choose one and start writing.
+
+Questline 2.0.2 adds desktop alerts for actual XP gains, level-ups and unlocked achievements. A background service keeps Swarm and water reminders alive when the terminal is closed, following your existing Questline preferences. See [Questline notifications](docs/questline-notifications.md).
 
 Capture the idea before it escapes into the Forest of Forgotten Thoughts. The Save Button has retired from active duty.
 
@@ -115,6 +118,22 @@ See [AppImage details](docs/appimages.md), [application colors](docs/application
 
 The optional Gaming profile brings **Steam, Lutris, Wine Staging, Winetricks, Proton GE, GameMode, Gamescope, MangoHud, GOverlay, and vkBasalt**, with matching Vulkan and 32-bit components for the selected hardware profile. Tune performance, watch frame times, and return to the boss fight.
 
+**Automatic Gaming bar:** when a game or launcher requests GameMode, SpectrumOS temporarily switches every monitor to the Gaming bar profile. Bars and decorations step aside, animations take a break, and the available Performance power mode kicks in. After the **last GameMode client exits**, each monitor gets its previous bar profile back and the previous power mode returns—including Balanced or Power saving. Your saved profiles stay intact. Two games at once? The bar waits for the final boss to leave.
+
+A game must actually **request GameMode**. Opening Steam, Proton, or a launcher alone does not guarantee this. Enable the launcher's GameMode option where available. For a Steam game without native integration, open **Properties → General → Launch Options** and enter:
+
+```sh
+gamemoderun %command%
+```
+
+For a standalone game or launcher, run its usual command through the wrapper:
+
+```sh
+gamemoderun /path/to/your-game
+```
+
+You can check whether GameMode is active with `gamemoded -s`. Performance power mode alone does not trigger the Gaming bar profile. You can also select Gaming manually in **Control Center (`Super + P`) → Bar Profile**; it then stays active until you leave it. Selecting another profile or **Leave Gaming** during an automatic session keeps that choice until all GameMode clients exit, then automatic activation is ready for the next session. A launcher running under GameMode counts as an active client too, so close it if you want that session to end. See [Gaming details](docs/spectrum-shell.md#gaming-profile).
+
 Game compatibility depends on drivers, Proton, and anti-cheat support. Calling every match a benchmark remains a personal decision.
 
 ## Your spellbook, minus the memorization exam
@@ -129,6 +148,7 @@ Game compatibility depends on drivers, Proton, and anti-cheat support. Calling e
 | `Super + Shift + Q` | Questline widget |
 | `Super + Shift + N` | Quick Scroll in the current project, or choose a project |
 | `Super + Shift + K` | UKVM widget |
+| `Super + Shift + U` | App Store |
 | `Super + Shift + E` | AppImage Manager |
 | `Super + J` | Change the current layout's arrangement |
 | `Super + Tab` / `Super + Shift + Tab` | Next / previous window |
@@ -144,6 +164,8 @@ Get the **x86_64 ISO and its SHA-256 checksum** from [the download page](https:/
 
 The installer offers Full/Lean selection, hardware profiles, **Btrfs**, and **Limine**. Installation erases the selected disk; back it up first. Manual partitioning and same-disk dual boot are not offered by this installer. A VM is useful for exploration; physical hardware acceptance is a separate test.
 
+**Stable update notifications:** SpectrumOS checks for newer installed packages from the signed SpectrumOS Stable repository about one minute after the shell starts, then every 30 minutes. When fresh loot is ready, a notification offers **Open Updates**. Click it to open the Updates widget, review the safety checks, and choose the update action. The widget also shows the Stable package status; **Check again** refreshes it. The same set of available versions is announced once, including across shell restarts. Offline or failed checks do not invent updates, and checks use a separate package database without changing the system database or installing anything. Notifications cover SpectrumOS Stable packages; the actual update still upgrades Arch and SpectrumOS together. Your party deserves compatible equipment.
+
 Installed systems receive Stable package updates through the widget or:
 
 ```sh
@@ -151,6 +173,10 @@ sudo pacman -Syu
 ```
 
 On supported Btrfs installations, the update workflow creates system restore points with matching boot backups, applies migrations, and checks health. Recovery restores system and boot together; home data stays outside system rollback. Heroes appreciate save points. They also keep separate backups of their actual work.
+
+## Favorites — your portals, ranked by escape frequency
+
+Open **Favorites** with **Super + Shift + V**, from More, or from the launcher. This wider left-side panel keeps categorized web links, automatically ranks them by use, and offers a TOP view, global search, site favicons, autosaving editors, JSON import/export, and a default-browser selector. Homepage backup imports read only `personal.links`, preserving categories and counters while merging duplicate URLs. See [the Favorites guide](docs/favorites.md).
 
 ## Make the terminal yours: aliases and custom commands
 

@@ -108,6 +108,29 @@ def account_balances(connection):
     return accounts
 
 
+def profile_key(connection):
+    tables={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if 'users' not in tables or 'id' not in {row[1] for row in connection.execute('PRAGMA table_info(users)')}:return ''
+    user=connection.execute('SELECT id FROM users LIMIT 1').fetchone()
+    if not user:return ''
+    epoch=connection.execute("SELECT value FROM settings WHERE key='shell_profile_epoch'").fetchone() if 'settings' in tables else None
+    return str(user[0])+':'+(epoch[0] if epoch else '')
+
+
+def chronicles(connection):
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(journal_entries)")}
+    if not columns:
+        return []
+    author = "journal_entries.author_username" if "author_username" in columns else "''"
+    return rows(connection, f"""
+        SELECT journal_entries.id, journal_entries.project_id,
+               journal_entries.entry_date AS title, journal_entries.content AS description,
+               {author} AS author_username, COALESCE(projects.name, 'Unfiled') AS campaign
+        FROM journal_entries LEFT JOIN projects ON projects.id = journal_entries.project_id
+        ORDER BY journal_entries.created_at DESC, journal_entries.id
+    """)
+
+
 def snapshot(connection):
     campaigns = rows(connection, """
         SELECT id, name, is_shared FROM projects WHERE archived = 0 AND completed = 0
@@ -154,6 +177,7 @@ def snapshot(connection):
     tree = dict(tree_row) if tree_row else None
     return {
         "available": True,
+        "profile_key": profile_key(connection),
         "campaigns": campaigns,
         "scrolls": scrolls,
         "tasks": tasks,
@@ -161,6 +185,7 @@ def snapshot(connection):
         "finances": finances,
         "accounts": account_balances(connection),
         "entries": entries,
+        "chronicles": chronicles(connection),
         "tree": tree,
         "hero": hero_profile(connection),
         "sidequests": sidequests(connection),
@@ -186,6 +211,7 @@ def render_tree(binary, tree):
         rows.pop(0)
     while rows and not any(span["text"].strip() for span in rows[-1]):
         rows.pop()
+    tree["bonsai_rows"] = rows
     lines = []
     for row in rows:
         parts = []
@@ -211,6 +237,7 @@ def main():
             result["actions_available"] = help_result.returncode == 0 and "shell-action" in help_result.stdout
             result["tree_available"] = help_result.returncode == 0 and "shell-tree" in help_result.stdout
             result["hero_available"] = help_result.returncode == 0 and "shell-hero" in help_result.stdout
+            result["chronicles_available"] = help_result.returncode == 0 and "and chronicles" in help_result.stdout
             result["sidequests_available"] = help_result.returncode == 0 and "including sidequests" in help_result.stdout
         except (OSError, subprocess.TimeoutExpired):
             result["actions_available"] = False

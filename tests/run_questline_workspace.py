@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
         shutil.copy2(root/'tests/fixtures/questline-widget-backend.py',directory/name)
         (directory/name).chmod(0o755)
     shutil.copy2(root/'scripts/questline-widget-state',directory/'questline-widget-state')
-    catalog={'available':True,'installed':True,'actions_available':True,'sidequests_available':True,
+    catalog={'available':True,'installed':True,'actions_available':True,'sidequests_available':True,'chronicles_available':True,
       'campaigns':[{'id':'campaign-a','name':'Alpha','is_shared':False},{'id':'campaign-b','name':'Beta','is_shared':False},{'id':'shared','name':'Shared','is_shared':True}],
       'tasks':[{'id':'task-a','project_id':'campaign-a','title':'Task','description':'original task','priority':'Medium','campaign':'Alpha','completed':False}],
       'scrolls':[{'id':'scroll-a','project_id':'campaign-a','title':'Scroll','markdown_content':'original scroll','campaign':'Alpha'}],
@@ -26,13 +26,18 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
     source=(root/'tests/qml/QuestlineWorkspaceTests.qml').read_text().replace('../../configs/','configs/')
     (directory/'Test.qml').write_text(source)
     panel=directory/'configs/spectrum-shell/UtilityPanel.qml'
-    source=panel.read_text().replace('PanelWindow {','FloatingWindow {',1)
+    source=panel.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:1280;implicitHeight:900',1)
     for line in ['    focusable: expanded\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
         source=source.replace(line,'',1)
     panel.write_text(source)
+    dashboard=directory/'configs/spectrum-shell/Dashboard.qml'
+    source=dashboard.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:800;implicitHeight:1000',1)
+    for line in ['    focusable: expanded\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-dashboard"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
+        source=source.replace(line,'',1)
+    dashboard.write_text(source)
     runtime=directory/'runtime';runtime.mkdir(mode=0o700)
     environment=dict(os.environ,QT_QPA_PLATFORM='offscreen',QT_QUICK_BACKEND='software',XDG_RUNTIME_DIR=str(runtime),XDG_STATE_HOME=str(directory/'state'),SPECTRUM_QUESTLINE_TEST_DIR=str(directory))
-    result=subprocess.run(['qs','--path',str(directory/'Test.qml'),'--no-color'],env=environment,capture_output=True,text=True,timeout=30)
+    result=subprocess.run(['qs','--path',str(directory/'Test.qml'),'--no-color'],env=environment,capture_output=True,text=True,timeout=45)
     output=result.stdout+result.stderr
     print(output,end='')
     if result.returncode or not re.search(r'Questline workspace: \d+ passed 0 failed',output):raise SystemExit(1)

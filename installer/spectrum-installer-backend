@@ -262,7 +262,7 @@ install_aur_desktop_apps() {
     fi
     install -m 0755 "$project_root/vendor/paru" "$target/usr/local/bin/paru"
 
-    if ! run arch-chroot "$target" pacman -S --needed --asdeps --noconfirm base-devel git; then
+    if ! run arch-chroot "$target" pacman -S --needed --noconfirm base-devel cmake git; then
         printf 'Warning: could not install AUR build tools; skipping desktop AUR applications.\n' >&2
         return 0
     fi
@@ -274,7 +274,6 @@ install_aur_desktop_apps() {
         printf 'Warning: one or more desktop AUR applications failed to install.\n' >&2
     fi
     rm -f "$sudoers_file"
-    arch-chroot "$target" pacman -Rns --noconfirm base-devel >/dev/null 2>&1 || true
 }
 
 install_system() {

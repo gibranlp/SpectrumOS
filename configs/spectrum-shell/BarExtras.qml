@@ -10,6 +10,8 @@ ColumnLayout {
     signal chosen(string action)
     spacing: 14
     readonly property var actions: [
+        {icon:"󰏗", label:"App Store", action:"app-store"},
+        {icon:"★", label:"Favorites", action:"favorites"},
         {icon:"󰒡", label:"SpectrumDrop", action:"spectrumdrop"},
         {icon:"󰏖", label:"AppImages", action:"appimages"},
         {icon:"󰥔", label:"Time & region", action:"time"},
