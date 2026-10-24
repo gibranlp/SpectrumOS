@@ -38,7 +38,8 @@ Scope {
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         visible: motion.active
-        focusable: rail.expanded
+        WlrLayershell.keyboardFocus: panelFocus.mode
+        ShellFocus { id: panelFocus; window: railWindow; enabled: rail.expanded }
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "spectrum-widget-sessionrail"
 

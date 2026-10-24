@@ -26,7 +26,17 @@ Scope {
         name: "QuestlineWorkspace"
         when: true
         onCompletedChanged: if (completed) { console.log("Questline workspace:",qtest_results.passCount,"passed",qtest_results.failCount,"failed"); Qt.quit(); }
-        function field(name) { return findChild(panel,"questline-"+name); }
+        function field(name) {
+            const direct=findChild(panel,"questline-"+name);
+            if(direct) return direct;
+            function visual(item) {
+                if(!item) return null;
+                if(item.objectName==="questline-"+name) return item;
+                for(const child of item.children || []) {const found=visual(child);if(found)return found;}
+                return null;
+            }
+            return visual(panel.contentItem);
+        }
         function init() {
             tryCompare(workspace,"ready",true,3000);
             tryCompare(workspace,"busy",false,3000);
@@ -376,6 +386,118 @@ Scope {
             verify(panel.questlineSelected !== null);
             compare(workspace.drafts[panel.questlineDraftKey].payload.action,"update_scroll");
             compare(workspace.drafts[panel.questlineDraftKey].payload.content,"First and second paragraphs");
+        }
+        function test_entry_savings_settings_and_separate_currency_totals() {
+            try {
+            panel.questline=Object.assign({},panel.questline,{
+                savings_accounts_available:true,
+                accounts:[{id:"checking",campaign_id:"campaign-a",name:"My bank",kind:"Spending",is_default:false,balance_minor:60000,currency_code:"MXN",version:1},
+                          {id:"investment",campaign_id:"campaign-a",name:"My investment",kind:"Savings",is_default:false,balance_minor:30000,currency_code:"MXN",version:1,savings_status:"Invested",interest_rate_bps:1200,interest_period:"Annual"},
+                          {id:"reserve",campaign_id:"campaign-a",name:"Emergency fund",kind:"Savings",is_default:false,balance_minor:10000,currency_code:"MXN",version:1,savings_status:"Available",interest_rate_bps:100,interest_period:"Monthly"},
+                          {id:"empty-custom",campaign_id:"campaign-a",name:"New bank",kind:"Spending",is_default:false,balance_minor:0,currency_code:"MXN",version:1}],
+                entries:[{id:"income",title:"Income",campaign:"Alpha",campaign_id:"campaign-a",currency_code:"MXN",entry_type:"Income",status:"Paid",amount_minor:100000},
+                         {id:"commitment",title:"Commitment",campaign:"Alpha",campaign_id:"campaign-a",currency_code:"MXN",entry_type:"Expense",status:"Approved",amount_minor:5000}]
+            });
+            panel.switchQuestlineTab("Treasury");panel.selectQuestlineProject("campaign-a");wait(100);
+            const summary=field("treasury-summary");verify(summary!==null);
+            const totals=summary.model[0];
+            compare(totals.available,55000);compare(totals.saved,40000);compare(totals.invested,30000);compare(totals.liquidSavings,10000);
+            const preview=Quickshell.env("SPECTRUM_QUESTLINE_SAVINGS_PREVIEW");
+            if(preview) grabImage(panel.contentItem).save(preview);
+            const settings=field("savings-settings-investment");verify(settings!==null);
+            settings.forceActiveFocus();wait(40);mouseClick(settings);wait(40);
+            const status=field("savings-status-investment");status.forceActiveFocus();keyClick(Qt.Key_Home);
+            const rate=field("savings-rate-investment");rate.forceActiveFocus();keyClick(Qt.Key_A,Qt.ControlModifier);keyClick(Qt.Key_1);keyClick(Qt.Key_Period);keyClick(Qt.Key_5);keyClick(Qt.Key_0);
+            const period=field("savings-period-investment");period.forceActiveFocus();keyClick(Qt.Key_Home);
+            const save=field("savings-save-investment");verify(save.enabled);
+            save.forceActiveFocus();wait(40);
+            if(preview) grabImage(panel.contentItem).save(preview.replace(".png","-settings.png"));
+            mouseClick(save);
+            tryCompare(workspace,"externalActions",1,1000);
+            tryCompare(workspace,"externalActions",0,3000);
+            wait(150);
+            panel.questline=Object.assign({},panel.questline,{accounts:[],entries:[]});
+            } catch(e) {console.warn("Savings test",e.message,String(e.stack));throw e;}
+        }
+        function test_entry_treasury_full_form_payload_and_draft_restoration() {
+            workspace.blocked=true;
+            try {
+                panel.questline=Object.assign({},panel.questline,{
+                    treasury_fields_available:true,
+                    accounts:[{id:"default-spending",campaign_id:"campaign-a",name:"Spending",is_default:true,balance_minor:0},
+                              {id:"default-savings",campaign_id:"campaign-a",name:"Savings",is_default:true,balance_minor:0},
+                              {id:"cash-a",campaign_id:"campaign-a",name:"Cash",is_default:false,balance_minor:0},
+                              {id:"savings-a",campaign_id:"campaign-a",name:"Savings",balance_minor:0}],
+                    categories:[{id:"transfer-a",campaign_id:"campaign-a",entry_type:"Transfer",name:"Internal Transfer"}]
+                });
+                panel.switchQuestlineTab("Treasury");panel.selectQuestlineProject("campaign-a");panel.beginQuestlineEdit(null);
+                panel.questlineEntryType="Transfer";
+                panel.questlineEntryFields={account_id:"cash-a",category_id:"transfer-a",transfer_account_id:"savings-a",
+                    related_task_id:"task-a",entry_date:"2026-10-21",due_date:"2026-10-22",payment_date:"2026-10-21",
+                    vendor_source:"Bank",notes:"Transfer notes",description:"Reserve",attachment_ref:"receipt.pdf",
+                    recurrence:"Custom",custom_recurrence:"Every six weeks"};
+                field("title").text="Treasury transfer";field("amount").text="45.50";
+                panel.rememberQuestline();wait(60);
+                verify(panel.questlineDraftPayload().valid);
+                const payload=panel.questlineDraftPayload().payload;
+                panel.questlineSelected={id:"saved-transfer"};
+                verify(panel.questlineDraftPayload().valid);
+                panel.questlineSelected=null;
+                compare(payload.amount_minor,4550);compare(payload.transfer_account_id,"savings-a");
+                compare(payload.account_id,"cash-a");compare(payload.category_id,"transfer-a");
+                compare(payload.notes,"Transfer notes");compare(payload.recurrence,"Custom");
+                const source=field("entry-account_id");const destination=field("entry-transfer_account_id");
+                verify(source!==null,"Account selector missing");verify(destination!==null,"Destination selector missing");verify(destination.visible,"Destination selector hidden");
+                verify(source.model.some(item=>item.id==="cash-a"));
+                verify(!destination.model.some(item=>item.id==="cash-a"));
+                compare(source.model.length,3);
+                source.forceActiveFocus();keyClick(Qt.Key_End);wait(40);
+                compare(panel.questlineEntryFields.account_id,"savings-a");
+                source.forceActiveFocus();keyClick(Qt.Key_Home);keyClick(Qt.Key_Down);wait(40);
+                compare(panel.questlineEntryFields.account_id,"cash-a");
+                panel.rememberQuestline();
+                const preview=Quickshell.env("SPECTRUM_QUESTLINE_TREASURY_PREVIEW");
+                if(preview) grabImage(panel.contentItem).save(preview);
+                const editor=field("entry-editor");
+                verify(editor.contentHeight>editor.height);
+                const notes=field("entry-notes");
+                notes.forceActiveFocus();wait(40);
+                verify(notes.mapToItem(editor,0,0).y>=0);
+                verify(notes.mapToItem(editor,0,notes.height).y<=editor.height+1);
+                if(preview) grabImage(panel.contentItem).save(preview.replace(".png","-scrolled.png"));
+                panel.expanded=false;panel.open("questline");wait(100);
+                compare(panel.questlineEntryFields,payloadToFields(payload));
+                compare(panel.questlineDraftPayload().payload.transfer_account_id,"savings-a");
+                panel.questlineEntryFields=Object.assign({},panel.questlineEntryFields,{transfer_account_id:"cash-a"});
+                verify(!panel.questlineDraftPayload().valid);
+                panel.questlineEntryFields=Object.assign({},panel.questlineEntryFields,{transfer_account_id:"savings-a",due_date:"2026-02-31"});
+                verify(!panel.questlineDraftPayload().valid);
+            } catch(e) {console.warn("Treasury test",e.message,String(e.stack));throw e;}
+            finally {workspace.drafts=({});workspace.blocked=false;panel.questline=Object.assign({},panel.questline,{treasury_fields_available:true});}
+        }
+        function payloadToFields(payload) {
+            const fields={};
+            for(const key of Object.keys(panel.questlineEntryFields)) fields[key]=payload[key];
+            return fields;
+        }
+        function test_entry_treasury_edit_keeps_fields_and_type_change_resets_category() {
+            workspace.blocked=true;
+            try {
+                panel.switchQuestlineTab("Treasury");panel.selectQuestlineProject("campaign-a");
+                panel.beginQuestlineEdit({id:"entry-full",campaign_id:"campaign-a",title:"Existing",amount_minor:100,
+                    entry_type:"Income",status:"Approved",account_id:"cash-a",category_id:"salary-a",
+                    notes:"Original note",description:"Original description",created_at:"2026-09-10T12:00:00Z",recurrence:"Monthly"});
+                compare(panel.questlineEntryFields.account_id,"cash-a");
+                compare(panel.questlineEntryFields.category_id,"salary-a");
+                compare(panel.questlineEntryFields.notes,"Original note");
+                compare(panel.questlineEntryFields.entry_date,"2026-09-10");
+                panel.questlineEntryType="Expense";
+                compare(panel.questlineEntryFields.category_id,"");
+                compare(panel.questlineEntryFields.account_id,"cash-a");
+                panel.questline.treasury_fields_available=false;
+                verify(!panel.questlineDraftPayload().valid);
+            } catch(e) {console.warn("Treasury test",e.message,String(e.stack));throw e;}
+            finally {workspace.drafts=({});workspace.blocked=false;panel.questline=Object.assign({},panel.questline,{treasury_fields_available:true});}
         }
         function test_tabs_restore_task_step_and_incomplete_treasury() {
             panel.switchQuestlineTab("Tasks");

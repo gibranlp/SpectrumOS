@@ -35,7 +35,7 @@ PanelWindow {
         if (!ready || planProcess.running)
             return;
         expanded = false;
-        Quickshell.execDetached(["uwsm", "app", "--", "kitty", "--hold", "-e", backendDir + "/spectrum-update-run", mode]);
+        ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", "kitty", "--hold", "-e", backendDir + "/spectrum-update-run", mode]);
     }
 
     screen: targetScreen
@@ -43,7 +43,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded }
 
     Process {
         id: planProcess

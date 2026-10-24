@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 from pathlib import Path
+from decimal import Decimal
 import secrets
 import string
 import subprocess
 import sys
 import tempfile
 import unicodedata
+
+COLOR_HISTORY_LIMIT = 60
 
 
 def search(query: str) -> int:
@@ -70,6 +74,69 @@ def calculate(expression: str) -> int:
     return 0
 
 
+def calculator_expression(expression: str, has_answer: bool) -> tuple[str, bool]:
+    expression = expression.strip().translate(str.maketrans({"×": "*", "÷": "/", "−": "-"}))
+    if not expression or len(expression) > 512 or "\n" in expression or "\r" in expression:
+        raise ValueError("Enter a calculation of up to 512 characters")
+    uses_answer = re.search(r"\b(?:ans|_)\b", expression, re.IGNORECASE) is not None
+    if has_answer and not uses_answer and expression[0] in "+-*/^":
+        expression = "ans " + expression
+        uses_answer = True
+    if uses_answer and not has_answer:
+        raise ValueError("Calculate a result before using Ans")
+    expression = re.sub(r"\b(?:ans|_)\b", "ans", expression, flags=re.IGNORECASE)
+    number = r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
+    relative = re.fullmatch(r"(.+?)\s*([+-])\s*(" + number + r")\s*%", expression)
+    if relative and re.search(r"(?:\d|\.)[eE]$", relative.group(1).strip()):
+        relative = None
+    if relative:
+        base, operation, percent = relative.groups()
+        base, _ = calculator_expression(base, has_answer)
+        expression = f"({base}) * (1 {operation} ({percent} / 100))"
+    expression = re.sub(r"(?<![\w.])(" + number + r")\s*%", r"(\1 / 100)", expression)
+    return expression, uses_answer
+
+
+def calculate_json(request_text: str) -> int:
+    try:
+        request = json.loads(request_text)
+        if not isinstance(request, dict) or not isinstance(request.get("expression"), str):
+            raise ValueError("Enter a calculation")
+        steps = request.get("steps", [])
+        if not isinstance(steps, list) or len(steps) > 64 or any(not isinstance(step, str) or len(step) > 2048 for step in steps):
+            raise ValueError("Invalid calculator memory")
+        expression, continues = calculator_expression(request["expression"], bool(steps))
+        steps = list(steps) if continues else []
+        if len(steps) >= 64:
+            raise ValueError("Start a new calculation with AC")
+        steps.append(expression)
+        command = ["numbat", "--no-config", "--no-init", "--color", "never", "--pretty-print", "never"]
+        for step in steps:
+            command.extend(["-e", step])
+        command.extend(["-e", 'print("__SPECTRUM_RESULT__{ans:.12e}")'])
+        result = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
+        if result.returncode:
+            lines = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+            message = next((line for line in lines if line.lower().startswith("error")), "Invalid expression")
+            raise ValueError(message[:240])
+        prefix = "__SPECTRUM_RESULT__"
+        lines = [line.strip()[len(prefix):] for line in result.stdout.splitlines() if line.strip().startswith(prefix)]
+        if not lines:
+            raise ValueError("Enter an expression that returns a result")
+        value = lines[-1].strip()
+        numeric = re.match(r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)(.*)$", value)
+        if numeric:
+            number = Decimal(numeric.group(1)).normalize()
+            text = format(number, "f") if number.is_zero() or -6 <= number.adjusted() < 15 else format(number, "E").replace("E", "e")
+            value = text + numeric.group(2)
+        print(json.dumps({"ok": True, "result": value, "steps": steps}))
+        return 0
+    except (ValueError, TypeError, OSError, subprocess.TimeoutExpired) as error:
+        message = "Calculator unavailable" if isinstance(error, (OSError, subprocess.TimeoutExpired)) else str(error)
+        print(json.dumps({"ok": False, "error": message}))
+        return 1
+
+
 def password(length: str, options: str) -> int:
     try:
         size = int(length)
@@ -119,7 +186,7 @@ def color_history() -> list[str]:
         return []
     if not isinstance(values, list):
         return []
-    return [value.upper() for value in values if isinstance(value, str) and len(value) == 7 and value.startswith("#") and all(character in string.hexdigits for character in value[1:])][:5]
+    return [value.upper() for value in values if isinstance(value, str) and len(value) == 7 and value.startswith("#") and all(character in string.hexdigits for character in value[1:])][:COLOR_HISTORY_LIMIT]
 
 
 def add_color(value: str) -> int:
@@ -132,7 +199,7 @@ def add_color(value: str) -> int:
     temporary_name = ""
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".colors-", delete=False) as temporary:
-            json.dump(colors[:5], temporary)
+            json.dump(colors[:COLOR_HISTORY_LIMIT], temporary)
             temporary_name = temporary.name
         os.replace(temporary_name, path)
     finally:
@@ -156,6 +223,8 @@ def main() -> int:
         return search(sys.argv[2])
     if len(sys.argv) == 3 and sys.argv[1] == "emoji":
         return emoji_search(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "calculate-json":
+        return calculate_json(sys.argv[2])
     if len(sys.argv) == 3 and sys.argv[1] == "calculate":
         return calculate(sys.argv[2])
     if len(sys.argv) == 4 and sys.argv[1] == "password":

@@ -559,9 +559,40 @@ def sync_legion_rgb() -> None:
         print(f"Legion RGB sync: {error}", file=sys.stderr)
 
 
+def sync_keychron_rgb() -> None:
+    helper = Path(__file__).resolve().with_name("keychron-rgb-sync")
+    try:
+        result = subprocess.run(
+            (str(helper), "--apply"), capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode:
+            print(result.stderr.strip(), file=sys.stderr)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"Keychron RGB sync: {error}", file=sys.stderr)
+
+
+
+def sync_win60_rgb() -> None:
+    helper = Path(__file__).resolve().with_name("win60-rgb-sync")
+    try:
+        result = subprocess.run(
+            (str(helper), "--apply"), capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode:
+            print(result.stderr.strip(), file=sys.stderr)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"WIN60 RGB sync: {error}", file=sys.stderr)
+
+
+def sync_rgb() -> None:
+    sync_legion_rgb()
+    sync_keychron_rgb()
+    sync_win60_rgb()
+
+
 def apply() -> str:
     metadata = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))
-    sync_legion_rgb()
+    sync_rgb()
     variant = metadata.get("variant", "dark")
     theme = ensure_gtk_theme(variant)
     for version in ("3", "4"):
@@ -622,10 +653,12 @@ if __name__ == "__main__":
     try:
         if sys.argv[1:] == ["--status"]:
             status()
+        elif sys.argv[1:] == ["--rgb-only"]:
+            sync_rgb()
         elif not sys.argv[1:] or sys.argv[1:] == ["--apply"]:
             apply()
         else:
-            raise SystemExit(f"Usage: {sys.argv[0]} [--apply|--status]")
+            raise SystemExit(f"Usage: {sys.argv[0]} [--apply|--rgb-only|--status]")
     except (OSError, KeyError, json.JSONDecodeError, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

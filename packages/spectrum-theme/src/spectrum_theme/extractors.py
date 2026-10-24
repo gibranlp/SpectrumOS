@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import colorsys
+import math
+import re
 from collections import Counter
 import os
 from pathlib import Path
@@ -9,7 +12,6 @@ import subprocess
 import tempfile
 
 from .palette import Palette, PaletteError, validate_contrast
-from .color import oklab, oklch
 from .interpretation import Candidate, interpret, parameters as backend_parameters
 
 
@@ -22,18 +24,15 @@ NATIVE_MODES = ("spectrum", "clustered", "median-cut", "weighted-regions")
 
 
 def extract_colors(pixels: list[RGB], mode: str, image_size: tuple[int, int] | None, options: dict) -> list[Candidate]:
-    if mode == "weighted-regions" and image_size is not None:
-        return _spatial_candidates(pixels, image_size, options["spatial_grid_size"])
-    if mode == "clustered":
+    if mode == "spectrum":
+        pairs = _wal_candidates(pixels, image_size, options["color_count"])
+    elif mode == "clustered":
         pairs = _clustered_candidates(pixels, options["cluster_count"])
     elif mode == "median-cut":
         pairs = _median_cut_candidates(pixels, options["color_count"])
-    elif mode == "weighted-regions":
-        pairs = _weighted_region_candidates(pixels)
     else:
-        pairs = _binned_colors(pixels)
-    return [Candidate(color, weight, center=weight ** 0.5, edge=weight, focal=weight ** 0.5 * oklch(color)[1],
-                      highlight=weight ** 0.5 * oklch(color)[0] ** 3) for color, weight in pairs]
+        pairs = _weighted_region_candidates(pixels)
+    return [Candidate(color, weight) for color, weight in pairs]
 
 
 def palette_from_pixels(
@@ -61,7 +60,8 @@ def palette_from_pixels(
         if debug is not None:
             debug.update({"mode": mode, "variant": variant, "image_size": image_size,
                           "spatial_coordinates_available": image_size is not None,
-                          "extraction": "spatial grid" if mode == "weighted-regions" and image_size else mode})
+                          "extraction": {"spectrum": "ImageMagick / wal", "clustered": "RGB k-means / Colorz",
+                                         "median-cut": "MMCQ / ColorThief", "weighted-regions": "RGB regions / Haishoku"}[mode]})
         return palette
     except (PaletteError, ValueError) as error:
         raise ExtractorError(f"Native palette failed Spectrum validation: {error}") from error
@@ -125,66 +125,106 @@ def decode_native_image(image: Path) -> tuple[list[RGB], int, int]:
     return _decode_ppm(result.stdout)
 
 
-def _clustered_candidates(pixels: list[RGB], count: int = 8) -> list[tuple[RGB, int]]:
-    histogram = Counter(dict(_binned_colors(pixels)))
+def _wal_candidates(pixels: list[RGB], image_size: tuple[int, int] | None, count: int = 16) -> list[tuple[RGB, int]]:
+    executable = shutil.which("magick")
+    if executable is None:
+        raise ExtractorError("ImageMagick is required for the Spectrum (Pywal) backend")
+    width, height = image_size or (len(pixels), 1)
+    data = f"P6\n{width} {height}\n255\n".encode() + bytes(channel for color in pixels for channel in color)
+    pairs = []
+    target = min(count, len(set(pixels)))
+    for requested in range(count, count + 20):
+        try:
+            result = subprocess.run([executable, "ppm:-", "+dither", "-colors", str(requested), "-depth", "8",
+                                     "-format", "%c", "histogram:info:-"], input=data,
+                                    check=True, capture_output=True, timeout=30)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise ExtractorError("ImageMagick could not quantize the wallpaper") from error
+        pairs = []
+        for line in result.stdout.decode().splitlines():
+            match = re.search(r"^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:\s|$)", line)
+            if match:
+                color = tuple(int(match[2][index:index + 2], 16) for index in (0, 2, 4))
+                pairs.append((color, int(match[1])))
+        if len(pairs) >= target:
+            break
+    if not pairs:
+        raise ExtractorError("ImageMagick returned no usable colors")
+    return sorted(pairs, key=lambda pair: (colorsys.rgb_to_yiq(*pair[0]), pair[0]))
+
+
+def _clustered_candidates(pixels: list[RGB], count: int = 6) -> list[tuple[RGB, int]]:
+    # Colorz limita V antes del agrupamiento y da el mismo peso a cada color único.
+    observations = []
+    for color in sorted(set(pixels)):
+        hue, saturation, value = colorsys.rgb_to_hsv(*(channel / 256 for channel in color))
+        value = max(170 / 256, min(200 / 256, value))
+        observations.append(tuple(int(channel * 256) for channel in colorsys.hsv_to_rgb(hue, saturation, value)))
+    histogram = Counter(observations)
     colors = sorted(histogram)
-    centers = [max(colors, key=lambda color: (histogram[color], tuple(-value for value in color)))]
+    centers = [colors[0]]
+    distance = lambda a, b: sum((x - y) ** 2 for x, y in zip(a, b))
     while len(centers) < min(count, len(colors)):
-        centers.append(
-            max(
-                (color for color in colors if color not in centers),
-                key=lambda color: (min(_distance_squared(color, center) for center in centers), histogram[color], color),
-            )
-        )
-    assignments: dict[RGB, list[tuple[RGB, int]]] = {}
-    for _ in range(12):
-        assignments = {center: [] for center in centers}
+        centers.append(max((color for color in colors if color not in centers),
+                           key=lambda color: (min(distance(color, center) for center in centers), color)))
+    for _ in range(64):
+        groups = [[] for _ in centers]
         for color in colors:
-            center = min(centers, key=lambda candidate: (_distance_squared(color, candidate), candidate))
-            assignments[center].append((color, histogram[color]))
-        updated = [_weighted_mean(group) if group else center for center, group in assignments.items()]
+            index = min(range(len(centers)), key=lambda index: (distance(color, centers[index]), index))
+            groups[index].append((color, histogram[color]))
+        updated = [_weighted_mean(group) for group in groups if group]
         if updated == centers:
             break
         centers = updated
-    result = []
-    for center, group in assignments.items():
-        result.append((center, sum(weight for _, weight in group)))
-    return sorted(result, key=lambda item: (-item[1], item[0]))
-
-
-def _binned_colors(pixels: list[RGB]) -> list[tuple[RGB, int]]:
-    groups = {}
-    for color, count in Counter(pixels).items():
-        entry = groups.setdefault(_quantize(color), [0, [0, 0, 0]])
-        entry[0] += count
-        for channel in range(3):
-            entry[1][channel] += color[channel] * count
-    return sorted([(tuple(round(channel / count) for channel in channels), count)
-                   for count, channels in groups.values()], key=lambda item: (-item[1], item[0]))
+    # Se recalculan los grupos para no publicar centros de la iteración anterior.
+    masses = Counter()
+    for color in colors:
+        center = min(centers, key=lambda center: (distance(color, center), center))
+        masses[center] += histogram[color]
+    return sorted(masses.items(), key=lambda pair: (colorsys.rgb_to_hsv(*pair[0])[0], pair[0]))
 
 
 def _median_cut_candidates(pixels: list[RGB], count: int = 8) -> list[tuple[RGB, int]]:
-    histogram = Counter(pixels)
+    # MMCQ usa cinco bits por canal y descarta blancos; un lienzo blanco sigue siendo válido.
+    source = [color for color in pixels if not all(channel > 250 for channel in color)] or pixels
+    histogram = Counter(tuple(channel >> 3 for channel in color) for color in source)
     boxes = [list(histogram.items())]
+
+    def volume(box):
+        return math.prod(max(color[i] for color, _ in box) - min(color[i] for color, _ in box) + 1
+                         for i in range(3))
+
     while len(boxes) < min(count, len(histogram)):
-        splittable = [box for box in boxes if len(box) > 1]
-        if not splittable:
+        available = [box for box in boxes if len(box) > 1]
+        if not available:
             break
-        box = max(splittable, key=lambda group: (_box_range(group) * sum(weight for _, weight in group), group))
+        population_phase = len(boxes) < math.ceil(count * 0.75)
+        box = max(available, key=lambda box: (sum(weight for _, weight in box) *
+                                             (1 if population_phase else volume(box)), box))
         boxes.remove(box)
-        channel = max(range(3), key=lambda index: max(color[index] for color, _ in box) - min(color[index] for color, _ in box))
-        ordered = sorted(box, key=lambda item: (item[0][channel], item[0]))
-        midpoint = sum(weight for _, weight in ordered) / 2
-        running = 0
-        split = 1
-        for index, (_, weight) in enumerate(ordered[:-1], start=1):
-            running += weight
-            if running >= midpoint:
-                split = index
+        channel = max(range(3), key=lambda i: max(c[i] for c, _ in box) - min(c[i] for c, _ in box))
+        ordered = sorted(box, key=lambda pair: (pair[0][channel], pair[0]))
+        total = sum(weight for _, weight in ordered)
+        cumulative = 0
+        median = ordered[0][0][channel]
+        for color, weight in ordered:
+            cumulative += weight
+            median = color[channel]
+            if cumulative > total / 2:
                 break
-        boxes.extend((ordered[:split], ordered[split:]))
-    result = [(_weighted_mean(box), sum(weight for _, weight in box)) for box in boxes]
-    return sorted(result, key=lambda item: (-item[1], item[0]))
+        low, high = ordered[0][0][channel], ordered[-1][0][channel]
+        cut = min(high - 1, int(median + (high - median) / 2)) if median - low <= high - median else max(low, int(median - 1 - (median - low) / 2))
+        values = sorted(set(color[channel] for color, _ in ordered))
+        cut = max(values[0], min(values[-2], cut))
+        boxes.extend(([pair for pair in ordered if pair[0][channel] <= cut],
+                      [pair for pair in ordered if pair[0][channel] > cut]))
+    result = []
+    for box in boxes:
+        total = sum(weight for _, weight in box)
+        color = tuple(min(255, int(sum((color[i] + 0.5) * 8 * weight for color, weight in box) / total))
+                      for i in range(3))
+        result.append((color, total))
+    return sorted(result, key=lambda pair: (colorsys.rgb_to_yiq(*pair[0]), pair[0]))
 
 
 def _weighted_region_candidates(pixels: list[RGB]) -> list[tuple[RGB, int]]:
@@ -196,56 +236,19 @@ def _weighted_region_candidates(pixels: list[RGB]) -> list[tuple[RGB, int]]:
         region = tuple(_region_index(color[index], minimum[index], maximum[index]) for index in range(3))
         groups.setdefault(region, []).append((color, weight))
     result = [(_weighted_mean(group), sum(weight for _, weight in group)) for group in groups.values()]
-    return sorted(result, key=lambda item: (-item[1], item[0]))[:8]
-
-
-def _spatial_candidates(pixels: list[RGB], image_size: tuple[int, int], grid_size: int) -> list[Candidate]:
-    width, height = image_size
-    mean_lab = tuple(sum(oklab(color)[index] for color in pixels) / len(pixels) for index in range(3))
-    groups = {}
-    for position, color in enumerate(pixels):
-        cell_x = min(grid_size - 1, (position % width) * grid_size // width)
-        cell_y = min(grid_size - 1, (position // width) * grid_size // height)
-        x, y = (cell_x + 0.5) / grid_size, (cell_y + 0.5) / grid_size
-        radius = max(abs(2 * x - 1), abs(2 * y - 1))
-        center, edge = (1 - radius) ** 2, radius ** 2
-        lab = oklab(color)
-        salience = sum((first - second) ** 2 for first, second in zip(lab, mean_lab)) ** 0.5
-        lightness, chroma, _ = oklch(color)
-        key = _quantize(color)
-        entry = groups.setdefault(key, [0, [0, 0, 0], 0.0, 0.0, 0.0, 0.0])
-        entry[0] += 1
-        for index in range(3):
-            entry[1][index] += color[index]
-        entry[2] += center
-        entry[3] += edge
-        entry[4] += salience * (0.25 + center)
-        entry[5] += lightness ** 3 * (0.02 + chroma)
-    candidates = []
-    for count, channels, center, edge, focal, highlight in groups.values():
-        color = tuple(round(channel / count) for channel in channels)
-        root = count ** 0.5
-        candidates.append(Candidate(color, count, center / root, edge, focal / root, highlight / root))
-    return sorted(candidates, key=lambda item: (-item.weight, item.color))
+    selected = sorted(result, key=lambda item: (item[1], item[0]), reverse=True)[:8]
+    return sorted(selected, key=lambda pair: (colorsys.rgb_to_yiq(*pair[0]), pair[0]))
 
 
 def _weighted_mean(colors: list[tuple[RGB, int]]) -> RGB:
     total = sum(weight for _, weight in colors)
-    return tuple(round(sum(color[index] * weight for color, weight in colors) / total) for index in range(3))
-
-
-def _distance_squared(first: RGB, second: RGB) -> float:
-    return sum((a - b) ** 2 for a, b in zip(oklab(first), oklab(second)))
-
-
-def _box_range(colors: list[tuple[RGB, int]]) -> int:
-    return max(max(color[index] for color, _ in colors) - min(color[index] for color, _ in colors) for index in range(3))
+    return tuple(int(sum(color[index] * weight for color, weight in colors) / total) for index in range(3))
 
 
 def _region_index(value: int, minimum: int, maximum: int) -> int:
     if maximum == minimum:
-        return 0
-    return min(2, int((value - minimum) * 3 / (maximum - minimum + 1)))
+        return 2
+    return min(2, int((value - minimum) * 3 / (maximum - minimum)))
 
 
 def _decode_ppm(data: bytes) -> tuple[list[RGB], int, int]:
@@ -294,10 +297,6 @@ def _decode_ppm(data: bytes) -> tuple[list[RGB], int, int]:
 
 def _read_ppm(data: bytes) -> list[RGB]:
     return _decode_ppm(data)[0]
-
-
-def _quantize(color: RGB) -> RGB:
-    return tuple(min(255, (channel // 8) * 8 + 4) for channel in color)
 
 
 def _luminance(color: RGB) -> float:

@@ -45,7 +45,8 @@ PanelWindow {
 
     visible: motion.active
     color: "transparent"
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: launcher; enabled: expanded }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "spectrum-widget-launcher"
@@ -59,7 +60,7 @@ PanelWindow {
         if (!entry)
             return;
         expanded = false;
-        Quickshell.execDetached(["uwsm", "app", "--", entry.id + ".desktop"]);
+        ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", entry.id + ".desktop"]);
     }
 
     onExpandedChanged: {

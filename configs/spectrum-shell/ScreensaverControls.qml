@@ -29,7 +29,7 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 5
         Repeater {
-            model: [60, 120, 180, 300, 480]
+            model: [60, 120, 180, 300, 480, 600, 900]
             ShellButton {
                 required property int modelData
                 objectName: "screensaver-timeout-" + modelData
@@ -90,16 +90,6 @@ ColumnLayout {
                 onClicked: controls.theme.configureScreensaver("branding", modelData.id)
             }
         }
-    }
-    ShellButton {
-        objectName: "screensaver-preview"
-        label: "Preview · 20 seconds"
-        enabled: !controls.theme.screensaverBusy
-        fontFamily: controls.theme.fontFamily
-        fontSize: controls.theme.fontSize - 1
-        backgroundColor: controls.theme.colors.accent
-        foregroundColor: controls.theme.colors.background
-        onClicked: controls.theme.previewScreensaver()
     }
     Text {
         Layout.fillWidth: true

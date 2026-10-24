@@ -120,6 +120,11 @@ class HyprlandConfigTests(unittest.TestCase):
         self.assertIn("/usr/lib/spectrumos/volume mute", bindings)
         self.assertNotIn("pamixer", bindings)
 
+    def test_launch_tracking_allows_slow_startup_without_pinning_children(self):
+        appearance = (CONFIG_DIR / "appearance.lua").read_text(encoding="utf-8")
+        self.assertIn("initial_workspace_tracking = 1", appearance)
+        self.assertIn("initial_workspace_token_timeout = 120", appearance)
+
     def test_lock_uses_generated_theme(self):
         bindings = (CONFIG_DIR / "keybindings.lua").read_text(encoding="utf-8")
         self.assertIn("current/hyprlock.conf", bindings)

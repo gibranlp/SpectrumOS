@@ -17,7 +17,8 @@ PanelWindow {
     exclusionMode:ExclusionMode.Ignore
     color:"transparent"
     visible:motion.active
-    focusable:expanded && !manager.choosing
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded && !manager.choosing }
     EscapeDismissal {active:panel.expanded && !panel.manager.choosing;onDismissed:panel.closeRequested()}
     Connections {target:panel.manager;function onFavoriteOpened(){if(panel.expanded)panel.closeRequested();}}
     onExpandedChanged: {
@@ -29,7 +30,7 @@ PanelWindow {
     ShellSurface {
         id:frame
         objectName:"favorites-frame"
-        width:Math.min(780,panel.width-panel.sideInset-8)
+        width:Math.min(960,panel.width-panel.sideInset-8)
         height:panel.height-panel.topInset-8
         x:panel.sideInset;y:panel.topInset
         color:panel.theme.colors.surface;radius:32

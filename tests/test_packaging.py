@@ -51,7 +51,7 @@ class PackagingTests(unittest.TestCase):
         launcher = (package_root / "spectrum-theme").read_text(encoding="utf-8")
 
         self.assertIn("pkgname=spectrum-theme", pkgbuild)
-        self.assertIn("depends=(python ffmpeg)", pkgbuild)
+        self.assertIn("depends=(python ffmpeg imagemagick)", pkgbuild)
         self.assertIn("optdepends=('matugen:", pkgbuild)
         self.assertIn("options=(!strip !debug)", pkgbuild)
         self.assertIn("/usr/share/spectrumos/theme-engine", pkgbuild)

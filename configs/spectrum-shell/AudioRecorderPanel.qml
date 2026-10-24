@@ -54,7 +54,8 @@ PanelWindow {
     WlrLayershell.namespace: "spectrum-widget-audiorecorderpanel"
     color: "transparent"
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded }
 
     Process {
         id: status

@@ -243,7 +243,7 @@ def browser_catalog():
             parser.read(path,encoding='utf-8');entry=parser['Desktop Entry']
             mimes=entry.get('MimeType','').split(';');categories=entry.get('Categories','').split(';')
             if not (any(m in mimes for m in ('x-scheme-handler/http','x-scheme-handler/https')) or 'WebBrowser' in categories):continue
-            browsers.append(dict(id=desktop_id,name=item['name'],icon=item['icon']))
+            browsers.append(dict(id=desktop_id,name=item['name'],icon=item['icon'],desktopFile=str(path)))
         except (OSError,ValueError,configparser.Error,KeyError):continue
     defaults={}
     for mime in ('x-scheme-handler/http','x-scheme-handler/https','text/html'):
@@ -415,11 +415,16 @@ def main(action,payload):
         elif action=='open':
             item=find(state['favorites'],payload.get('id'))
             if not item:raise ValueError('This favorite no longer exists.')
+            browser=None
+            if payload.get('browser') is not None:
+                browser=next((b for b in browser_catalog()['browsers'] if b['id']==payload['browser']),None)
+                if not browser:raise ValueError('This browser is no longer installed. Refresh the browser list.')
+            launcher=['gio','launch',browser['desktopFile']] if browser else ['gio','open']
             environment=dict(os.environ);environment.pop('BROWSER',None)
-            process=subprocess.Popen(['uwsm','app','--','gio','open',valid_url(item['url'])],env=environment,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+            process=subprocess.Popen(['uwsm','app','--',*launcher,valid_url(item['url'])],env=environment,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
             try: code=process.wait(timeout=2)
             except subprocess.TimeoutExpired: code=0
-            if code:raise ValueError('The default browser could not open this link. Check the browser selector below.')
+            if code:raise ValueError(f'{browser["name"]} could not open this link.' if browser else 'The default browser could not open this link. Check the browser selector below.')
             item['clickCount']=counter(item['clickCount']+1);changed=True
         elif action=='import-preview':
             links,invalid=load_import(payload['path']);known={f['url'] for f in state['favorites']};new={f['url'] for f in links}-known

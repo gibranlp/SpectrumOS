@@ -56,7 +56,6 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open appimages"))
 hl.bind(mainMod .. " + SHIFT + G", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open appearance"))
 hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open bluetooth"))
-hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open calendar"))
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open dashboard"))
 hl.bind(mainMod .. " + SHIFT + O", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open displays"))
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open focus"))
@@ -107,7 +106,7 @@ for direction, delta in pairs({
     up = { x = 0, y = -20 },
     down = { x = 0, y = 20 },
 }) do
-    hl.bind(mainMod .. " + CTRL + " .. direction, hl.dsp.window.resize({ x = delta.x, y = delta.y, relative = true }))
+    hl.bind(mainMod .. " + CTRL + " .. direction, hl.dsp.window.resize({ x = delta.x, y = delta.y, relative = true }), { repeating = true })
 end
 
 for workspace = 1, 6 do

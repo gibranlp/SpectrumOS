@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='spectrum-app-store-ui-') as temporary:
                  '    WlrLayershell.namespace: "spectrum-widget-app-store"\n',
                  '    anchors { top:true; bottom:true; left:true; right:true }\n',
                  '    exclusionMode: ExclusionMode.Ignore\n',
-                 '    focusable: expanded && !manager.authenticating\n'):
+                 '    WlrLayershell.keyboardFocus: panelFocus.mode\n'):
         source = source.replace(line, '', 1)
     panel.write_text(source)
     helper = folder/'app-store-adapter'

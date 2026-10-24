@@ -1,7 +1,7 @@
 [Unit]
 Description=Questline desktop Swarm and hydration reminders
 PartOf=graphical-session.target spectrum-shell.service
-After=spectrum-shell.service
+After=graphical-session.target spectrum-shell.service
 
 [Service]
 Type=simple

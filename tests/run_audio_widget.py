@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='spectrum-audio-widget-') as temporary:
                  '    exclusionMode: ExclusionMode.Ignore\n',
                  '    WlrLayershell.layer: WlrLayer.Top\n',
                  '    WlrLayershell.namespace: "spectrum-widget-barwidget"\n',
-                 '    focusable: expanded && !(page === "time" && timeRegionContent.busy) && !(page === "appimages" && appImageContent.busy)\n']:
+                 '    WlrLayershell.keyboardFocus: panelFocus.mode\n']:
         source=source.replace(line,'',1)
     panel.write_text(source)
     runtime=directory/'runtime'

@@ -75,7 +75,7 @@ class AppearanceSyncTests(unittest.TestCase):
             module.CONFIG_HOME = root / "config"
             module.CURRENT.mkdir()
             (module.CURRENT / "palette.json").write_text('{"variant":"dark"}')
-            for name in ("sync_legion_rgb", "ensure_import", "select_kvantum", "ensure_cava", "ensure_vencord", "ensure_zen_browser", "ensure_icon_theme", "ensure_gamemode_hook", "sync_gtk_font_size", "sync_qt_font_size"):
+            for name in ("sync_keychron_rgb", "sync_legion_rgb", "ensure_import", "select_kvantum", "ensure_cava", "ensure_vencord", "ensure_zen_browser", "ensure_icon_theme", "ensure_gamemode_hook", "sync_gtk_font_size", "sync_qt_font_size"):
                 stack.enter_context(mock.patch.object(module, name))
             stack.enter_context(mock.patch.object(module.subprocess, "run"))
             settings = stack.enter_context(mock.patch.object(module, "setting"))
@@ -83,6 +83,7 @@ class AppearanceSyncTests(unittest.TestCase):
                 (module.CURRENT / "gtk-3.css").write_text("@define-color theme_bg_color " + color + ";")
                 self.assertEqual(module.apply(), "dark")
             self.assertEqual(module.sync_legion_rgb.call_count, 2)
+            self.assertEqual(module.sync_keychron_rgb.call_count, 2)
             names = [call.args[2] for call in settings.call_args_list if call.args[1] == "gtk-theme"]
             self.assertEqual(len(names), 2)
             self.assertNotEqual(names[0], names[1])

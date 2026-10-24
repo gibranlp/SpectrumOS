@@ -21,7 +21,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded }
 
     function select(mode): void {
         pendingMode = mode;

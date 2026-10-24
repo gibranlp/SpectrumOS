@@ -79,3 +79,5 @@ Hyprland's package upgrade script also starts and completes the guard. Its depen
 `Super+Shift+R` runs the wallpaper widget’s Spectrumize me action; `Super+Shift+S` opens the screen recorder. Kitty defaults disable remembered window size so newly opened terminals tile alongside existing windows. Package upgrades migrate the legacy user copy of Spectrum’s Kitty defaults while preserving other settings; new installations include the package-owned defaults directly.
 
 Media Play/Pause, Next, Previous, and Stop keys route through `/usr/lib/spectrumos/media-control` to SpectrumShell’s selected MPRIS app. When multiple players require a choice, the Audio widget opens on the focused monitor. The helper falls back to `media-adapter` if SpectrumShell IPC is unavailable.
+
+Questline Sync and reminders explicitly start after both `graphical-session.target` and SpectrumShell. This prevents the graphical target from adding an opposite implicit ordering through enabled services, which otherwise makes `uwsm stop` reject logout with `TransactionOrderIsCyclic`. The session widget retains the managed UWSM logout action.

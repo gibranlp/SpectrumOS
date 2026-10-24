@@ -28,7 +28,7 @@ def read_settings():
     if isinstance(data.get('enabled'), bool):
         settings['enabled'] = data['enabled']
     timeout = data.get('timeout')
-    if isinstance(timeout, int) and not isinstance(timeout, bool) and 30 <= timeout <= 540:
+    if isinstance(timeout, int) and not isinstance(timeout, bool) and 30 <= timeout <= 900:
         settings['timeout'] = timeout
     for key, choices in [('effect', EFFECTS), ('branding', BRANDING)]:
         if data.get(key) in choices:
@@ -39,10 +39,10 @@ def read_settings():
 def save(key, value):
     if key == 'enabled' and value in ('on', 'off'):
         value = value == 'on'
-    elif key == 'timeout' and value.isdecimal() and 30 <= int(value) <= 540:
+    elif key == 'timeout' and value.isdecimal() and 30 <= int(value) <= 900:
         value = int(value)
     elif not ((key == 'effect' and value in EFFECTS) or (key == 'branding' and value in BRANDING)):
-        raise ValueError('Choose a valid screensaver setting; delay must be 30–540 seconds')
+        raise ValueError('Choose a valid screensaver setting; delay must be 30–900 seconds')
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with (path.parent / 'screensaver.lock').open('a') as lock:

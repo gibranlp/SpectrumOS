@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
         shutil.copy2(root/'tests/fixtures/questline-widget-backend.py',directory/name)
         (directory/name).chmod(0o755)
     shutil.copy2(root/'scripts/questline-widget-state',directory/'questline-widget-state')
-    catalog={'available':True,'installed':True,'actions_available':True,'sidequests_available':True,'chronicles_available':True,
+    catalog={'available':True,'installed':True,'actions_available':True,'sidequests_available':True,'chronicles_available':True,'treasury_fields_available':True,
       'campaigns':[{'id':'campaign-a','name':'Alpha','is_shared':False},{'id':'campaign-b','name':'Beta','is_shared':False},{'id':'shared','name':'Shared','is_shared':True}],
       'tasks':[{'id':'task-a','project_id':'campaign-a','title':'Task','description':'original task','priority':'Medium','campaign':'Alpha','completed':False}],
       'scrolls':[{'id':'scroll-a','project_id':'campaign-a','title':'Scroll','markdown_content':'original scroll','campaign':'Alpha'}],
@@ -27,12 +27,12 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
     (directory/'Test.qml').write_text(source)
     panel=directory/'configs/spectrum-shell/UtilityPanel.qml'
     source=panel.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:1280;implicitHeight:900',1)
-    for line in ['    focusable: expanded\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
+    for line in ['    WlrLayershell.keyboardFocus: panelFocus.mode\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
         source=source.replace(line,'',1)
     panel.write_text(source)
     dashboard=directory/'configs/spectrum-shell/Dashboard.qml'
     source=dashboard.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:800;implicitHeight:1000',1)
-    for line in ['    focusable: expanded\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-dashboard"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
+    for line in ['    WlrLayershell.keyboardFocus: panelFocus.mode\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-dashboard"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
         source=source.replace(line,'',1)
     dashboard.write_text(source)
     runtime=directory/'runtime';runtime.mkdir(mode=0o700)
@@ -45,6 +45,11 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
     creates=[p for p in payloads if p['action']=='create_scroll' and not p['title'].startswith('Quick note')]
     assert len(creates)==1,payloads
     assert not any(p['action']=='create_entry' for p in payloads),payloads
+    savings=[p for p in payloads if p['action']=='configure_savings']
+    assert len(savings)==1,payloads
+    assert savings[0]['id']=='investment' and savings[0]['savings_status']=='Available'
+    assert savings[0]['interest_rate']=='1.50' and savings[0]['interest_period']=='Monthly'
+
     state=json.loads((directory/'state/spectrumos/questline-widget.json').read_text())
     assert state['version']==1 and state['views']
     print('Verified one scroll creation, no incomplete treasury entries, and durable workspace state.')

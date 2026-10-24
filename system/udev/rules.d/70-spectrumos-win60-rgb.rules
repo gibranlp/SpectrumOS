@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2e3c", ATTRS{idProduct}=="c365", ATTRS{product}=="WIN 60 HE", ENV{ID_USB_INTERFACE_NUM}=="02", TAG+="uaccess"

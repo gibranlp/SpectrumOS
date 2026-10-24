@@ -20,7 +20,8 @@ PanelWindow {
 
     screen: targetScreen
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: picker; enabled: expanded }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top

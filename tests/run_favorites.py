@@ -21,7 +21,7 @@ spec=importlib.util.spec_from_loader(loader.name,loader);m=importlib.util.module
 selection=Path(__file__).with_name('browser-selection')
 def browsers():
  id=selection.read_text() if selection.exists() else 'browser.desktop'
- return dict(browsers=[dict(id='browser.desktop',name='Test Browser',icon=''),dict(id='second.desktop',name='Second Browser',icon='')],defaultBrowser=id,httpBrowser=id)
+ return dict(browsers=[dict(id='browser.desktop',name='Test Browser',icon='',desktopFile='/tmp/browser.desktop'),dict(id='second.desktop',name='Second Browser',icon='',desktopFile='/tmp/second.desktop')],defaultBrowser=id,httpBrowser=id)
 def select(id):
  selection.write_text(id);return browsers()
 m.browser_catalog=browsers;m.set_browser=select;m.fetch_icon=lambda url:None
@@ -41,7 +41,7 @@ except Exception as e:
     (folder/'Test.qml').write_text(source)
     panel=folder/'configs/spectrum-shell/FavoritesPanel.qml'
     text=panel.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:800;implicitHeight:950',1)
-    for line in ['    WlrLayershell.layer:WlrLayer.Top\n','    WlrLayershell.namespace:"spectrum-widget-favorites"\n','    anchors {top:true;bottom:true;left:true;right:true}\n','    exclusionMode:ExclusionMode.Ignore\n','    focusable:expanded && !manager.choosing\n']:
+    for line in ['    WlrLayershell.layer:WlrLayer.Top\n','    WlrLayershell.namespace:"spectrum-widget-favorites"\n','    anchors {top:true;bottom:true;left:true;right:true}\n','    exclusionMode:ExclusionMode.Ignore\n','    WlrLayershell.keyboardFocus: panelFocus.mode\n']:
         text=text.replace(line,'',1)
     panel.write_text(text)
     runtime=folder/'runtime';runtime.mkdir(mode=0o700)

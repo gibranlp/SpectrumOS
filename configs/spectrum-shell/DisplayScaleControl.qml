@@ -18,7 +18,7 @@ Column {
         width: parent.width
         spacing: 5
         Repeater {
-            model: [1, 1.5, 1.75, 2]
+            model: [1, 1.25, 1.5, 1.75, 2]
             ShellButton {
                 required property real modelData
                 readonly property bool selected: Math.abs(control.currentScale - modelData) < 0.01

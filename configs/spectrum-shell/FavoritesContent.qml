@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Controls as Controls
 import QtQuick.Layouts
+import Quickshell
 
 ColumnLayout {
     id: content
@@ -13,6 +14,22 @@ ColumnLayout {
     onVisibleChanged:if(!visible)cancelDrag()
     spacing: 12
     property string editorKey: ""
+    FontMetrics {
+        id:actionMetrics
+        font.family:content.theme.fontFamily
+        font.pixelSize:Math.max(10,content.theme.fontSize-2)
+        font.bold:true
+    }
+    readonly property real countWidth:Math.max(16,actionMetrics.advanceWidth(String(Math.max(0,...manager.favorites.map(f=>f.clickCount)))))
+    function actionRows(width): int {
+        const widths=[countWidth].concat(manager.browsers.map(()=>30),[Math.max(36,actionMetrics.advanceWidth("Edit")+24),36]);
+        let rows=1,used=0;
+        for(const size of widths) {
+            if(used>0 && used+4+size>width) {rows++;used=0;}
+            used+=(used>0?4:0)+size;
+        }
+        return rows;
+    }
     function focusInitial(): void { if (manager.view.editor) titleField.forceActiveFocus(); else search.forceActiveFocus(); }
     Connections { target:content.manager; function onViewChanged() {
         const key=content.manager.view.editor+":"+(content.manager.view.draft.id||"");
@@ -91,12 +108,16 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth:true;Layout.fillHeight:true;spacing:14
         Controls.ScrollView {
-            Layout.preferredWidth:Math.min(160,content.width*0.27)
+            id:categoryScroll
+            Layout.preferredWidth:Math.min(240,content.width*0.32)
+            Layout.minimumWidth:0
             Layout.fillHeight:true
             clip:true
+            contentWidth:availableWidth
+            rightPadding:12
             Controls.ScrollBar.horizontal.policy:Controls.ScrollBar.AlwaysOff
             ColumnLayout {
-                width:parent.width;spacing:6
+                width:categoryScroll.availableWidth;spacing:6
                 Repeater {
                     objectName:"favorites-categories"
                     model:content.manager.categoryList
@@ -105,10 +126,23 @@ ColumnLayout {
                         required property var modelData
                         objectName:"favorites-category-"+modelData.id
                         Layout.fillWidth:true
-                        label:modelData.name+" ("+(modelData.id==="top" ? Math.min(24,content.manager.favorites.length) : content.manager.favorites.filter(f=>f.category===modelData.id).length)+")"
+                        property string categoryText:modelData.name+" ("+(modelData.id==="top" ? Math.min(24,content.manager.favorites.length) : content.manager.favorites.filter(f=>f.category===modelData.id).length)+")"
+                        label:""
+                        implicitHeight:Math.max(34,categoryLabel.implicitHeight+14)
+                        Accessible.name:categoryText
                         backgroundColor:categoryDrop.containsDrag || content.manager.view.category===modelData.id?content.theme.colors.accent:content.theme.colors.surface_alt
                         foregroundColor:categoryDrop.containsDrag || content.manager.view.category===modelData.id?content.theme.colors.background:content.theme.colors.foreground
                         onClicked:content.manager.selectCategory(modelData.id)
+                        Text {
+                            id:categoryLabel
+                            anchors.centerIn:parent
+                            width:Math.max(0,parent.width-24)
+                            text:categoryButton.categoryText
+                            textFormat:Text.PlainText
+                            wrapMode:Text.Wrap
+                            color:categoryButton.foregroundColor
+                            font {family:content.theme.fontFamily;pixelSize:content.theme.fontSize;bold:true}
+                        }
                         DropArea {
                             id:categoryDrop
                             objectName:"favorites-drop-"+categoryButton.modelData.id
@@ -142,7 +176,7 @@ ColumnLayout {
                 Layout.fillWidth:true;Layout.fillHeight:true
                 clip:true
                 cellWidth:Math.floor((width-12)/(width>=440?2:1))
-                cellHeight:138
+                cellHeight:100+content.actionRows(cellWidth-28)*38
                 model:content.manager.visibleFavorites
                 boundsBehavior:Flickable.StopAtBounds
                 flickableDirection:Flickable.VerticalFlick
@@ -197,9 +231,34 @@ ColumnLayout {
                                 onActivated:if(!dragged)content.manager.run("open",{id:card.modelData.id})
                             }
                         }
-                        RowLayout {
+                        Flow {
                             Layout.fillWidth:true
-                            Label { Layout.fillWidth:true;text:card.modelData.clickCount;color:content.theme.colors.muted;font.pixelSize:Math.max(10,content.theme.fontSize-2) }
+                            spacing:4
+                            Label {width:content.countWidth;height:34;verticalAlignment:Text.AlignVCenter;text:card.modelData.clickCount;color:content.theme.colors.muted;font.pixelSize:Math.max(10,content.theme.fontSize-2)}
+                            Repeater {
+                                model:content.manager.browsers
+                                Button {
+                                    id:browserButton
+                                    required property var modelData
+                                    objectName:"favorites-browser-"+card.modelData.id+"-"+modelData.id
+                                    implicitWidth:30
+                                    label:browserIcon.status===Image.Ready?"":modelData.name.slice(0,1)
+                                    Accessible.name:"Open in "+modelData.name
+                                    Controls.ToolTip.visible:browserHover.hovered
+                                    Controls.ToolTip.text:"Open in "+modelData.name
+                                    Controls.ToolTip.delay:400
+                                    HoverHandler {id:browserHover}
+                                    Image {
+                                        id:browserIcon
+                                        anchors.centerIn:parent
+                                        width:20;height:20
+                                        source:Quickshell.iconPath(browserButton.modelData.icon||"web-browser",true)
+                                        fillMode:Image.PreserveAspectFit
+                                        visible:status===Image.Ready
+                                    }
+                                    onClicked:content.manager.run("open",{id:card.modelData.id,browser:modelData.id})
+                                }
+                            }
                             Button { objectName:"favorites-edit-"+card.modelData.id;label:"Edit";fontSize:Math.max(10,content.theme.fontSize-2);onClicked:content.manager.editFavorite(card.modelData) }
                             Button { objectName:"favorites-remove-"+card.modelData.id;label:"×";onClicked:{content.manager.persist();content.manager.run("favorite-delete",{id:card.modelData.id});} }
                         }
@@ -227,7 +286,11 @@ ColumnLayout {
                         onActivated:index=>content.manager.draft({category:content.manager.categories[index].id})
                     }
                     Label {visible:content.manager.draftError.length>0;Layout.fillWidth:true;text:content.manager.draftError;color:content.theme.colors.accent}
-                    Button { objectName:"favorites-back";label:"Back";onClicked:content.manager.back() }
+                    RowLayout {
+                        Layout.fillWidth:true
+                        Button {objectName:"favorites-save";label:"Save";enabled:content.manager.ready && !content.manager.busy && !content.manager.choosing;onClicked:content.manager.save()}
+                        Button { objectName:"favorites-back";label:"Back";onClicked:content.manager.back() }
+                    }
                 }
             }
         }

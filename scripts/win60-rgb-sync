@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import select
+import sys
+import time
+
+HIDRAW = Path('/sys/class/hidraw')
+DEV = Path('/dev')
+CACHE = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache'))
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+CURRENT = CACHE / 'spectrumos/theme/current'
+DESCRIPTOR = bytes.fromhex('061bff0991a101850119002aff00150026ff007508953f8102190029ff9102c0')
+PRODUCTS = {'SI2825KZHEARGB', 'SI2825HEARGB'}
+
+
+def devices() -> list[Path]:
+    found = []
+    for node in sorted(HIDRAW.glob('hidraw*')):
+        try:
+            parent = node / 'device'
+            info = dict(line.split('=', 1) for line in (parent / 'uevent').read_text().splitlines() if '=' in line)
+            if (info.get('HID_ID', '').upper() == '0003:00002E3C:0000C365'
+                    and info.get('HID_NAME') == 'WIN 60 HE'
+                    and (parent / 'report_descriptor').read_bytes() == DESCRIPTOR):
+                found.append(DEV / node.name)
+        except OSError:
+            continue
+    return found
+
+
+def send(fd: int, command: int, subcommand: int = 0, payload: bytes = b'') -> None:
+    if len(payload) > 58:
+        raise ValueError('Invalid WIN60 packet size')
+    frame = bytes([1, command, subcommand, 0, 0, len(payload)]) + payload
+    frame = frame.ljust(64, b'\0')
+    if os.write(fd, frame) != len(frame):
+        raise OSError('Incomplete WIN60 HID report')
+
+
+def query(fd: int, command: int, subcommand: int = 0) -> bytes:
+    for _ in range(32):
+        if not select.select([fd], [], [], 0)[0]:
+            break
+        os.read(fd, 64)
+    send(fd, command, subcommand)
+    deadline = time.monotonic() + 0.5
+    while time.monotonic() < deadline:
+        if not select.select([fd], [], [], max(0, deadline - time.monotonic()))[0]:
+            break
+        report = os.read(fd, 64)
+        if len(report) != 64 or report[0] != 1:
+            continue
+        body = report[1:]
+        if body[0] == command and body[2:4] == b'\0\0':
+            size = body[4]
+            if size > 58:
+                raise ValueError('Invalid WIN60 response size')
+            return body[5:5 + size]
+    raise TimeoutError(f'WIN60 command {command:02x} timed out')
+
+
+def state(fd: int) -> tuple[dict, bytes]:
+    identity = query(fd, 13).rstrip(b'\0').decode('ascii')
+    parts = identity.split(',')
+    if len(parts) < 6 or parts[4] not in PRODUCTS:
+        raise ValueError('This WIN60 firmware model is not supported')
+    payload = query(fd, 7, 1)
+    if len(payload) not in (12, 14) or payload[1] > 4 or payload[2] > 4 or payload[9] > 7 or payload[10] > 1 or payload[11] > 1:
+        raise ValueError('Unsupported WIN60 lighting response')
+    return ({'product': parts[4], 'firmware': parts[5], 'mode': payload[0],
+             'brightness': payload[1], 'speed': payload[2], 'color': '#' + payload[3:6].hex(),
+             'rainbow': bool(payload[10]), 'enabled': payload[11] == 0}, payload.ljust(14, b'\0'))
+
+
+def accent() -> bytes:
+    color = json.loads((CURRENT / 'palette.json').read_text())['roles']['accent']
+    if not isinstance(color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+        raise ValueError('Invalid keyboard accent color')
+    return bytes.fromhex(color[1:])
+
+
+def apply(fd: int, color: bytes) -> dict:
+    before, raw = state(fd)
+    expected = bytearray(raw)
+    expected[0] = 0
+    expected[3:6] = color
+    expected[10] = 0
+    if bytes(expected) == raw:
+        return {**before, 'changed': False}
+    if before['mode'] != 0:
+        send(fd, 23, payload=b'\0\0')
+        time.sleep(0.02)
+    send(fd, 7, payload=bytes(expected))
+    time.sleep(0.05)
+    after, actual = state(fd)
+    if (actual[0] != 0 or actual[3:6] != color or actual[10] != 0
+            or actual[1] != raw[1] or actual[11] != raw[11]):
+        raise ValueError('WIN60 lighting readback did not match the requested color and power state')
+    return {**after, 'changed': True}
+
+
+def main() -> int:
+    if sys.argv[1:] not in ([], ['--apply'], ['--status']):
+        print('Usage: win60-rgb-sync [--apply|--status]', file=sys.stderr)
+        return 2
+    status_only = sys.argv[1:] == ['--status']
+    enabled = not (CONFIG / 'spectrumos/win60-rgb.disabled').exists()
+    if not enabled and not status_only:
+        return 0
+    nodes = devices()
+    readings = []
+    try:
+        if nodes:
+            directory = CACHE / 'spectrumos/theme'
+            directory.mkdir(parents=True, exist_ok=True)
+            with (directory / 'win60-rgb.lock').open('a') as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    if status_only:
+                        print(json.dumps({'devices': [], 'enabled': enabled, 'busy': True}))
+                    return 0
+                color = None if status_only else accent()
+                for node in nodes:
+                    item = {'device': str(node), 'writable': os.access(node, os.R_OK | os.W_OK)}
+                    if not item['writable']:
+                        raise PermissionError(f'WIN60 configuration access is unavailable: {node}')
+                    fd = os.open(node, os.O_RDWR | os.O_NONBLOCK)
+                    try:
+                        item.update(state(fd)[0] if status_only else apply(fd, color))
+                    finally:
+                        os.close(fd)
+                    readings.append(item)
+        print(json.dumps({'devices': readings, 'enabled': enabled}))
+        return 0
+    except (OSError, ValueError, KeyError, TypeError, TimeoutError) as error:
+        print(f'WIN60 RGB sync: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

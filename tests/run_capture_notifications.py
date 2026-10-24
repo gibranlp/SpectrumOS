@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="spectrum-capture-notifications-") as te
     for line in ('    WlrLayershell.layer: WlrLayer.Top\n',
                  '    WlrLayershell.namespace: "spectrum-widget-screenshotpanel"\n',
                  '    anchors { top: true; left: true; right: true; bottom: true }\n',
-                 '    exclusionMode: ExclusionMode.Ignore\n', '    focusable: expanded\n'):
+                 '    exclusionMode: ExclusionMode.Ignore\n', '    WlrLayershell.keyboardFocus: panelFocus.mode\n'):
         source = source.replace(line, "", 1)
     source = source.replace('        id: card\n', '        id: card\n        objectName: "captureCard"\n', 1)
     panel.write_text(source)

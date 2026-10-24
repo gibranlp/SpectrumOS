@@ -22,7 +22,8 @@ PanelWindow {
     color: "transparent"
     property bool expanded: false
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: browser; enabled: expanded }
 
     function moveSelection(offset): void {
         if (gallery.count === 0)

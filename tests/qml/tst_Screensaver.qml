@@ -98,13 +98,15 @@ Item {
             compare(theme.commands[2], ["effect", "rain"]);
             mouseClick(findChild(controls, "screensaver-branding-logo"));
             compare(theme.commands[3], ["branding", "logo"]);
-            mouseClick(findChild(controls, "screensaver-preview"));
-            compare(theme.commands[4], ["preview"]);
+            mouseClick(findChild(controls, "screensaver-timeout-600"));
+            compare(theme.commands[4], ["timeout", 600]);
+            mouseClick(findChild(controls, "screensaver-timeout-900"));
+            compare(theme.commands[5], ["timeout", 900]);
         }
         function test_busy_disables_actions() {
             theme.screensaverBusy = true;
             verify(!findChild(controls, "screensaver-enabled").enabled);
-            verify(!findChild(controls, "screensaver-preview").enabled);
+            verify(!findChild(controls, "screensaver-timeout-900").enabled);
         }
         function test_animation_stops_when_inactive() {
             scene.running = true; wait(90); verify(scene.frameCount > 0);

@@ -24,7 +24,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     visible: motion.active
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: center; enabled: expanded }
     EscapeDismissal { active: center.expanded; onDismissed: center.closeRequested() }
     onExpandedChanged: {
         if (expanded) {

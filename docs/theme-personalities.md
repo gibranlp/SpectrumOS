@@ -1,94 +1,55 @@
-# Native palette interpretation
+# Pywal-inspired native palettes
 
-## Audit of the existing pipeline
+The four existing mode identifiers remain stable, with the following references:
 
-Before implementation changes, all four native backends followed this path:
+| Mode | Reference | Default control |
+|---|---|---|
+| Spectrum (`spectrum`) | Pywal `wal` / ImageMagick | `color_count=16` |
+| Clustered (`clustered`) | Pywal `colorz` | `cluster_count=6` |
+| Median Cut (`median-cut`) | Pywal `colorthief` | `color_count=8` |
+| Weighted Regions (`weighted-regions`) | Pywal `haishoku` | No parameters |
 
-1. FFmpeg decoded the image to a PPM sample bounded by 160×160 pixels. The PPM reader discarded image dimensions.
-2. Spectrum counted RGB bins with 32-channel quantization. Clustered ran deterministic RGB k-means over those bins. Median Cut split the same bins into population/range boxes. Weighted Regions grouped colors into a 3×3×3 RGB color cube; it did not use image coordinates.
-3. Every backend entered the same `palette_from_pixels` interpretation: dominant color → HLS background clamp; a population/chroma cutoff → accent selection; HLS saturation/lightness clamps → accents; RGB blends → surfaces and foregrounds.
-4. Shared background limits constrained dark/light canvases to the same narrow range. The same gray foregrounds and neutral accent fallback seeded every mode. Coarse HLS lightness stepping for contrast could wash distinct candidates toward the same extremes.
-5. Stable semantic status hues came from the variant fallback. The palette passed the existing consumer contrast contracts, then the independent renderers and atomic generation mechanism activated it.
+This replaces the previous frequency-bin, OKLab-cluster, source-box and spatial/cinematic personalities. Historical comparison artifacts describe that earlier implementation, not the current algorithms.
 
-The old profiles made Clustered more saturated than Spectrum, made Median Cut select a distant secondary hue instead of favoring fidelity, and gave Weighted Regions no spatial information. Although profile numbers varied, the shared normalization, common starting grays, tonal secondary fallback and loss of position restricted visual identity. The evaluation report selected only the automatic variant and did not explain individual role adjustments.
+## Extraction
 
-## Proposed change
+FFmpeg decodes images within 160×160 pixels and retains dimensions. Spectrum sends that RGB sample to ImageMagick without dithering, requests sixteen colors, and retries up to nineteen larger quantizations if fewer representatives are returned. Solid/low-color sources are accepted rather than rejected. Representatives are ordered by YIQ brightness. This follows [Pywal's wal backend](https://github.com/dylanaraps/pywal/blob/master/pywal/backends/wal.py), with fixed sampling and no spatial dithering for reproducibility.
 
-Preserve the decoder boundary, deterministic frequency/k-means/median-box algorithms, ten-role schema, Matugen adapter, renderer interfaces and atomic activation. Split native processing into raw extraction with source/position evidence and four explicit interpretation functions. Use OKLab/OKLCH for interpretation, gamut mapping and minimum contrast corrections. The only common final processing will be color conversion, hue-preserving accessibility repair and validation; it will not choose accents, backgrounds or stylistic targets.
+Clustered follows [Colorz](https://github.com/metakirby5/colorz/blob/master/colorz.py): unique source colors get equal influence, HSV value is limited to 170–200, RGB k-means produces six representatives, and output is hue-ordered. Deterministic farthest-point initialization and bounded convergence replace SciPy's random initialization. Duplicate source pixels do not change the cluster fitting. This deliberately differs from a population-weighted dominant-color algorithm.
 
-Spectrum will separate colorful source hues and use the strongest chroma with a rich dark or tinted bright canvas. Clustered will choose compatible families and bounded chroma around its dominant cluster. Median Cut will keep source hues and chroma and adapt natural dark/bright representatives only as necessary for UI contrast. Weighted Regions will retain decoded dimensions, select environment colors from edges and focal/highlight colors from spatial evidence, and grade deliberate dark and cinematic light variants.
+Median Cut follows [ColorThief's MMCQ](https://github.com/fengsp/color-thief-py/blob/master/colorthief.py): five bits per channel, near-white exclusion, population-prioritized splitting for the first 75% of boxes, then population×RGB-volume priority. Each box splits along its longest RGB axis around a population median with a range-based cut adjustment. Representatives use weighted five-bit cell centers. Spectrum directly processes the bounded sample instead of ColorThief's quality-stride subsampling, retains nonempty boxes for low-color sources, and falls back to the source for all-white images. Its compact box implementation tightens bounds to occupied colors, so it is not a byte-for-byte port of the upstream quantizer.
 
-A comparison command will export all eight palettes for a wallpaper, a standalone visual dashboard, raw/selected/rejected candidates, role transformations and contrast checks. The acceptance corpus will include colorful, blue, warm, near-neutral, dark, bright, low-saturation, small-focal-object and many-color cases, with real wallpapers alongside controlled fixtures. Visual review will accompany numerical checks.
+Weighted Regions follows [Haishoku](https://github.com/LanceGin/haishoku/blob/master/haishoku/alg.py): divide each observed channel range into three equal intervals, group colors into the resulting 27 color-space regions, calculate population-weighted RGB means with integer truncation, and retain the eight largest populations. Output is brightness-ordered for the Pywal wrapper. These are color regions, not positional regions; edge/center/focal controls have been removed. Source means and region boundaries match the upstream calculation.
 
-## Implemented pipeline
+## Interpretation and accessibility
 
-`decode_native_image` returns pixels **and dimensions**, sampled within 160×160. `extract_colors` produces source representatives with population and optional spatial evidence. `interpret` dispatches to four separate functions that choose all seven wallpaper-derived roles. Conversion and accessibility repair happen after those choices. Renderers still consume the existing ten-role palette; terminal ANSI colors remain a consumer mapping, not an extraction constraint.
+Let `lighten(c,a)=c+(255-c)×a` and `darken(c,a)=c×(1-a)`, truncating each RGB channel as Pywal does. Color ordering is preserved from extraction.
 
-Spectrum groups eight-channel RGB bins but retains their actual source means, avoiding quantization-created hues in gray images. Clustered retains deterministic k-means initialization and population aggregation, using OKLab distance. Median Cut retains the box-splitting algorithm and now uses actual source pixels rather than coarse bins. Weighted Regions accumulates source means and spatial evidence by color bin across the image. These are source discovery operations; none imposes a shared UI style.
+| Mode | Dark background | Light background | Foreground |
+|---|---|---|---|
+| Spectrum | First color darkened 40%, unless its red channel already begins with hexadecimal zero | Last color lightened 85% | Last color blended equally with #eeeeee in dark mode; first color in light mode |
+| Clustered | First hue-ordered color darkened 80% | First hue-ordered color lightened 95% | Dark background lightened 75%; light background darkened 75% |
+| Median Cut | First color darkened 80% | First color lightened 90% | First color lightened 60% in dark mode or darkened 75% in light mode |
+| Weighted Regions | First color lightened 40%, then darkened 80% | First color lightened 40%, then lightened 95% | Same generic foreground adjustment as Clustered |
 
-Perceptual operations use the [original OKLab conversion](https://bottosson.github.io/posts/oklab/). Colors outside sRGB lose the minimum chroma necessary to preserve lightness and hue, rather than clipping RGB channels; this follows the constant-lightness/hue approach described in [gamut mapping](https://bottosson.github.io/posts/gamutclipping/). Contrast is checked on the final quantized sRGB colors using actual relative luminance. Repairs search from the intended color toward lighter ink in dark mode or darker ink in light mode, preserving hue and reducing chroma only when gamut requires it. Repairs do not change canvases or select new sources.
+Accents retain extracted chroma and hue before accessibility repair. Spectrum favors the upper half of a full palette, matching wal's palette selection; other modes use their chromatic representatives. The primary is the most chromatic qualifying representative and the secondary favors a distant extracted family. There is no synthetic hue rotation or chroma boost. Existing area/chroma checks prevent weak noise from coloring neutral wallpapers.
 
-## Role selection
+Spectrum derives surface/surface_alt by blending background 6%/12% toward the intended foreground and muted ink by blending 68%. Unusable background extremes are bounded to OKLCH L≤.32 dark or L≥.94 light. Hue-preserving minimum contrast repair then enforces all existing text, selection and control contracts. These adaptations and the ten-role mapping mean the final desktop colors need not equal Pywal's sixteen ANSI slots. Terminal renderers keep their existing semantic mapping. Pywal's ineffective loop-local saturation adjustments are not reproduced as real saturation changes.
 
-`accent` is the primary interaction color and `accent_alt` the secondary color. Each backend deliberately controls hue hierarchy, canvas tint, foreground tint and surface elevation. OKLCH lightness below is normalized to 0–1; actual sRGB gamut and minimum contrast can change final chroma/lightness.
-
-| Roles | Spectrum | Clustered | Median Cut | Weighted Regions |
-|---|---|---|---|---|
-| `background` | Dominant chromatic source, otherwise the vivid source; L=.23 dark/.968 light | Dominant cluster, chromatic anchor if dominant is neutral; L=.275/.947 | Darkest/brightest representative covering at least 2%; source L bounded to .255–.34/.905–.972 | Strongest edge/environment source; dark L=.155+.065×source L; light L=.913+.012×source L |
-| `surface` | Primary family, distinct tint and L=.30/.925 | Dominant family, controlled C=.025/.018 and L=.325/.915 | Canvas family, dark L+ .04/light L− .033, minimal source chroma | Environment family, dark L+ .08/light L− .055, retained shadow/ivory tint |
-| `surface_alt` | Actual secondary source family; L=.365/.875 | Dominant family, C=.03/.022 and L=.375/.88 | Canvas family, dark L+ .075/light L− .063 | Environmental counter-tone, dark L+ .16/light L− .112 |
-| `foreground` | Primary-tinted readable ink, L=.94/.24 | Lightly anchor-tinted ink, L=.91/.275 | Naturally bright/dark source, L=.89/.31; subdued source chroma | Highlight-tinted dark-mode text at L=.965; environment-derived light-mode ink at L=.20 |
-| `muted` | Secondary-tinted ink, L=.74/.43 | Restrained primary-family ink, L=.705/.47 | Same natural text family at L=.70/.46 | Environment/counter-tone at L=.72/.40 |
-| `accent` | Strongest meaningful source chroma; desired C≥.22; L=.74/.48 | Population×√chroma anchor; coherent C≤.12; L=.76/.50 | Population×chroma source; preserve hue and nearly all C; dark source L bounded .61–.81/light .40–.54 | Spatial focal score; selective C=.085–.18; luminous L=.82 dark/rich ink L=.405 light |
-| `accent_alt` | Distant chromatic source; retain its hue even when source hues crowd; L=.70/.46 | Strongest compatible cluster within 65°; if too close, a related 28° hierarchy; L=.68/.535 | Actual source family ranked by population×hue distance; no rotation; source C with restrained correction | Environmental source at least 45° from focal when available; otherwise environment itself; quieter C≤.095/.10 and L=.64/.425 |
-
-For Spectrum, `success`, `warning`, and `error` use the meaningful wallpaper families nearest the usual green, amber and red hues, with vivid chroma and distinct readable tones (success/warning/error use dark lightness .84/.74/.64 and light lightness .32/.43/.54 before contrast repair). A single-family wallpaper keeps that family across all roles, and a neutral wallpaper stays neutral. Spectrum never rotates a source hue or injects fallback status colors. The other backends retain variant-matched semantic green, amber and red from Spectrum's existing fallback palette. They are independent of wallpaper fashion and receive only minimum contrast correction. Every backend chooses the other seven roles independently; shared semantic status hues do not flatten canvas/accent identity.
-
-Primary and selection text maintain 4.5:1 against their registered consumers. Muted text, secondary accents and semantic states maintain the existing 3:1 contract; both accent fills also maintain 3:1 against both surfaces. The contract remains in `palette.py`. This does not assert 4.5:1 for every use of colored secondary text. Accessibility and sRGB gamut take priority over exact source luminance/chroma, particularly for bright source colors used as light-theme ink. Diagnostics distinguish intended grading, gamut reduction and accessibility corrections.
-
-Pure gray sources do not acquire arbitrary hue. Their personalities remain distinct through canvas depth, surface spacing and accent hierarchy. A weak colored noise candidate is not amplified unless chroma and area evidence support it; a genuinely vivid focal color covering 0.1% or more of the sample can qualify. A broadly tinted low-chroma image can also qualify, allowing expressive interpretation without using a random seed or a generic fallback hue.
-
-## Spatial weighting
-
-The default grid is 5×5. Each sampled pixel uses its grid cell's normalized center `(x,y)`. Define `r=max(abs(2x−1),abs(2y−1))`, center evidence `(1−r)²`, and edge evidence `r²`. Salience is its OKLab distance from the mean image color. Highlight evidence is `L³×(.02+C)`.
-
-For each color bin, accumulate population `n`, center, edge, salience×(.25+center), and highlight. Center, focal and highlight sums are divided by √n, retaining population influence while letting a small vivid object compete. Edge evidence keeps its full sum to favor large environmental areas.
-
-- Environment score: `(edge×edge_weight + .1×n)×(1.5−L)`.
-- Primary score: `(center×center_weight + focal×focal_weight)×max(C,.005)` among meaningful chromatic candidates, or all candidates for a neutral source.
-- Secondary score: `edge×edge_weight + highlight×luminance_weight` among source families at least 45° from the focal hue; fall back to environment when none exists.
-- Foreground highlight family: strongest accumulated highlight evidence, used as a restrained tint rather than another saturated accent.
-
-This is deterministic composition weighting, not semantic object recognition. Moving a subject without changing the color histogram can change the primary accent. Center/focal controls influence the primary; edge controls influence canvas and counter-tone; luminance controls influence counter-tone highlights. Grid size changes positional resolution. The image/PPM entrypoints and comparison command always retain coordinates. Legacy library calls to `palette_from_pixels` without `image_size` remain supported through nonspatial representative grouping; diagnostics explicitly flag missing coordinates. Callers requiring spatial interpretation must supply matching dimensions.
+Spectrum status hues still come from source families nearest conventional green/amber/red, with distinct tones. Other modes retain the variant's fixed semantic status colors. Auto variant detection and atomic rendering/activation are unchanged.
 
 ## Parameters and comparison
 
-Defaults are defined in `interpretation.BACKEND_DEFAULTS`. All overrides are validated and deterministic. They do not change persistent desktop preferences automatically.
+`color_count` accepts integers 4–35; `cluster_count` accepts integers 4–16. Unknown or removed styling/spatial parameters return a clear error instead of silently doing nothing. `extract native --parameters` accepts that mode's controls; comparison accepts an object keyed by mode:
 
-| Backend | Parameter defaults | Purpose |
-|---|---|---|
-| Spectrum | `target_chroma=.22`, `hue_separation=95`, `saturation_boost=1.4` | Desired chroma floor, preferred source accent separation (selection only; never rotates hues), source chroma amplification; desired C capped at .27 before gamut |
-| Clustered | `cluster_count=8`, `harmony_threshold=65`, `target_chroma=.12` | Raw representative count, maximum compatible source hue distance, coherent accent chroma ceiling |
-| Median Cut | `color_count=12`, `fidelity_strength=.92`, `max_chroma_adjustment=.012` | Box count, retained source chroma fraction, maximum intentional chroma reduction; gamut can require further reduction |
-| Weighted Regions | `center_weight=2.8`, `edge_weight=2`, `focal_weight=4`, `luminance_weight=1.5`, `spatial_grid_size=5` | Exact positional/hierarchy controls described above |
-
-```bash
-spectrum-theme compare wallpaper.jpg --output /tmp/spectrum-comparison
-spectrum-theme compare ~/Pictures/Wallpapers --output /tmp/spectrum-comparison
-spectrum-theme extract native wallpaper.jpg --mode weighted-regions --variant light \
-  --parameters spatial.json --debug decisions.json --output cinematic-light.toml
+```json
+{"spectrum": {"color_count": 16}, "clustered": {"cluster_count": 6}, "median-cut": {"color_count": 8}}
 ```
 
-For `extract`, `spatial.json` contains a flat object such as `{"center_weight":4,"edge_weight":1.5}`. For `compare`, overrides are keyed by backend, such as `{"weighted-regions":{"center_weight":4},"spectrum":{"hue_separation":110}}`. Unknown names, invalid types, nonfinite values, out-of-range values and fractional counts are rejected.
+```sh
+spectrum-theme compare wallpaper.png --output /tmp/spectrum-comparison
+```
 
-Comparison decodes each image once and extracts candidates once per backend, then interprets both variants. It writes eight validated TOML palettes per image, `report.html` and `report.json`. The HTML embeds wallpaper thumbnails and puts four UI interpretations side by side for each variant; it requires no network or JavaScript. Expand a card for raw colors, selections, role transformations and contrast ratios. JSON retains every raw candidate, rejected candidates, weights/spatial scores, role source and intended/final OKLCH, ΔL/ΔC/Δh, separate accessibility ΔL, parameters, timings and pairwise perceptual distances. Hue shift is zero when a source or result is achromatic, with `hue_defined=false`. HTML shows selected candidates first and then the most populous other colors, limited to 96 swatches for readability. Exported palette downloads require the adjacent TOML files; the visual report itself is standalone.
+This exports eight dark/light palettes, an HTML preview and source/final-role diagnostics, including contrast checks. RGB dark/light blends can shift perceived OKLCH hue slightly; accessibility changes are reported separately. Dimensions remain available for decoding and diagnostics, but no backend uses focal/edge image-position weighting.
 
-Reproduce the controlled acceptance images with `python scripts/theme-personality-fixtures /tmp/personality-wallpapers`, then compare that directory. The fixture generator uses only Python's standard library.
-
-## Acceptance review
-
-The reviewed corpus contains the nine requested controlled image types, four real repository wallpapers (color orbits, amber orchard, azure balloons and violet horizon), and the active user wallpaper: 14 images × 8 palettes = 112 valid palettes. UI contact sheets were visually inspected for every image in both variants. Spectrum shows multiple confident color families, Clustered preserves coherent hierarchy, Median Cut retains original families with modest processing, and Weighted Regions creates environmental shadows or editorial light structure with selective focal accents.
-
-The small vivid focal fixture gives Clustered the broad blue-gray environment and Weighted Regions the small warm focal subject. A test swaps a warm patch between center and edge while preserving the histogram: all nonspatial backends remain identical, while Weighted Regions changes its primary accent. Nearly monochrome and low-saturation cases distinguish expressive grading from source fidelity. Color science reference/roundtrip/gamut tests, semantic role validation, all nine corpus cases, CLI diagnostics/comparison tests and 4,000 seeded randomized dark/light contrast cases and 1,120 parameter-boundary cases accompany the visual review.
-
-Across the same 14-image corpus, mean nearest-backend distance averaged over background, foreground and both accents rose from .0416 to .0690 in OKLab (0–1 scale). This supports the audit but is not the visual acceptance criterion. The generated review artifacts live under `generated/theme-personalities/review/` and are intentionally not source/package assets.
+Regression coverage includes Colorz value clamping, equal unique-color influence and deterministic ordering; MMCQ five-bit cells, white handling and population conservation; Haishoku exact-third boundaries, means and top-eight populations; ImageMagick quantization/retries and failures; known Pywal background formulas; neutral/low-color cases; the nine-image fixture corpus; renderers, CLI and atomic generation behavior.

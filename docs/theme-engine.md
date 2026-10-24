@@ -158,22 +158,56 @@ including the unpadded effect report length modulo 255. Zone addresses match the
 [Legion Spectrum Control](https://github.com/alstergee/legion-spectrum-control)
 layout tested on this model.
 
+## Keychron Q11 lighting
+
+`appearance-sync --apply` also runs `/usr/lib/spectrumos/keychron-rgb-sync`.
+It supports the Q11 ANSI Encoder (`3434:01e0`) with VIA protocol 11, verified
+on the local keyboard. Detection requires its 32-byte Raw HID descriptor;
+keyboard and mouse input interfaces are never written to. Other models and
+firmware protocols are skipped or reported as unsupported.
+
+The keyboard follows the active palette's `accent` hue and saturation. Enabled
+lighting switches to solid color so rainbow effects cannot override the theme.
+Brightness is preserved, and disabled lighting stays disabled. VIA exposes one
+shared color for both halves; independent key or half colors are outside this
+adapter's scope. Updates use volatile VIA settings without sending the save
+command, avoiding EEPROM writes on each theme change. Reconnecting the keyboard
+restores its saved settings until the next appearance application.
+
+Wallpaper/theme changes, rollback, and session startup use the existing
+appearance synchronization path. Errors are bounded to three seconds without
+failing desktop appearance application. Updates are serialized and read the
+current palette after acquiring the lock. No additional daemon or firmware
+flash is required. The packaged `70-spectrumos-keychron-rgb.rules` grants the
+active session access to this model through logind's `uaccess`.
+
+Inspect firmware lighting values with `keychron-rgb-sync --status` and apply with
+`keychron-rgb-sync --apply` (both under `/usr/lib/spectrumos/`). Create
+`~/.config/spectrumos/keychron-rgb.disabled` to opt out; removing it resumes sync.
+Disabling sync leaves the current color in place; use the keyboard's lighting
+controls or VIA to select another effect.
+
+The adapter follows the [QMK VIA implementation](https://github.com/qmk/qmk_firmware/blob/master/quantum/via.c)
+and the [VIA Q11 definition](https://github.com/the-via/keyboards/blob/master/v3/keychron/q11/ansi_encoder.json).
+
 ## Extractor boundary
 
 Wallpaper extraction is not embedded in the renderer. The first adapter invokes Matugen in dry-run JSON mode and maps its Material roles into schema-v1 TOML. Success and warning deliberately retain Spectrum's stable fallback colors because Matugen does not produce those semantic states. Consumer renderers remain unaware of Matugen.
 
-The Matugen adapter provides a reference for comparison. Native processing separates raw source evidence (`extractors.py`) from four explicit palette interpretations (`interpretation.py`). OKLab/OKLCH conversion, hue-preserving gamut mapping and minimum accessibility repairs live in `color.py`; shared helpers do not select palette roles or stylistic targets.
+The Matugen adapter remains available independently. The four native modes now follow the requested Pywal backend families, based on the backend wrappers in the owner's Pywal checkout and the upstream extraction algorithms:
 
-| Mode | Extraction | Interpretation |
+| Spectrum mode | Pywal reference | Extraction and palette behavior |
 |---|---|---|
-| `spectrum` | Frequency bins retaining actual mean source colors | Vivid chroma, source-only hue families (including status roles), colorful dark/bright canvases |
-| `clustered` | Deterministic clusters with OKLab distance | Compatible families, coherent chroma, a polished dominant-cluster canvas |
-| `median-cut` | Population/range splitting of actual source colors | Original hue relationships, restrained chroma changes, natural dark/bright representatives |
-| `weighted-regions` | Color populations with decoded coordinates and spatial grid evidence | Edge-derived environment, focal accents, selective highlights, distinct cinematic dark/light grading |
+| `spectrum` | `wal` | ImageMagick quantization, at least sixteen representatives when available, brightness ordering, upper-palette accents and Pywal-style background/foreground adjustments |
+| `clustered` | `colorz` | Six deterministic RGB clusters of unique colors, HSV value limited to 170–200 before clustering, hue ordering and Pywal generic adjustments |
+| `median-cut` | `colorthief` | Eight five-bit modified median-cut representatives; population-first then population×volume splitting, near-white filtering, brightness ordering and ColorThief wrapper adjustments |
+| `weighted-regions` | `haishoku` | Three divisions per RGB channel, population-weighted regional means, eight largest color regions, brightness ordering and Haishoku wrapper adjustments |
 
-Stable sorting, fixed cluster initialization and explicit interpretation rules make repeated extraction reproducible. Automatic variant selection retains the existing average image-luminance threshold. Both forced variants have their own rules; light palettes are not inverted dark palettes. Fully neutral sources keep neutral families, while meaningful low-chroma sources can be amplified by Spectrum. Spectrum status roles select the wallpaper families nearest their conventional hues without adding absent colors; the other backends retain fixed semantic status hues with accessibility correction. The ten-role schema, Matugen mapping, application renderers and atomic activation remain compatible.
+Weighted Regions refers to regions of **color space**, as in Haishoku; moving a patch without changing its histogram no longer changes its palette. Native modes no longer boost chroma, rotate secondary hues, or impose the previous vivid/curated/cinematic styling. ImageMagick is now an explicit Theme package dependency, alongside Python and FFmpeg. No Pywal checkout, SciPy, or optional Python backend package is needed at runtime.
 
-See [Native palette interpretation](theme-personalities.md) for the pre-change audit, every role's selection rules, tunable defaults, exact spatial weighting, limitations and validation evidence. `spectrum-theme compare wallpaper.jpg --output /tmp/spectrum-comparison` exports all eight palettes and an HTML comparison with source/role diagnostics. `extract native` also accepts `--parameters overrides.json` and `--debug decisions.json`. FFmpeg remains the explicit image decoder dependency and now preserves sample dimensions at the PPM boundary.
+These are Spectrum adaptations, not byte-identical Pywal output. FFmpeg still samples images within 160×160; Colorz initialization is deterministic; low-color and all-white wallpapers remain supported. Spectrum maps representative colors to its ten semantic roles, derives two surfaces and muted ink, and keeps its existing OKLCH accessibility corrections. Unusable canvas extremes are bounded for contrast. Spectrum status roles stay source-derived with distinct tones, while the other modes retain the existing semantic fallback colors. Terminal ANSI output is still the existing semantic consumer mapping.
+
+Automatic variant selection, the Matugen adapter, renderers and atomic generation activation remain compatible. See [Native palette interpretation](theme-personalities.md) for formulas, intentional differences and tunable parameters. `spectrum-theme compare wallpaper.jpg --output /tmp/spectrum-comparison` exports all eight palettes with source/role diagnostics. `extract native` accepts `--parameters overrides.json` and `--debug decisions.json`.
 
 `/usr/lib/spectrumos/theme-menu` provides the Wofi frontend. `Super+W` selects the previous theme, a specific or random extraction mode, an automatic/dark/light variant, and a specific or random wallpaper from `${XDG_PICTURES_DIR:-$HOME/Pictures}/Wallpapers`. Its `Random Dark` and `Random Light` actions choose both the mode and wallpaper immediately while forcing the requested variant. The wallpaper gallery's "Surprise me" button (`theme-menu --random`) selects a wallpaper, extraction mode, and color scheme all randomly with automatic variant detection, without opening a menu, and excludes the previous wallpaper whenever more than one is available. `Super+R` (`theme-menu --random-wallpaper`) is deliberately narrower: it only rerolls the wallpaper, leaving whatever extraction mode, variant, and color scheme are currently selected applying to it — a quick "next wallpaper" rather than "Surprise me"'s full reroll of every axis at once. Both exclude the previous wallpaper whenever more than one is available, and the color scheme pick (for "Surprise me") includes "none" alongside every installed gowall theme, so a surprise can land on plain Spectrum extraction just as easily as any one filter. The frontend extracts and strictly renders a complete generation before asking Awww to change the wallpaper, reloads Hyprland and active Kitty instances, reloads Dunst with its generated configuration, signals Waybar to reload its generated CSS, and reports the selected variant and mode. The last wallpaper is user state under `${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/theme/`.
 
@@ -181,7 +215,7 @@ Random wallpaper actions share a shuffled queue under `${XDG_STATE_HOME:-$HOME/.
 
 SpectrumShell's wallpaper gallery (`/usr/lib/spectrumos/theme-adapter`) exposes the same mode and variant choices in its inspector. Selecting one immediately re-runs the full pipeline — `theme-menu --apply` — against whichever wallpaper is currently active, so switching between them (or between `Auto`/`Dark`/`Light`) repaints the desktop right away for a side-by-side comparison, rather than only taking effect the next time a wallpaper is applied by hand. The choice is still persisted to the same preferences file `theme-menu` reads, so it also becomes the default for the next wallpaper pick.
 
-Canvas selection belongs to each backend: Spectrum may tint from a vivid source, Clustered from its dominant family, Median Cut from a natural dark/bright representative, and Weighted Regions from spatial environment evidence. There is no shared background normalization that forces them to converge.
+Canvas selection follows each corresponding Pywal wrapper: Spectrum uses the darkest/brightest representative, Clustered uses its first hue-ordered cluster, and Median Cut and Weighted Regions use their darkest brightness-ordered representative. Readability repair follows these backend choices.
 
 ## Color scheme conversion (gowall)
 
@@ -209,3 +243,17 @@ The native extractor design addresses:
 - Per-consumer health reporting.
 - Package recipes and installation paths.
 - SDDM and Plymouth renderers.
+
+
+## WIN60 HE lighting and WebHID
+
+`appearance-sync --apply` also runs `/usr/lib/spectrumos/win60-rgb-sync`. The connected WIN60 HE uses USB `2e3c:c365`, vendor interface 02 (usage page `0xff1b`, usage `0x91`) and product `SI2825KZHEARGB`, verified on firmware `V3.13.06`. The helper also recognizes `SI2825HEARGB`; it requires the exact WIN 60 HE HID name and vendor report descriptor and checks firmware identity before lighting writes, because other boards share this USB ID.
+
+The helper applies the active semantic accent as static RGB and preserves brightness, speed, background, direction and on/off state. It reads the result back and skips writes when the requested lighting state already matches. It sends only identity/lighting commands; keymaps, macros, Hall-effect actuation, calibration and firmware are not modified. Disconnected keyboards are a quiet no-op. To opt out, create `~/.config/spectrumos/win60-rgb.disabled`. Inspect with `/usr/lib/spectrumos/win60-rgb-sync --status` or apply with `--apply`.
+
+`70-spectrumos-win60-rgb.rules` grants the active local session access only to this model's vendor configuration HID interface through logind `uaccess`. It does not open the keyboard/mouse input interfaces or make devices world-writable. The rule applies automatically on reconnection; the local installation was activated without unplugging the keyboard. In Chrome, open the [standard WIN60 configurator](https://hed.aulacn.com/), click its Connect control and select WIN 60 HE in the browser's device chooser. The website's per-device permission remains a browser choice. Keychron Q11 permissions/support remain unchanged.
+
+Protocol references: [Omakboard's captured WIN60 protocol](https://github.com/elberacasa/omakboard/blob/main/notes/protocol-aula-ff1b.md) and [Aether-HE protocol implementation](https://github.com/MrWhosNexus/Aether-HE/blob/main/protocol.py). The native helper implements the documented report layout independently with Python's standard library.
+
+
+Gowall filter and extraction backend changes invoke `appearance-sync --rgb-only` immediately after the new palette is committed, at the start of `theme-menu` generation application. This updates connected Legion, Keychron Q11 and WIN60 lighting before shell/wallpaper/compositor refresh work, so a later desktop consumer failure cannot prevent the color update. The normal full appearance apply still synchronizes RGB; unchanged lighting is not written again. `--rgb-only` does not alter GTK, Qt, browser styling, wallpaper or saved theme choices.

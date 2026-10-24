@@ -32,8 +32,68 @@ ShellRoot {
     readonly property bool volumeAvailable: !!(Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.ready && Pipewire.defaultAudioSink.audio)
     readonly property int volumePercent: volumeAvailable ? Math.round(Pipewire.defaultAudioSink.audio.volume * 100) : 0
     readonly property bool volumeMuted: volumeAvailable && Pipewire.defaultAudioSink.audio.muted
+    property bool volumeIndicatorArmed: false
+    onVolumeNodeChanged: Qt.callLater(() => { volumeIndicatorArmed = false; volumeIndicatorUpdate.stop(); volumeIndicatorWarmup.restart(); })
+    onVolumeAvailableChanged: Qt.callLater(() => { volumeIndicatorArmed = false; volumeIndicatorWarmup.restart(); })
+    onVolumePercentChanged: if (volumeIndicatorArmed && volumeAvailable && !volumeIndicatorUpdate.running) volumeIndicatorUpdate.start()
+    onVolumeMutedChanged: if (volumeIndicatorArmed && volumeAvailable && !volumeIndicatorUpdate.running) volumeIndicatorUpdate.start()
+    Timer {
+        id: volumeIndicatorWarmup
+        interval: 300
+        running: true
+        onTriggered: shell.volumeIndicatorArmed = shell.volumeAvailable
+    }
+    Timer {
+        id: volumeIndicatorUpdate
+        interval: 35
+        onTriggered: if (shell.volumeIndicatorArmed && shell.volumeAvailable) shell.showLevelIndicator("volume", shell.volumePercent, "", "")
+    }
+    function showLevelIndicator(kind, percent, label, monitor): void {
+        const target = bars.instances.find(bar => bar.modelData.name === monitor) || focusedBar();
+        if (!target) return;
+        for (const bar of bars.instances) if (bar !== target) bar.dismissLevelIndicator();
+        target.showLevelIndicator(kind, percent, label);
+    }
+
     PwObjectTracker { objects: shell.audioNodes }
     readonly property var media: mediaState.state
+    property bool trackIndicatorReady: false
+    property bool trackIndicatorPrimed: false
+    property string lastIndicatorTrack: ""
+    readonly property string indicatorTrackKey: {
+        const player = mediaState.player;
+        if (!player || !player.trackTitle) return "";
+        const metadata = player.metadata || {};
+        return JSON.stringify([mediaState.playerId(player), player.uniqueId,
+            String(metadata["mpris:trackid"] || ""), String(metadata["xesam:url"] || ""),
+            player.trackTitle]);
+    }
+    onIndicatorTrackKeyChanged: Qt.callLater(() => trackIndicatorUpdate.restart())
+    Timer {
+        interval: 800
+        running: true
+        onTriggered: { shell.lastIndicatorTrack = shell.indicatorTrackKey; shell.trackIndicatorPrimed = !!shell.indicatorTrackKey; shell.trackIndicatorReady = true; }
+    }
+    Timer {
+        id: trackIndicatorUpdate
+        interval: 200
+        onTriggered: {
+            const key = shell.indicatorTrackKey;
+            const changed = key !== shell.lastIndicatorTrack;
+            shell.lastIndicatorTrack = key;
+            if (key && !shell.trackIndicatorPrimed) { shell.trackIndicatorPrimed = true; return; }
+            if (!shell.trackIndicatorReady || !changed) return;
+            if (!key) {
+                for (const bar of bars.instances) bar.dismissTrackIndicator();
+                return;
+            }
+            const target = shell.focusedBar();
+            if (!target) return;
+            for (const bar of bars.instances) if (bar !== target) bar.dismissLevelIndicator();
+            target.showTrackIndicator();
+        }
+    }
+
     readonly property var mediaPlayers: mediaState.choices
     readonly property bool mediaChoiceRequired: mediaState.choiceRequired
     readonly property string mediaPendingAction: mediaState.pendingAction
@@ -99,8 +159,8 @@ ShellRoot {
         id: igorRoutine
         visitsEnabled: shell.igorEnabled && !shell.gamingActive && !screensaver.active
         available: monitorNames.length > 0
-        monitorNames: bars.instances.map(bar => bar.screen.name)
-        blockedMonitors: bars.instances.filter(bar => bar.igorSuppressed).map(bar => bar.screen.name)
+        monitorNames: bars.instances.map(bar => bar.modelData.name)
+        blockedMonitors: bars.instances.filter(bar => bar.igorSuppressed).map(bar => bar.modelData.name)
         suppressed: monitorNames.length === blockedMonitors.length
         playing: shell.igorMeetingPreview || meetingState.active || shell.media.playing === true
         meeting: shell.igorMeetingPreview || meetingState.active
@@ -120,12 +180,12 @@ ShellRoot {
     readonly property bool animationsEnabled: !gamingActive
     property string barProfile: "standard"
     property var barProfiles: ({})
-    readonly property bool barVisible: !shell.gamingActive && barProfile !== "minimal"
+    readonly property bool barVisible: !shell.gamingActive && barProfile !== "minimal" && barProfile !== "gaming"
     readonly property int barLeftInset: barVisible && barPosition === "left" ? 52 : 0
     readonly property int panelLeftInset: shell.gamingActive ? 0 : barVisible ? barLeftInset : 8
     readonly property int panelTopInset: shell.gamingActive ? 0 : barVisible && barPosition === "top" ? 34 : 8
-    property string activeWindowTitle: ""
-    property string activeWindowIdentity: ""
+    property var titleWindows: []
+    property bool activeWindowRefreshPending: false
     property string currentDateTime: Qt.formatDateTime(new Date(), "ddd d MMM  HH:mm")
     property var focusState: ({ phase: "idle", remaining: 1500, task: "", tasks: [] })
     property var waveSamples: []
@@ -264,26 +324,37 @@ ShellRoot {
             keyboardLayoutProcess.running = true;
     }
 
+    // El historial de foco se filtra por monitor y espacio antes de elegir el título de cada barra.
+    function windowForMonitor(monitor) {
+        if (!monitor || !monitor.activeWorkspace) return null;
+        const special = monitor.lastIpcObject.specialWorkspace || {};
+        const workspace = special.id ? special.id : monitor.activeWorkspace.id;
+        const candidates = titleWindows.filter(window => window.monitor === monitor.id
+            && window.mapped !== false && !window.hidden && window.workspace
+            && (window.workspace.id === workspace || (!special.id && window.pinned)));
+        candidates.sort((a, b) => {
+            const first = a.focusHistoryID >= 0 ? a.focusHistoryID : Number.MAX_SAFE_INTEGER;
+            const second = b.focusHistoryID >= 0 ? b.focusHistoryID : Number.MAX_SAFE_INTEGER;
+            return first - second || String(a.address).localeCompare(String(b.address));
+        });
+        return candidates[0] || null;
+    }
+
+    function focusedBar() {
+        const focused = Hyprland.focusedMonitor;
+        return bars.instances.find(instance => focused && instance.modelData.name === focused.name)
+            || bars.instances.find(instance => instance.monitor && instance.monitor.focused)
+            || bars.instances[0] || null;
+    }
+
     function openOnFocused(name): void {
-        for (const instance of bars.instances) {
-            if (instance.monitor && instance.monitor.focused) {
-                instance[name]();
-                return;
-            }
-        }
-        if (bars.instances.length)
-            bars.instances[0][name]();
+        const target = focusedBar();
+        if (target) target[name]();
     }
 
     function openWidgetOnFocused(page): void {
-        for (const instance of bars.instances) {
-            if (instance.monitor && instance.monitor.focused) {
-                instance.toggleBarWidget(page);
-                return;
-            }
-        }
-        if (bars.instances.length)
-            bars.instances[0].toggleBarWidget(page);
+        const target = focusedBar();
+        if (target) target.toggleBarWidget(page);
     }
 
     function refreshBrightness(): void {
@@ -305,6 +376,10 @@ ShellRoot {
     }
 
     function runAction(command): void {
+        if (command[0] === "uwsm" && command[1] === "app") {
+            ApplicationLaunch.start(command);
+            return;
+        }
         if (!actionProcess.running) {
             actionError = "";
             actionProcess.exec(command);
@@ -394,9 +469,8 @@ ShellRoot {
             return;
         }
         if (!monitorName) {
-            const focused = bars.instances.find(instance => instance.monitor && instance.monitor.focused);
-            const target = focused || bars.instances[0];
-            monitorName = target ? target.screen.name : "";
+            const target = focusedBar();
+            monitorName = target ? target.modelData.name : "";
         }
         if (monitorName)
             layoutActionProcess.exec([backend("spectrum-shell-layout"), "set-profile", profile, monitorName]);
@@ -625,32 +699,42 @@ ShellRoot {
 
     Process {
         id: activeWindowProcess
-        command: ["hyprctl", "activewindow", "-j"]
+        command: ["hyprctl", "clients", "-j"]
         running: true
         stdout: StdioCollector { onStreamFinished: {
             try {
-                const window = JSON.parse(text);
-                shell.activeWindowTitle = window.title || "";
-                shell.activeWindowIdentity = window.address || "";
+                const windows = JSON.parse(text);
+                shell.titleWindows = Array.isArray(windows) ? windows : [];
             }
-            catch (error) {
-                shell.activeWindowTitle = "";
-                shell.activeWindowIdentity = "";
-            }
+            catch (error) { shell.titleWindows = []; }
         } }
+        onExited: {
+            if (shell.activeWindowRefreshPending) {
+                shell.activeWindowRefreshPending = false;
+                activeWindowRefresh.restart();
+            }
+        }
     }
 
     Timer {
         id: activeWindowRefresh
         interval: 40
-        onTriggered: { if (!activeWindowProcess.running) activeWindowProcess.running = true; }
+        onTriggered: {
+            if (activeWindowProcess.running) shell.activeWindowRefreshPending = true;
+            else activeWindowProcess.running = true;
+        }
     }
 
     Connections {
         target: Hyprland
         function onRawEvent(event) {
-            if (["activewindow", "activewindowv2", "windowtitle", "windowtitlev2"].includes(event.name))
+            if (["activewindow", "activewindowv2", "windowtitle", "windowtitlev2", "openwindow", "closewindow",
+                 "movewindow", "movewindowv2", "workspace", "workspacev2", "focusedmon", "focusedmonv2",
+                 "moveworkspace", "moveworkspacev2", "activespecial", "activespecialv2", "pin",
+                 "monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2", "configreloaded"].includes(event.name))
                 activeWindowRefresh.restart();
+            if (["activespecial", "activespecialv2"].includes(event.name))
+                Hyprland.refreshMonitors();
             if (["monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2", "configreloaded"].includes(event.name))
                 workspaceAssignmentsRefresh.restart();
         }
@@ -866,6 +950,7 @@ ShellRoot {
 
     FileView {
         id: focusFile
+        preload: true
         printErrors: false
         path: shell.stateHome + "/spectrumos/focus/state.json"
         watchChanges: true
@@ -873,6 +958,13 @@ ShellRoot {
         onTextChanged: {
             try { shell.focusState = JSON.parse(text()); } catch (error) {}
         }
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: focusFile.reload()
     }
 
     FileView {
@@ -991,6 +1083,14 @@ ShellRoot {
 
     IpcHandler {
         target: "spectrum-shell"
+        function showBrightnessIndicator(percent: int, monitor: string, internal: bool): void {
+            const target = internal ? bars.instances.find(bar => /^(eDP-|LVDS-|DSI-)/.test(bar.modelData.name)) : null;
+            shell.showLevelIndicator("brightness", percent, internal ? "" : monitor, target ? target.modelData.name : monitor);
+        }
+        function levelIndicatorState(): string {
+            return JSON.stringify(bars.instances.map(bar => bar.levelIndicatorState()));
+        }
+
         function refreshTheme(palette: string): bool {
             const applied = shell.applyPalette(palette);
             if (applied)
@@ -999,12 +1099,8 @@ ShellRoot {
         }
 
         function openPicker(directory: string): void {
-            for (const instance of bars.instances) {
-                if (instance.monitor && instance.monitor.focused) {
-                    pickerPanel.targetScreen = instance.screen;
-                    break;
-                }
-            }
+            const target = shell.focusedBar();
+            if (target) pickerPanel.targetScreen = target.modelData;
             pickerPanel.open(directory);
         }
 
@@ -1040,7 +1136,7 @@ ShellRoot {
         function toggleTypography(): void { shell.openWidgetOnFocused("typography"); }
         function toggleAppImages(): void { shell.openWidgetOnFocused("appimages"); }
         function toggleAppStore(): void { shell.openOnFocused("toggleAppStore"); }
-        function appStoreStatus(): string { return JSON.stringify({page:sharedAppStore.page,results:sharedAppStore.results.length,error:sharedAppStore.error,jobs:sharedAppStore.jobs.map(job=>({id:job.id,active:job.active,phase:job.phase})),panels:bars.instances.map(bar=>({monitor:bar.screen.name,expanded:bar.appStoreOpen}))}); }
+        function appStoreStatus(): string { return JSON.stringify({page:sharedAppStore.page,results:sharedAppStore.results.length,error:sharedAppStore.error,jobs:sharedAppStore.jobs.map(job=>({id:job.id,active:job.active,phase:job.phase})),panels:bars.instances.map(bar=>({monitor:bar.modelData.name,expanded:bar.appStoreOpen}))}); }
         function toggleMouse(): void { shell.openWidgetOnFocused("mouse"); }
         function toggleDisplays(): void { shell.openWidgetOnFocused("displays"); }
         function previewScreensaver(effect: string): bool { return screensaver.preview(effect); }
@@ -1054,30 +1150,16 @@ ShellRoot {
         function toggleTimeRegion(): void { shell.openWidgetOnFocused("time"); }
         function toggleBattery(): void { shell.openWidgetOnFocused("battery"); }
 
-        function toggleLauncher(): void {
-            for (const instance of bars.instances) {
-                if (instance.monitor && instance.monitor.focused) {
-                    instance.toggleLauncher();
-                    return;
-                }
-            }
-            if (bars.instances.length)
-                bars.instances[0].toggleLauncher();
-        }
+        function toggleLauncher(): void { shell.openOnFocused("toggleLauncher"); }
 
         function toggleFavorites(): void { shell.openOnFocused("toggleFavorites"); }
-        function favoritesStatus(): string { return JSON.stringify({ready:sharedFavorites.ready,busy:sharedFavorites.busy,favorites:sharedFavorites.favorites.length,categories:sharedFavorites.categories.length,defaultBrowser:sharedFavorites.defaultBrowser,panels:bars.instances.map(bar=>({monitor:bar.screen.name,expanded:bar.favoritesOpen}))}); }
+        function favoritesStatus(): string { return JSON.stringify({ready:sharedFavorites.ready,busy:sharedFavorites.busy,favorites:sharedFavorites.favorites.length,categories:sharedFavorites.categories.length,defaultBrowser:sharedFavorites.defaultBrowser,panels:bars.instances.map(bar=>({monitor:bar.modelData.name,expanded:bar.favoritesOpen}))}); }
         function toggleControlCenter(): void { shell.openOnFocused("toggleControlCenter"); }
         function openControlPage(page: string): void {
-            for (const instance of bars.instances) {
-                if (instance.monitor && instance.monitor.focused) {
-                    instance.openControlPage(page);
-                    return;
-                }
-            }
-            if (bars.instances.length)
-                bars.instances[0].openControlPage(page);
+            const target = shell.focusedBar();
+            if (target) target.openControlPage(page);
         }
+
         function toggleWallpapers(): void { shell.openOnFocused("toggleWallpapers"); }
         function toggleNotifications(): void { shell.openOnFocused("toggleNotifications"); }
         function toggleSession(): void { shell.openOnFocused("toggleSession"); }
@@ -1094,8 +1176,11 @@ ShellRoot {
         function toggleShortcuts(): void { shell.openOnFocused("toggleShortcuts"); }
         function toggleUpdates(): void { shell.openOnFocused("toggleUpdates"); }
         function toggleFocusTimer(): void { shell.openOnFocused("toggleFocusTimer"); }
+        function focusTimerState(): string {
+            return JSON.stringify({phase: shell.focusState.phase, remaining: shell.focusState.remaining,
+                monitors: bars.instances.map(bar => bar.focusTimerState())});
+        }
         function toggleEmoji(): void { shell.openOnFocused("toggleEmoji"); }
-        function toggleCalendar(): void { shell.openOnFocused("toggleCalendar"); }
         function toggleQuestline(): void { shell.openOnFocused("toggleQuestline"); }
         function openQuestlineNewTask(): void { shell.openOnFocused("openQuestlineNewTask"); }
         function openQuestlineNewScroll(): void { shell.openOnFocused("openQuestlineNewScroll"); }
@@ -1128,19 +1213,32 @@ ShellRoot {
         function leaveGaming(): void { shell.leaveGaming(); }
         function stableUpdateState(): string { return JSON.stringify({checking: shell.checkingStableUpdates, status: shell.stableUpdates}); }
         function checkStableUpdates(): void { shell.checkStableUpdates(); }
-        function updatesState(): string { return JSON.stringify(bars.instances.map(bar => ({monitor: bar.screen.name, expanded: bar.updatesOpen}))); }
+        function updatesState(): string { return JSON.stringify(bars.instances.map(bar => ({monitor: bar.modelData.name, expanded: bar.updatesOpen}))); }
         function gamingState(): string {
             return JSON.stringify({
                 enabled: shell.gamingActive,
                 backend: shell.gamingStatus,
                 animationsEnabled: shell.animationsEnabled,
-                monitors: bars.instances.map(bar => ({ name: bar.screen.name, profile: bar.barProfile,
+                monitors: bars.instances.map(bar => ({ name: bar.modelData.name, profile: bar.barProfile,
                     barVisible: bar.barVisible, leftInset: bar.panelLeftInset, topInset: bar.panelTopInset }))
             });
         }
         function barState(): string {
             return JSON.stringify({ style: shell.barStyle, position: shell.barPosition,
                 monitors: bars.instances.map(bar => bar.styleState()) });
+        }
+        function windowTitleState(): string {
+            return JSON.stringify(bars.instances.map(bar => ({monitor: bar.modelData.name,
+                workspace: bar.monitor && bar.monitor.activeWorkspace ? bar.monitor.activeWorkspace.id : null,
+                windowMonitor: bar.titleWindow ? bar.titleWindow.monitor : null,
+                windowWorkspace: bar.titleWindow && bar.titleWindow.workspace ? bar.titleWindow.workspace.id : null,
+                pinned: bar.titleWindow ? bar.titleWindow.pinned === true : false,
+                title: bar.activeWindowTitle, address: bar.activeWindowIdentity})));
+        }
+        function widgetMonitorState(): string {
+            const target = shell.focusedBar();
+            return JSON.stringify({focused: Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "",
+                target: target ? target.modelData.name : "", monitors: bars.instances.map(bar => bar.widgetMonitorState())});
         }
         function setBarStyle(style: string): void { shell.setBarStyle(style); }
         function setBarProfile(profile: string): void { shell.setBarProfile(profile); }
@@ -1176,11 +1274,14 @@ ShellRoot {
             property bool keyboardActive: false
             focusable: keyboardActive
             readonly property string barProfile: shell.gamingActive ? "gaming" : shell.barProfiles[bar.modelData.name] || shell.barProfile
-            readonly property bool barVisible: !shell.gamingActive && barProfile !== "minimal"
+            readonly property bool barVisible: !shell.gamingActive && barProfile !== "minimal" && barProfile !== "gaming"
             readonly property int barLeftInset: barVisible && shell.barPosition === "left" ? 52 : 0
             readonly property int panelLeftInset: shell.gamingActive ? 0 : barVisible ? barLeftInset : 8
             readonly property int panelTopInset: shell.gamingActive ? 0 : barVisible && shell.barPosition === "top" ? bar.implicitHeight : 8
-            readonly property var monitor: Hyprland.monitorFor(screen)
+            readonly property var monitor: Hyprland.monitors.values.find(item => item.name === bar.modelData.name) || null
+            readonly property var titleWindow: shell.windowForMonitor(monitor)
+            readonly property string activeWindowTitle: titleWindow ? titleWindow.title || "" : ""
+            readonly property string activeWindowIdentity: titleWindow ? titleWindow.address || "" : ""
             readonly property bool widgetOpen: barWidget.expanded
             readonly property string widgetPage: barWidget.page
             readonly property bool dashboardOpen: dashboard.expanded
@@ -1191,35 +1292,61 @@ ShellRoot {
                 id: shellFrame
                 barHeight: bar.implicitHeight
                 barProfile: bar.barProfile
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 barPosition: shell.barPosition
             }
 
             PanelWindow {
-                id: recordingCorner
-                screen: bar.screen
+                id: focusCorner
+                screen: bar.modelData
                 anchors { top: true; right: true }
-                implicitWidth: recordingStatus.implicitWidth + 28
-                implicitHeight: 34
+                implicitWidth: shellFrame.curveRadius + cornerContents.implicitWidth + shellFrame.thickness
+                implicitHeight: shellFrame.thickness + 34 + shellFrame.curveRadius
                 exclusionMode: ExclusionMode.Ignore
                 WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.namespace: "spectrum-recording-indicator"
+                WlrLayershell.namespace: "spectrum-focus-countdown"
                 color: "transparent"
                 focusable: false
-                mask: Region { item: recordingStatus }
-                visible: !shell.gamingActive && (shell.recording.active || shell.audioRecording.active)
-
-                RecordingStatus {
-                    id: recordingStatus
-                    anchors.centerIn: parent
-                    fontFamily: shell.fontFamily
-                    fontSize: shell.fontSize
-                    screenRecording: shell.recording.active
-                    animationsEnabled: shell.animationsEnabled
-                    audioRecording: shell.audioRecording.active
-                    onScreenRequested: bar.toggleRecorder()
-                    onAudioRequested: bar.toggleAudioRecorder()
+                visible: !shell.gamingActive && bar.barProfile !== "gaming"
+                    && (bar.barProfile === "minimal" || shell.barPosition === "left")
+                    && (cornerFocus.active || shell.recording.active || shell.audioRecording.active)
+                mask: Region { item: cornerContents }
+                ShellSurface {
+                    x: shellFrame.curveRadius
+                    y: shellFrame.thickness
+                    width: cornerContents.implicitWidth
+                    height: 34
+                    radius: shellFrame.curveRadius
+                    color: shell.colors.surface
+                    attachTop: true
+                    attachRight: true
+                    topFrameThickness: 0
+                    rightFrameThickness: 0
+                    Row {
+                        id: cornerContents
+                        anchors.centerIn: parent
+                        height: 34
+                        spacing: 8
+                        FocusCountdown {
+                            id: cornerFocus
+                            implicitHeight: 34
+                            theme: shell
+                            focusState: shell.focusState
+                            onOpenRequested: bar.openFocusTimer()
+                        }
+                        RecordingStatus {
+                            id: cornerRecordingStatus
+                            width: implicitWidth + 12
+                            fontFamily: shell.fontFamily
+                            fontSize: shell.fontSize
+                            screenRecording: shell.recording.active
+                            audioRecording: shell.audioRecording.active
+                            animationsEnabled: shell.animationsEnabled
+                            onScreenRequested: bar.toggleRecorder()
+                            onAudioRequested: bar.toggleAudioRecorder()
+                        }
+                    }
                 }
             }
 
@@ -1227,7 +1354,7 @@ ShellRoot {
             readonly property bool igorSuppressed: shell.gamingActive || shell.recording.active || shell.audioRecording.active || audioRecorderPanel.expanded || barWidget.expanded || controlCenter.expanded || favoritesPanel.expanded || appStorePanel.expanded || appLauncher.expanded || dashboard.expanded || screenshotPanel.expanded || recorderPanel.expanded || updatePanel.expanded || utilityPanel.expanded || notificationCenter.expanded || sessionRail.expanded || wallpaperBrowser.expanded || pickerPanel.visible || notificationToast.visible
 
             DesktopBranding {
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 visible: shell.desktopLogoEnabled && !shell.gamingActive
                 corner: shell.desktopLogoCorner
                 leftInset: bar.barLeftInset
@@ -1236,11 +1363,18 @@ ShellRoot {
 
             IgorVisitor {
                 id: igorVisitor
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 panelLeftInset: shell.barStyle === "islands" ? 8 : bar.panelLeftInset
                 panelTopInset: shell.barStyle === "islands" ? 8 : bar.panelTopInset
                 routine: igorRoutine
+            }
+
+            function widgetMonitorState(): var {
+                return {name: modelData.name, barScreen: screen ? screen.name : "", monitor: monitor ? monitor.name : "",
+                    profile: barProfile, controlScreen: controlCenter.screen ? controlCenter.screen.name : "",
+                    controlOpen: controlCenter.expanded, utilityScreen: utilityPanel.screen ? utilityPanel.screen.name : "",
+                    utilityOpen: utilityPanel.expanded};
             }
 
             function styleState(): var {
@@ -1338,9 +1472,29 @@ ShellRoot {
                 if (updatePanel.expanded) updatePanel.expanded = false;
                 else openUpdates();
             }
+            function showLevelIndicator(kind, percent, label): void { levelIndicator.show(kind, percent, label); }
+            function dismissLevelIndicator(): void { levelIndicator.dismiss(); }
+            function showTrackIndicator(): void { levelIndicator.showTrack(); }
+            function dismissTrackIndicator(): void { levelIndicator.dismissTrack(); }
+            function levelIndicatorState(): var { return levelIndicator.state(); }
             function toggleFocusTimer(): void { openUtility("focus"); }
+            function focusTimerState(): var {
+                return {monitor: modelData.name, profile: barProfile, position: shell.barPosition,
+                    top: {visible: bar.visible && topFocusCountdown.visible, width: topFocusCountdown.width, height: topFocusCountdown.height},
+                    left: {visible: false, width: 0, height: 0},
+                    topRecording: {visible: bar.visible && topRecordingStatus.visible,
+                        x: topRow.x + trayGroup.x + topRecordingStatus.x,
+                        y: topRow.y + trayGroup.y + topRecordingStatus.y,
+                        width: topRecordingStatus.width, height: topRecordingStatus.height},
+                    corner: {visible: focusCorner.visible, width: focusCorner.width, height: focusCorner.height,
+                        focus: cornerFocus.active, screenRecording: cornerRecordingStatus.screenRecording,
+                        audioRecording: cornerRecordingStatus.audioRecording}};
+            }
+
+            function openFocusTimer(): void {
+                if (!utilityPanel.expanded || utilityPanel.page !== "focus") openUtility("focus");
+            }
             function toggleEmoji(): void { openUtility("emoji"); }
-            function toggleCalendar(): void { openUtility("calendar"); }
             function toggleQuestline(): void { openUtility("questline"); }
             function openQuestlineNewScroll(): void {
                 closeSidePanels();
@@ -1468,7 +1622,7 @@ ShellRoot {
                 keyboardActive: bar.keyboardActive && shell.barPosition === "left"
                 onKeyboardDismissed: bar.keyboardActive = false
                 barProfile: bar.barProfile
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 monitor: bar.monitor
                 network: shell.network
@@ -1476,8 +1630,8 @@ ShellRoot {
                 weather: shell.weather
                 recording: shell.recording
                 media: shell.media
-                activeWindowTitle: shell.activeWindowTitle
-                activeWindowIdentity: shell.activeWindowIdentity
+                activeWindowTitle: bar.activeWindowTitle
+                activeWindowIdentity: bar.activeWindowIdentity
                 active: bar.barVisible && shell.barPosition === "left"
                 onLauncherRequested: bar.toggleLauncher()
                 onDashboardRequested: bar.toggleDashboard()
@@ -1501,7 +1655,7 @@ ShellRoot {
             }
 
             MediaNotch {
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 samples: shell.waveSamples
                 barPosition: shell.barPosition
@@ -1519,7 +1673,7 @@ ShellRoot {
                     wallpaperBrowser.expanded = false;
                     utilityPanel.openQuestlineDueItem(taskId, stepId);
                 }
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 weather: shell.weather
                 media: shell.media
@@ -1538,7 +1692,7 @@ ShellRoot {
 
             ScreenshotPanel {
                 id: screenshotPanel
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 topInset: bar.panelTopInset
                 leftInset: bar.panelLeftInset
@@ -1547,7 +1701,7 @@ ShellRoot {
 
             UpdatePanel {
                 id: updatePanel
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 backendDir: shell.backendDir
                 topInset: bar.panelTopInset
@@ -1556,7 +1710,7 @@ ShellRoot {
 
             AudioRecorderPanel {
                 id: audioRecorderPanel
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 backendDir: shell.backendDir
                 topInset: bar.panelTopInset
@@ -1566,7 +1720,7 @@ ShellRoot {
 
             RecorderPanel {
                 id: recorderPanel
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 backendDir: shell.backendDir
                 recording: shell.recording
@@ -1581,7 +1735,7 @@ ShellRoot {
 
             SessionRail {
                 id: sessionRail
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 onActionRequested: action => {
                     if (action === "lock")
@@ -1593,7 +1747,7 @@ ShellRoot {
 
             Launcher {
                 id: appLauncher
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 leftInset: bar.barLeftInset
             }
@@ -1610,7 +1764,7 @@ ShellRoot {
                 panelLeftInset: bar.panelLeftInset
                 id: utilityPanel
                 questlineWorkspace: sharedQuestlineWorkspace
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 backendDir: shell.backendDir
                 focusState: shell.focusState
@@ -1622,7 +1776,7 @@ ShellRoot {
 
             AppStorePanel {
                 id: appStorePanel
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 manager: sharedAppStore
                 topInset: bar.panelTopInset
@@ -1632,7 +1786,7 @@ ShellRoot {
 
             FavoritesPanel {
                 id: favoritesPanel
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 manager: sharedFavorites
                 topInset: bar.panelTopInset
@@ -1645,7 +1799,7 @@ ShellRoot {
                 topInset: bar.panelTopInset
                 sideInset: bar.panelLeftInset
                 id: controlCenter
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 barPosition: shell.barPosition
                 themeState: shell.themeState
@@ -1655,7 +1809,7 @@ ShellRoot {
                     controlCenter.expanded = false;
                 }
                 onBarProfileSelected: profile => {
-                    shell.setBarProfile(profile, bar.screen.name);
+                    shell.setBarProfile(profile, bar.modelData.name);
                     controlCenter.expanded = false;
                 }
                 onCloseRequested: controlCenter.expanded = false
@@ -1674,7 +1828,7 @@ ShellRoot {
             WallpaperBrowser {
                 leftInset: bar.barLeftInset
                 id: wallpaperBrowser
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 catalog: shell.themeState
                 barPosition: shell.barPosition
@@ -1700,7 +1854,7 @@ ShellRoot {
 
             NotificationCenter {
                 id: notificationCenter
-                screen: bar.screen
+                screen: bar.modelData
                 theme: shell
                 topInset: bar.panelTopInset
                 notificationModel: notificationServer.trackedNotifications
@@ -1719,14 +1873,14 @@ ShellRoot {
 
             PanelWindow {
                 id: notificationToast
-                screen: bar.screen
+                screen: bar.modelData
                 anchors { top: true; bottom: true; right: true }
                 margins.top: bar.panelTopInset
                 exclusionMode: ExclusionMode.Ignore
                 WlrLayershell.layer: WlrLayer.Top
                 WlrLayershell.namespace: "spectrum-widget-toasts"
                 focusable: false
-                implicitWidth: Math.min(Math.max(260, shell.fontSize * 20) + 8, bar.screen.width - 20)
+                implicitWidth: Math.min(Math.max(260, shell.fontSize * 20) + 8, bar.modelData.width - 20)
                 mask: Region { item: toastStack }
                 visible: shell.toastNotifications.count > 0 && bar.monitor && bar.monitor.focused && !shell.doNotDisturb && !shell.gamingActive && !barWidget.expanded
                 color: "transparent"
@@ -1776,7 +1930,7 @@ ShellRoot {
                     id: dashboardBarHover
                     anchors { top: parent.top; bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
                     width: Math.min(260, parent.width)
-                    targetScreen: bar.screen
+                    targetScreen: bar.modelData
                     barPosition: shell.barPosition
                     barProfile: bar.barProfile
                     barVisible: bar.barVisible
@@ -1805,7 +1959,7 @@ ShellRoot {
                     id: topRow
                     anchors.fill: parent
                     anchors.leftMargin: 14
-                    anchors.rightMargin: recordingCorner.visible ? recordingCorner.implicitWidth : 14
+                    anchors.rightMargin: 14
                     spacing: 16
 
                     Rectangle {
@@ -1832,7 +1986,7 @@ ShellRoot {
                         id: workspaceButtons
                         spacing: 5
                         Repeater {
-                            model: shell.workspacesForMonitor(bar.screen ? bar.screen.name : "")
+                            model: shell.workspacesForMonitor(bar.modelData ? bar.modelData.name : "")
                             Rectangle {
                                 required property int modelData
                                 readonly property bool active: bar.monitor && bar.monitor.activeWorkspace && bar.monitor.activeWorkspace.id === modelData
@@ -1857,13 +2011,13 @@ ShellRoot {
 
                     ScrollingTitle {
                         id: windowTitle
-                        visible: bar.barProfile === "standard" || bar.barProfile === "detailed"
-                        Layout.preferredWidth: Math.min(shell.barStyle === "islands" ? windowTitle.measuredTextWidth : 420, 420, bar.screen.width * 0.25,
+                        visible: (bar.barProfile === "standard" || bar.barProfile === "detailed") && bar.activeWindowTitle.length > 0
+                        Layout.preferredWidth: Math.min(shell.barStyle === "islands" ? windowTitle.measuredTextWidth : 420, 420, bar.modelData.width * 0.25,
                             islandStats.visible ? Math.max(0, islandStats.availableWidth - islandStats.naturalWidth) : 420)
                         Layout.minimumWidth: 0
                         Layout.maximumWidth: islandStats.visible ? Layout.preferredWidth : 420
-                        title: shell.activeWindowTitle
-                        windowIdentity: shell.activeWindowIdentity
+                        title: bar.activeWindowTitle
+                        windowIdentity: bar.activeWindowIdentity
                         fontFamily: shell.fontFamily
                         fontPixelSize: shell.fontSize
                         textColor: shell.colors.muted
@@ -1891,6 +2045,12 @@ ShellRoot {
                         id: minimalStatusGroup
                         spacing: 8
                         HoverHandler { id: minimalStatusHover }
+                        FocusCountdown {
+                            id: topFocusCountdown
+                            theme: shell
+                            focusState: shell.focusState
+                            onOpenRequested: bar.openFocusTimer()
+                        }
 
                     Text {
                         text: shell.performance.available ? (shell.performance.mode === "performance" ? "󰓅" : shell.performance.mode === "power-saver" ? "󰌪" : "") : ""
@@ -2042,6 +2202,16 @@ ShellRoot {
                                 }
                             }
                         }
+                        RecordingStatus {
+                            id: topRecordingStatus
+                            fontFamily: shell.fontFamily
+                            fontSize: shell.fontSize
+                            screenRecording: shell.recording.active
+                            audioRecording: shell.audioRecording.active
+                            animationsEnabled: shell.animationsEnabled
+                            onScreenRequested: bar.toggleRecorder()
+                            onAudioRequested: bar.toggleAudioRecorder()
+                        }
                     }
 
                 }
@@ -2139,11 +2309,21 @@ ShellRoot {
 
             }
 
+            LevelIndicator {
+                id: levelIndicator
+                targetScreen: bar.modelData
+                theme: shell
+                barPosition: shell.barPosition
+                panelLeftInset: bar.panelLeftInset
+                panelTopInset: bar.panelTopInset
+                blocked: barWidget.expanded && ["audio", "displays"].includes(barWidget.page)
+            }
+
             BarWidget {
                 panelLeftInset: bar.panelLeftInset
                 panelTopInset: bar.panelTopInset
                 id: barWidget
-                targetScreen: bar.screen
+                targetScreen: bar.modelData
                 theme: shell
                 barPosition: shell.barPosition
                 onExtraRequested: action => {

@@ -109,19 +109,15 @@ class ExtractorTests(unittest.TestCase):
         for mode, palette in palettes.items():
             self.assertEqual(palette.source, f"native:{mode}:fixture.ppm")
 
-    def test_native_modes_give_the_accent_a_distinct_personality(self):
+    def test_raw_accents_are_no_longer_styled_with_chroma_boosts(self):
         pixels = [(18, 24, 35)] * 60 + [(28, 120, 220)] * 30 + [(190, 60, 150)] * 10
-
-        def saturation(palette):
-            return oklch(palette.rgb("accent"))[1]
-
-        saturations = {
-            mode: saturation(palette_from_pixels(pixels, "fixture.ppm", FALLBACK, mode))
-            for mode in ("spectrum", "clustered", "median-cut", "weighted-regions")
-        }
-
-        self.assertGreater(saturations["spectrum"], saturations["clustered"])
-        self.assertGreater(saturations["median-cut"], saturations["clustered"])
+        for mode in ("spectrum", "clustered", "median-cut", "weighted-regions"):
+            debug = {}
+            palette_from_pixels(pixels, "fixture.ppm", FALLBACK, mode, debug=debug)
+            for role in ("accent", "accent_alt"):
+                decision = debug["roles"][role]
+                self.assertAlmostEqual(decision["intended_oklch"][1], decision["source_oklch"][1])
+                self.assertAlmostEqual(decision["intended_oklch"][2], decision["source_oklch"][2])
 
     def test_native_modes_change_the_canvas_and_surfaces(self):
         pixels = (

@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -44,7 +45,7 @@ class SpectrumShellToolsTests(unittest.TestCase):
         self.assertEqual(emojis[0]["character"], "😀")
         self.assertEqual(emojis[0]["name"], "Grinning Face")
 
-    def test_color_history_keeps_five_unique_recent_colors(self):
+    def test_color_history_keeps_sixty_unique_recent_colors(self):
         with tempfile.TemporaryDirectory() as directory:
             environment = {**os.environ, "XDG_STATE_HOME": directory}
             for value in ("#112233", "#445566", "#778899", "#AABBCC", "#DDEEFF", "#112233"):
@@ -52,7 +53,10 @@ class SpectrumShellToolsTests(unittest.TestCase):
             self.assertEqual(json.loads(result.stdout), ["#112233", "#DDEEFF", "#AABBCC", "#778899", "#445566"])
             subprocess.run([str(TOOL), "color-add", "#000000"], env=environment, check=True, capture_output=True, text=True)
             result = subprocess.run([str(TOOL), "colors"], env=environment, check=True, capture_output=True, text=True)
-            self.assertEqual(json.loads(result.stdout), ["#000000", "#112233", "#DDEEFF", "#AABBCC", "#778899"])
+            self.assertEqual(json.loads(result.stdout), ["#000000", "#112233", "#DDEEFF", "#AABBCC", "#778899", "#445566"])
+            for number in range(70):
+                result = subprocess.run([str(TOOL), "color-add", f"#{number:06X}"], env=environment, check=True, capture_output=True, text=True)
+            self.assertEqual(json.loads(result.stdout), [f"#{number:06X}" for number in range(69, 9, -1)])
             invalid = subprocess.run([str(TOOL), "color-add", "#GGGGGG"], env=environment, capture_output=True, text=True)
             self.assertEqual(invalid.returncode, 2)
 
@@ -65,6 +69,59 @@ class SpectrumShellToolsTests(unittest.TestCase):
             subprocess.run([str(TOOL), "questline-campaign", "project-456"], env=environment, check=True)
             result = subprocess.run([str(TOOL), "questline-campaign"], env=environment, check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "project-456")
+
+
+@unittest.skipUnless(shutil.which("numbat"), "Numbat is unavailable")
+class CalculatorChainTests(unittest.TestCase):
+    def calculate(self, expression, steps=None):
+        process = subprocess.run([str(TOOL), "calculate-json", json.dumps({"expression": expression, "steps": steps or []})],
+                                 capture_output=True, text=True)
+        return process.returncode, json.loads(process.stdout)
+
+    def value(self, expression, steps=None):
+        code, response = self.calculate(expression, steps)
+        self.assertEqual(code, 0, response)
+        self.assertTrue(response["ok"])
+        return response
+
+    def test_reported_decimal_product_preserves_precision(self):
+        result = self.value("10414.81*1.16")
+        self.assertEqual(result["result"], "12081.1796")
+
+    def test_conversions_return_values_with_their_units(self):
+        length = self.value("(1) m -> cm")
+        self.assertEqual(length["result"], "100 cm")
+        temperature = self.value("(20) °C -> °F")
+        self.assertAlmostEqual(float(temperature["result"]), 68)
+
+    def test_continuous_operations_and_relative_percentage(self):
+        result = self.value("100 + 20")
+        result = self.value("* 2", result["steps"])
+        result = self.value("+ 15%", result["steps"])
+        self.assertAlmostEqual(float(result["result"].replace("_", "")), 276)
+
+    def test_percentage_multiplication_and_fresh_entry(self):
+        result = self.value("100 + 15%")
+        self.assertAlmostEqual(float(result["result"].replace("_", "")), 115)
+        result = self.value("* 15%", result["steps"])
+        self.assertAlmostEqual(float(result["result"].replace("_", "")), 17.25)
+        fresh = self.value("7", result["steps"])
+        self.assertEqual(len(fresh["steps"]), 1)
+        self.assertAlmostEqual(float(fresh["result"]), 7)
+
+    def test_answer_reuses_computation_before_display_rounding(self):
+        result = self.value("1 / 3")
+        result = self.value("ans * 3", result["steps"])
+        self.assertAlmostEqual(float(result["result"]), 1)
+
+    def test_failed_expression_does_not_replace_the_answer(self):
+        previous = self.value("10")
+        code, error = self.calculate("sqrt(", previous["steps"])
+        self.assertNotEqual(code, 0)
+        self.assertFalse(error["ok"])
+        self.assertNotIn("steps", error)
+        result = self.value("+ 5", previous["steps"])
+        self.assertAlmostEqual(float(result["result"]), 15)
 
 
 if __name__ == "__main__":

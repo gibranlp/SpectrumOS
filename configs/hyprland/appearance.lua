@@ -18,5 +18,7 @@ hl.config({
     misc = {
         disable_hyprland_logo = true,
         force_default_wallpaper = 0,
+        initial_workspace_tracking = 1,
+        initial_workspace_token_timeout = 120,
     },
 })

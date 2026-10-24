@@ -1,6 +1,6 @@
 pkgname=spectrum-desktop
 pkgver=1.0.0
-pkgrel=20
+pkgrel=24
 pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
 arch=(x86_64)
 url="https://spectrum.gibranlp.dev"
@@ -8,7 +8,7 @@ license=(MIT)
 depends=(
     'ukvm>=0.1.0.r21' spectrumdrop acl adwaita-cursors alacritty alsa-lib awww blueman bluez bluez-utils brightnessctl cava curl dbus ddcutil evolution fastfetch ffmpeg flatpak gcc-libs glibc gnome-disk-utility gnome-keyring grim gtk-layer-shell gtk3 gvfs gvfs-mtp hyprpicker
     imagemagick htop hypridle hyprland hyprlock kdeconnect kitty kvantum kvantum-qt5 libdbusmenu-gtk3 libnotify networkmanager nm-connection-editor noto-fonts noto-fonts-cjk noto-fonts-emoji ntfs-3g numbat pavucontrol pipewire pipewire-alsa pipewire-jack pipewire-pulse
-    playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct satty sddm slurp spectrum-base 'spectrum-hyprland>=1.0.0-7' spectrum-plymouth spectrum-sddm spectrum-theme swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
+    playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct satty sddm slurp spectrum-base 'spectrum-hyprland>=1.0.0-10' spectrum-plymouth spectrum-sddm 'spectrum-theme>=1.0.0-3' swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
     ttf-jetbrains-mono-nerd ttf-firacode-nerd ttf-sourcecodepro-nerd ttf-cascadia-code-nerd ttf-hack-nerd ttf-ibmplex-mono-nerd ttf-iosevka-nerd ttf-victor-mono-nerd ttf-ubuntu-mono-nerd ttf-meslo-nerd
     ffmpegthumbnailer gst-thumbnailers gst-libav gst-plugins-bad gst-plugins-ugly gnome-epub-thumbnailer poppler poppler-glib libgsf libgepub libopenraw
     webp-pixbuf-loader libheif uwsm vlc
@@ -34,16 +34,16 @@ conflicts=(eww eww-git wofi waybar dunst)
 replaces=(eww eww-git wofi waybar dunst)
 options=(!strip !debug)
 backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/fastfetch/config.jsonc')
-_source_revision=0323cc3f44e9a785
+_source_revision=0703354473d943af
 _source_root="spectrumos-source-$pkgver"
 _questline_version=2.0.3
 _stash_version=0.7.0
 source=("spectrumos-source-$pkgver-$_source_revision.tar.zst"
-        "questline-2.0.3-spectrum-chronicles-db3bc0f4c942bb88.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-chronicles-db3bc0f4c942bb88.tar.zst"
+        "questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst"
         'questline.LICENSE'
         "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
-sha256sums=('f71ed332e90de44b8e3d68075601c757673b3583b4937c7fd27ad3560b208db7'
-            'db3bc0f4c942bb880b799c56758c83c868f8aa24cbffbcc5399f725d325113d1'
+sha256sums=('c4a4192711affac73afcc8462ba96d6dc2fe84acee5f6f180e75ef363f4eacac'
+            'a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495'
             '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
             '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')
 
@@ -65,10 +65,11 @@ check() {
     done
     python -m py_compile "$_project/scripts/favorites-adapter" "$_project/scripts/appimage-adapter" "$_project/scripts/network-adapter" "$_project/scripts/theme-adapter" "$_project/scripts/application-adapter" "$_project/scripts/idle-adapter" "$_project/scripts/media-adapter" "$_project/scripts/spectrum-shell-tools" "$_project/scripts/spectrum-shell-picker" "$_project/scripts/time-region-adapter" "$_project/scripts/mouse-adapter" "$_project/scripts/audio-recorder" "$_project/scripts/hotkey-adapter" "$_project/scripts/spectrumdrop-adapter"
     python -m py_compile "$_project/scripts/spectrum-update-check"
-    python -m py_compile "$_project/scripts/system-adapter" "$_project/scripts/brightness-adapter" "$_project/scripts/control-adapter" "$_project/scripts/display-menu" "$_project/scripts/weather-adapter" "$_project/scripts/workspace-layout" "$_project/scripts/waybar-workspace-icons" "$_project/scripts/appearance-sync" "$_project/scripts/legion-rgb-sync" "$_project/scripts/performance-mode" "$_project/scripts/resource-monitor" "$_project/scripts/window-pin-toggle" "$_project/scripts/spectrum-shell-layout" "$_project/scripts/spectrum-gaming-session" "$_project/scripts/questline-adapter" "$_project/scripts/questline-action" "$_project/scripts/questline-widget-state" "$_project/scripts/questline-notifications" "$_project/scripts/questline-sync" "$_project/scripts/questline-sync-control"
+    python -m py_compile "$_project/scripts/system-adapter" "$_project/scripts/brightness-adapter" "$_project/scripts/control-adapter" "$_project/scripts/display-menu" "$_project/scripts/weather-adapter" "$_project/scripts/workspace-layout" "$_project/scripts/waybar-workspace-icons" "$_project/scripts/appearance-sync" "$_project/scripts/legion-rgb-sync" "$_project/scripts/keychron-rgb-sync" "$_project/scripts/win60-rgb-sync" "$_project/scripts/performance-mode" "$_project/scripts/resource-monitor" "$_project/scripts/window-pin-toggle" "$_project/scripts/spectrum-shell-layout" "$_project/scripts/spectrum-gaming-session" "$_project/scripts/questline-adapter" "$_project/scripts/questline-action" "$_project/scripts/questline-widget-state" "$_project/scripts/questline-notifications" "$_project/scripts/questline-sync" "$_project/scripts/questline-sync-control"
     cd "$_project"
     python -m unittest tests.test_packaging.PackagingTests.test_desktop_frontend_install_loop_ships_app_store_helpers
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_widget_polling.py
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_shell_focus.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_launcher.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_capture_notifications.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_questline_notifications.py
@@ -88,7 +89,7 @@ check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_AppImages.qml
     python -m unittest \
         tests.test_stable_updates tests.test_favorites tests.test_flatpak tests.test_bar_style tests.test_gaming_profile tests.test_thunar_actions tests.test_waybar tests.test_wofi tests.test_desktop_cleanup tests.test_network_menu tests.test_spectrum_shell_network tests.test_spectrum_shell_picker tests.test_panel \
-        tests.test_hyprland_menu tests.test_display_menu tests.test_recorder_menu tests.test_eww tests.test_weather tests.test_installer tests.test_rescue_shell tests.test_workspace_layout tests.test_appearance_sync tests.test_legion_rgb_sync tests.test_browser_defaults tests.test_performance_mode tests.test_notifications \
+        tests.test_hyprland_menu tests.test_display_menu tests.test_recorder_menu tests.test_eww tests.test_weather tests.test_installer tests.test_rescue_shell tests.test_workspace_layout tests.test_appearance_sync tests.test_legion_rgb_sync tests.test_keychron_rgb_sync tests.test_browser_defaults tests.test_performance_mode tests.test_notifications \
         tests.test_font_size_menu tests.test_font_family_menu tests.test_theme_menu tests.test_idle_adapter tests.test_hyprland_config tests.test_calculator_menu tests.test_resource_monitor tests.test_session_menu tests.test_system_adapter tests.test_spectrum_update_run tests.test_window_pin_toggle tests.test_time_region_adapter tests.test_igor tests.test_shell_idle tests.test_desktop_branding tests.test_user_avatar tests.test_questline_adapter tests.test_questline_widget_state tests.test_media_adapter tests.test_media_control tests.test_fastfetch tests.test_stash tests.test_mouse_adapter tests.test_audio_recorder
     QUESTLINE_TEST_BINARY="$srcdir/questline-$_questline_version-linux-x86_64" python -m unittest tests.test_questline_autosave tests.test_questline_notifications
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTree.qml
@@ -160,11 +161,17 @@ package() {
     install -Dm644 "$_project/system/udev/rules.d/70-spectrumos-legion-rgb.rules" \
         "$pkgdir/usr/lib/udev/rules.d/70-spectrumos-legion-rgb.rules"
 
+    install -Dm644 "$_project/system/udev/rules.d/70-spectrumos-keychron-rgb.rules" \
+        "$pkgdir/usr/lib/udev/rules.d/70-spectrumos-keychron-rgb.rules"
+
+    install -Dm644 "$_project/system/udev/rules.d/70-spectrumos-win60-rgb.rules" \
+        "$pkgdir/usr/lib/udev/rules.d/70-spectrumos-win60-rgb.rules"
+
     install -Dm644 "$_project/system/modules-load.d/spectrumos-ddc.conf" "$pkgdir/usr/lib/modules-load.d/spectrumos-ddc.conf"
 
     for script in \
         volume brightness theme-menu waybar-menu panel hyprland-menu font-size-menu font-family-menu application-menu calculator-menu \
-        network-menu bluetooth-menu recorder-menu display-menu appearance-sync legion-rgb-sync waybar-widgets \
+        network-menu bluetooth-menu recorder-menu display-menu appearance-sync legion-rgb-sync keychron-rgb-sync win60-rgb-sync waybar-widgets \
         waybar-cava wallpaper-restore session-menu keyboard-layout spectrum-update-run window-pin-toggle spectrum-browser-defaults \
         spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder application-adapter app-store-adapter app-store-privileged app-store-paru-bridge idle-adapter screensaver-adapter appimage-adapter favorites-adapter media-adapter media-control weather-adapter workspace-layout waybar-workspace-icons performance-mode resource-monitor spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session spectrum-shell-tools spectrum-shell-picker thunar-actions spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-widget-state questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus; do
         install -m 0755 "$_project/scripts/$script" "$pkgdir/usr/lib/spectrumos/$script"

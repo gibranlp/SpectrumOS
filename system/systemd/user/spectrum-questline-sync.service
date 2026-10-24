@@ -1,7 +1,7 @@
 [Unit]
 Description=Questline encrypted profile and Favorites synchronization
 PartOf=graphical-session.target spectrum-shell.service
-After=spectrum-shell.service
+After=graphical-session.target spectrum-shell.service
 
 [Service]
 Type=simple

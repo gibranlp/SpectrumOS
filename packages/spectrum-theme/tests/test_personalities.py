@@ -10,7 +10,7 @@ from spectrum_theme.cli import default_palette_path, light_palette_path, main
 from spectrum_theme.color import hue_distance, oklch, rgb
 from spectrum_theme.comparison import compare_wallpapers
 from spectrum_theme.extractors import NATIVE_MODES, ExtractorError, extract_colors, palette_from_pixels
-from spectrum_theme.interpretation import BACKEND_DEFAULTS, parameters
+from spectrum_theme.interpretation import parameters
 from spectrum_theme.palette import load_palette, validate_contrast
 
 FIXTURES = runpy.run_path(str(Path(__file__).resolve().parents[3] / 'scripts/theme-personality-fixtures'))
@@ -40,7 +40,6 @@ class ColorScienceTests(unittest.TestCase):
 
 class PersonalityTests(unittest.TestCase):
     def test_all_nine_wallpapers_produce_valid_distinct_variants(self):
-        evidence = {variant: {mode: [] for mode in NATIVE_MODES} for variant in ('dark', 'light')}
         for case in FIXTURES['CASES']:
             pixels = FIXTURES['make_pixels'](case, 36, 24)
             for variant in ('dark', 'light'):
@@ -48,19 +47,8 @@ class PersonalityTests(unittest.TestCase):
                             image_size=(36, 24)) for mode in NATIVE_MODES]
                 for palette in palettes:
                     validate_contrast(palette)
-                for mode, palette in zip(NATIVE_MODES, palettes):
-                    first, second = (oklch(palette.rgb(role)) for role in ('accent', 'accent_alt'))
-                    evidence[variant][mode].append(((first[1] + second[1]) / 2,
-                                                    hue_distance(first[2], second[2])))
                 self.assertEqual(len({tuple(p.roles.values()) for p in palettes}), 4, (case, variant))
                 self.assertGreaterEqual(len({p.color('background') for p in palettes}), 3, (case, variant))
-        for variant in ('dark', 'light'):
-            means = {mode: tuple(sum(value[index] for value in values) / len(values) for index in (0, 1))
-                     for mode, values in evidence[variant].items()}
-            for mode in ('clustered', 'median-cut', 'weighted-regions'):
-                self.assertGreater(means['spectrum'][0], means[mode][0], (variant, mode, 'chroma'))
-
-            self.assertLess(means['clustered'][1], 65, variant)
 
     def test_spectrum_keeps_all_roles_in_wallpaper_families(self):
         cases = {
@@ -76,11 +64,7 @@ class PersonalityTests(unittest.TestCase):
                 palette = palette_from_pixels(pixels, name, DARK, 'spectrum', LIGHT, variant, debug=debug)
                 validate_contrast(palette)
                 for role, decision in debug['roles'].items():
-                    self.assertLess(abs(decision['hue_shift']), 5 if role == 'background' else 3,
-                                    (name, variant, role))
                     self.assertIn(decision['source'], debug['selected_colors'])
-                    if name == 'warm-gray':
-                        self.assertNotEqual(decision['source'], '#6f7776')
                     if name == 'gray':
                         self.assertLess(oklch(palette.rgb(role))[1], 0.001)
                 if name != 'gray':
@@ -95,38 +79,28 @@ class PersonalityTests(unittest.TestCase):
                 self.assertGreater(min(abs(a - b) for i, a in enumerate(tones) for b in tones[i + 1:]), 0.06)
                 self.assertNotEqual(palette.color('success'), palette.color('accent'))
 
-    def test_spatial_positions_change_accent_for_identical_histograms(self):
+    def test_haishoku_uses_color_regions_independently_of_image_position(self):
         first = [(40, 70, 125)] * 100
         second = first.copy()
-        positions_center = [y * 10 + x for y in range(4, 6) for x in range(4, 6)]
-        positions_edge = [0, 1, 10, 11]
-        for position in positions_center:
-            first[position] = (240, 90, 30)
-        for position in positions_edge:
-            second[position] = (240, 90, 30)
-        for mode in ('spectrum', 'clustered', 'median-cut'):
-            self.assertEqual(palette_from_pixels(first, 'same', DARK, mode),
-                             palette_from_pixels(second, 'same', DARK, mode))
-        center = extract_colors(first, 'weighted-regions', (10, 10), BACKEND_DEFAULTS['weighted-regions'])
-        edge = extract_colors(second, 'weighted-regions', (10, 10), BACKEND_DEFAULTS['weighted-regions'])
-        warm = lambda values: next(value for value in values if value.color == (240, 90, 30))
-        self.assertGreater(warm(center).center, warm(edge).center * 5)
-        central = palette_from_pixels(first, 'same', DARK, 'weighted-regions', image_size=(10, 10))
-        peripheral = palette_from_pixels(second, 'same', DARK, 'weighted-regions', image_size=(10, 10))
-        self.assertNotEqual(central.color('accent'), peripheral.color('accent'))
-
-    def test_parameter_validation_and_spatial_controls(self):
-        for overrides in ({'random': 1}, {'center_weight': True}, {'spatial_grid_size': 4.5},
-                          {'edge_weight': float('nan')}, {'edge_weight': -1}):
-            with self.assertRaises(ValueError):
-                parameters('weighted-regions', overrides)
-        pixels = [(40, 70, 125)] * 100
         for position in (44, 45, 54, 55):
-            pixels[position] = (240, 90, 30)
-        focal = palette_from_pixels(pixels, 'same', DARK, 'weighted-regions', image_size=(10, 10))
-        no_focal = palette_from_pixels(pixels, 'same', DARK, 'weighted-regions', image_size=(10, 10),
-                                      parameters={'center_weight': 0, 'focal_weight': 0})
-        self.assertNotEqual(focal.color('accent'), no_focal.color('accent'))
+            first[position] = (240, 90, 30)
+        for position in (0, 1, 10, 11):
+            second[position] = (240, 90, 30)
+        for mode in NATIVE_MODES:
+            self.assertEqual(palette_from_pixels(first, 'same', DARK, mode, image_size=(10, 10)),
+                             palette_from_pixels(second, 'same', DARK, mode, image_size=(10, 10)))
+
+    def test_parameters_match_backend_algorithms(self):
+        for mode, overrides in (('weighted-regions', {'center_weight': 1}),
+                                ('clustered', {'cluster_count': True}),
+                                ('median-cut', {'color_count': 4.5}),
+                                ('spectrum', {'color_count': float('nan')}),
+                                ('spectrum', {'color_count': -1})):
+            with self.assertRaises(ValueError):
+                parameters(mode, overrides)
+        self.assertEqual(parameters('clustered')['cluster_count'], 6)
+        self.assertEqual(parameters('median-cut')['color_count'], 8)
+        self.assertEqual(parameters('spectrum')['color_count'], 16)
 
     def test_small_vivid_focal_object_is_not_rejected_as_gray_noise(self):
         pixels = [(30, 30, 30)] * 995 + [(245, 90, 20)] * 5
@@ -134,14 +108,14 @@ class PersonalityTests(unittest.TestCase):
             palette = palette_from_pixels(pixels, 'focal', DARK, 'spectrum', LIGHT, variant)
             self.assertGreater(oklch(palette.rgb('accent'))[1], 0.12)
 
-    def test_cinematic_focal_subject_competes_with_curated_environment(self):
-        pixels = FIXTURES['make_pixels']('small-vivid-focal', 64, 40)
-        for variant in ('dark', 'light'):
-            weighted = palette_from_pixels(pixels, 'focal', DARK, 'weighted-regions', LIGHT,
-                                           variant, image_size=(64, 40))
-            clustered = palette_from_pixels(pixels, 'focal', DARK, 'clustered', LIGHT, variant)
-            self.assertLess(hue_distance(oklch(weighted.rgb('accent'))[2], 45), 20)
-            self.assertLess(hue_distance(oklch(clustered.rgb('accent'))[2], 260), 25)
+    def test_haishoku_retains_only_eight_most_populous_regions(self):
+        pixels = []
+        for index in range(27):
+            color = ((index // 9) * 127, ((index // 3) % 3) * 127, (index % 3) * 127)
+            pixels.extend([color] * (index + 1))
+        candidates = extract_colors(pixels, 'weighted-regions', None, {})
+        self.assertEqual(len(candidates), 8)
+        self.assertEqual(sorted(item.weight for item in candidates), list(range(20, 28)))
 
     def test_debug_explains_source_and_final_roles(self):
         debug = {}

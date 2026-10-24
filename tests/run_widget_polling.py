@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix="spectrum-widget-polling-") as temporary
     if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
         panel = directory / "configs/spectrum-shell/UtilityPanel.qml"
         source = panel.read_text().replace("PanelWindow {", "FloatingWindow {", 1)
-        for line in ("    focusable: expanded\n", "    exclusionMode: ExclusionMode.Ignore\n", "    WlrLayershell.layer: WlrLayer.Top\n", '    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n', "    anchors { top: true; bottom: true; left: true; right: true }\n"):
+        for line in ("    WlrLayershell.keyboardFocus: panelFocus.mode\n", "    exclusionMode: ExclusionMode.Ignore\n", "    WlrLayershell.layer: WlrLayer.Top\n", '    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n', "    anchors { top: true; bottom: true; left: true; right: true }\n"):
             source = source.replace(line, "", 1)
         panel.write_text(source)
     runtime = directory / "runtime"

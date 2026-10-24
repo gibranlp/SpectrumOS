@@ -1,0 +1,911 @@
+--- a/src/app/mod.rs
++++ b/src/app/mod.rs
+@@ -582,6 +582,9 @@
+         version: i64,
+         name: String,
+         kind_idx: usize,
++        savings_status_idx: usize,
++        rate: String,
++        rate_period_idx: usize,
+         focus_idx: usize,
+     },
+     // Divisa de trabajo de la campaña — solo cambia la denominación, no convierte importes
+@@ -3689,26 +3692,14 @@
+                 let visible = inner(popup).height.saturating_sub(1) as usize;
+                 rows(popup, 1, count, selected_idx.saturating_add(1).saturating_sub(visible))
+             }
+-            ModalType::TreasuryAccount { .. } => {
+-                let popup = pct(56, 30, term);
++            ModalType::TreasuryAccount { kind_idx, .. } => {
++                let popup = pct(56, 75, term);
+                 let block_inner = inner(popup);
+-                fields(
+-                    popup,
+-                    vec![
+-                        Rect {
+-                            x: block_inner.x,
+-                            y: block_inner.y + 2,
+-                            width: block_inner.width,
+-                            height: 1,
+-                        },
+-                        Rect {
+-                            x: block_inner.x,
+-                            y: block_inner.y + 4,
+-                            width: block_inner.width,
+-                            height: 1,
+-                        },
+-                    ],
+-                )
++                let count = if *kind_idx == 1 { 5 } else { 2 };
++                fields(popup, (0..count).map(|index| Rect {
++                    x: block_inner.x, y: block_inner.y + 2 + index * 2,
++                    width: block_inner.width, height: 1,
++                }).collect())
+             }
+             ModalType::CustomFocusDuration { .. } => outside_only(pct(40, 25, term)),
+             ModalType::EditServerUrl { .. } => outside_only(pct(50, 20, content_area)),
+@@ -6677,7 +6668,7 @@
+         }
+         let categories = crate::services::TreasuryService::new(&self.db)
+             .categories_for_type(p_id, entry.entry_type)?;
+-        let accounts = crate::services::TreasuryService::new(&self.db).accounts(p_id)?;
++        let accounts = crate::services::TreasuryService::new(&self.db).entry_accounts(p_id, Some(entry.id))?;
+         self.treasury_account_idx = entry
+             .account_id
+             .and_then(|id| accounts.iter().position(|account| account.id == id))
+@@ -15429,7 +15420,7 @@
+                     version: 1,
+                     name: String::new(),
+                     kind_idx: 0,
+-                    focus_idx: 0,
++                    savings_status_idx: 0, rate: "0".into(), rate_period_idx: 1, focus_idx: 0,
+                 };
+             }
+             KeyCode::Char('p') if self.workspace_tab_idx == 4 => {
+@@ -16501,7 +16492,7 @@
+                                 account_id: Some(account.id), version: account.version,
+                                 name: account.name.clone(),
+                                 kind_idx: crate::models::TreasuryAccountKind::ALL.iter().position(|kind| *kind == account.kind).unwrap_or(0),
+-                                focus_idx: 0,
++                                savings_status_idx: usize::from(account.savings_status == crate::models::SavingsStatus::Invested), rate: crate::services::treasury::format_interest_rate(account.interest_rate_bps), rate_period_idx: usize::from(account.interest_period == crate::models::InterestPeriod::Annual), focus_idx: 0,
+                             };
+                             return Ok(());
+                         }
+@@ -16525,7 +16516,7 @@
+                     }
+                     KeyCode::Char('A') => {
+                         if !self.treasury_allows(project_id, crate::services::treasury_policy::TreasuryAction::ManageCategories) { return Ok(()); }
+-                        self.modal_state = ModalType::TreasuryAccount { account_id: None, version: 1, name: String::new(), kind_idx: 0, focus_idx: 0 };
++                        self.modal_state = ModalType::TreasuryAccount { account_id: None, version: 1, name: String::new(), kind_idx: 0, savings_status_idx: 0, rate: "0".into(), rate_period_idx: 1, focus_idx: 0 };
+                         return Ok(());
+                     }
+                     _ => {}
+@@ -16536,17 +16527,24 @@
+                 account_id,
+                 version,
+                 ref name,
+-                kind_idx,
++                kind_idx, savings_status_idx, ref rate, rate_period_idx,
+                 focus_idx,
+             } => {
+                 let mut name = name.clone();
+                 let mut kind_idx = kind_idx.min(crate::models::TreasuryAccountKind::ALL.len() - 1);
+-                let mut focus_idx = focus_idx.min(1);
++                let mut savings_status_idx = savings_status_idx.min(1);
++                let mut rate = rate.clone();
++                let mut rate_period_idx = rate_period_idx.min(1);
++                let field_count = if kind_idx == 1 { 5 } else { 2 };
++                let mut focus_idx = focus_idx.min(field_count - 1);
+                 match key.code {
+                     KeyCode::Esc => self.modal_state = ModalType::None,
+-                    KeyCode::Tab | KeyCode::Down | KeyCode::BackTab | KeyCode::Up => {
+-                        focus_idx = (focus_idx + 1) % 2
+-                    }
++                    KeyCode::Tab | KeyCode::Down => focus_idx = (focus_idx + 1) % field_count,
++                    KeyCode::BackTab | KeyCode::Up => focus_idx = (focus_idx + field_count - 1) % field_count,
++                    KeyCode::Left | KeyCode::Right if focus_idx == 2 => savings_status_idx = 1 - savings_status_idx,
++                    KeyCode::Left | KeyCode::Right if focus_idx == 4 => rate_period_idx = 1 - rate_period_idx,
++                    KeyCode::Backspace if focus_idx == 3 => { rate.pop(); }
++                    KeyCode::Char(character) if focus_idx == 3 && (character.is_ascii_digit() || character == '.') && rate.len() < 10 => rate.push(character),
+                     KeyCode::Left if focus_idx == 1 => {
+                         kind_idx = (kind_idx + crate::models::TreasuryAccountKind::ALL.len() - 1)
+                             % crate::models::TreasuryAccountKind::ALL.len();
+@@ -16565,15 +16563,26 @@
+                     KeyCode::Enter if focus_idx == 0 => focus_idx = 1,
+                     KeyCode::Enter if !name.trim().is_empty() => {
+                         if !self.treasury_allows(project_id, crate::services::treasury_policy::TreasuryAction::ManageCategories) { return Ok(()); }
++                        let parsed_rate = if kind_idx == 1 {
++                            match crate::services::treasury::parse_interest_rate(&rate) {
++                                Ok(value) => value,
++                                Err(error) => { self.notifications.push(Notification::warning(error.to_string())); return Ok(()); }
++                            }
++                        } else { 0 };
++                        let savings_status = if savings_status_idx == 1 { crate::models::SavingsStatus::Invested } else { crate::models::SavingsStatus::Available };
++                        let interest_period = if rate_period_idx == 0 { crate::models::InterestPeriod::Monthly } else { crate::models::InterestPeriod::Annual };
+                         let service = crate::services::TreasuryService::new(&self.db);
+                         let result = if let Some(id) = account_id {
+                             let mut account = service.get_account(id)?.context("Treasury account no longer exists")?;
+                             account.version = version;
+                             account.name = name.clone();
+                             account.kind = crate::models::TreasuryAccountKind::ALL[kind_idx];
++                            account.savings_status = savings_status;
++                            account.interest_rate_bps = parsed_rate;
++                            account.interest_period = interest_period;
+                             service.update_account(account)
+                         } else {
+-                            service.create_account(project_id, &name, crate::models::TreasuryAccountKind::ALL[kind_idx])
++                            service.create_account_with_savings(project_id, &name, crate::models::TreasuryAccountKind::ALL[kind_idx], savings_status, parsed_rate, interest_period)
+                         };
+                         if let Err(error) = result {
+                             self.notifications.push(Notification::warning(error.to_string()));
+@@ -16592,7 +16601,7 @@
+                         account_id,
+                         version,
+                         name,
+-                        kind_idx,
++                        kind_idx, savings_status_idx, rate, rate_period_idx,
+                         focus_idx,
+                     };
+                 }
+@@ -17965,7 +17974,7 @@
+         let entry_types = crate::models::LedgerEntryType::ALL;
+         let categories = crate::services::TreasuryService::new(&self.db)
+             .categories_for_type(project_id, entry_types[entry_type_idx.min(3)])?;
+-        let accounts = crate::services::TreasuryService::new(&self.db).accounts(project_id)?;
++        let accounts = crate::services::TreasuryService::new(&self.db).entry_accounts(project_id, entry_id)?;
+         title_cursor = title_cursor.min(title.len());
+         amount_cursor = amount_cursor.min(amount.len());
+         // El campo Date siempre está disponible — al crear nace en "hoy", al editar en la
+@@ -18113,6 +18122,10 @@
+                 let account_id = accounts
+                     .get(self.treasury_account_idx.min(accounts.len().saturating_sub(1)))
+                     .map(|account| account.id);
++                if entry_id.is_none() && account_id.is_none() {
++                    self.notifications.push(Notification::warning("Create a Treasury account first (E, then A).".to_string()));
++                    return Ok(());
++                }
+                 let transfer_account_id = (entry_type == crate::models::LedgerEntryType::Transfer)
+                     .then(|| {
+                         accounts
+@@ -28962,8 +28975,11 @@
+                 && account.kind == crate::models::TreasuryAccountKind::Savings
+         }));
+ 
+-        app.treasury_account_idx = 1;
+-        app.treasury_transfer_account_idx = 0;
++        let service = crate::services::TreasuryService::new(&app.db);
++        let daily = service.create_account(project_id,"Everyday",crate::models::TreasuryAccountKind::Spending).unwrap();
++        let choices = service.entry_accounts(project_id,None).unwrap();
++        app.treasury_account_idx = choices.iter().position(|account|account.name == "Rainy Day").unwrap();
++        app.treasury_transfer_account_idx = choices.iter().position(|account|account.id == daily.id).unwrap();
+         app.modal_state = ModalType::TreasuryEntry {
+             entry_id: None,
+             title: "Move savings to spending".into(),
+@@ -28989,14 +29005,30 @@
+             )
+             .unwrap()
+             .remove(0);
+-        assert_eq!(transfer.account_id, Some(accounts[1].id));
+-        assert_eq!(transfer.transfer_account_id, Some(accounts[0].id));
++        assert_eq!(transfer.account_id, Some(choices.iter().find(|account|account.name == "Rainy Day").unwrap().id));
++        assert_eq!(transfer.transfer_account_id, Some(daily.id));
+ 
+         drop(app);
+         let _ = std::fs::remove_file(db_file);
+     }
+ 
+     #[test]
++    fn treasury_account_modal_saves_savings_availability_and_percentage() {
++        let db_file = Path::new("test_questline_savings_terms_modal.db");
++        let (mut app, project_id, _) = treasury_role_app(db_file,"Owner");
++        let account = crate::services::TreasuryService::new(&app.db).create_account(project_id,"Reserve",crate::models::TreasuryAccountKind::Savings).unwrap();
++        app.modal_state = ModalType::TreasuryAccount {account_id:Some(account.id),version:account.version,name:account.name,
++            kind_idx:1,savings_status_idx:1,rate:"12.50".into(),rate_period_idx:1,focus_idx:3};
++        app.handle_key_event(KeyEvent::new(KeyCode::Enter,KeyModifiers::empty())).unwrap();
++        assert_eq!(app.modal_state,ModalType::None);
++        let saved = crate::services::TreasuryService::new(&app.db).get_account(account.id).unwrap().unwrap();
++        assert_eq!(saved.savings_status,crate::models::SavingsStatus::Invested);
++        assert_eq!(saved.interest_rate_bps,1250);
++        assert_eq!(saved.interest_period,crate::models::InterestPeriod::Annual);
++        drop(app);let _ = std::fs::remove_file(db_file);
++    }
++
++    #[test]
+     fn treasury_account_manager_edits_defaults_and_moves_paid_entries() {
+         let db_file = Path::new("test_questline_treasury_account_manager.db");
+         let (mut app, project_id, entry_id) = treasury_role_app(db_file, "Owner");
+@@ -29005,7 +29037,7 @@
+         let original = crate::services::TreasuryService::new(&app.db).accounts(project_id).unwrap()[0].clone();
+         app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+         assert!(matches!(app.modal_state, ModalType::TreasuryAccount { account_id: Some(id), .. } if id == original.id));
+-        app.modal_state = ModalType::TreasuryAccount { account_id: Some(original.id), version: original.version, name: "bank1".into(), kind_idx: 1, focus_idx: 1 };
++        app.modal_state = ModalType::TreasuryAccount { account_id: Some(original.id), version: original.version, name: "bank1".into(), kind_idx: 1, savings_status_idx: 0, rate: "0".into(), rate_period_idx: 1, focus_idx: 1 };
+         app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+         let updated = crate::services::TreasuryService::new(&app.db).get_account(original.id).unwrap().unwrap();
+         assert_eq!(updated.name, "bank1");
+--- a/src/database/mod.rs
++++ b/src/database/mod.rs
+@@ -540,7 +540,7 @@
+     /// column-existence-check block below, so upgraded installs re-run that
+     /// whole block once (idempotent either way) instead of it silently
+     /// staying skipped forever via a stale `PRAGMA user_version`.
+-    const SCHEMA_VERSION: i64 = 4;
++    const SCHEMA_VERSION: i64 = 5;
+ 
+     pub fn database_size_bytes(&self) -> Result<u64> {
+         let page_count: i64 = self
+@@ -676,6 +676,17 @@
+             )?;
+         }
+ 
++        for (column, definition) in [
++            ("savings_status", "TEXT NOT NULL DEFAULT 'Available' CHECK(savings_status IN ('Available','Invested'))"),
++            ("interest_rate_bps", "INTEGER NOT NULL DEFAULT 0 CHECK(interest_rate_bps BETWEEN 0 AND 1000000)"),
++            ("interest_period", "TEXT NOT NULL DEFAULT 'Annual' CHECK(interest_period IN ('Monthly','Annual'))"),
++        ] {
++            let exists: bool = conn.query_row(
++                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('treasury_accounts') WHERE name=?1)",
++                params![column], |row| row.get(0))?;
++            if !exists { conn.execute(&format!("ALTER TABLE treasury_accounts ADD COLUMN {column} {definition}"), [])?; }
++        }
++
+         for (column, migration) in [
+             (
+                 "account_id",
+--- a/src/database/schema.rs
++++ b/src/database/schema.rs
+@@ -561,6 +561,9 @@
+     name TEXT NOT NULL COLLATE NOCASE,
+     kind TEXT NOT NULL CHECK(kind IN ('Spending', 'Savings', 'Cash', 'Other')),
+     is_default INTEGER NOT NULL DEFAULT 0,
++    savings_status TEXT NOT NULL DEFAULT 'Available' CHECK(savings_status IN ('Available','Invested')),
++    interest_rate_bps INTEGER NOT NULL DEFAULT 0 CHECK(interest_rate_bps BETWEEN 0 AND 1000000),
++    interest_period TEXT NOT NULL DEFAULT 'Annual' CHECK(interest_period IN ('Monthly','Annual')),
+     version INTEGER NOT NULL DEFAULT 1,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL,
+--- a/src/models/mod.rs
++++ b/src/models/mod.rs
+@@ -30,7 +30,7 @@
+     CategoryReport, CategoryTotals, Currency, LedgerCategory, LedgerEntry, LedgerEntryType,
+     LedgerFilter, LedgerRecurrence, LedgerSort, LedgerStatus, MonthlySpending,
+     MonthlyTreasuryMetrics, TaskFinancials, TaskPaymentStatus, TreasuryAccount,
+-    TreasuryAccountBalance, TreasuryAccountKind, TreasuryReport,
++    TreasuryAccountBalance, TreasuryAccountKind, TreasuryReport, SavingsStatus, InterestPeriod,
+ };
+ pub use user::{ClassType, User};
+ pub use xp_event::XPEvent;
+--- a/src/models/treasury.rs
++++ b/src/models/treasury.rs
+@@ -133,6 +133,30 @@
+     }
+ }
+ 
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
++pub enum SavingsStatus {
++    #[default]
++    Available,
++    Invested,
++}
++
++impl SavingsStatus {
++    pub fn as_str(self) -> &'static str { match self { Self::Available => "Available", Self::Invested => "Invested" } }
++    pub fn parse(value: &str) -> Option<Self> { match value { "Available" => Some(Self::Available), "Invested" => Some(Self::Invested), _ => None } }
++}
++
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
++pub enum InterestPeriod {
++    Monthly,
++    #[default]
++    Annual,
++}
++
++impl InterestPeriod {
++    pub fn as_str(self) -> &'static str { match self { Self::Monthly => "Monthly", Self::Annual => "Annual" } }
++    pub fn parse(value: &str) -> Option<Self> { match value { "Monthly" => Some(Self::Monthly), "Annual" => Some(Self::Annual), _ => None } }
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct TreasuryAccount {
+     pub id: Uuid,
+@@ -140,11 +164,24 @@
+     pub name: String,
+     pub kind: TreasuryAccountKind,
+     pub is_default: bool,
++    #[serde(default)]
++    pub savings_status: SavingsStatus,
++    #[serde(default)]
++    pub interest_rate_bps: i64,
++    #[serde(default)]
++    pub interest_period: InterestPeriod,
+     pub version: i64,
+     pub created_at: DateTime<Utc>,
+     pub updated_at: DateTime<Utc>,
+ }
+ 
++impl TreasuryAccount {
++    pub fn estimated_interest_minor(&self, balance_minor: i64) -> Option<i64> {
++        if self.kind != TreasuryAccountKind::Savings { return Some(0); }
++        i64::try_from(i128::from(balance_minor.max(0)) * i128::from(self.interest_rate_bps) / 10000).ok()
++    }
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct TreasuryAccountBalance {
+     pub account: TreasuryAccount,
+@@ -368,6 +405,9 @@
+     pub paid_minor: i64,
+     pub committed_minor: i64,
+     pub available_minor: i64,
++    pub saved_minor: i64,
++    pub invested_minor: i64,
++    pub liquid_savings_minor: i64,
+ }
+ 
+ #[derive(Debug, Clone, PartialEq, Eq)]
+@@ -447,6 +487,12 @@
+     pub paid_minor: i64,
+     pub committed_minor: i64,
+     pub available_minor: i64,
++    #[serde(default)]
++    pub saved_minor: i64,
++    #[serde(default)]
++    pub invested_minor: i64,
++    #[serde(default)]
++    pub liquid_savings_minor: i64,
+ }
+ 
+ impl From<CampaignTotals> for CampaignTotalsReport {
+@@ -457,6 +503,9 @@
+             paid_minor: value.paid_minor,
+             committed_minor: value.committed_minor,
+             available_minor: value.available_minor,
++            saved_minor: value.saved_minor,
++            invested_minor: value.invested_minor,
++            liquid_savings_minor: value.liquid_savings_minor,
+         }
+     }
+ }
+--- a/src/screens/project_workspace.rs
++++ b/src/screens/project_workspace.rs
+@@ -822,6 +822,7 @@
+             f,
+             app,
+             entry_id.is_some(),
++            *entry_id,
+             title,
+             *title_cursor,
+             amount,
+@@ -867,10 +868,10 @@
+         ModalType::TreasuryAccount {
+             account_id,
+             name,
+-            kind_idx,
++            kind_idx, savings_status_idx, rate, rate_period_idx,
+             focus_idx,
+             ..
+-        } => draw_treasury_account_modal(f, name, *kind_idx, *focus_idx, account_id.is_some(), theme),
++        } => draw_treasury_account_modal(f, name, *kind_idx, *savings_status_idx, rate, *rate_period_idx, *focus_idx, account_id.is_some(), theme),
+         ModalType::TreasuryCurrency { selected_idx } => {
+             draw_treasury_currency_modal(f, app, *selected_idx, theme)
+         }
+@@ -1278,11 +1279,7 @@
+         .entries(campaign_id, &filter, app.treasury_sort)
+         .unwrap_or_default();
+     let account_balances = service.account_balances(campaign_id).unwrap_or_default();
+-    let saved_minor = account_balances
+-        .iter()
+-        .filter(|balance| balance.account.kind == crate::models::TreasuryAccountKind::Savings)
+-        .map(|balance| balance.balance_minor)
+-        .sum::<i64>();
++    let saved_minor = totals.saved_minor;
+     let upcoming = service
+         .upcoming_payments(campaign_id, Utc::now(), 30)
+         .unwrap_or_default();
+@@ -1313,11 +1310,12 @@
+         ("Paid", totals.paid_minor),
+         ("Committed", totals.committed_minor),
+         ("Saved", saved_minor),
++        ("Invested", totals.invested_minor),
+         ("Available", totals.available_minor),
+     ];
+     let summary_chunks = Layout::default()
+         .direction(Direction::Horizontal)
+-        .constraints([Constraint::Ratio(1, 6); 6])
++        .constraints([Constraint::Ratio(1, 7); 7])
+         .split(sections[0]);
+     for (index, (label, amount)) in summary.into_iter().enumerate() {
+         let color = match label {
+@@ -1325,7 +1323,7 @@
+             "Paid" => theme.danger,
+             "Committed" => theme.warning,
+             "Saved" if amount < 0 => theme.danger,
+-            "Saved" => theme.secondary,
++            "Saved" | "Invested" => theme.secondary,
+             "Available" if amount < 0 => theme.danger,
+             "Available" => theme.success,
+             _ => theme.primary,
+@@ -1633,6 +1631,7 @@
+     f: &mut Frame,
+     app: &App,
+     is_editing: bool,
++    existing_entry_id: Option<uuid::Uuid>,
+     title: &str,
+     title_cursor: usize,
+     amount: &str,
+@@ -1667,7 +1666,7 @@
+         .active_project_id
+         .and_then(|id| {
+             crate::services::TreasuryService::new(&app.db)
+-                .accounts(id)
++                .entry_accounts(id, existing_entry_id)
+                 .ok()
+         })
+         .unwrap_or_default();
+@@ -1680,7 +1679,7 @@
+     let account = accounts
+         .get(app.treasury_account_idx.min(accounts.len().saturating_sub(1)))
+         .map(|value| value.name.as_str())
+-        .unwrap_or("Spending");
++        .unwrap_or("Create an account: E, then A");
+     let destination = accounts
+         .get(
+             app.treasury_transfer_account_idx
+@@ -2095,12 +2094,18 @@
+     let currency = service.campaign_currency(campaign_id).unwrap_or_default();
+     let block = Block::default().title(" Treasury Accounts · ↑↓ select · Enter edit · A add · Del delete · Esc close ")
+         .borders(Borders::ALL).border_type(BorderType::Thick).border_style(Style::default().fg(theme.primary));
+-    let rows = balances.iter().map(|balance| Row::new(vec![
+-        balance.account.name.clone(), balance.account.kind.as_str().to_string(),
+-        crate::services::treasury::format_money(balance.balance_minor, currency),
+-    ]));
+-    let table = Table::new(rows, [Constraint::Percentage(45), Constraint::Percentage(25), Constraint::Percentage(30)])
+-        .header(Row::new(vec!["Account", "Type", "Balance"]).style(Style::default().fg(theme.muted)))
++    let rows = balances.iter().map(|balance| {
++        let account = &balance.account;
++        let terms = if account.kind == crate::models::TreasuryAccountKind::Savings {
++            format!("{} · {}% {} · est {}", account.savings_status.as_str(),
++                crate::services::treasury::format_interest_rate(account.interest_rate_bps), account.interest_period.as_str(),
++                account.estimated_interest_minor(balance.balance_minor).map(|value| crate::services::treasury::format_money(value,currency)).unwrap_or_else(|| "—".into()))
++        } else { String::new() };
++        Row::new(vec![account.name.clone(), account.kind.as_str().to_string(),terms,
++            crate::services::treasury::format_money(balance.balance_minor,currency)])
++    });
++    let table = Table::new(rows,[Constraint::Percentage(22),Constraint::Percentage(12),Constraint::Percentage(43),Constraint::Percentage(23)])
++        .header(Row::new(vec!["Account","Type","Savings / estimated interest per period","Balance"]).style(Style::default().fg(theme.muted)))
+         .block(block).highlight_style(Style::default().bg(theme.primary).fg(theme.background)).highlight_symbol("▶ ");
+     let mut state = TableState::default();
+     if !balances.is_empty() { state.select(Some(selected_idx.min(balances.len() - 1))); }
+@@ -2108,52 +2113,30 @@
+ }
+ 
+ fn draw_treasury_account_modal(
+-    f: &mut Frame,
+-    name: &str,
+-    kind_idx: usize,
+-    focus_idx: usize,
+-    editing: bool,
+-    theme: &Theme,
++    f: &mut Frame, name: &str, kind_idx: usize, savings_status_idx: usize,
++    rate: &str, rate_period_idx: usize, focus_idx: usize, editing: bool, theme: &Theme,
+ ) {
+-    let area = centered_rect(56, 30, f.size());
++    let area = centered_rect(56, 75, f.size());
+     f.render_widget(Clear, area);
+-    let kinds = crate::models::TreasuryAccountKind::ALL;
+-    let kind = kinds[kind_idx.min(kinds.len() - 1)].as_str();
+-    let label_style = |index| {
+-        Style::default().fg(if focus_idx == index {
+-            theme.primary
+-        } else {
+-            theme.muted
+-        })
+-    };
+-    f.render_widget(
+-        Paragraph::new(vec![
+-            Line::from("Choose a name and type. Existing transactions stay linked."),
+-            Line::from(""),
+-            Line::from(vec![
+-                Span::styled("Name  ", label_style(0)),
+-                Span::styled(format!("{name}_"), Style::default().fg(theme.text)),
+-            ]),
+-            Line::from(""),
+-            Line::from(vec![
+-                Span::styled("Type  ", label_style(1)),
+-                Span::styled(format!("◀ {kind} ▶"), Style::default().fg(theme.text)),
+-            ]),
+-            Line::from(""),
+-            Line::from(Span::styled(
+-                "Tab/↑↓ field · ←→ type · Enter continue/save · Esc cancel",
+-                Style::default().fg(theme.muted),
+-            )),
+-        ])
+-        .block(
+-            Block::default()
+-                .title(if editing { " Edit Treasury Account " } else { " New Treasury Account " })
+-                .borders(Borders::ALL)
+-                .border_type(BorderType::Thick)
+-                .border_style(Style::default().fg(theme.primary)),
+-        ),
+-        area,
+-    );
++    let kind = crate::models::TreasuryAccountKind::ALL[kind_idx.min(3)];
++    let label_style = |index| Style::default().fg(if focus_idx == index { theme.primary } else { theme.muted });
++    let mut lines = vec![Line::from("Savings stay separate from spendable funds."),Line::from("")];
++    let mut values = vec![("Name", format!("{name}_")), ("Type", format!("◀ {} ▶", kind.as_str()))];
++    if kind == crate::models::TreasuryAccountKind::Savings {
++        values.extend([
++            ("Savings", if savings_status_idx == 1 {"◀ Invested ▶"} else {"◀ Available ▶"}.to_string()),
++            ("Rate %", format!("{rate}_")),
++            ("Period", if rate_period_idx == 0 {"◀ Monthly ▶"} else {"◀ Annual ▶"}.to_string()),
++        ]);
++    }
++    for (index, (label, value)) in values.into_iter().enumerate() {
++        lines.push(Line::from(vec![Span::styled(format!("{label:<10}"), label_style(index)),Span::styled(value, Style::default().fg(theme.text))]));
++        lines.push(Line::from(""));
++    }
++    lines.push(Line::from(Span::styled("Estimates only; interest is never added automatically.",Style::default().fg(theme.muted))));
++    lines.push(Line::from(Span::styled("Tab/↑↓ field · ←→ choice · Enter save · Esc cancel",Style::default().fg(theme.muted))));
++    f.render_widget(Paragraph::new(lines).block(Block::default().title(if editing {" Edit Treasury Account "} else {" New Treasury Account "})
++        .borders(Borders::ALL).border_type(BorderType::Thick).border_style(Style::default().fg(theme.primary))),area);
+ }
+ 
+ fn draw_treasury_currency_modal(f: &mut Frame, app: &App, selected_idx: usize, theme: &Theme) {
+@@ -6863,6 +6846,17 @@
+     }
+ 
+     #[test]
++    fn treasury_savings_account_controls_fit_a_standard_terminal() {
++        let mut terminal = Terminal::new(TestBackend::new(80,24)).unwrap();
++        let theme = Theme::default_theme();
++        terminal.draw(|frame| draw_treasury_account_modal(frame,"Reserve",1,1,"12.50",1,3,true,&theme)).unwrap();
++        let rendered = terminal.backend().buffer().content.iter().map(|cell|cell.symbol()).collect::<String>();
++        for label in ["Reserve","Savings","Invested","12.50","Annual","Estimates only"] {
++            assert!(rendered.contains(label),"missing {label}: {rendered}");
++        }
++    }
++
++    #[test]
+     fn treasury_scroll_centers_selection_until_it_reaches_the_ends() {
+         let visible = 7;
+         let count = 20;
+--- a/src/services/sync_engine.rs
++++ b/src/services/sync_engine.rs
+@@ -2820,16 +2820,22 @@
+                             if let Ok(value) =
+                                 serde_json::from_str::<crate::models::TreasuryAccount>(content)
+                             {
++                                let fields: serde_json::Value = serde_json::from_str(content).unwrap_or_default();
+                                 let stored = self.db.conn.execute(
+                                     "INSERT INTO treasury_accounts
+-                                     (id, campaign_id, name, kind, is_default, version, created_at, updated_at)
+-                                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
++                                     (id, campaign_id, name, kind, is_default, version, created_at, updated_at, savings_status, interest_rate_bps, interest_period)
++                                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                                      ON CONFLICT(id) DO UPDATE SET name=excluded.name,
+                                       kind=excluded.kind, is_default=excluded.is_default,
+-                                      version=excluded.version, updated_at=excluded.updated_at",
++                                      version=excluded.version, updated_at=excluded.updated_at,
++                                      savings_status=CASE WHEN ?12 THEN excluded.savings_status ELSE treasury_accounts.savings_status END,
++                                      interest_rate_bps=CASE WHEN ?13 THEN excluded.interest_rate_bps ELSE treasury_accounts.interest_rate_bps END,
++                                      interest_period=CASE WHEN ?14 THEN excluded.interest_period ELSE treasury_accounts.interest_period END",
+                                     params![value.id.to_string(), value.campaign_id.to_string(), value.name,
+                                         value.kind.as_str(), value.is_default as i32, value.version,
+-                                        value.created_at.to_rfc3339(), value.updated_at.to_rfc3339()],
++                                        value.created_at.to_rfc3339(), value.updated_at.to_rfc3339(),
++                                        value.savings_status.as_str(), value.interest_rate_bps, value.interest_period.as_str(),
++                                        fields.get("savings_status").is_some(), fields.get("interest_rate_bps").is_some(), fields.get("interest_period").is_some()],
+                                 );
+                                 if Self::defer_treasury_event(
+                                     &log,
+@@ -5638,7 +5644,8 @@
+             sync(&db_b, receiver, "account-edit-b", true);
+             let service = crate::services::TreasuryService::new(&db_a);
+             let bank1 = service.create_account(campaign_id, "bank1", crate::models::TreasuryAccountKind::Spending).unwrap();
+-            let bank2 = service.create_account(campaign_id, "bank2", crate::models::TreasuryAccountKind::Savings).unwrap();
++            let bank2 = service.create_account_with_savings(campaign_id, "bank2", crate::models::TreasuryAccountKind::Savings,
++                crate::models::SavingsStatus::Invested,1250,crate::models::InterestPeriod::Annual).unwrap();
+             sync(&db_a, &owner, "account-edit-a", false);
+             sync(&db_b, receiver, "account-edit-b", true);
+             let mut edited = bank1.clone();
+@@ -5653,6 +5660,7 @@
+             sync(&db_b, receiver, "account-edit-b", true);
+             let received = crate::services::TreasuryService::new(&db_b);
+             assert_eq!(received.get_account(bank1.id).unwrap().unwrap(), edited);
++            assert_eq!(received.get_account(bank2.id).unwrap().unwrap(), bank2);
+             assert_eq!(serde_json::to_value(received.get_entry(entry_id).unwrap().unwrap()).unwrap(), serde_json::to_value(&moved).unwrap());
+             assert_eq!(moved.payment_date, old_payment_date);
+             assert_eq!(received.account_balances(campaign_id).unwrap(), service.account_balances(campaign_id).unwrap());
+--- a/src/services/treasury.rs
++++ b/src/services/treasury.rs
+@@ -12,7 +12,7 @@
+     CategoryReport, CategoryTotals, Currency, LedgerCategory, LedgerEntry, LedgerEntryType,
+     LedgerFilter, LedgerRecurrence, LedgerSort, LedgerStatus, MonthlySpending,
+     MonthlyTreasuryMetrics, TaskFinancials, TaskPaymentStatus, TreasuryAccount,
+-    TreasuryAccountBalance, TreasuryAccountKind, TreasuryReport,
++    TreasuryAccountBalance, TreasuryAccountKind, TreasuryReport, SavingsStatus, InterestPeriod,
+ };
+ 
+ pub const DEFAULT_CATEGORIES: [(&str, LedgerEntryType); 25] = [
+@@ -347,7 +347,7 @@
+     pub fn accounts(&self, campaign_id: Uuid) -> Result<Vec<TreasuryAccount>> {
+         self.ensure_campaign(campaign_id)?;
+         let mut stmt = self.db.conn.prepare(
+-            "SELECT id, campaign_id, name, kind, is_default, version, created_at, updated_at
++            "SELECT id, campaign_id, name, kind, is_default, version, created_at, updated_at, savings_status, interest_rate_bps, interest_period
+              FROM treasury_accounts WHERE campaign_id=?1
+              ORDER BY is_default DESC,
+                       CASE kind WHEN 'Spending' THEN 0 WHEN 'Savings' THEN 1 WHEN 'Cash' THEN 2 ELSE 3 END,
+@@ -358,12 +358,32 @@
+             .map_err(Into::into)
+     }
+ 
++    pub fn entry_accounts(&self, campaign_id: Uuid, existing: Option<Uuid>) -> Result<Vec<TreasuryAccount>> {
++        let entry = existing.map(|id| self.get_entry(id)).transpose()?.flatten();
++        let accounts = self.accounts(campaign_id)?;
++        Ok(accounts.into_iter().filter(|account| {
++            if !account.is_default { return true; }
++            entry.as_ref().is_some_and(|entry| {
++                entry.account_id == Some(account.id) || entry.transfer_account_id == Some(account.id) ||
++                    (entry.account_id.is_none() && account.id == deterministic_account_id(campaign_id, "Spending"))
++            })
++        }).collect())
++    }
++
+     pub fn create_account(
+         &self,
+         campaign_id: Uuid,
+         name: &str,
+         kind: TreasuryAccountKind,
+     ) -> Result<TreasuryAccount> {
++        self.create_account_with_savings(campaign_id, name, kind, SavingsStatus::Available, 0, InterestPeriod::Annual)
++    }
++
++    pub fn create_account_with_savings(
++        &self, campaign_id: Uuid, name: &str, kind: TreasuryAccountKind,
++        savings_status: SavingsStatus, interest_rate_bps: i64, interest_period: InterestPeriod,
++    ) -> Result<TreasuryAccount> {
++        if !(0..=1000000).contains(&interest_rate_bps) { bail!("Interest rate must be between 0 and 10000 percent"); }
+         self.ensure_campaign(campaign_id)?;
+         let name = name.trim();
+         if name.is_empty() {
+@@ -375,14 +395,14 @@
+         let now = Utc::now();
+         self.db.conn.execute(
+             "INSERT INTO treasury_accounts
+-             (id, campaign_id, name, kind, is_default, version, created_at, updated_at)
+-             VALUES (?1, ?2, ?3, ?4, 0, 1, ?5, ?5)",
++             (id, campaign_id, name, kind, is_default, version, created_at, updated_at, savings_status, interest_rate_bps, interest_period)
++             VALUES (?1, ?2, ?3, ?4, 0, 1, ?5, ?5, ?6, ?7, ?8)",
+             params![
+                 id.to_string(),
+                 campaign_id.to_string(),
+                 name,
+                 kind.as_str(),
+-                now.to_rfc3339()
++                now.to_rfc3339(), savings_status.as_str(), interest_rate_bps, interest_period.as_str()
+             ],
+         )?;
+         self.db
+@@ -414,6 +434,7 @@
+         if previous.campaign_id != account.campaign_id {
+             bail!("An account cannot move between campaigns");
+         }
++        if !(0..=1000000).contains(&account.interest_rate_bps) { bail!("Interest rate must be between 0 and 10000 percent"); }
+         account.name = account.name.trim().to_string();
+         self.validate_account_name(account.campaign_id, &account.name, Some(account.id))?;
+         account.is_default = previous.is_default;
+@@ -422,8 +443,8 @@
+         account.version += 1;
+         account.updated_at = Utc::now();
+         let changed = self.db.conn.execute(
+-            "UPDATE treasury_accounts SET name=?1, kind=?2, version=?3, updated_at=?4 WHERE id=?5 AND version=?6",
+-            params![account.name, account.kind.as_str(), account.version, account.updated_at.to_rfc3339(), account.id.to_string(), expected_version],
++            "UPDATE treasury_accounts SET name=?1, kind=?2, version=?3, updated_at=?4, savings_status=?7, interest_rate_bps=?8, interest_period=?9 WHERE id=?5 AND version=?6",
++            params![account.name, account.kind.as_str(), account.version, account.updated_at.to_rfc3339(), account.id.to_string(), expected_version, account.savings_status.as_str(), account.interest_rate_bps, account.interest_period.as_str()],
+         )?;
+         if changed == 0 {
+             bail!("Treasury account changed on another device; reload before editing");
+@@ -469,7 +490,7 @@
+         self.db
+             .conn
+             .query_row(
+-                "SELECT id, campaign_id, name, kind, is_default, version, created_at, updated_at
++                "SELECT id, campaign_id, name, kind, is_default, version, created_at, updated_at, savings_status, interest_rate_bps, interest_period
+                  FROM treasury_accounts WHERE id=?1",
+                 params![id.to_string()],
+                 map_account,
+@@ -760,12 +781,18 @@
+             params![campaign_id.to_string()],
+             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+         )?;
++        let balances = self.account_balances(campaign_id)?;
++        let savings = balances.iter().filter(|balance| balance.account.kind == TreasuryAccountKind::Savings);
++        let saved_minor = savings.clone().try_fold(0i64, |total, balance| total.checked_add(balance.balance_minor).context("Savings total is too large"))?;
++        let invested_minor = savings.filter(|balance| balance.account.savings_status == SavingsStatus::Invested)
++            .try_fold(0i64, |total, balance| total.checked_add(balance.balance_minor).context("Invested total is too large"))?;
+         Ok(CampaignTotals {
+             budget_minor: treasury.overall_budget_minor,
+             income_minor: income,
+             paid_minor: paid,
+             committed_minor: committed,
+-            available_minor: income - paid - committed,
++            available_minor: (income - paid - committed).checked_sub(saved_minor).context("Available total is too large")?,
++            saved_minor, invested_minor, liquid_savings_minor: saved_minor - invested_minor,
+         })
+     }
+ 
+@@ -1356,6 +1383,9 @@
+         kind: TreasuryAccountKind::parse(&kind)
+             .ok_or_else(|| conversion_error(3, "treasury account kind"))?,
+         is_default: row.get::<_, i32>(4)? != 0,
++        savings_status: SavingsStatus::parse(&row.get::<_, String>(8)?).ok_or_else(|| conversion_error(8,"savings status"))?,
++        interest_rate_bps: row.get(9)?,
++        interest_period: InterestPeriod::parse(&row.get::<_, String>(10)?).ok_or_else(|| conversion_error(10,"interest period"))?,
+         version: row.get(5)?,
+         created_at: parse_datetime(row, 6)?,
+         updated_at: parse_datetime(row, 7)?,
+@@ -1650,6 +1680,20 @@
+     Uuid::from_bytes(bytes)
+ }
+ 
++pub fn parse_interest_rate(value: &str) -> Result<i64> {
++    let (whole, fraction) = value.trim().split_once('.').unwrap_or((value.trim(), ""));
++    if whole.is_empty() || !whole.chars().all(|c| c.is_ascii_digit()) || fraction.len() > 2 || !fraction.chars().all(|c| c.is_ascii_digit()) {
++        bail!("Enter a percentage with up to two decimal places");
++    }
++    let whole: i64 = whole.parse().context("Interest rate is too large")?;
++    let fractional: i64 = format!("{fraction:0<2}").parse()?;
++    let rate = whole.checked_mul(100).and_then(|v| v.checked_add(fractional)).context("Interest rate is too large")?;
++    if rate > 1000000 { bail!("Interest rate must be between 0 and 10000 percent"); }
++    Ok(rate)
++}
++
++pub fn format_interest_rate(rate: i64) -> String { format!("{}.{:02}", rate / 100, rate % 100) }
++
+ pub fn format_minor(value: i64) -> String {
+     let sign = if value < 0 { "-" } else { "" };
+     let absolute = value.unsigned_abs();
+@@ -1854,6 +1898,65 @@
+     }
+ 
+     #[test]
++    fn treasury_savings_terms_and_estimates_preserve_actual_balances() {
++        let (_file, db, campaign_id) = test_db();
++        let service = TreasuryService::new(&db);
++        let spending = service.create_account(campaign_id,"Checking",TreasuryAccountKind::Spending).unwrap();
++        let savings = service.create_account_with_savings(campaign_id,"Investment",TreasuryAccountKind::Savings,
++            SavingsStatus::Invested,1250,InterestPeriod::Annual).unwrap();
++        let mut income = entry(campaign_id,category_id(&service,campaign_id,LedgerEntryType::Income),LedgerEntryType::Income,LedgerStatus::Paid,100000);
++        income.account_id = Some(spending.id); service.create_entry(income).unwrap();
++        let mut transfer = entry(campaign_id,category_id(&service,campaign_id,LedgerEntryType::Transfer),LedgerEntryType::Transfer,LedgerStatus::Paid,40000);
++        transfer.account_id = Some(spending.id); transfer.transfer_account_id = Some(savings.id); service.create_entry(transfer).unwrap();
++        let before = service.entries(campaign_id,&LedgerFilter::default(),LedgerSort::Newest).unwrap().len();
++        let totals = service.calculate_campaign_totals(campaign_id).unwrap();
++        assert_eq!((totals.available_minor,totals.saved_minor,totals.invested_minor,totals.liquid_savings_minor),(60000,40000,40000,0));
++        assert_eq!(savings.estimated_interest_minor(40000),Some(5000));
++        assert_eq!(savings.estimated_interest_minor(-100),Some(0));
++        let mut edited = savings.clone(); edited.savings_status = SavingsStatus::Available; edited.interest_period = InterestPeriod::Monthly; edited.interest_rate_bps=125;
++        let saved = service.update_account(edited).unwrap();
++        assert_eq!(saved.estimated_interest_minor(40000),Some(500));
++        assert!(service.update_account(savings).is_err());
++        let totals = service.calculate_campaign_totals(campaign_id).unwrap();
++        assert_eq!((totals.available_minor,totals.saved_minor,totals.invested_minor,totals.liquid_savings_minor),(60000,40000,0,40000));
++        assert_eq!(service.entries(campaign_id,&LedgerFilter::default(),LedgerSort::Newest).unwrap().len(),before);
++        let history: String = db.conn.query_row("SELECT snapshot FROM treasury_history WHERE entity_id=?1 AND action='updated'",params![saved.id.to_string()],|row|row.get(0)).unwrap();
++        assert!(history.contains("interest_rate_bps"));
++        assert_eq!(service.get_account(saved.id).unwrap().unwrap(),saved);
++    }
++
++    #[test]
++    fn treasury_entry_accounts_only_offer_user_accounts_and_preserve_existing_legacy_links() {
++        let (_file, db, campaign_id) = test_db();
++        let service = TreasuryService::new(&db);
++        assert!(service.entry_accounts(campaign_id,None).unwrap().is_empty());
++        let custom = service.create_account(campaign_id,"My bank",TreasuryAccountKind::Spending).unwrap();
++        assert_eq!(service.entry_accounts(campaign_id,None).unwrap(),vec![custom.clone()]);
++        let legacy = entry(campaign_id,category_id(&service,campaign_id,LedgerEntryType::Income),LedgerEntryType::Income,LedgerStatus::Paid,100);
++        let legacy = service.create_entry(legacy).unwrap();
++        let choices = service.entry_accounts(campaign_id,Some(legacy.id)).unwrap();
++        assert!(choices.iter().any(|account| account.id == custom.id));
++        assert!(choices.iter().any(|account| account.is_default && account.name == "Spending"));
++        assert!(!choices.iter().any(|account| account.name == "Savings" || account.name == "Cash"));
++    }
++
++    #[test]
++    fn treasury_interest_rates_are_decimal_and_legacy_payloads_have_safe_defaults() {
++        assert_eq!(parse_interest_rate("12.50").unwrap(),1250);
++        assert_eq!(parse_interest_rate("0.1").unwrap(),10);
++        for value in ["-1","1.001","NaN","1e3","10000.01",""] { assert!(parse_interest_rate(value).is_err(),"{value}"); }
++        let (_file, db, campaign_id) = test_db();
++        let service = TreasuryService::new(&db);
++        let account = service.create_account(campaign_id,"Safe",TreasuryAccountKind::Savings).unwrap();
++        let mut legacy = serde_json::to_value(&account).unwrap();
++        for name in ["savings_status","interest_rate_bps","interest_period"] {legacy.as_object_mut().unwrap().remove(name);}
++        let decoded: TreasuryAccount = serde_json::from_value(legacy).unwrap();
++        assert_eq!(decoded.savings_status,SavingsStatus::Available);
++        assert_eq!(decoded.interest_rate_bps,0);assert_eq!(decoded.interest_period,InterestPeriod::Annual);
++        assert!(service.create_account_with_savings(campaign_id,"Bad",TreasuryAccountKind::Savings,SavingsStatus::Invested,-1,InterestPeriod::Monthly).is_err());
++    }
++
++    #[test]
+     fn default_categories_are_idempotent() {
+         let (_file, db, campaign_id) = test_db();
+         let service = TreasuryService::new(&db);
+@@ -2031,7 +2134,7 @@
+     }
+ 
+     #[test]
+-    fn transfers_move_money_between_accounts_without_changing_campaign_totals() {
++    fn transfers_separate_savings_from_spendable_campaign_funds() {
+         let (_file, db, campaign_id) = test_db();
+         let service = TreasuryService::new(&db);
+         let income_category = category_id(&service, campaign_id, LedgerEntryType::Income);
+@@ -2100,7 +2203,9 @@
+         let totals = service.calculate_campaign_totals(campaign_id).unwrap();
+         assert_eq!(totals.income_minor, 10_000);
+         assert_eq!(totals.paid_minor, 1_000);
+-        assert_eq!(totals.available_minor, 9_000);
++        assert_eq!(totals.available_minor, 6_000);
++        assert_eq!(totals.saved_minor, 3_000);
++        assert_eq!(totals.available_minor + totals.saved_minor, 9_000);
+     }
+ 
+     #[test]
+--- a/src/shell_api.rs
++++ b/src/shell_api.rs
+@@ -144,7 +144,7 @@
+ 
+ pub fn run(path: &Path, request: &Value) -> Result<Value> {
+     if request["action"].as_str() == Some("capabilities") {
+-        return Ok(json!({"treasury_fields": true,
++        return Ok(json!({"treasury_fields": true, "savings_accounts": true,
+             "treasury_defaults": {
+                 "accounts": crate::services::treasury::DEFAULT_ACCOUNTS.iter().map(|(name, kind)| json!({"name":name,"kind":kind.as_str()})).collect::<Vec<_>>(),
+                 "categories": crate::services::treasury::DEFAULT_CATEGORIES.iter().map(|(name, kind)| json!({"name":name,"entry_type":kind.as_str()})).collect::<Vec<_>>()
+@@ -519,6 +519,25 @@
+             app.db.delete_note(note.id)?;
+             Ok(json!({"message": "Scroll deleted"}))
+         }
++        "treasury_snapshot" => {
++            let campaign_id = id_field(request,"project_id")?;
++            local_campaign(&app,campaign_id)?;
++            let treasury = TreasuryService::new(&app.db);
++            Ok(json!({"accounts":treasury.account_balances(campaign_id)?,
++                "totals":crate::models::treasury::CampaignTotalsReport::from(treasury.calculate_campaign_totals(campaign_id)?)}))
++        }
++        "configure_savings" => {
++            let treasury = TreasuryService::new(&app.db);
++            let mut account = treasury.get_account(id_field(request,"id")?)?.context("Account not found")?;
++            local_campaign(&app, account.campaign_id)?;
++            if account.kind != crate::models::TreasuryAccountKind::Savings { bail!("Choose a savings account"); }
++            if request["version"].as_i64() != Some(account.version) { bail!("Account changed; refresh before saving"); }
++            account.savings_status = crate::models::SavingsStatus::parse(field(request,"savings_status")?).context("Choose Available or Invested")?;
++            account.interest_rate_bps = crate::services::treasury::parse_interest_rate(field(request,"interest_rate")?)?;
++            account.interest_period = crate::models::InterestPeriod::parse(field(request,"interest_period")?).context("Choose Monthly or Annual")?;
++            let saved = treasury.update_account(account)?;
++            Ok(json!({"id":saved.id,"message":"Savings settings saved; interest estimates do not change balances"}))
++        }
+         "create_entry" | "update_entry" => {
+             let treasury = TreasuryService::new(&app.db);
+             let updating = field(request, "action")? == "update_entry";
+@@ -547,7 +566,19 @@
+             if entry.amount_minor <= 0 { bail!("Amount must be greater than zero"); }
+             entry.status = LedgerStatus::parse(request["status"].as_str().unwrap_or("Planned"))
+                 .context("Choose a valid treasury status")?;
++            let legacy_source = if entry.account_id.is_none() && updating {
++                treasury.accounts(entry.campaign_id)?.into_iter().find(|account| account.is_default && account.name == "Spending").map(|account| account.id)
++            } else { None };
++            let previous_accounts = [entry.account_id.or(legacy_source), entry.transfer_account_id];
+             apply_entry_fields(request, &mut entry, &treasury)?;
++            if request["custom_accounts_only"].as_bool() == Some(true) {
++                for id in [entry.account_id, entry.transfer_account_id].into_iter().flatten() {
++                    let account = treasury.get_account(id)?.context("Account not found")?;
++                    if account.is_default && !(updating && previous_accounts.contains(&Some(id))) {
++                        bail!("Choose a user-created account");
++                    }
++                }
++            }
+             let saved = if updating { treasury.update_entry(entry)? } else { treasury.create_entry(entry)? };
+             Ok(json!({"id": saved.id, "message": if updating {"Treasury entry updated"} else {"Treasury entry created"}}))
+         }

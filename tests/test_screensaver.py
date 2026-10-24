@@ -28,7 +28,7 @@ class ScreensaverTests(unittest.TestCase):
             path = saver.config_path()
             path.parent.mkdir()
             path.write_text('{"personal":"preserved"}')
-            for key, values in [('enabled', ['off', 'on']), ('timeout', ['30', '180', '540']),
+            for key, values in [('enabled', ['off', 'on']), ('timeout', ['30', '180', '540', '600', '900']),
                                 ('effect', saver.EFFECTS), ('branding', saver.BRANDING)]:
                 for value in values:
                     saver.save(key, value)
@@ -41,7 +41,7 @@ class ScreensaverTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'XDG_CONFIG_HOME': directory}):
             saver.save('effect', 'rain')
             original = saver.config_path().read_bytes()
-            for key, value in [('enabled', 'yes'), ('timeout', '0'), ('timeout', '600'),
+            for key, value in [('enabled', 'yes'), ('timeout', '0'), ('timeout', '901'),
                                ('timeout', '1; echo unsafe'), ('effect', 'bad'), ('branding', '../logo'), ('bad', 'on')]:
                 with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                     saver.save(key, value)

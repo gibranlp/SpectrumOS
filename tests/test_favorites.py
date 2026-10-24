@@ -67,6 +67,30 @@ class FavoritesTests(unittest.TestCase):
             self.assertNotIn('BROWSER',options['env'])
             self.assertTrue(options['start_new_session'])
             for stream in ('stdin','stdout','stderr'):self.assertEqual(options[stream],subprocess.DEVNULL)
+    def test_browser_icon_launches_selected_desktop_without_changing_defaults(self):
+        self.favorite(url='https://example.com/path?a=1&b=2#part')
+        for identifier in ('firefox.desktop','google-chrome.desktop'):
+            browser=dict(id=identifier,name=identifier,desktopFile='/tmp/Browser Apps/'+identifier)
+            with self.subTest(browser=identifier),patch.object(backend,'browser_catalog',return_value=dict(browsers=[browser])),patch.object(backend,'set_browser') as defaults,patch.object(backend.subprocess,'Popen') as popen:
+                popen.return_value.wait.return_value=0
+                before=self.action('status')['state']['favorites'][0]['clickCount']
+                result=self.action('open',id='favorite',browser=identifier)
+                self.assertEqual(popen.call_args.args[0],['uwsm','app','--','gio','launch',browser['desktopFile'],'https://example.com/path?a=1&b=2#part'])
+                self.assertEqual(result['state']['favorites'][0]['clickCount'],before+1)
+                defaults.assert_not_called()
+    def test_missing_browser_does_not_fall_back_or_count_visit(self):
+        self.favorite()
+        with patch.object(backend,'browser_catalog',return_value=dict(browsers=[])),patch.object(backend.subprocess,'Popen') as popen:
+            with self.assertRaisesRegex(ValueError,'no longer installed'):self.action('open',id='favorite',browser='removed.desktop')
+            popen.assert_not_called()
+        self.assertEqual(self.action('status')['state']['favorites'][0]['clickCount'],0)
+    def test_failed_explicit_browser_does_not_count_visit(self):
+        self.favorite()
+        browser=dict(id='firefox.desktop',name='Firefox',desktopFile='/tmp/firefox.desktop')
+        with patch.object(backend,'browser_catalog',return_value=dict(browsers=[browser])),patch.object(backend.subprocess,'Popen') as popen:
+            popen.return_value.wait.return_value=1
+            with self.assertRaisesRegex(ValueError,'Firefox could not open'):self.action('open',id='favorite',browser='firefox.desktop')
+        self.assertEqual(self.action('status')['state']['favorites'][0]['clickCount'],0)
     def test_failed_launch_does_not_increment(self):
         self.favorite()
         with patch.object(backend.subprocess,'Popen') as popen:

@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix="spectrum-launcher-test-") as temporary:
     shutil.copytree(root / "configs/spectrum-shell", directory / "shell")
     launcher = directory / "shell/Launcher.qml"
     source = launcher.read_text().replace("PanelWindow {", "FloatingWindow {", 1)
-    for line in ("    focusable: expanded\n", "    exclusionMode: ExclusionMode.Ignore\n", "    WlrLayershell.layer: WlrLayer.Top\n", '    WlrLayershell.namespace: "spectrum-widget-launcher"\n', "    anchors { top: true; bottom: true; left: true; right: true }\n"):
+    for line in ("    WlrLayershell.keyboardFocus: panelFocus.mode\n", "    exclusionMode: ExclusionMode.Ignore\n", "    WlrLayershell.layer: WlrLayer.Top\n", '    WlrLayershell.namespace: "spectrum-widget-launcher"\n', "    anchors { top: true; bottom: true; left: true; right: true }\n"):
         source = source.replace(line, "", 1)
     launcher.write_text(source)
     backend = directory / "application-adapter"

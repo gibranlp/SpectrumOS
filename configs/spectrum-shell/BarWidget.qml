@@ -44,7 +44,8 @@ PanelWindow {
     WlrLayershell.namespace: "spectrum-widget-barwidget"
     color: "transparent"
     visible: motion.active
-    focusable: expanded && !(page === "time" && timeRegionContent.busy) && !(page === "appimages" && appImageContent.busy)
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: widget; enabled: expanded && !(page === "time" && timeRegionContent.busy) && !(page === "appimages" && appImageContent.busy) }
 
     function open(name): void {
         page = name;
@@ -674,7 +675,7 @@ PanelWindow {
                         fontSize: widget.theme.fontSize - 1
                         backgroundColor: widget.theme.colors.surface_alt
                         foregroundColor: widget.theme.colors.foreground
-                        onClicked: Quickshell.execDetached(["uwsm", "app", "--", "nm-connection-editor"])
+                        onClicked: ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", "nm-connection-editor"])
                     }
                 }
 

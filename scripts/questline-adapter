@@ -72,8 +72,11 @@ def enrich_hero(binary, hero):
 def account_balances(connection):
     if not connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'treasury_accounts'").fetchone():
         return []
-    accounts = rows(connection, """
-        SELECT a.id, a.campaign_id, a.name, a.kind, p.name AS campaign,
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(treasury_accounts)")}
+    fields = {"version":"1", "savings_status":"'Available'", "interest_rate_bps":"0", "interest_period":"'Annual'"}
+    extras = ", ".join("a." + name if name in columns else default + " AS " + name for name, default in fields.items())
+    accounts = rows(connection, f"""
+        SELECT a.id, a.campaign_id, a.name, a.kind, a.is_default, {extras}, p.name AS campaign,
                COALESCE(t.currency_code, 'USD') AS currency_code
         FROM treasury_accounts a
         JOIN projects p ON p.id = a.campaign_id
@@ -106,6 +109,18 @@ def account_balances(connection):
         if entry["entry_type"] == "Transfer" and entry["status"] == "Paid" and entry["transfer_account_id"] in by_id:
             by_id[entry["transfer_account_id"]]["balance_minor"] += entry["amount_minor"]
     return accounts
+
+
+def treasury_defaults(connection, snapshot, defaults):
+    initialized = {row[0] for row in connection.execute("SELECT campaign_id FROM campaign_treasury")}
+    for campaign in snapshot.get("campaigns", []):
+        if campaign.get("is_shared") or campaign["id"] in initialized:
+            continue
+        for kind, prefix in (("accounts", b"treasury-account:"), ("categories", b"")):
+            for template in defaults.get(kind, []):
+                digest = hashlib.sha256(prefix + uuid.UUID(campaign["id"]).bytes + template["name"].encode()).digest()
+                snapshot[kind].append(dict(template, is_default=True, version=1, savings_status="Available", interest_rate_bps=0, interest_period="Annual", id=str(uuid.UUID(bytes=digest[:16], version=5)),
+                    campaign_id=campaign["id"], campaign=campaign["name"], balance_minor=0, currency_code="USD"))
 
 
 def profile_key(connection):
@@ -143,7 +158,7 @@ def snapshot(connection):
         ORDER BY notes.updated_at DESC
     """)
     tasks = rows(connection, """
-        SELECT tasks.id, tasks.project_id, tasks.title, tasks.description, tasks.priority,
+        SELECT tasks.id, tasks.project_id, tasks.title, tasks.description, tasks.priority, tasks.recurrence,
                substr(tasks.due_date, 1, 10) AS due_date,
                COALESCE(projects.name, 'Unfiled') AS campaign
         FROM tasks LEFT JOIN projects ON projects.id = tasks.project_id
@@ -162,14 +177,22 @@ def snapshot(connection):
         GROUP BY currency_code, entry_type, status
         ORDER BY currency_code, entry_type, status
     """)
-    entries = rows(connection, """
+    entry_columns = {row[1] for row in connection.execute("PRAGMA table_info(ledger_entries)")}
+    extra_fields = ("description", "category_id", "account_id", "transfer_account_id", "due_date",
+                    "payment_date", "vendor_source", "related_task_id", "notes", "attachment_ref",
+                    "recurrence", "custom_recurrence", "created_at")
+    extra_select = ", ".join("ledger_entries." + field if field in entry_columns else "NULL AS " + field
+                             for field in extra_fields)
+    entries = rows(connection, f"""
         SELECT ledger_entries.id, ledger_entries.campaign_id, ledger_entries.title,
                ledger_entries.entry_type, ledger_entries.status,
                ledger_entries.amount_minor, ledger_entries.currency_code,
-               COALESCE(projects.name, 'Unfiled') AS campaign
+               {extra_select}, COALESCE(projects.name, 'Unfiled') AS campaign
         FROM ledger_entries LEFT JOIN projects ON projects.id = ledger_entries.campaign_id
         ORDER BY ledger_entries.created_at DESC
     """)
+    category_columns = {row[1] for row in connection.execute("PRAGMA table_info(ledger_categories)")}
+    categories = rows(connection, "SELECT id, campaign_id, name, entry_type FROM ledger_categories ORDER BY name COLLATE NOCASE") if category_columns else []
     tree_row = connection.execute("""
         SELECT stage, growth, health, water_today, last_watered, total_waterings
         FROM zen_tree LIMIT 1
@@ -184,6 +207,7 @@ def snapshot(connection):
         "steps": steps,
         "finances": finances,
         "accounts": account_balances(connection),
+        "categories": categories,
         "entries": entries,
         "chronicles": chronicles(connection),
         "tree": tree,
@@ -241,6 +265,18 @@ def main():
             result["sidequests_available"] = help_result.returncode == 0 and "including sidequests" in help_result.stdout
         except (OSError, subprocess.TimeoutExpired):
             result["actions_available"] = False
+    defaults = {}
+    if binary:
+        try:
+            capability = subprocess.run([binary, "shell-action", '{"action":"capabilities"}'],
+                                        capture_output=True, text=True, timeout=2)
+            capabilities = json.loads(capability.stdout) if capability.returncode == 0 else {}
+            result["treasury_fields_available"] = capabilities.get("treasury_fields") is True
+            result["savings_accounts_available"] = capabilities.get("savings_accounts") is True
+            result["task_recurrence_available"] = capabilities.get("task_recurrence") is True
+            defaults = capabilities.get("treasury_defaults", {})
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            result["treasury_fields_available"] = False
     if database_path.is_file():
         try:
             connection = sqlite3.connect(database_path.as_uri() + "?mode=ro", uri=True, timeout=2)
@@ -249,6 +285,8 @@ def main():
             with connection:
                 if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                     result.update(snapshot(connection))
+                    if defaults:
+                        treasury_defaults(connection, result, defaults)
                 else:
                     result["needs_onboarding"] = result["installed"]
             connection.close()

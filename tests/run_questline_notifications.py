@@ -22,7 +22,7 @@ print(json.dumps({'recorded':request['action']=='drink_water'}))
 ''');backend.chmod(0o755)
     center=directory/'shell/NotificationCenter.qml'
     text=center.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:420;implicitHeight:900',1)
-    for line in ['    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-notificationcenter"\n','    anchors { top: true; bottom: true; left: true; right: true }\n','    margins.bottom: 8\n','    exclusionMode: ExclusionMode.Ignore\n','    focusable: expanded\n']:
+    for line in ['    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-notificationcenter"\n','    anchors { top: true; bottom: true; left: true; right: true }\n','    margins.bottom: 8\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.keyboardFocus: panelFocus.mode\n']:
         text=text.replace(line,'',1)
     center.write_text(text)
     shell=(root/'configs/spectrum-shell/shell.qml').read_text();methods=[]

@@ -139,8 +139,20 @@ def change(operation: str, identifier: str | None) -> dict:
         return dict(ok=True, device=after, error='')
 
 
+
+def show_indicator(device: dict) -> None:
+    source = Path(__file__).resolve().parent.parent / 'configs/spectrum-shell'
+    config = source if (source / 'shell.qml').is_file() else Path('/usr/share/spectrumos/spectrum-shell')
+    try:
+        subprocess.run(['qs', 'ipc', '-p', str(config), 'call', 'spectrum-shell', 'showBrightnessIndicator',
+                        str(device['percent']), device['name'] if device['backend'] == 'ddc' else '',
+                        'true' if device['backend'] == 'backlight' else 'false'], capture_output=True, timeout=1, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Read and change hardware display brightness without notifications.')
+    parser = argparse.ArgumentParser(description='Read and change hardware display brightness.')
     parser.add_argument('operation', nargs='?', choices=('up', 'down', 'status'), default='status')
     parser.add_argument('--device')
     parser.add_argument('--json', action='store_true')
@@ -154,6 +166,8 @@ def main() -> int:
         else:
             print(payload['error'], file=sys.stderr)
         return 1
+    if args.operation != 'status' and payload.get('ok') and payload.get('device'):
+        show_indicator(payload['device'])
     if args.json:
         print(json.dumps(payload))
     elif args.operation == 'status':

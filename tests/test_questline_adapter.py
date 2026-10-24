@@ -71,6 +71,22 @@ class QuestlineAccountTests(unittest.TestCase):
         self.connection.execute("UPDATE projects SET archived = 1")
         self.assertEqual(ADAPTER.account_balances(self.connection), [])
 
+    def test_accounts_expose_custom_flags_and_savings_terms(self):
+        self.connection.executescript("""
+            ALTER TABLE treasury_accounts ADD COLUMN version INTEGER DEFAULT 1;
+            ALTER TABLE treasury_accounts ADD COLUMN savings_status TEXT DEFAULT 'Available';
+            ALTER TABLE treasury_accounts ADD COLUMN interest_rate_bps INTEGER DEFAULT 0;
+            ALTER TABLE treasury_accounts ADD COLUMN interest_period TEXT DEFAULT 'Annual';
+            UPDATE treasury_accounts SET is_default=0,name='My investment',savings_status='Invested',
+                interest_rate_bps=1250,interest_period='Annual',version=3 WHERE id='savings';
+        """)
+        accounts=ADAPTER.account_balances(self.connection)
+        user=next(account for account in accounts if account['id']=='savings')
+        self.assertEqual(user['is_default'],0)
+        self.assertEqual(user['version'],3)
+        self.assertEqual((user['savings_status'],user['interest_rate_bps'],user['interest_period']),('Invested',1250,'Annual'))
+        self.assertEqual(next(account for account in accounts if account['id']==self.spending)['is_default'],1)
+
     def test_old_profile_without_account_table(self):
         self.connection.execute("DROP TABLE treasury_accounts")
         self.assertEqual(ADAPTER.account_balances(self.connection), [])
@@ -84,7 +100,7 @@ class QuestlineAccountTests(unittest.TestCase):
             ALTER TABLE ledger_entries ADD COLUMN created_at INTEGER;
             CREATE TABLE notes (id TEXT, project_id TEXT, title TEXT, markdown_content TEXT, updated_at INTEGER);
             CREATE TABLE tasks (id TEXT, project_id TEXT, title TEXT, description TEXT, priority TEXT,
-                                due_date TEXT, completed INTEGER, parent_task_id TEXT, created_at INTEGER);
+                                due_date TEXT, completed INTEGER, parent_task_id TEXT, created_at INTEGER, recurrence TEXT);
             CREATE TABLE zen_tree (stage INTEGER, growth INTEGER, health INTEGER, water_today INTEGER,
                                    last_watered TEXT, total_waterings INTEGER);
             INSERT INTO projects VALUES ('older', 'Older campaign', 0, 0, 0);
@@ -98,6 +114,45 @@ class QuestlineAccountTests(unittest.TestCase):
         self.assertEqual(len(snapshot["entries"]), 41)
         self.assertEqual(snapshot["entries"][-1]["campaign"], "Older campaign")
         self.assertEqual(snapshot["entries"][0]["id"], "40")
+        for column in ("category_id", "description", "due_date", "payment_date", "vendor_source",
+                       "related_task_id", "notes", "attachment_ref", "recurrence", "custom_recurrence"):
+            self.connection.execute(f"ALTER TABLE ledger_entries ADD COLUMN {column} TEXT")
+        self.connection.executescript("""
+            CREATE TABLE ledger_categories (id TEXT, campaign_id TEXT, name TEXT, entry_type TEXT);
+            INSERT INTO ledger_categories VALUES ('food', 'older', 'Food', 'Expense');
+            UPDATE ledger_entries SET account_id='cash', transfer_account_id='savings', category_id='food',
+                description='Description', notes='Keep notes', due_date='2026-10-21', payment_date='2026-10-20',
+                vendor_source='Store', related_task_id='task', attachment_ref='receipt.pdf', recurrence='Monthly',
+                custom_recurrence=NULL WHERE id='40';
+        """)
+        snapshot = ADAPTER.snapshot(self.connection)
+        entry = snapshot["entries"][0]
+        self.assertEqual(entry["account_id"], "cash")
+        self.assertEqual(entry["transfer_account_id"], "savings")
+        self.assertEqual(entry["category_id"], "food")
+        self.assertEqual(entry["notes"], "Keep notes")
+        self.assertEqual(entry["attachment_ref"], "receipt.pdf")
+        self.assertEqual(entry["recurrence"], "Monthly")
+        self.assertEqual(snapshot["categories"], [{"id":"food","campaign_id":"older","name":"Food","entry_type":"Expense"}])
+
+    def test_uninitialized_campaign_choices_are_read_only_and_stable(self):
+        self.connection.execute('DELETE FROM campaign_treasury')
+        snapshot={"campaigns":[{"id":self.campaign,"name":"Home","is_shared":False}],"accounts":[],"categories":[]}
+        templates={"accounts":[{"name":"Spending","kind":"Spending"}],
+                   "categories":[{"name":"Food","entry_type":"Expense"}]}
+        before=self.connection.total_changes
+        ADAPTER.treasury_defaults(self.connection,snapshot,templates)
+        self.assertEqual(self.connection.total_changes,before)
+        self.assertEqual(snapshot["accounts"][0]["id"],self.spending)
+        digest=hashlib.sha256(uuid.UUID(self.campaign).bytes+b"Food").digest()
+        self.assertEqual(snapshot["categories"][0]["id"],str(uuid.UUID(bytes=digest[:16],version=5)))
+        self.assertEqual(snapshot["accounts"][0]["balance_minor"],0)
+        self.connection.execute("INSERT INTO campaign_treasury VALUES (?, 'MXN')",(self.campaign,))
+        current={"campaigns":snapshot["campaigns"],"accounts":[],"categories":[]}
+        ADAPTER.treasury_defaults(self.connection,current,templates)
+        self.assertEqual(current["accounts"],[])
+        self.assertEqual(current["categories"],[])
+
 
 
 class QuestlineChronicleTests(unittest.TestCase):

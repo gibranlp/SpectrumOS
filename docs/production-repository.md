@@ -129,6 +129,28 @@ Stable remains closed until the real HTTPS origin, production-key audit, indepen
 
 ## Current status
 
+Published Desktop **1.0.0-24** and Hyprland **1.0.0-10** to **Stable only**. Removes the redundant standalone Calendar widget, its IPC/command entries and Super+Shift+C shortcut; the dashboard calendar and Questline date picker remain available. All earlier updates are included; other seven package artifacts are unchanged. Update through Updates or `sudo pacman -Syu`.
+
+Snapshot `20261024T1816360000-2ca9d55fb0f9c1fc` has verified production signatures and remote/HTTPS checksums. Public/local Testing unchanged. Signed downloads installed locally with matching payloads, preserved settings and active Shell/Hotkey/Sync. Tests skipped (`--nocheck`); no ISO build/upload. Evidence: `artifacts/package-release-20261024-calendar`.
+
+Published Desktop **1.0.0-23** and Hyprland **1.0.0-9** to production-signed **Stable only** at https://spectrum.gibranlp.dev/repo/stable/x86_64. Includes display/screensaver/logout fixes, recording/Focus integration, Questline task fields/live refresh, calculator chaining and conversions, volume/brightness/song popups, WIN60 lighting/WebHID permissions and immediate theme RGB sync. Other seven package artifacts are unchanged. Update through Updates or `sudo pacman -Syu`.
+
+Stable snapshot `20261024T1747490000-1b82688ef11c249e` has verified production signatures and remote/HTTPS checksums, including both immutable source archives. Public and local Testing remain byte-identical; neither Testing nor Edge was published. Installed both signed packages locally with matching payloads, preserved settings and active Shell/Hotkey/Sync. Tests skipped (`--nocheck`); no ISO build/upload. Evidence: `artifacts/package-release-20261024`.
+
+Earlier release records follow.
+
+Published Desktop **1.0.0-22** to production-signed **Stable only** at https://spectrum.gibranlp.dev/repo/stable/x86_64. Includes Favorites browser actions and Save/layout fixes, compact color swatches/copy notifications, monitor-aware widgets/window titles, and Focus countdowns with the integrated Minimal recording corner. Other eight package artifacts are unchanged. Update through Updates or `sudo pacman -Syu`.
+
+Stable snapshot `20261023T0233210000-aaa7b3de86f0666e` has verified remote/HTTPS checksums and production signatures. Public and local Testing remain unchanged at Desktop **1.0.0-21**; no Testing promotion or publication was performed. Installed the signed Stable download locally with matching payloads, preserved settings and active Shell/Hotkey/Sync. Tests skipped (`--nocheck`), no ISO build/upload. Evidence: `artifacts/package-release-20261022-stable-widgets`.
+
+The preceding release records are retained below.
+
+Published Desktop **1.0.0-21** to production-signed Testing and Stable at https://spectrum.gibranlp.dev/repo. This adds the shared widget focus fix for games holding a pointer lock. All other package payloads remain unchanged, including Hyprland **1.0.0-8** and Theme **1.0.0-3**. Existing installations update through Updates or `sudo pacman -Syu`.
+
+Testing `20261022T1855350000-1db80770e5272b53` and Stable `20261022T1855350000-46c3f2a9d275067f` have identical signed inventories. Remote checksums and HTTPS readback are verified. The signed Testing Desktop download is installed locally, settings are preserved, and Shell/Hotkey/Sync are active. Tests were skipped as requested; packaging used `--nocheck`. The ISO is unchanged. Evidence: `artifacts/package-release-20261022`.
+
+The preceding release records are retained below.
+
 Published Desktop **1.0.0-19** to signed Testing and Stable at https://spectrum.gibranlp.dev/repo. The update includes Chronicles reading, creation and editing with a matching Questline 2.0.3 binary, horizontal campaign selection in the new-task editor, compact campaign scrollbars, and the character/class/level/XP header. It also includes the previously published sync controls and live Audio slider corrections. Hyprland remains **1.0.0-7**; the other eight package artifacts retain their verified bytes. Existing installations update through Updates or `sudo pacman -Syu`.
 
 Stable snapshot `20261019T2356310000-ca666971527bb0a6` and Testing snapshot `20261019T2356310000-01cf8e088cc6c660` have identical signed package/database inventories. All public channel files and both complete immutable source archives match their local SHA-256 checksums. The signed Testing package was installed on this PC before Stable promotion; saved shell/widget/Favorites state is preserved and Shell, Sync and reminder services are active. Tests were skipped at the owner's request, including the package `check()` function; package construction used Arch Devtools with `--nocheck`.

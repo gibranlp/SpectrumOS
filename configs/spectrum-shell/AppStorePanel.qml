@@ -17,7 +17,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     visible: motion.active
-    focusable: expanded && !manager.authenticating
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded && !manager.authenticating }
     EscapeDismissal { active:panel.expanded && !panel.manager.authenticating; onDismissed:panel.closeRequested() }
     Connections { target:panel.manager; function onInstallationRequested() { if (panel.expanded) panel.closeRequested(); } }
     onExpandedChanged: if (expanded) { manager.refresh(); Qt.callLater(() => content.focusInitial()); }

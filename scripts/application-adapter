@@ -143,11 +143,24 @@ def main() -> int:
         print(json.dumps({"count": len(items), "applications": items}, ensure_ascii=False, separators=(",", ":")))
         return 0
     if len(sys.argv) == 3 and sys.argv[1] == "launch":
+        if not re.fullmatch(r"[a-f0-9]{16}", sys.argv[2]):
+            return 2
+        command = shlex.join([sys.executable, str(Path(__file__).resolve()), "_launch", sys.argv[2]])
+        separator = "="
+        while "]" + separator + "]" in command:
+            separator += "="
+        # Captura el workspace antes de consultar el catálogo o esperar a UWSM.
+        result = subprocess.run(
+            ["hyprctl", "dispatch", f"hl.dsp.exec_cmd([{separator}[{command}]{separator}])"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return 0 if result.returncode == 0 and result.stdout.strip() == "ok" else 1
+    if len(sys.argv) == 3 and sys.argv[1] == "_launch":
         selected = next((item for item in applications() if item["token"] == sys.argv[2]), None)
         if selected is None:
             return 2
         subprocess.Popen(
-            ["uwsm", "app", "--", selected["desktop_id"]],
+            ["uwsm", "app", "-t", "scope", "--", selected["desktop_id"]],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

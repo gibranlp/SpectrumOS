@@ -60,6 +60,11 @@ Item {
     function back(): void {
         persist(); change({editor:"",draft:{}}); persist(); draftError="";
     }
+    function save(): void {
+        if (!ready || busy || choosing || !view.editor) return;
+        saveDelay.stop(); pendingView=false;
+        run("view-save",{view:JSON.parse(JSON.stringify(view)),finishEditing:true});
+    }
     function moveFavorite(id,category): void {
         persist();
         if (view.editor === "favorite" && view.draft.id === id) change({draft:Object.assign({},view.draft,{category:category})});
@@ -95,6 +100,7 @@ Item {
         onStarted: { write(JSON.stringify(manager.job.payload)+"\n"); }
         stdout: StdioCollector { onStreamFinished:manager.response=text }
         onExited:(code,status)=> {
+            let changedAccount=false;
             try {
                 const result=JSON.parse(manager.response);
                 if (!result.ok) manager.error=result.error || "Favorites could not complete that action.";
@@ -103,7 +109,7 @@ Item {
                     if (result.state) {
                         manager.favorites=result.state.favorites;
                         manager.categories=result.state.categories;
-                        const changedAccount=manager.account && result.state.questlineAccount && manager.account!==result.state.questlineAccount;
+                        changedAccount=!!(manager.account && result.state.questlineAccount && manager.account!==result.state.questlineAccount);
                         manager.account=result.state.questlineAccount || "";
                         manager.versions=result.state._versions || {};
                         if (!manager.ready || changedAccount) { manager.view=result.state.view; manager.ready=true; }
@@ -118,6 +124,10 @@ Item {
                     if (manager.job.action==="import-apply") { manager.preview=null;manager.iconsWanted=true; }
                     if (manager.job.action==="view-save") manager.iconsWanted=true;
                     if (manager.job.action==="open") manager.favoriteOpened();
+                    if (manager.job.action==="view-save" && manager.job.payload.finishEditing && !result.draftError
+                        && !changedAccount && manager.job.revision===manager.revision
+                        && manager.job.payload.view.editor===manager.view.editor
+                        && manager.job.payload.view.draft.id===manager.view.draft.id) manager.back();
                 }
             } catch(error) { manager.error="Could not read the Favorites response. Your saved data has been preserved."; }
             Qt.callLater(()=>manager.pump());

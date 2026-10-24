@@ -67,7 +67,8 @@ ShellRoot {
         visible: motion.active
         WlrLayershell.namespace: "spectrum-widget-ukvm"
         WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: root.expanded ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: panelFocus.mode
+        Shell.ShellFocus { id: panelFocus; window: window; enabled: root.expanded }
         MouseArea { anchors.fill: parent; onClicked: root.close() }
         Shell.ShellSurface {
             id: card

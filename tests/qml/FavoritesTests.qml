@@ -158,6 +158,38 @@ Scope {
             assertEqual(manager.favorites.find(f=>f.id===id).clickCount,1);
             verify(!panel.expanded);
         }
+        function test_each_browser_icon_routes_mouse_and_keyboard_open() {
+            manager.editFavorite(null);manager.draft({title:"Portal",url:"https://example.com/"});settle();manager.back();settle();
+            const id=manager.favorites[0].id;
+            for(let index=0;index<manager.browsers.length;index++) {
+                panel.expanded=true;settle();field("grid").forceLayout();wait(100);
+                const browser=manager.browsers[index];
+                const button=findChild(field("grid").itemAtIndex(0),"favorites-browser-"+id+"-"+browser.id);
+                verify(button!==null);verify(button.visible);
+                if(index===0)mouseClick(button);else {
+                    const action=button.children.find(child=>child.activeFocusOnTab===true);
+                    verify(action!==undefined);action.forceActiveFocus();keyClick(Qt.Key_Return);
+                }
+                settle();assertEqual(manager.error,"");
+                assertEqual(manager.job.action,"open");assertEqual(manager.job.payload.browser,browser.id);
+                assertEqual(manager.favorites[0].clickCount,index+1);
+                assertEqual(manager.defaultBrowser,"browser.desktop");verify(!panel.expanded);
+            }
+        }
+        function test_many_browser_icons_wrap_inside_favorite() {
+            manager.editFavorite(null);manager.draft({title:"Portal",url:"https://example.com/"});settle();manager.back();settle();
+            manager.browsers=Array.from({length:12},(_,i)=>({id:"test-"+i+".desktop",name:"Browser "+i,icon:""}));
+            field("grid").forceLayout();wait(100);
+            const card=field("grid").itemAtIndex(0);
+            for(const browser of manager.browsers) {
+                const button=findChild(card,"favorites-browser-"+manager.favorites[0].id+"-"+browser.id);
+                const point=button.mapToItem(card,0,0);
+                verify(point.x>=0 && point.x+button.width<=card.width);
+                verify(point.y>=0 && point.y+button.height<=card.height);
+            }
+            const edit=findChild(card,"favorites-edit-"+manager.favorites[0].id);
+            verify(edit.mapToItem(card,0,edit.height).y<=card.height);
+        }
         function test_keyboard_open_increments_once(){
             try {
             manager.editFavorite(null);manager.draft({title:"Portal",url:"https://example.com/"});settle();manager.back();settle();
@@ -216,6 +248,8 @@ Scope {
             tryVerify(()=>manager.iconRevision>previous,5000,"Favicon worker did not return a result");
         }
         function test_z_preview() {
+            manager.browsers=[{id:"brave-browser.desktop",name:"Brave",icon:"brave-desktop"},{id:"firefox.desktop",name:"Firefox",icon:"firefox"},{id:"google-chrome.desktop",name:"Google Chrome",icon:"google-chrome"},{id:"zen.desktop",name:"Zen Browser",icon:"zen-browser"}];
+            manager.defaultBrowser="zen.desktop";
             manager.categories=[{id:"uncategorized",name:"Uncategorized"},{id:"work",name:"Work"},{id:"music",name:"Music"},{id:"linux",name:"Linux"}];
             manager.favorites=[{id:"1",title:"SpectrumOS",url:"https://gibranlp.dev/en/spectrum/",host:"gibranlp.dev",icon:"",category:"linux",clickCount:48},{id:"2",title:"Questline",url:"https://questlinecli.com/",host:"questlinecli.com",icon:"",category:"work",clickCount:31},{id:"3",title:"Arch Linux",url:"https://archlinux.org/",host:"archlinux.org",icon:"",category:"linux",clickCount:24},{id:"4",title:"Your next soundtrack",url:"https://example.com/music",host:"example.com",icon:"",category:"music",clickCount:12}];
             manager.view=({category:"top",search:"",editor:"",draft:{}});wait(200);

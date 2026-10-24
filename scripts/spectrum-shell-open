@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (($# < 1 || $# > 2)); then
-    printf 'Usage: %s {bar|dashboard|control|appearance|favorites|app-store|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|calendar|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
+    printf 'Usage: %s {bar|dashboard|control|appearance|favorites|app-store|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
     exit 2
 fi
 
@@ -41,7 +41,6 @@ case $1 in
     shortcuts) method=toggleShortcuts; fallback=shortcuts ;;
     updates) method=toggleUpdates; fallback=updates ;;
     focus) method=toggleFocusTimer; fallback=home ;;
-    calendar) method=toggleCalendar; fallback=home ;;
     questline) method=toggleQuestline; fallback=none ;;
     new-task) method=openQuestlineNewTask; fallback=none ;;
     new-scroll) method=openQuestlineNewScroll; fallback=none ;;

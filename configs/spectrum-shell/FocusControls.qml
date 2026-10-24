@@ -55,78 +55,70 @@ ColumnLayout {
     }
     Timer { interval: 10000; repeat: true; running: focus.viewActive && focus.visible; onTriggered: focus.refresh() }
 
-    RowLayout {
+    Text {
         Layout.fillWidth: true
-        Text {
-            Layout.fillWidth: true
-            text: "QUESTLINE FOCUS"
-            color: focus.theme.colors.foreground
-            font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize; bold: true }
-        }
-        Text {
-            text: String(Math.floor((focus.active ? focus.focusState.remaining : focus.duration * 60) / 60)).padStart(2, "0") + ":" + String(focus.active ? focus.focusState.remaining % 60 : 0).padStart(2, "0")
-            color: focus.theme.colors.accent
-            font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize + 8; bold: true }
-        }
+        horizontalAlignment: Text.AlignHCenter
+        text: String(Math.floor((focus.active ? focus.focusState.remaining : focus.duration * 60) / 60)).padStart(2, "0") + ":" + String(focus.active ? focus.focusState.remaining % 60 : 0).padStart(2, "0")
+        color: focus.theme.colors.accent
+        font { family: focus.theme.fontFamily; pixelSize: Math.max(64, focus.theme.fontSize * 4); bold: true }
     }
     Text {
         Layout.fillWidth: true
-        text: focus.active ? (focus.focusState.phase === "paused" ? "Paused" : "Focusing") + (focus.focusState.task ? " · " + focus.focusState.task : focus.focusState.campaign ? " · " + focus.focusState.campaign : "") : "Complete a session to earn Questline XP."
-        wrapMode: Text.Wrap
+        visible: focus.active && text.length > 0
+        text: focus.focusState.phase === "paused" ? "Paused" : focus.focusState.task || focus.focusState.campaign || ""
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
         color: focus.theme.colors.muted
-        font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 }
+        font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
     }
-    Text { text: "Campaign"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
-    FocusChoice {
+    ColumnLayout {
         Layout.fillWidth: true
-        theme: focus.theme
-        enabled: !focus.active
-        model: focus.campaigns.map(item => item.name)
-        currentIndex: Math.max(0, focus.campaigns.findIndex(item => item.id === focus.projectId))
-        onActivated: { focus.projectId = focus.campaigns[currentIndex].id; focus.taskId = ""; }
-    }
-    Text { text: "Task"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
-    FocusChoice {
-        Layout.fillWidth: true
-        theme: focus.theme
-        enabled: !focus.active
-        model: focus.tasks.map(item => item.title)
-        currentIndex: Math.max(0, focus.tasks.findIndex(item => item.id === focus.taskId))
-        onActivated: focus.taskId = focus.tasks[currentIndex].id
-    }
-    RowLayout {
-        Layout.fillWidth: true
-        Text { text: "Minutes"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
-        Controls.SpinBox {
+        visible: !focus.active
+        spacing: 6
+        Text { text: "Campaign"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        FocusChoice {
             Layout.fillWidth: true
-            from: 5; to: 180; stepSize: 5; editable: true
+            theme: focus.theme
             enabled: !focus.active
-            value: focus.duration
-            onValueModified: focus.duration = value
-            background: Rectangle {
-                radius: 8
-                color: parent.activeFocus ? Qt.tint(focus.theme.colors.surface_alt, Qt.rgba(focus.theme.colors.accent.r, focus.theme.colors.accent.g, focus.theme.colors.accent.b, 0.3)) : focus.theme.colors.surface_alt
-            }
-            font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
-            palette { base: focus.theme.colors.surface_alt; text: focus.theme.colors.foreground; button: focus.theme.colors.surface_alt; buttonText: focus.theme.colors.foreground }
+            model: focus.campaigns.map(item => item.name)
+            currentIndex: Math.max(0, focus.campaigns.findIndex(item => item.id === focus.projectId))
+            onActivated: { focus.projectId = focus.campaigns[currentIndex].id; focus.taskId = ""; }
         }
-    }
-    Text { text: "Soundscape"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
-    FocusChoice {
-        Layout.fillWidth: true
-        theme: focus.theme
-        enabled: !focus.active
-        model: focus.soundscapes
-        currentIndex: Math.max(0, focus.soundscapes.indexOf(focus.soundscape))
-        onActivated: focus.soundscape = focus.soundscapes[currentIndex]
-    }
-    Text {
-        Layout.fillWidth: true
-        visible: focus.soundscape === "Local Folder" || focus.soundscape === "Music For Programming"
-        text: focus.soundscape === "Local Folder" ? "Uses the music folder configured in Questline." : "Streams Music For Programming mixes."
-        wrapMode: Text.Wrap
-        color: focus.theme.colors.muted
-        font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 2 }
+        Text { text: "Task"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        FocusChoice {
+            Layout.fillWidth: true
+            theme: focus.theme
+            enabled: !focus.active
+            model: focus.tasks.map(item => item.title)
+            currentIndex: Math.max(0, focus.tasks.findIndex(item => item.id === focus.taskId))
+            onActivated: focus.taskId = focus.tasks[currentIndex].id
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Text { text: "Minutes"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+            Controls.SpinBox {
+                Layout.fillWidth: true
+                from: 5; to: 180; stepSize: 5; editable: true
+                enabled: !focus.active
+                value: focus.duration
+                onValueModified: focus.duration = value
+                background: Rectangle {
+                    radius: 8
+                    color: parent.activeFocus ? Qt.tint(focus.theme.colors.surface_alt, Qt.rgba(focus.theme.colors.accent.r, focus.theme.colors.accent.g, focus.theme.colors.accent.b, 0.3)) : focus.theme.colors.surface_alt
+                }
+                font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
+                palette { base: focus.theme.colors.surface_alt; text: focus.theme.colors.foreground; button: focus.theme.colors.surface_alt; buttonText: focus.theme.colors.foreground }
+            }
+        }
+        Text { text: "Soundscape"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        FocusChoice {
+            Layout.fillWidth: true
+            theme: focus.theme
+            enabled: !focus.active
+            model: focus.soundscapes
+            currentIndex: Math.max(0, focus.soundscapes.indexOf(focus.soundscape))
+            onActivated: focus.soundscape = focus.soundscapes[currentIndex]
+        }
     }
     RowLayout {
         Layout.fillWidth: true
@@ -165,7 +157,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !focus.questline.available || !!focus.focusState.message
-        text: !focus.questline.available ? "Open Questline and complete onboarding to earn XP." : focus.focusState.message || ""
+        text: focus.focusState.message || (!focus.questline.available ? "Complete Questline setup to start." : "")
         wrapMode: Text.Wrap
         color: focus.focusState.phase === "error" ? focus.theme.colors.error || "#ff8c9a" : focus.theme.colors.accent
         font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 }

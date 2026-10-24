@@ -110,6 +110,7 @@ mark_current_wallpaper() {
 
 apply_generation() {
     local wallpaper=$1 shell_response transition_pid
+    /usr/lib/spectrumos/appearance-sync --rgb-only
     if command -v qs >/dev/null 2>&1 && systemctl --user is-active --quiet spectrum-shell.service; then
         if ! shell_response=$(timeout 3 qs --path /usr/share/spectrumos/spectrum-shell ipc call spectrum-shell refreshTheme "$(cat -- "$cache_dir/current/palette.json")") \
                 || [[ $shell_response != true ]]; then
@@ -281,10 +282,10 @@ else
         'Random mode (Super+R)' \
         'Random Dark (Super+R opens automatic)' \
         'Random Light (Super+R opens automatic)' \
-        'Spectrum — expressive color' \
-        'Clustered — curated harmony' \
-        'Median Cut — natural source colors' \
-        'Weighted Regions — cinematic composition' | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Palette mode')
+        'Spectrum — Pywal colors' \
+        'Clustered — Colorz colors' \
+        'Median Cut — ColorThief colors' \
+        'Weighted Regions — Haishoku colors' | /usr/lib/spectrumos/spectrum-shell-picker left --dmenu --prompt 'Palette mode')
     case $mode_label in
         'Previous theme')
             restore_previous
@@ -301,10 +302,10 @@ else
             wallpaper=$(random_wallpaper)
             variant=light
             ;;
-        'Spectrum — expressive color') mode=spectrum ;;
-        'Clustered — curated harmony') mode=clustered ;;
-        'Median Cut — natural source colors') mode=median-cut ;;
-        'Weighted Regions — cinematic composition') mode=weighted-regions ;;
+        'Spectrum — Pywal colors') mode=spectrum ;;
+        'Clustered — Colorz colors') mode=clustered ;;
+        'Median Cut — ColorThief colors') mode=median-cut ;;
+        'Weighted Regions — Haishoku colors') mode=weighted-regions ;;
         '') exit 0 ;;
         *) exit 1 ;;
     esac

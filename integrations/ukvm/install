@@ -6,7 +6,7 @@ install -d -m 0755 "$destination/usr/share/spectrumos/spectrum-ukvm" "$destinati
 install -m 0644 "$project"/configs/spectrum-ukvm/*.qml "$project"/configs/spectrum-ukvm/*.js "$destination/usr/share/spectrumos/spectrum-ukvm/"
 frame="$destination/usr/share/spectrumos/spectrum-ukvm/frame"
 install -d -m 0755 "$frame"
-for component in ShellSurface ShellMotion ShellCorner ShellGeometry KeyboardNavigation; do
+for component in ShellSurface ShellMotion ShellCorner ShellGeometry ShellFocus KeyboardNavigation; do
     install -m 0644 "$project/configs/spectrum-shell/$component.qml" "$frame/"
 done
 sed 's@import "../spectrum-shell" as Shell@import "frame" as Shell@' \

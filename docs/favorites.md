@@ -2,7 +2,7 @@
 
 Open **Favorites** from the bar's **More** menu, search for it in the application launcher, or press **Super + Shift + V**. The shortcuts widget lists Favorites alphabetically.
 
-Favorites uses a wider left-side panel, with categories beside the links and the default-browser selector fixed at the bottom. Links use two columns when space allows, and one on narrower screens. Categories scroll independently.
+Favorites uses a wider left-side panel, with categories beside the links and the default-browser selector fixed at the bottom. Links use two columns when space allows, and one on narrower screens. Categories have a wider sidebar, wrap long names, and scroll independently with space reserved beside the scrollbar.
 
 ## Find and open a portal
 
@@ -10,11 +10,13 @@ Favorites uses a wider left-side panel, with categories beside the links and the
 
 Click a favorite or focus it with the keyboard and press Enter or Space. It opens through the system default browser, starting it when needed, and the panel closes after the launch is accepted. Each accepted launch from Favorites increments its count. Browser visits elsewhere and whether a page finishes loading are not tracked.
 
+Each favorite also shows installed-browser icons before **Edit**. Click an icon to open that link in that browser, starting the browser when needed. Hover an icon to see its name, or reach it with Tab and press Enter or Space. These launches leave your default browser unchanged and count as one visit. The icon controls wrap inside the card when needed. The browser list refreshes when Favorites opens or when you use the bottom refresh button; a removed browser reports an error instead of opening a different browser.
+
 The application fetches `/favicon.ico` from each site's origin, caches usable icons locally and shows a star when no usable icon is available. There is no third-party favicon proxy. Failed lookups are cached for a day; missing icons do not prevent opening a link.
 
 ## Create and edit
 
-Choose **+ Favorite**, enter a title and an HTTP/HTTPS URL, and choose a category. Changes autosave after a short pause; there is no Save button. The default category is the one currently selected, or Uncategorized when viewing TOP.
+Choose **+ Favorite**, enter a title and an HTTP/HTTPS URL, and choose a category. **Save** writes the current form immediately and returns to the list after a successful save. Validation or sync errors keep the editor and draft open. Changes also autosave after a short pause. The default category is the one currently selected, or Uncategorized when viewing TOP. Category editors have the same **Save** control.
 
 Use a link's **Edit** action to change its title, URL or category. An incomplete or invalid draft remains on the device and resumes when you reopen the widget, but does not create an invalid link on the board. The active category, search, editor and draft survive a shell restart. **Back** leaves the editor; complete the required fields before leaving if you want the link added to the board.
 

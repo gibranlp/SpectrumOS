@@ -18,7 +18,7 @@ PanelWindow {
     readonly property bool cornerPanel: page === "spectrumdrop"
     readonly property bool cornerTop: cornerPanel && theme.barPosition === "top"
     readonly property bool sidePanel: page === "shortcuts"
-    readonly property bool topPanel: page === "calendar" || page === "questline" || page === "focus"
+    readonly property bool topPanel: page === "questline" || page === "focus"
     property var questline: ({ available: false, installed: false })
     required property var questlineWorkspace
     property bool questlineRestoring: false
@@ -44,6 +44,10 @@ PanelWindow {
     property string questlineCampaignId: ""
     property string questlineSidequestFrequency: "Daily"
     property int questlineSidequestReward: 20
+    property string questlineTaskPriority: "Medium"
+    property string questlineTaskRecurrence: "None"
+    readonly property var questlineTaskPriorities: ["Low", "Medium", "High"]
+    readonly property var questlineTaskRecurrences: ["None", "Daily", "Weekly", "Monthly", "Yearly"]
     readonly property var questlineSidequestFrequencies: ["Daily", "2x Daily", "3x Daily", "5x Daily", "Weekdays", "Weekly", "Monthly"]
     property string questlineTreasuryCampaignId: ""
     property bool questlineCalendarOpen: false
@@ -74,7 +78,6 @@ PanelWindow {
     property int emojiSelectedIndex: 0
     property string submittedEmojiQuery: ""
     property string submittedQuery: ""
-    property string calculation: ""
     property string password: ""
     property string colorValue: ""
     property var savedColors: []
@@ -91,6 +94,25 @@ PanelWindow {
     required property var focusState
     signal focusAction(string action)
     signal focusStart(var request)
+    property string pendingFocusPage: ""
+    property string previousFocusSession: ""
+
+    function startFocus(request): void {
+        if (["starting", "work", "paused"].includes(focusState.phase)) return;
+        pendingFocusPage = page;
+        previousFocusSession = focusState.session_id || "";
+        focusStart(request);
+    }
+
+    onFocusStateChanged: {
+        if (!pendingFocusPage) return;
+        if (focusState.phase === "work" && (focusState.session_id || "") !== previousFocusSession) {
+            if (expanded && page === pendingFocusPage) expanded = false;
+            pendingFocusPage = "";
+        } else if (["error", "completed", "cancelled"].includes(focusState.phase)) {
+            pendingFocusPage = "";
+        }
+    }
     property var pendingShortcut: []
 
     function activateShortcut(index): void {
@@ -98,6 +120,7 @@ PanelWindow {
             return;
         pendingShortcut = shortcuts[index].command;
         expanded = false;
+        ApplicationLaunch.start(pendingShortcut, 380);
         shortcutDelay.restart();
     }
 
@@ -106,17 +129,8 @@ PanelWindow {
         // Espera a que el panel suelte el foco antes de ejecutar la acción.
         interval: 380
         onTriggered: {
-            const command = panel.pendingShortcut;
             panel.pendingShortcut = [];
-            Quickshell.execDetached(command);
         }
-    }
-    property date calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    readonly property var calendarDays: {
-        const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
-        const offset = (first.getDay() + 6) % 7;
-        const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-        return Array.from({ length: offset + count }, (_, index) => index < offset ? 0 : index - offset + 1);
     }
     readonly property var shortcuts: [
         { combo: "Super + Shift + U", action: "App Store", command: [backendDir + "/spectrum-shell-open", "app-store"] },
@@ -128,7 +142,6 @@ PanelWindow {
         { combo: "Super + Shift + A", action: "Audio recorder", command: [backendDir + "/spectrum-shell-open", "audio-recorder"] },
         { combo: "Super + Shift + L", action: "Bluetooth", command: [backendDir + "/spectrum-shell-open", "bluetooth"] },
         { combo: "Super + C", action: "Calculator", command: [backendDir + "/spectrum-shell-open", "calculator"] },
-        { combo: "Super + Shift + C", action: "Calendar", command: [backendDir + "/spectrum-shell-open", "calendar"] },
         { combo: "Super + J", action: "Change window arrangement", command: ["hyprctl", "eval", "require(\"window-actions\").arrange()"] },
         { combo: "Ctrl + Shift + Space", action: "Clear notifications", command: [backendDir + "/spectrum-shell-open", "clear-notifications"] },
         { combo: "Super + P", action: "Control Center", command: [backendDir + "/spectrum-shell-open", "control"] },
@@ -199,7 +212,8 @@ PanelWindow {
 
     visible: motion.active
     color: "transparent"
-    focusable: expanded
+    WlrLayershell.keyboardFocus: panelFocus.mode
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "spectrum-widget-utilitypanel"
@@ -214,7 +228,6 @@ PanelWindow {
         searchSelectedIndex = 0;
         emojis = [];
         emojiSelectedIndex = 0;
-        calculation = "";
         if (name === "shortcuts") {
             shortcutList.currentIndex = 0;
             shortcutList.positionViewAtBeginning();
@@ -224,8 +237,6 @@ PanelWindow {
         if (name === "spectrumdrop") spectrumDrop.command(["status"]);
         if (name === "password")
             generatePassword();
-        if (name === "calendar")
-            calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         questlineDueTarget = null;
         if (name === "questline") {
             questlinePendingNewTask = false;
@@ -237,7 +248,9 @@ PanelWindow {
             }
             refreshQuestline();
         }
-        else if (name === "search" || name === "calculator" || name === "emoji")
+        else if (name === "calculator")
+            calculatorEditor.activate();
+        else if (name === "search" || name === "emoji")
             Qt.callLater(() => query.forceActiveFocus());
         if (name === "emoji")
             emojiDelay.restart();
@@ -336,7 +349,7 @@ PanelWindow {
 
     function openQuestlineFullApp(): void {
         expanded = false;
-        Quickshell.execDetached([backendDir + "/questline-open"]);
+        ApplicationLaunch.start([backendDir + "/questline-open"]);
     }
 
     function beginColorPick(): void {
@@ -447,11 +460,14 @@ PanelWindow {
         questlineTitle.text = item ? item.title : questlineTab === "Chronicles" ? Qt.formatDate(new Date(), "yyyy-MM-dd") : "";
         questlineBody.text = item ? (questlineTab === "Scrolls" ? item.markdown_content : item.description || "") : "";
         questlineDate.text = item && item.due_date ? item.due_date : "";
+        questlineTaskPriority = item && item.priority ? item.priority : "Medium";
+        questlineTaskRecurrence = item && item.recurrence ? item.recurrence : "None";
         questlineAmount.text = item && item.amount_minor ? (item.amount_minor / 100).toFixed(2) : "";
         questlineSidequestFrequency = item && item.frequency ? item.frequency : "Daily";
         questlineSidequestReward = item && item.reward_xp !== undefined ? item.reward_xp : 20;
         questlineEntryType = item && item.entry_type ? item.entry_type : "Expense";
         questlineEntryStatus = item && item.status ? item.status : "Planned";
+        questlineEntryFields = loadQuestlineEntryFields(item);
         const campaigns = (questline.campaigns || []).filter(c => !c.is_shared);
         const campaignId = item ? (item.project_id || item.campaign_id) : questlineTab === "Scrolls" ? questlineScrollProjectId : questlineTab === "Treasury" ? questlineTreasuryCampaignId : questlineCampaignId;
         questlineCampaignIndex = Math.max(0, campaigns.findIndex(c => c.id === campaignId));
@@ -477,11 +493,49 @@ PanelWindow {
         questlineTitle.text = step ? step.title : "";
         questlineBody.text = step ? step.description || "" : "";
         questlineDate.text = step && step.due_date ? step.due_date : "";
+        questlineTaskPriority = step && step.priority ? step.priority : "Medium";
+        questlineTaskRecurrence = "None";
         questlineRestoring = false;
         rememberQuestline(!!step);
         Qt.callLater(() => questlineTitle.forceActiveFocus());
     }
 
+    function questlineEntryDetails(entry): string {
+        if (!entry) return "";
+        const accountName = id => ((questline.accounts || []).find(item => item.id === id) || {}).name || "Default account";
+        const categoryName = ((questline.categories || []).find(item => item.id === entry.category_id) || {}).name || "Default category";
+        const lines = [entry.entry_type + " · " + entry.status,
+            entry.currency_code + " " + (entry.amount_minor / 100).toFixed(2),
+            "Campaign: " + entry.campaign, "Account: " + accountName(entry.account_id), "Category: " + categoryName];
+        if (entry.transfer_account_id) lines.push("To account: " + accountName(entry.transfer_account_id));
+        for (const [key,label] of [["created_at","Entry date"],["due_date","Due date"],["payment_date","Payment date"],
+                                  ["vendor_source","Vendor / source"],["description","Description"],["notes","Notes"],
+                                  ["attachment_ref","Attachment"],["recurrence","Recurrence"],["custom_recurrence","Schedule"]])
+            if (entry[key] && entry[key] !== "None") lines.push(label + ": " + (key.endsWith("date") || key === "created_at" ? entry[key].slice(0,10) : entry[key]));
+        return lines.join("\n");
+    }
+    property var questlineEntryFields: ({})
+    function questlineLegacyAccountIds() {
+        if (!questlineSelected) return [];
+        const entry = (questline.entries || []).find(item => item.id === questlineSelected.id) || questlineSelected;
+        const implicit = (questline.accounts || []).find(item => item.campaign_id === entry.campaign_id && item.is_default && item.name === "Spending");
+        return [entry.account_id || (implicit || {}).id, entry.transfer_account_id].filter(Boolean);
+    }
+    function loadQuestlineEntryFields(item) {
+        const fields = {};
+        for (const name of ["account_id","category_id","transfer_account_id","related_task_id",
+                            "description","vendor_source","notes","attachment_ref","custom_recurrence"])
+            fields[name] = item && item[name] ? item[name] : "";
+        for (const name of ["due_date","payment_date"])
+            fields[name] = item && item[name] ? item[name].slice(0,10) : "";
+        fields.entry_date = item && item.created_at ? item.created_at.slice(0,10) : Qt.formatDate(new Date(),"yyyy-MM-dd");
+        fields.recurrence = item && item.recurrence ? item.recurrence : "None";
+        if (item && !fields.account_id) {
+            const implicit = (questline.accounts || []).find(account => account.campaign_id === item.campaign_id && account.is_default && account.name === "Spending");
+            if (implicit) fields.account_id = implicit.id;
+        }
+        return fields;
+    }
     property string questlineEntryType: "Expense"
     property string questlineEntryStatus: "Planned"
     function setQuestlineDate(offset): void {
@@ -499,6 +553,7 @@ PanelWindow {
         if (index < 0) return;
         questlineCampaignIndex = index;
         questlineEditCampaignId = campaigns[questlineCampaignIndex].id;
+        if (questlineTab === "Treasury") questlineEntryFields = Object.assign({},questlineEntryFields,{account_id:"",category_id:"",transfer_account_id:"",related_task_id:""});
         syncQuestlineCampaign(questlineEditCampaignId);
         rememberQuestline();
         if (questlineEditCampaignId) Quickshell.execDetached([backendDir + "/spectrum-shell-tools", "questline-campaign", questlineEditCampaignId]);
@@ -522,7 +577,12 @@ PanelWindow {
         if (kind === "task" || kind === "step") {
             payload.description = questlineBody.text;
             payload.due_date = questlineDate.text.trim();
-            payload.priority = selected ? selected.priority : "Medium";
+            payload.priority = questlineTaskPriority;
+            if (kind === "task") {
+                payload.recurrence = questlineTaskRecurrence;
+                if (!questline.task_recurrence_available && (payload.recurrence !== "None" || (selected && selected.recurrence)))
+                    reason = "Update Questline to save task recurrence.";
+            }
             const date = new Date(payload.due_date + "T12:00:00");
             if (payload.due_date && (!/^\d{4}-\d{2}-\d{2}$/.test(payload.due_date)
                 || Number.isNaN(date.getTime()) || Qt.formatDate(date,"yyyy-MM-dd") !== payload.due_date)) reason = "Enter a valid date as YYYY-MM-DD.";
@@ -540,6 +600,25 @@ PanelWindow {
             payload.amount_minor = Math.round(Number(questlineAmount.text) * 100);
             payload.entry_type = questlineEntryType;
             payload.status = questlineEntryStatus;
+            Object.assign(payload, questlineEntryFields);
+            payload.custom_accounts_only = true;
+            if (!questline.treasury_fields_available) reason = "Update Questline to save the complete Treasury form.";
+            const campaignId = selected && selected.campaign_id ? selected.campaign_id : questlineEditCampaignId;
+            const accounts = (questline.accounts || []).filter(item => item.campaign_id === campaignId && (!item.is_default || questlineLegacyAccountIds().includes(item.id)));
+            const categories = (questline.categories || []).filter(item => item.campaign_id === campaignId && item.entry_type === questlineEntryType);
+            if (!payload.account_id || !accounts.some(item => item.id === payload.account_id)) reason = "Choose a user-created account in this campaign. Create one in Questline if the list is empty.";
+            if (payload.category_id && !categories.some(item => item.id === payload.category_id)) reason = "Choose a category matching this campaign and entry type.";
+            if (questlineEntryType === "Transfer" && (!payload.transfer_account_id || payload.transfer_account_id === (payload.account_id || (accounts[0] || {}).id)
+                || !accounts.some(item => item.id === payload.transfer_account_id))) reason = "Choose a different destination account for the transfer.";
+            if (questlineEntryType !== "Transfer") payload.transfer_account_id = "";
+            if (payload.related_task_id && !(questline.tasks || []).some(item => item.id === payload.related_task_id && item.project_id === campaignId)) reason = "Choose a related task in this campaign.";
+            for (const name of ["entry_date","due_date","payment_date"]) {
+                const value = payload[name] || "";
+                const date = new Date(value + "T12:00:00");
+                if ((name === "entry_date" && !value) || (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime())
+                    || Qt.formatDate(date,"yyyy-MM-dd") !== value))) reason = "Enter valid dates as YYYY-MM-DD.";
+            }
+            if (payload.recurrence === "Custom" && !(payload.custom_recurrence || "").trim()) reason = "Describe the custom recurrence.";
             if (!/^\d+(\.\d{1,2})?$/.test(questlineAmount.text.trim()) || !Number.isSafeInteger(payload.amount_minor)
                 || payload.amount_minor <= 0) reason = "Enter a positive amount with up to two decimals.";
         }
@@ -556,8 +635,8 @@ PanelWindow {
             stepParent:questlineStepParent,stepSelected:questlineStepSelected,campaignId:questlineCampaignId,
             treasuryCampaignId:questlineTreasuryCampaignId,scrollProjectId:questlineScrollProjectId,
             campaignIndex:questlineCampaignIndex,editCampaignId:questlineEditCampaignId,title:questlineTitle.text,body:questlineBody.text,
-            date:questlineDate.text,amount:questlineAmount.text,frequency:questlineSidequestFrequency,
-            reward:questlineSidequestReward,entryType:questlineEntryType,entryStatus:questlineEntryStatus,
+            date:questlineDate.text,taskPriority:questlineTaskPriority,taskRecurrence:questlineTaskRecurrence,amount:questlineAmount.text,frequency:questlineSidequestFrequency,
+            reward:questlineSidequestReward,entryType:questlineEntryType,entryStatus:questlineEntryStatus,entryFields:questlineEntryFields,
             titleCursor:questlineTitle.cursorPosition,bodyCursor:questlineBody.cursorPosition,
             editorScroll:questlineEditorFlick.contentY,listScroll:questlineItemList.contentY,detailScroll:questlineDetailFlick.contentY,
             focus:{projectId:questlineFocusEditor.projectId,taskId:questlineFocusEditor.taskId,
@@ -600,11 +679,15 @@ PanelWindow {
         questlineTitle.text = view.title || "";
         questlineBody.text = view.body || "";
         questlineDate.text = view.date || "";
+        const task = questlineStepParent ? questlineStepSelected : questlineSelected;
+        questlineTaskPriority = view.taskPriority || (draft && draft.payload.priority) || (task && task.priority) || "Medium";
+        questlineTaskRecurrence = view.taskRecurrence || (draft && draft.payload.recurrence) || (task && task.recurrence) || "None";
         questlineAmount.text = view.amount || "";
         questlineSidequestFrequency = view.frequency || "Daily";
         questlineSidequestReward = view.reward === undefined ? 20 : view.reward;
         questlineEntryType = view.entryType || "Expense";
         questlineEntryStatus = view.entryStatus || "Planned";
+        questlineEntryFields = view.entryFields || loadQuestlineEntryFields((questline.entries || []).find(item => questlineSelected && item.id === questlineSelected.id) || questlineSelected);
         if (view.focus && !questlineFocusEditor.active) {
             questlineFocusEditor.projectId = view.focus.projectId || "";
             questlineFocusEditor.taskId = view.focus.taskId || "";
@@ -643,11 +726,22 @@ PanelWindow {
         rememberQuestline();
     }
     Timer { id: questlineRememberDelay; interval: 80; onTriggered: panel.rememberQuestline() }
-    onExpandedChanged: if (!expanded && page === "questline") { rememberQuestline(); questlineWorkspace.flush(); }
+    onExpandedChanged: {
+        if (!expanded) {
+            pendingFocusPage = "";
+            if (page === "questline") { rememberQuestline(); questlineWorkspace.flush(); }
+        }
+    }
     onQuestlineSelectedChanged: queueQuestlineState()
     onQuestlineSidequestFrequencyChanged: queueQuestlineState()
     onQuestlineSidequestRewardChanged: queueQuestlineState()
-    onQuestlineEntryTypeChanged: queueQuestlineState()
+    onQuestlineTaskPriorityChanged: queueQuestlineState()
+    onQuestlineTaskRecurrenceChanged: queueQuestlineState()
+    onQuestlineEntryFieldsChanged: queueQuestlineState()
+    onQuestlineEntryTypeChanged: {
+        if (!questlineRestoring) questlineEntryFields = Object.assign({},questlineEntryFields,{category_id:"",transfer_account_id:""});
+        queueQuestlineState();
+    }
     onQuestlineEntryStatusChanged: queueQuestlineState()
     onQuestlineCampaignIndexChanged: queueQuestlineState()
     onQuestlineEditCampaignIdChanged: queueQuestlineState()
@@ -822,11 +916,6 @@ PanelWindow {
             if (panel.expanded && panel.page === "search" && panel.submittedQuery !== query.text)
                 searchDelay.restart();
         }
-    }
-
-    Process {
-        id: calculatorProcess
-        stdout: StdioCollector { onStreamFinished: panel.calculation = text.trim() }
     }
 
     Process {
@@ -1079,7 +1168,7 @@ PanelWindow {
         leftAttachmentWidth: panel.theme.barStyle === "islands" && panel.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
         width: panel.cornerPanel ? Math.min(680, panel.screen.width - (panel.cornerTop ? 16 : panel.panelLeftInset + 16)) : panel.sidePanel ? Math.min(660, panel.screen.width - panel.panelLeftInset) : panel.page === "questline" ? Math.min(1500, panel.screen.width * 0.88) : Math.min(680, panel.screen.width - 40)
-        height: panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : panel.page === "hotkey" ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "focus" ? Math.min(focusEditor.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" || panel.page === "calendar" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
+        height: panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : panel.page === "hotkey" ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "calculator" ? Math.min(calculatorEditor.implicitHeight + 100, panel.screen.height - 50) : panel.page === "focus" ? Math.min(focusEditor.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
         x: panel.cornerPanel ? (panel.cornerTop ? panel.screen.width - width : panel.panelLeftInset) : panel.sidePanel ? panel.panelLeftInset : (panel.screen.width + panel.leftInset - width) / 2
         y: panel.cornerTop || panel.sidePanel || panel.topPanel ? panel.topInset : panel.screen.height - height - (panel.theme.gamingActive ? 0 : 8)
 
@@ -1106,7 +1195,7 @@ PanelWindow {
                 }
                 Text {
                     visible: panel.page !== "questline" || !panel.questline.hero
-                    text: panel.page === "spectrumdrop" ? "SpectrumDrop" : panel.page === "hotkey" ? "HotKey" : panel.page === "search" ? "Files" : panel.page === "calculator" ? "Calculator" : panel.page === "password" ? "Password generator" : panel.page === "shortcuts" ? "Keyboard shortcuts" : panel.page === "emoji" ? "Emoji" : panel.page === "focus" ? "Focus timer" : panel.page === "calendar" ? "Calendar" : panel.page === "questline" ? "Questline" : panel.page === "color" ? "Color picker" : "Updates"
+                    text: panel.page === "spectrumdrop" ? "SpectrumDrop" : panel.page === "hotkey" ? "HotKey" : panel.page === "search" ? "Files" : panel.page === "calculator" ? "Calculator" : panel.page === "password" ? "Password generator" : panel.page === "shortcuts" ? "Keyboard shortcuts" : panel.page === "emoji" ? "Emoji" : panel.page === "focus" ? "Focus timer" : panel.page === "questline" ? "Questline" : panel.page === "color" ? "Color picker" : "Updates"
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + (panel.page === "questline" ? 10 : 5); bold: true }
                 }
@@ -1126,7 +1215,7 @@ PanelWindow {
                 implicitHeight: 46
                 radius: 10
                 color: panel.theme.colors.background
-                visible: panel.page === "search" || panel.page === "calculator" || panel.page === "emoji"
+                visible: panel.page === "search" || panel.page === "emoji"
                 Text {
                     anchors { fill: parent; leftMargin: 14 }
                     verticalAlignment: Text.AlignVCenter
@@ -1166,54 +1255,25 @@ PanelWindow {
                         else event.accepted = false;
                     }
                     Keys.onReturnPressed: {
-                        if (panel.page === "calculator" && !calculatorProcess.running)
-                            calculatorProcess.exec([panel.backendDir + "/spectrum-shell-tools", "calculate", text]);
-                        else if (panel.page === "emoji")
+                        if (panel.page === "emoji")
                             panel.copySelectedEmoji();
                         else if (panel.page === "search")
                             panel.openSelectedFile();
                     }
                     Keys.onEnterPressed: {
-                        if (panel.page === "calculator" && !calculatorProcess.running)
-                            calculatorProcess.exec([panel.backendDir + "/spectrum-shell-tools", "calculate", text]);
-                        else if (panel.page === "emoji") panel.copySelectedEmoji();
+                        if (panel.page === "emoji") panel.copySelectedEmoji();
                         else if (panel.page === "search") panel.openSelectedFile();
                     }
                 }
             }
 
-            ShellButton {
+            Calculator {
+                id: calculatorEditor
                 Layout.fillWidth: true
                 visible: panel.page === "calculator"
-                label: "Calculate"
-                fontFamily: panel.theme.fontFamily
-                fontSize: panel.theme.fontSize
-                backgroundColor: panel.theme.colors.accent
-                foregroundColor: panel.theme.colors.background
-                onClicked: {
-                    if (!calculatorProcess.running)
-                        calculatorProcess.exec([panel.backendDir + "/spectrum-shell-tools", "calculate", query.text]);
-                }
-            }
-
-            Text {
-                Layout.fillWidth: true
-                visible: panel.page === "calculator"
-                text: panel.calculation || "Use Numbat expressions, units, and conversions"
-                color: panel.calculation ? panel.theme.colors.foreground : panel.theme.colors.muted
-                wrapMode: Text.Wrap
-                font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 2 }
-            }
-            ShellButton {
-                Layout.fillWidth: true
-                visible: panel.page === "calculator"
-                enabled: panel.calculation.length > 0 && !["Enter a calculation", "Invalid expression", "Calculator unavailable"].includes(panel.calculation)
-                label: "Copy result"
-                fontFamily: panel.theme.fontFamily
-                fontSize: panel.theme.fontSize
-                backgroundColor: panel.theme.colors.surface_alt
-                foregroundColor: panel.theme.colors.foreground
-                onClicked: Quickshell.execDetached(["wl-copy", panel.calculation])
+                theme: panel.theme
+                backendDir: panel.backendDir
+                onCloseRequested: panel.expanded = false
             }
 
             ListView {
@@ -1765,6 +1825,40 @@ PanelWindow {
                     }
                     Item { Layout.fillWidth: true }
                 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: panel.questlineTab === "Tasks"
+                    spacing: 10
+                    Text {
+                        text: "Priority"
+                        color: panel.theme.colors.foreground
+                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                    }
+                    FocusChoice {
+                        objectName: "questline-task-priority"
+                        Layout.preferredWidth: 160
+                        theme: panel.theme
+                        model: panel.questlineTaskPriorities
+                        currentIndex: Math.max(0, panel.questlineTaskPriorities.indexOf(panel.questlineTaskPriority))
+                        onActivated: panel.questlineTaskPriority = panel.questlineTaskPriorities[currentIndex]
+                    }
+                    Text {
+                        visible: !panel.questlineStepParent
+                        text: "Recurrence"
+                        color: panel.theme.colors.foreground
+                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                    }
+                    FocusChoice {
+                        objectName: "questline-task-recurrence"
+                        visible: !panel.questlineStepParent
+                        Layout.preferredWidth: 180
+                        theme: panel.theme
+                        model: panel.questlineTaskRecurrences
+                        currentIndex: Math.max(0, panel.questlineTaskRecurrences.indexOf(panel.questlineTaskRecurrence))
+                        onActivated: panel.questlineTaskRecurrence = panel.questlineTaskRecurrences[currentIndex]
+                    }
+                    Item { Layout.fillWidth: true }
+                }
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: panel.questlineTab === "Tasks"
@@ -1884,11 +1978,14 @@ PanelWindow {
                     Layout.fillWidth: true
                     visible: panel.questlineTab === "Treasury"
                     ShellButton {
-                        visible: panel.questlineSelected === null || panel.questlineDraftKey.indexOf(":new-") >= 0
+                        objectName: "questline-entry-type"
                         label: panel.questlineEntryType + "  ›"
                         fontFamily: panel.theme.fontFamily; fontSize: panel.theme.fontSize
                         backgroundColor: panel.theme.colors.surface_alt; foregroundColor: panel.theme.colors.foreground
-                        onClicked: panel.questlineEntryType = panel.questlineEntryType === "Expense" ? "Income" : "Expense"
+                        onClicked: {
+                            const types = ["Expense","Income","Transfer","Adjustment"];
+                            panel.questlineEntryType = types[(types.indexOf(panel.questlineEntryType) + 1) % types.length];
+                        }
                     }
                     ShellButton {
                         label: "Status: " + panel.questlineEntryStatus + "  ›"
@@ -1943,7 +2040,22 @@ PanelWindow {
                         }
                     }
                 }
-                Item { Layout.fillHeight: panel.questlineTab === "Treasury" }
+                QuestlineEntryEditor {
+                    objectName: "questline-entry-editor"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: panel.questlineTab === "Treasury"
+                    enabled: !!panel.questline.treasury_fields_available
+                    theme: panel.theme
+                    fields: panel.questlineEntryFields
+                    accounts: panel.questline.accounts || []
+                    categories: panel.questline.categories || []
+                    tasks: panel.questline.tasks || []
+                    campaignId: panel.questlineEditCampaignId
+                    entryType: panel.questlineEntryType
+                    legacyAccountIds: panel.questlineLegacyAccountIds()
+                    onEdited: value => panel.questlineEntryFields = value
+                }
                 RowLayout {
                     Layout.fillWidth: true
                     ShellButton {
@@ -2158,6 +2270,48 @@ PanelWindow {
                 }
             }
 
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: panel.page === "questline" && panel.questlineTab === "Treasury" && !panel.questlineEditing
+                spacing: 6
+                Repeater {
+                    objectName: "questline-treasury-summary"
+                    model: questlineTreasury.currencyTotals
+                    GridLayout {
+                        id: currencySummary
+                        required property var modelData
+                        Layout.fillWidth: true
+                        columns: width >= 600 ? 4 : 2
+                        Repeater {
+                            model: [{label:"Available",amount:currencySummary.modelData.available},{label:"Saved",amount:currencySummary.modelData.saved},
+                                    {label:"Invested",amount:currencySummary.modelData.invested},{label:"Available savings",amount:currencySummary.modelData.liquidSavings}]
+                            Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                implicitHeight: 60
+                                radius: 8
+                                color: panel.theme.colors.background
+                                ColumnLayout {
+                                    anchors { fill: parent; margins: 8 }
+                                    spacing: 2
+                                    Text {
+                                        text: modelData.label
+                                        color: panel.theme.colors.muted
+                                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 2 }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: currencySummary.modelData.currency + " " + (modelData.amount / 100).toLocaleString(Qt.locale(),'f',2)
+                                        elide: Text.ElideRight
+                                        color: modelData.amount < 0 ? panel.theme.colors.error : panel.theme.colors.accent
+                                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize; bold: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -2181,13 +2335,14 @@ PanelWindow {
                         Text {
                             Layout.fillWidth: true
                             visible: questlineAccountList.count === 0
-                            text: "No accounts with a nonzero balance."
+                            text: "Create your accounts in Questline to start recording entries."
                             wrapMode: Text.Wrap
                             color: panel.theme.colors.muted
                             font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                         }
                         ListView {
                             id: questlineAccountList
+                            objectName: "questline-account-list"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
@@ -2219,10 +2374,35 @@ PanelWindow {
                                     }
                                     Text {
                                         Layout.fillWidth: true
-                                        text: modelData.campaign + " · " + modelData.kind
+                                        text: modelData.kind + (modelData.is_default ? " · Legacy" : "")
                                         wrapMode: Text.Wrap
                                         color: panel.theme.colors.muted
                                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 2 }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: modelData.kind === "Savings"
+                                        text: (modelData.savings_status || "Available") + " savings · " + ((modelData.interest_rate_bps || 0) / 100).toFixed(2) + "% " + (modelData.interest_period || "Annual").toLowerCase()
+                                        wrapMode: Text.Wrap
+                                        color: panel.theme.colors.muted
+                                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 2 }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: modelData.kind === "Savings"
+                                        text: questlineTreasury.estimate(modelData)
+                                        wrapMode: Text.Wrap
+                                        color: panel.theme.colors.accent_alt
+                                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 2 }
+                                    }
+                                    QuestlineSavingsEditor {
+                                        Layout.fillWidth: true
+                                        visible: modelData.kind === "Savings" && !!panel.questline.savings_accounts_available
+                                        theme: panel.theme
+                                        account: modelData
+                                        viewport: questlineAccountList
+                                        busy: panel.questlineWorkspace.busy || panel.questlineWorkspace.externalActions > 0
+                                        onSaveRequested: payload => panel.runQuestlineAction(payload)
                                     }
                                 }
                             }
@@ -2343,7 +2523,7 @@ PanelWindow {
                         Text {
                             Layout.fillWidth: true
                             visible: panel.questlineTab === "Tasks" && panel.questlineSelected !== null
-                            text: panel.questlineSelected ? "Due " + (panel.questlineSelected.due_date || "anytime") + "  ·  " + panel.questlineSelected.priority + " priority" : ""
+                            text: panel.questlineSelected ? "Due " + (panel.questlineSelected.due_date || "anytime") + "  ·  " + panel.questlineSelected.priority + " priority" + (panel.questlineSelected.recurrence ? "  ·  " + panel.questlineSelected.recurrence : "") : ""
                             color: panel.theme.colors.muted
                             font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                         }
@@ -2381,7 +2561,7 @@ PanelWindow {
                                 persistentSelection: true
                                 wrapMode: TextEdit.Wrap
                                 textFormat: TextEdit.PlainText
-                                text: !panel.questlineSelected ? "" : panel.questlineTab === "Scrolls" ? (panel.questlineSelected.markdown_content || "") : panel.questlineTab === "Treasury" ? panel.questlineSelected.entry_type + " · " + panel.questlineSelected.status + "\n" + panel.questlineSelected.currency_code + " " + (panel.questlineSelected.amount_minor / 100).toFixed(2) + "\nCampaign: " + panel.questlineSelected.campaign : (panel.questlineSelected.description || "No description yet.")
+                                text: !panel.questlineSelected ? "" : panel.questlineTab === "Scrolls" ? (panel.questlineSelected.markdown_content || "") : panel.questlineTab === "Treasury" ? panel.questlineEntryDetails(panel.questlineSelected) : (panel.questlineSelected.description || "No description yet.")
                                 color: panel.theme.colors.foreground
                                 selectionColor: panel.theme.colors.accent
                                 selectedTextColor: panel.theme.colors.background
@@ -2526,7 +2706,7 @@ PanelWindow {
                 onDurationChanged: panel.queueQuestlineState()
                 onSoundscapeChanged: panel.queueQuestlineState()
                 onFocusAction: action => panel.focusAction(action)
-                onFocusStart: request => panel.focusStart(request)
+                onFocusStart: request => panel.startFocus(request)
             }
 
             FocusControls {
@@ -2538,126 +2718,32 @@ PanelWindow {
                 focusState: panel.focusState
                 backendDir: panel.backendDir
                 onFocusAction: action => panel.focusAction(action)
-                onFocusStart: request => panel.focusStart(request)
+                onFocusStart: request => panel.startFocus(request)
                 onQuestlineRequested: { panel.switchQuestlineTab("Overview"); panel.open("questline"); }
             }
 
-            RowLayout {
+            ColorSwatch {
                 Layout.fillWidth: true
-                visible: panel.page === "calendar"
-                ShellButton {
-                    label: "‹"
-                    fontFamily: panel.theme.fontFamily
-                    fontSize: panel.theme.fontSize + 4
-                    backgroundColor: panel.theme.colors.surface_alt
-                    foregroundColor: panel.theme.colors.foreground
-                    onClicked: panel.calendarMonth = new Date(panel.calendarMonth.getFullYear(), panel.calendarMonth.getMonth() - 1, 1)
-                }
-                Text {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    text: Qt.formatDateTime(panel.calendarMonth, "MMMM yyyy")
-                    color: panel.theme.colors.foreground
-                    font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 3; bold: true }
-                }
-                ShellButton {
-                    label: "›"
-                    fontFamily: panel.theme.fontFamily
-                    fontSize: panel.theme.fontSize + 4
-                    backgroundColor: panel.theme.colors.surface_alt
-                    foregroundColor: panel.theme.colors.foreground
-                    onClicked: panel.calendarMonth = new Date(panel.calendarMonth.getFullYear(), panel.calendarMonth.getMonth() + 1, 1)
-                }
-            }
-            GridLayout {
-                Layout.fillWidth: true
-                visible: panel.page === "calendar"
-                columns: 7
-                columnSpacing: 4
-                rowSpacing: 4
-                Repeater {
-                    model: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                    Text {
-                        required property string modelData
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                        text: modelData
-                        color: panel.theme.colors.muted
-                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1; bold: true }
-                    }
-                }
-                Repeater {
-                    model: panel.calendarDays
-                    Rectangle {
-                        required property int modelData
-                        readonly property bool isToday: modelData > 0 && modelData === new Date().getDate() && panel.calendarMonth.getMonth() === new Date().getMonth() && panel.calendarMonth.getFullYear() === new Date().getFullYear()
-                        Layout.fillWidth: true
-                        implicitHeight: 30
-                        radius: 7
-                        color: isToday ? panel.theme.colors.accent : panel.theme.colors.surface_alt
-                        Text {
-                            anchors.centerIn: parent
-                            text: parent.modelData > 0 ? String(parent.modelData) : ""
-                            color: parent.isToday ? panel.theme.colors.background : panel.theme.colors.foreground
-                            font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
-                        }
-                    }
-                }
+                implicitHeight: 48
+                visible: panel.page === "color" && panel.colorValue.length > 0
+                value: panel.colorValue
+                fontFamily: panel.theme.fontFamily
+                fontSize: panel.theme.fontSize + 2
             }
             ShellButton {
                 Layout.fillWidth: true
-                visible: panel.page === "calendar"
-                label: "Today"
+                visible: panel.page === "color"
+                label: "Pick colors"
                 fontFamily: panel.theme.fontFamily
                 fontSize: panel.theme.fontSize
-                backgroundColor: panel.theme.colors.surface_alt
-                foregroundColor: panel.theme.colors.foreground
-                onClicked: panel.calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 68
-                radius: 11
-                visible: panel.page === "color"
-                color: panel.colorValue || panel.theme.colors.surface_alt
+                backgroundColor: panel.theme.colors.accent
+                foregroundColor: panel.theme.colors.background
+                onClicked: panel.beginColorPick()
             }
             Text {
                 Layout.fillWidth: true
                 visible: panel.page === "color"
-                horizontalAlignment: Text.AlignHCenter
-                text: panel.colorValue || "Choose a color from the screen"
-                color: panel.theme.colors.foreground
-                font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 3; bold: true }
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                visible: panel.page === "color"
-                spacing: 8
-                ShellButton {
-                    Layout.fillWidth: true
-                    label: "Pick colors"
-                    fontFamily: panel.theme.fontFamily
-                    fontSize: panel.theme.fontSize
-                    backgroundColor: panel.theme.colors.accent
-                    foregroundColor: panel.theme.colors.background
-                    onClicked: panel.beginColorPick()
-                }
-                ShellButton {
-                    Layout.fillWidth: true
-                    label: "Copy hex"
-                    enabled: panel.colorValue.length > 0
-                    fontFamily: panel.theme.fontFamily
-                    fontSize: panel.theme.fontSize
-                    backgroundColor: panel.theme.colors.surface_alt
-                    foregroundColor: panel.theme.colors.foreground
-                    onClicked: Quickshell.execDetached(["wl-copy", panel.colorValue])
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                visible: panel.page === "color"
-                text: "Click to collect more colors. Press Escape to finish and return here."
+                text: "Click a color to copy its hex. Press Escape to finish picking."
                 color: panel.theme.colors.muted
                 wrapMode: Text.WordWrap
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
@@ -2678,32 +2764,35 @@ PanelWindow {
                 wrapMode: Text.WordWrap
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
             }
-            Repeater {
+            GridView {
+                id: colorGrid
+                objectName: "saved-color-grid"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: panel.page === "color"
+                clip: true
+                cellWidth: width / Math.max(1, Math.floor(width / Math.max(112, hexMetrics.advanceWidth("#FFFFFF") + 32)))
+                cellHeight: 50
                 model: panel.page === "color" ? panel.savedColors : []
-                RowLayout {
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                Controls.ScrollBar.vertical: Controls.ScrollBar { policy: Controls.ScrollBar.AsNeeded }
+                FontMetrics {
+                    id: hexMetrics
+                    font.family: panel.theme.fontFamily
+                    font.pixelSize: panel.theme.fontSize
+                    font.bold: true
+                }
+                delegate: ColorSwatch {
                     required property string modelData
-                    Layout.fillWidth: true
-                    spacing: 12
-                    Rectangle {
-                        width: 58
-                        height: 34
-                        radius: 8
-                        color: parent.modelData
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: parent.modelData
-                        color: panel.theme.colors.foreground
-                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 1; bold: true }
-                    }
-                    ShellButton {
-                        label: "Copy"
-                        fontFamily: panel.theme.fontFamily
-                        fontSize: panel.theme.fontSize
-                        backgroundColor: panel.theme.colors.surface_alt
-                        foregroundColor: panel.theme.colors.foreground
-                        onClicked: Quickshell.execDetached(["wl-copy", parent.modelData])
-                    }
+                    objectName: "saved-color-" + modelData.slice(1)
+                    width: colorGrid.cellWidth - 8
+                    height: 42
+                    value: modelData
+                    selected: panel.colorValue === value
+                    fontFamily: panel.theme.fontFamily
+                    fontSize: panel.theme.fontSize
+                    onCopied: panel.colorValue = value
                 }
             }
 
@@ -2824,7 +2913,7 @@ PanelWindow {
                 backend: hotkeys
             }
             Item {
-                visible: !["questline", "search", "emoji", "shortcuts", "hotkey", "spectrumdrop"].includes(panel.page)
+                visible: !["questline", "search", "emoji", "shortcuts", "hotkey", "spectrumdrop", "color", "calculator"].includes(panel.page)
                 Layout.fillHeight: visible
             }
         }
@@ -2832,7 +2921,7 @@ PanelWindow {
 
     function openFile(path): void {
         expanded = false;
-        Quickshell.execDetached(["uwsm", "app", "--", "gio", "open", path]);
+        ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", "gio", "open", path]);
     }
 
     function moveSearchSelection(offset): void {
