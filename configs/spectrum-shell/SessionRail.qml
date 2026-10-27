@@ -37,7 +37,7 @@ Scope {
         anchors { top: true; bottom: true; left: true; right: true }
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
-        visible: motion.active
+        visible: !!rail.targetScreen && motion.active
         WlrLayershell.keyboardFocus: panelFocus.mode
         ShellFocus { id: panelFocus; window: railWindow; enabled: rail.expanded }
         WlrLayershell.layer: WlrLayer.Top
@@ -69,8 +69,8 @@ Scope {
                 bounceEnabled: rail.theme.widgetBounceEnabled !== false
                 expanded: rail.expanded
                 edge: "right"
-                viewportWidth: rail.targetScreen.width
-                viewportHeight: rail.targetScreen.height
+                viewportWidth: rail.targetScreen ? rail.targetScreen.width : 0
+                viewportHeight: rail.targetScreen ? rail.targetScreen.height : 0
             }
             attachRight: true
             width: 72

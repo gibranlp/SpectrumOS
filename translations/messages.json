@@ -1,0 +1,277 @@
+[
+  "None",
+  "Daily",
+  "Weekly",
+  "Monthly",
+  "Yearly",
+  "Weekdays",
+  "2x Daily",
+  "3x Daily",
+  "5x Daily",
+  "Low",
+  "Medium",
+  "High",
+  "Custom",
+  "Overview",
+  "Tasks",
+  "Sidequests",
+  "Scrolls",
+  "Chronicles",
+  "Treasury",
+  "Focus",
+  "Hero",
+  "Sync",
+  "Expense",
+  "Income",
+  "Transfer",
+  "Planned",
+  "Paid",
+  "Pending",
+  "Cancelled",
+  "Cash",
+  "Bank",
+  "Credit",
+  "Savings",
+  "Investment",
+  "Light",
+  "Dark",
+  "Auto",
+  "Dwindle",
+  "Master",
+  "Scrolling",
+  "Monocle",
+  "Standard",
+  "Minimal",
+  "Detailed",
+  "Multimedia",
+  "Gaming",
+  "Compact",
+  "Balanced",
+  "Spacious",
+  "Thin",
+  "Thick",
+  "Square",
+  "Subtle",
+  "Soft",
+  "Strong",
+  "Opaque",
+  "Glass",
+  "Smooth",
+  "Heavy",
+  "Off",
+  "On",
+  "No additional user services",
+  "Files",
+  "Categories",
+  "File types",
+  "Web browser",
+  "Email",
+  "File manager",
+  "Videos",
+  "Music",
+  "Images",
+  "Text editor",
+  "Documents",
+  "Spreadsheets",
+  "Presentations",
+  "Archives",
+  "Not set",
+  "Silent",
+  "LoFi Radio",
+  "Forest Sounds",
+  "Rain Sounds",
+  "Ocean Waves",
+  "White Noise",
+  "Music For Programming",
+  "Local Folder",
+  "Conversions",
+  "Scientific",
+  "Length",
+  "Mass",
+  "Temperature",
+  "Area",
+  "Volume",
+  "Time",
+  "Speed",
+  "Data",
+  "Energy",
+  "Power",
+  "Pressure",
+  "Angle",
+  "Frequency",
+  "Force",
+  "Currency",
+  "Custom units",
+  "Name",
+  "Description",
+  "Type",
+  "Status",
+  "Title",
+  "Search",
+  "Add",
+  "Left",
+  "Right",
+  "Up",
+  "Down",
+  "Stop",
+  "Start",
+  "Restart",
+  "Enable",
+  "Disable",
+  "Logs",
+  "Enabled",
+  "Disabled",
+  "Failed",
+  "Inactive",
+  "Active",
+  "Running",
+  "Stopped",
+  "Exited",
+  "Dead",
+  "Paused",
+  "Reconnecting",
+  "Syncing",
+  "Ready",
+  "Allowed",
+  "Denied",
+  "Trusted",
+  "Untrusted",
+  "Online",
+  "Offline",
+  "Connected",
+  "Disconnected",
+  "Downloading",
+  "Installing",
+  "Completed",
+  "Cancelled",
+  "Waiting",
+  "Error",
+  "Success",
+  {
+    "source": "%n file",
+    "plural": "%n files"
+  },
+  {
+    "source": "Sharing text · %n computer",
+    "plural": "Sharing text · %n computers"
+  },
+  "Tree",
+  "Feels like  ",
+  "Humidity  ",
+  "Wind  ",
+  "Rest your eyes",
+  "Time to move",
+  "Look at something about 6 metres away for 20 seconds.",
+  "Take a short break, stand up if comfortable, and change your position.",
+  "Questline Focus",
+  "Focus session interrupted. Start a new session to continue.",
+  "Questline focus session stopped unexpectedly",
+  "Color copied",
+  {
+    "source": "Clear",
+    "context": "Weather"
+  },
+  {
+    "source": "Partly cloudy",
+    "context": "Weather"
+  },
+  {
+    "source": "Overcast",
+    "context": "Weather"
+  },
+  {
+    "source": "Fog",
+    "context": "Weather"
+  },
+  {
+    "source": "Drizzle",
+    "context": "Weather"
+  },
+  {
+    "source": "Rain",
+    "context": "Weather"
+  },
+  {
+    "source": "Snow",
+    "context": "Weather"
+  },
+  {
+    "source": "Thunderstorm",
+    "context": "Weather"
+  },
+  {
+    "source": "Variable",
+    "context": "Weather"
+  },
+  {
+    "source": "Unavailable",
+    "context": "Weather"
+  },
+  "Approved",
+  "Select key…",
+  "Schedule",
+  "Attachment",
+  "Choose a supported interface language",
+  "Could not create language settings directory",
+  "Could not save interface language",
+  {
+    "source": "Mon",
+    "context": "Calendar"
+  },
+  {
+    "source": "Tue",
+    "context": "Calendar"
+  },
+  {
+    "source": "Wed",
+    "context": "Calendar"
+  },
+  {
+    "source": "Thu",
+    "context": "Calendar"
+  },
+  {
+    "source": "Fri",
+    "context": "Calendar"
+  },
+  {
+    "source": "Sat",
+    "context": "Calendar"
+  },
+  {
+    "source": "Sun",
+    "context": "Calendar"
+  },
+  {
+    "source": "M",
+    "context": "Calendar"
+  },
+  {
+    "source": "Tu",
+    "context": "Calendar"
+  },
+  {
+    "source": "W",
+    "context": "Calendar"
+  },
+  {
+    "source": "Th",
+    "context": "Calendar"
+  },
+  {
+    "source": "F",
+    "context": "Calendar"
+  },
+  {
+    "source": "Sa",
+    "context": "Calendar"
+  },
+  {
+    "source": "Su",
+    "context": "Calendar"
+  },
+  "Not connected",
+  "Wi-Fi disabled",
+  "NetworkManager unavailable",
+  "No networks found"
+]

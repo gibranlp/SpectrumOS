@@ -1,7 +1,7 @@
 pkgbase = spectrumdrop
-	pkgdesc = SpectrumOS native nearby file transfer with a maintained AWDL backend
+	pkgdesc = SpectrumOS encrypted network sharing and native AirDrop file transfers
 	pkgver = 1.0.0
-	pkgrel = 4
+	pkgrel = 6
 	url = https://spectrum.gibranlp.dev
 	install = spectrumdrop.install
 	arch = x86_64
@@ -43,7 +43,7 @@ pkgbase = spectrumdrop
 	replaces = omdrop
 	replaces = omdrop-owl
 	options = !debug
-	source = spectrumos-source-1.0.0-a66ae26d50893c89.tar.zst
-	sha256sums = 7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162
+	source = spectrumos-source-1.0.0-a1d68347eb8e7fe9.tar.zst
+	sha256sums = 223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20
 
 pkgname = spectrumdrop

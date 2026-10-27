@@ -45,14 +45,37 @@ spectrumos_select_restore_point() {
     done
 }
 
-# Replaces the active @ subvolume below the mounted Btrfs top level $1 with
-# restore point $3, and -- if the EFI partition is mounted at $2 -- restores
-# its matching /boot archive there too. The previous @ and EFI contents are
-# preserved under @failed/spectrumos/<operation>, mirroring the offline
-# `spectrum-snapshot restore` contract this hook is a boot-time entry point
-# for. Returns non-zero if the root replacement itself did not complete;
-# a failed /boot restore is logged but does not fail the rescue, since an
-# unmatched EFI partition is recoverable from a normal boot afterward.
+# Valida la partición EFI antes de reemplazar @ y sus archivos de arranque.
+# Si falla la extracción, intenta recuperar tanto el arranque como la raíz anterior.
+spectrumos_boot_is_owned() {
+    ownership="$1/@/etc/spectrumos/boot-ownership"
+    if [ -d "$2/EFI" ]; then
+        for entry in "$2/EFI/"*; do
+            [ -e "$entry" ] || continue
+            case "${entry##*/}" in
+                BOOT|Boot|boot|Linux|LINUX|linux|SpectrumOS|SPECTRUMOS|spectrumos) ;;
+                *) echo "spectrumos-restore: foreign EFI files found; refusing recovery"; return 1 ;;
+            esac
+        done
+    fi
+    if [ ! -f "$ownership" ]; then
+        [ ! -e "$2/.spectrumos-boot-owner" ]
+        return $?
+    fi
+    mountpoint -q "$2" || return 1
+    owned_root=$(sed -n 's/^root_uuid=//p' "$ownership")
+    owned_boot=$(sed -n 's/^boot_uuid=//p' "$ownership")
+    owned_part=$(sed -n 's/^boot_partuuid=//p' "$ownership")
+    [ "$(sed -n 's/^schema=//p' "$ownership")" = 1 ] || return 1
+    [ -n "$owned_root" ] && [ -n "$owned_boot" ] && [ -n "$owned_part" ] || return 1
+    [ "$(blkid -s UUID -o value "$root")" = "$owned_root" ] || return 1
+    [ "$(blkid -s UUID -o value "$espdevice")" = "$owned_boot" ] || return 1
+    [ "$(blkid -s PARTUUID -o value "$espdevice")" = "$owned_part" ] || return 1
+    [ "$(cat "$2/.spectrumos-boot-owner" 2>/dev/null)" = "$owned_root" ] || return 1
+    [ "$(tar -xOf "$1/@snapshots/spectrumos/$3/boot.tar" ./.spectrumos-boot-owner 2>/dev/null)" = "$owned_root" ] || return 1
+    [ "$(cat "$ownership")" = "$(cat "$1/@snapshots/spectrumos/$3/root/etc/spectrumos/boot-ownership" 2>/dev/null)" ]
+}
+
 spectrumos_perform_rescue() {
     top="$1"
     boot="$2"
@@ -63,7 +86,12 @@ spectrumos_perform_rescue() {
     restored_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     failed="$top/@failed/spectrumos"
 
+    spectrumos_boot_is_owned "$top" "$boot" "$id" || return 1
+    tar -tf "$snapshots_root/$id/boot.tar" >/dev/null 2>&1 || return 1
     mkdir -p "$failed" || return 1
+    if mountpoint -q "$boot" 2>/dev/null; then
+        tar --numeric-owner -cpf "$failed/$operation.boot.tar" -C "$boot" . || return 1
+    fi
     mv "$top/@" "$failed/$operation" || return 1
     if ! btrfs subvolume snapshot "$snapshots_root/$id/root" "$top/@"; then
         mv "$failed/$operation" "$top/@"
@@ -71,10 +99,14 @@ spectrumos_perform_rescue() {
     fi
 
     if [ -d "$boot" ] && mountpoint -q "$boot" 2>/dev/null; then
-        tar --numeric-owner -cpf "$failed/$operation.boot.tar" -C "$boot" . 2>/dev/null
         find "$boot" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
-        tar --numeric-owner -xpf "$snapshots_root/$id/boot.tar" -C "$boot" 2>/dev/null \
-            || echo "spectrumos-restore: could not restore /boot; reboot once the desktop is usable to fix it"
+        if ! tar --numeric-owner -xpf "$snapshots_root/$id/boot.tar" -C "$boot"; then
+            find "$boot" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
+            tar --numeric-owner -xpf "$failed/$operation.boot.tar" -C "$boot" \
+                || echo "spectrumos-restore: boot recovery failed; use recovery media"
+            btrfs subvolume delete "$top/@" && mv "$failed/$operation" "$top/@"
+            return 1
+        fi
     fi
 
     mkdir -p "$top/@/var/lib/spectrumos"
@@ -111,6 +143,18 @@ run_hook() {
     fi
 
     espdevice=/dev/disk/by-label/SPECTRM_EFI
+    ownership="$top/@/etc/spectrumos/boot-ownership"
+    if [ -f "$ownership" ]; then
+        owned_boot=$(sed -n 's/^boot_uuid=//p' "$ownership")
+        case "$owned_boot" in
+            ''|*[!A-Za-z0-9-]*)
+                echo "spectrumos-restore: invalid EFI ownership; refusing recovery"
+                umount "$top"
+                return 0
+                ;;
+        esac
+        espdevice="/dev/disk/by-uuid/$owned_boot"
+    fi
     if [ -e "$espdevice" ]; then
         mount "$espdevice" "$boot" 2>/dev/null \
             || echo "spectrumos-restore: could not mount the EFI partition; root recovery will continue"

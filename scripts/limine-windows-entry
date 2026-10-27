@@ -16,7 +16,7 @@ WINDOWS_PATH = ("EFI", "Microsoft", "Boot", "bootmgfw.efi")
 PARTUUID_PATTERN = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\Z")
 
 
-def candidates(devices: dict, excluded_disk: str) -> list[tuple[str, str]]:
+def candidates(devices: dict, excluded_disk: str, excluded_partuuid: str = "") -> list[tuple[str, str]]:
     found: list[tuple[str, str]] = []
     for disk in devices.get("blockdevices", []):
         if disk.get("type") != "disk" or os.path.realpath(disk.get("path", "")) == excluded_disk:
@@ -29,6 +29,7 @@ def candidates(devices: dict, excluded_disk: str) -> list[tuple[str, str]]:
                 and str(partition.get("fstype", "")).lower() == "vfat"
                 and isinstance(partuuid, str)
                 and PARTUUID_PATTERN.fullmatch(partuuid)
+                and partuuid.lower() != excluded_partuuid.lower()
                 and partition.get("path")
             ):
                 found.append((partition["path"], partuuid.lower()))
@@ -52,7 +53,30 @@ def windows_loader(root: Path) -> str | None:
     return None
 
 
-def discover(disks: list[tuple[str, str]]) -> list[tuple[str, str]]:
+def linux_loaders(root: Path) -> list[tuple[str, str]]:
+    efi = next((item for item in root.iterdir() if item.name.casefold() == "efi" and item.is_dir()), None)
+    if efi is None:
+        return []
+    found = []
+    for directory in sorted(efi.iterdir()):
+        if (not directory.is_dir() or directory.name.casefold() in ("microsoft", "boot")
+                or not re.fullmatch(r"[A-Za-z0-9_. -]+", directory.name)):
+            continue
+        files = {item.name.casefold(): item for item in directory.iterdir() if item.is_file()}
+        # Se elige un cargador por distribución para no duplicar shim y GRUB.
+        for name in ("shimx64.efi", "grubx64.efi", "systemd-bootx64.efi", "limine.efi"):
+            loader = files.get(name)
+            if loader:
+                with loader.open("rb") as handle:
+                    if handle.read(2) != b"MZ":
+                        continue
+                title = re.sub(r"[^A-Za-z0-9 ._-]", "", directory.name).strip() or "Linux"
+                found.append((title, "/" + loader.relative_to(root).as_posix()))
+                break
+    return found
+
+
+def discover(disks: list[tuple[str, str]], linux: list | None = None) -> list[tuple[str, str]]:
     found: list[tuple[str, str]] = []
     for device, partuuid in disks:
         with tempfile.TemporaryDirectory(prefix="spectrum-windows-esp-") as directory:
@@ -70,6 +94,11 @@ def discover(disks: list[tuple[str, str]]) -> list[tuple[str, str]]:
                 loader = windows_loader(Path(directory))
                 if loader is not None:
                     found.append((partuuid, loader))
+                if linux is not None:
+                    try:
+                        linux.extend((partuuid, title, path) for title, path in linux_loaders(Path(directory)))
+                    except OSError as error:
+                        print(f"Could not inspect Linux EFI loaders on {device}: {error}", file=sys.stderr)
             finally:
                 subprocess.run(["umount", directory], check=True)
     return found
@@ -89,18 +118,25 @@ def add_entries(content: str, windows: list[tuple[str, str]]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Add detected Windows UEFI loaders to Limine")
+    parser = argparse.ArgumentParser(description="Add preserved Windows and Linux UEFI loaders to Limine")
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--exclude-disk", required=True)
+    parser.add_argument("--exclude-disk", default="")
+    parser.add_argument("--exclude-partuuid", default="")
+    parser.add_argument("--include-linux", action="store_true")
     options = parser.parse_args()
     result = subprocess.run(
         ["lsblk", "--json", "--tree", "--paths", "--output", "PATH,TYPE,PARTTYPE,PARTUUID,FSTYPE"],
         check=True, capture_output=True, text=True,
     )
-    disks = candidates(json.loads(result.stdout), os.path.realpath(options.exclude_disk))
-    windows = discover(disks)
+    disks = candidates(json.loads(result.stdout), os.path.realpath(options.exclude_disk) if options.exclude_disk else "", options.exclude_partuuid)
+    linux = [] if options.include_linux else None
+    windows = discover(disks, linux)
     content = options.config.read_text(encoding="utf-8")
     updated = add_entries(content, windows)
+    for partuuid, title, loader in linux or []:
+        path = f"guid({partuuid}):{loader}"
+        if path.casefold() not in updated.casefold():
+            updated = updated.rstrip() + f"\n\n/{title} ({partuuid[:8]})\n    protocol: efi\n    path: {path}\n"
     if updated != content:
         descriptor, temporary = tempfile.mkstemp(prefix=".limine-windows-", dir=options.config.parent)
         try:

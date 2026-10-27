@@ -79,7 +79,7 @@ ColumnLayout {
                 }
                 ShellButton {
                     objectName: "calendar-today"
-                    label: "Today"
+                    label: qsTranslate("Spectrum", "Today")
                     fontFamily: calendar.theme.fontFamily
                     fontSize: calendar.theme.fontSize - 1
                     backgroundColor: calendar.theme.colors.surface
@@ -111,7 +111,7 @@ ColumnLayout {
                         required property string modelData
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        text: modelData
+                        text: qsTranslate("Calendar", modelData)
                         color: calendar.theme.colors.muted
                         font { family: calendar.theme.fontFamily; pixelSize: calendar.theme.fontSize - 2 }
                     }
@@ -165,9 +165,9 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 14
                 Repeater {
-                    model: [{label: "Later", color: calendar.theme.colors.accent},
-                        {label: "Within 3 days", color: calendar.theme.colors.warning || "#e6bd57"},
-                        {label: "Today / overdue", color: calendar.theme.colors.error || "#ff8c9a"}]
+                    model: [{label: qsTranslate("Spectrum", "Later"), color: calendar.theme.colors.accent},
+                        {label: qsTranslate("Spectrum", "Within 3 days"), color: calendar.theme.colors.warning || "#e6bd57"},
+                        {label: qsTranslate("Spectrum", "Today / overdue"), color: calendar.theme.colors.error || "#ff8c9a"}]
                     RowLayout {
                         required property var modelData
                         spacing: 5
@@ -187,7 +187,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         text: Qt.formatDate(new Date(Number(calendar.selectedDate.slice(0, 4)), Number(calendar.selectedDate.slice(5, 7)) - 1, Number(calendar.selectedDate.slice(8, 10)), 12), "dddd, d MMMM")
-            + (calendar.selectedEntries.length ? " · " + calendar.selectedEntries.length + " due" : "")
+            + (calendar.selectedEntries.length ? " · " + calendar.selectedEntries.length + qsTranslate("Spectrum", " due") : "")
         color: calendar.theme.colors.foreground
         wrapMode: Text.WordWrap
         font { family: calendar.theme.fontFamily; pixelSize: calendar.theme.fontSize; bold: true }
@@ -195,9 +195,9 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: calendar.selectedEntries.length === 0
-        text: !calendar.loaded ? "Loading due dates…" : !calendar.questline.available
-            ? (calendar.questline.error ? "Could not load Questline due dates." : "Questline due dates are unavailable.")
-            : "No tasks or steps due on this day."
+        text: !calendar.loaded ? qsTranslate("Spectrum", "Loading due dates…") : !calendar.questline.available
+            ? (calendar.questline.error ? qsTranslate("Spectrum", "Could not load Questline due dates.") : qsTranslate("Spectrum", "Questline due dates are unavailable."))
+            : qsTranslate("Spectrum", "No tasks or steps due on this day.")
         color: calendar.theme.colors.muted
         wrapMode: Text.WordWrap
         font { family: calendar.theme.fontFamily; pixelSize: calendar.theme.fontSize - 1 }
@@ -228,7 +228,7 @@ ColumnLayout {
                     spacing: 3
                     Text {
                         Layout.fillWidth: true
-                        text: (modelData.stepId ? "Step · " : "Task · ") + modelData.title
+                        text: (modelData.stepId ? qsTranslate("Spectrum", "Step · ") : qsTranslate("Spectrum", "Task · ")) + modelData.title
                         elide: Text.ElideRight
                         color: calendar.theme.colors.foreground
                         font { family: calendar.theme.fontFamily; pixelSize: calendar.theme.fontSize; bold: true }

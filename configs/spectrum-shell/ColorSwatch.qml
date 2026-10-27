@@ -19,7 +19,7 @@ Rectangle {
     border.width: selected ? 2 : 1
     border.color: Qt.rgba(ink.r, ink.g, ink.b, selected ? 0.8 : 0.2)
     Accessible.role: Accessible.Button
-    Accessible.name: "Copy " + value
+    Accessible.name: qsTranslate("Spectrum", "Copy ") + value
     Accessible.onPressAction: copyColor()
 
     function linear(channel): real {
@@ -37,7 +37,7 @@ Rectangle {
         onExited: (code, status) => {
             if (code !== 0) return;
             Quickshell.execDetached(["notify-send", "--app-name", "SpectrumOS Color Picker",
-                "--icon", "color-select-symbolic", "--expire-time", "2000", "Color copied", swatch.copiedValue]);
+                "--icon", "color-select-symbolic", "--expire-time", "2000", qsTranslate("Spectrum", "Color copied"), swatch.copiedValue]);
             swatch.copied();
         }
     }

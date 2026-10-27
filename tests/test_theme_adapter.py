@@ -112,7 +112,7 @@ class ThemeAdapterTests(unittest.TestCase):
 
     def test_apply_to_current_wallpaper_is_a_no_op_without_an_active_wallpaper(self):
         with mock.patch.object(self.module, "launch") as launch:
-            self.module.apply_to_current_wallpaper("clustered", "dark")
+            self.module.apply_to_current_wallpaper()
 
         launch.assert_not_called()
 
@@ -122,10 +122,10 @@ class ThemeAdapterTests(unittest.TestCase):
         self.set_current_wallpaper(wallpaper)
 
         with mock.patch.object(self.module, "launch") as launch:
-            self.module.apply_to_current_wallpaper("clustered", "dark")
+            self.module.apply_to_current_wallpaper()
 
         launch.assert_called_once_with(
-            ["/usr/lib/spectrumos/theme-menu", "--apply", str(wallpaper.resolve()), "clustered", "dark"]
+            ["/usr/lib/spectrumos/theme-menu", "--refresh"]
         )
 
     def test_mode_command_saves_the_preference_and_previews_it_live(self):
@@ -140,7 +140,7 @@ class ThemeAdapterTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.module.preferences()["mode"], "weighted-regions")
         launch.assert_called_once_with(
-            ["/usr/lib/spectrumos/theme-menu", "--apply", str(wallpaper.resolve()), "weighted-regions", "dark"]
+            ["/usr/lib/spectrumos/theme-menu", "--refresh"]
         )
 
     def test_mode_command_rejects_an_unknown_backend(self):
@@ -227,7 +227,7 @@ class ThemeAdapterTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.module.preferences()["scheme"], "nord")
         launch.assert_called_once_with(
-            ["/usr/lib/spectrumos/theme-menu", "--apply", str(wallpaper.resolve()), "spectrum", "dark"]
+            ["/usr/lib/spectrumos/theme-menu", "--refresh"]
         )
 
     def test_scheme_command_rejects_a_scheme_gowall_does_not_offer(self):
@@ -262,7 +262,7 @@ class ThemeAdapterTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(self.module.preferences()["variant"], "light")
         launch.assert_called_once_with(
-            ["/usr/lib/spectrumos/theme-menu", "--apply", str(wallpaper.resolve()), "spectrum", "light"]
+            ["/usr/lib/spectrumos/theme-menu", "--refresh"]
         )
 
 

@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import os
+import shutil
+import subprocess
+import tempfile
+
+root = Path(__file__).resolve().parents[1]
+with tempfile.TemporaryDirectory(prefix='spectrum-search-ui-') as temporary:
+    folder = Path(temporary)
+    runtime = folder / 'runtime'
+    runtime.mkdir(mode=0o700)
+    backend = folder / 'spectrum-shell-tools'
+    backend.write_text('''#!/usr/bin/env python3
+from pathlib import Path
+import json,sys,time
+state=Path(__file__).with_name('selected-root')
+root=state.read_text() if state.exists() else '/home/test'
+action=sys.argv[1]
+if action=='search-root':
+ root=sys.argv[2]
+ if root=='/missing':print(json.dumps({'ok':False,'error':'Folder unavailable'}));sys.exit(1)
+ state.write_text(root)
+if action in ['search-state','search-root']:
+ print(json.dumps({'ok':True,'root':root,'locations':[{'path':'/home/test','name':'Home'},{'path':'/media/Music','name':'Music'}]}))
+elif action=='search-json':
+ request=json.loads(sys.argv[2]);time.sleep(.6 if request['query']=='slow' else .03)
+ print(json.dumps({'ok':True,'matches':[request['root']+'/'+request['query']+'.txt'],'request_id':request['request_id']}))
+''')
+    backend.chmod(0o755)
+    ui = folder / 'ui'
+    ui.mkdir()
+    for name in ['FileSearch', 'FocusChoice', 'ShellButton', 'KeyboardAction']:
+        shutil.copy2(root / f'configs/spectrum-shell/{name}.qml', ui / (name + '.qml'))
+    test = folder / 'shell.qml'
+    test.write_text((root / 'tests/qml/FileSearchTests.qml').read_text().replace('../../configs/spectrum-shell', 'ui'))
+    env = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'QT_QUICK_BACKEND': 'software',
+           'XDG_RUNTIME_DIR': str(runtime), 'SPECTRUM_SEARCH_FIXTURE': str(folder)}
+    env.pop('WAYLAND_DISPLAY', None)
+    env.pop('DISPLAY', None)
+    result = subprocess.run(['qs', '--path', str(test)], env=env, capture_output=True, text=True, timeout=60)
+    output = result.stdout + result.stderr
+    print(output)
+    assert '0 failed' in output and 'FAIL!' not in output, output
+    raise SystemExit(result.returncode)

@@ -10,6 +10,8 @@ import sys
 import time
 
 CLI = '/usr/bin/spectrumdrop'
+LAN = '/usr/lib/spectrumos/spectrumdrop/bin/lan.py'
+PICK = '/usr/lib/spectrumos/spectrumdrop/bin/pick.py'
 UNIT = 'spectrumdrop-send.service'
 MAC = re.compile(r'(?:[0-9a-f]{2}:){5}[0-9a-f]{2}')
 
@@ -24,7 +26,7 @@ def runtime():
 def read_state(name):
     path = runtime() / (name + '.json')
     try:
-        if path.stat().st_size > 8192:
+        if path.stat().st_size > (128 * 1024 if name in ('lan-peers', 'selection') or name.startswith(('lan-job-', 'apple-job-')) else 8192):
             return {}
         return json.loads(path.read_text())
     except (OSError, ValueError):
@@ -87,6 +89,45 @@ def peer(value):
     return value
 
 
+def selected_files(values):
+    if not isinstance(values, list) or not 1 <= len(values) <= 128:
+        raise ValueError('Select between 1 and 128 regular files.')
+    result = []
+    for value in values:
+        if not isinstance(value, str) or '\0' in value or not Path(value).is_absolute():
+            raise ValueError('The file selection contains an invalid path.')
+        path = Path(value)
+        if path.is_symlink() or not path.is_file() or not os.access(path, os.R_OK):
+            raise ValueError('A selected file is missing or unreadable: ' + path.name)
+        result.append(str(path))
+    if len(json.dumps(result).encode()) > 96 * 1024:
+        raise ValueError('The selected file paths are too large.')
+    return result
+
+
+def selection():
+    value = read_state('selection')
+    if not isinstance(value, dict) or value.get('expires', 0) < time.time():
+        return {}
+    return value
+
+
+def selection_summary():
+    value = selection()
+    paths = value.get('paths', [])
+    return dict(count=len(paths), names=[Path(path).name for path in paths[:5]])
+
+
+def prepare_selection(payload):
+    paths = selected_files(payload.get('paths'))
+    with open(runtime() / 'send.lock', 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if read_state('transfer').get('active'):
+            raise ValueError('Finish or cancel the current transfer before selecting more files.')
+        write_state('selection', {'paths': paths, 'expires': time.time() + 900})
+    return dict(ok=True, selection=selection_summary())
+
+
 def normalize_peers(rows):
     result = {}
     if not isinstance(rows, list):
@@ -101,9 +142,161 @@ def normalize_peers(rows):
     return list(result.values())
 
 
-def status():
+def lan_command(*args, timeout=15):
+    if not Path(LAN).is_file():
+        raise ValueError('Network sharing is unavailable. Update SpectrumOS and retry.')
+    out, _ = run([sys.executable, LAN, *args], timeout=timeout, check=False)
+    value = json.loads(out)
+    if not isinstance(value, dict):
+        raise ValueError('SpectrumDrop network sharing returned an invalid response.')
+    if not value.get('ok'):
+        raise ValueError(str(value.get('error', 'SpectrumDrop network sharing failed.'))[:300])
+    return value
+
+
+def lan_status():
+    if not Path(LAN).is_file():
+        return dict(available=False, receiving=False, incoming=[], error='Update SpectrumOS to enable network sharing.')
+    try:
+        return lan_command('status', timeout=5)
+    except (ValueError, OSError, TypeError):
+        return dict(available=True, receiving=False, incoming=[], error='Could not read network sharing status.')
+
+
+def scan_lan():
+    value = lan_command('scan', timeout=20)
+    peers = []
+    for row in value.get('peers', [])[:64]:
+        if not isinstance(row, dict) or not re.fullmatch(r'[0-9a-f]{32}', str(row.get('id', ''))):
+            continue
+        peers.append({**row, 'mac': 'lan:' + row['id'], 'transport': 'lan'})
+    write_state('lan-peers', {'peers': peers})
+    return dict(ok=True, peers=peers, warning=value.get('error', ''))
+
+
+def send_lan(address, payload):
+    code = payload.get('code', '')
+    if not isinstance(code, str) or not re.fullmatch(r'[A-Z2-7]{16}', code.upper().replace('-', '').replace(' ', '')):
+        raise ValueError('Enter the 16-character code shown on the receiving Spectrum PC.')
+    if address == 'manual':
+        value = payload.get('address', '').strip()
+        import ipaddress
+        host, marker, port = value.rpartition(':')
+        if value.startswith('[') and ']:' in value:
+            host, port = value[1:].split(']:', 1)
+        elif value.count(':') != 1:
+            host, port = value, '8857'
+        ipaddress.ip_address(host.split('%')[0])
+        port = int(port)
+        if not 1 <= port <= 65535:
+            raise ValueError('Enter a valid receiver port.')
+        target = {'addresses': [host], 'port': port, 'name': 'Spectrum PC'}
+    else:
+        target = next((row for row in read_state('lan-peers').get('peers', []) if row['mac'] == address), None)
+        if target is None:
+            raise ValueError('This device is no longer listed. Search again.')
+    with open(runtime() / 'send.lock', 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        _, active = run(['systemctl', '--user', 'is-active', UNIT], check=False)
+        if active == 0:
+            raise ValueError('A transfer is already running.')
+        import secrets
+        job_id = secrets.token_hex(16)
+        job = {'peer': target, 'code': code}
+        queued = selection()
+        if queued:
+            job['paths'] = selected_files(queued.get('paths'))
+        write_state('lan-job-' + job_id, job)
+        write_state('transfer', dict(active=True, phase='choosing', peer=address, transport='lan', message='Choose files…', updated=time.time()))
+        try:
+            run(['systemd-run', '--user', '--quiet', '--collect', '--unit=' + UNIT,
+                 '--property=Type=exec', '--property=TimeoutStopSec=12s',
+                 '--property=KillMode=control-group', sys.argv[0], 'worker-lan', job_id])
+            (runtime() / 'selection.json').unlink(missing_ok=True)
+        except (OSError, ValueError):
+            (runtime() / ('lan-job-' + job_id + '.json')).unlink(missing_ok=True)
+            write_state('transfer', dict(active=False, phase='failed', message='Could not start sending.'))
+            raise
+    return status('lan')
+
+
+def worker_lan(job_id):
+    if not re.fullmatch(r'[0-9a-f]{32}', job_id):
+        raise ValueError('Invalid send job.')
+    job = read_state('lan-job-' + job_id)
+    (runtime() / ('lan-job-' + job_id + '.json')).unlink(missing_ok=True)
+    state = dict(active=True, phase='choosing', transport='lan', message='Choose files…', updated=time.time())
+    process = None
+    cancelled = False
+    def stopping(*_):
+        nonlocal cancelled
+        cancelled = True
+        if process and process.poll() is None:
+            process.send_signal(signal.SIGTERM)
+    signal.signal(signal.SIGTERM, stopping)
+    signal.signal(signal.SIGINT, stopping)
+    try:
+        if 'paths' in job:
+            job['paths'] = selected_files(job['paths'])
+        else:
+            directory = lan_status().get('dir') or str(Path.home() / 'Downloads')
+            paths, result = run([sys.executable, PICK, 'files', directory, 'Send with SpectrumDrop'], timeout=180, check=False)
+            if result == 1:
+                raise InterruptedError('Send cancelled.')
+            if result or not paths:
+                raise ValueError('Could not open the file chooser.')
+            job['paths'] = [item for item in paths.split('\0') if item]
+        state.update(phase='preparing', message='Preparing encrypted transfer…', updated=time.time())
+        write_state('transfer', state)
+        process = subprocess.Popen([sys.executable, LAN, 'send'], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process.stdin.write(json.dumps(job))
+        process.stdin.close()
+        for line in process.stdout:
+            try:
+                value = json.loads(line)
+            except ValueError:
+                continue
+            if not value.get('ok'):
+                state.update(phase=value.get('phase', 'failed'), message=value.get('error') or value.get('message') or 'Send failed.')
+            else:
+                for key in ('phase', 'message', 'bytes', 'total', 'percent'):
+                    if key in value:
+                        state[key] = value[key]
+            state['updated'] = time.time()
+            write_state('transfer', state)
+        result = process.wait()
+        if cancelled or result == 130:
+            state.update(phase='cancelled', message='Send cancelled.')
+        elif result or state['phase'] != 'complete':
+            state.update(phase='failed', message=state.get('message') if state['phase'] == 'failed' else 'Send failed. The receiver did not confirm completion.')
+    except (InterruptedError, SystemExit):
+        state.update(phase='cancelled', message='Send cancelled.')
+    except (OSError, ValueError, KeyError) as error:
+        state.update(phase='failed', message=str(error)[:300])
+    finally:
+        if process:
+            for stream in (process.stdout, process.stderr):
+                if stream:
+                    stream.close()
+        state.update(active=False, updated=time.time())
+        write_state('transfer', state)
+        if state['phase'] in ('complete', 'failed'):
+            notify(state['message'], state['phase'] == 'failed')
+
+
+def status(transport=None):
+    if transport == "lan":
+        transfer = read_state("transfer")
+        if transfer.get("active"):
+            _, active = run(["systemctl", "--user", "is-active", UNIT], check=False)
+            if active and time.time() - transfer.get("updated", 0) > 3:
+                transfer.update(active=False, phase="failed", message="Send worker stopped unexpectedly.")
+                write_state("transfer", transfer)
+        return dict(ok=True, available=Path(LAN).is_file(), receiving=False, visible=False,
+                    transfer=transfer, lan=lan_status(), selection=selection_summary(), error="")
     if not Path(CLI).is_file():
-        return dict(ok=True, available=False, receiving=False, visible=False, transfer={},
+        return dict(ok=True, available=False, receiving=False, visible=False, transfer={}, selection=selection_summary(),
                     error='SpectrumDrop is unavailable. Update SpectrumOS to restore its components.')
     out, _ = run([CLI, 'status', '--json'], timeout=10)
     state = json.loads(out)
@@ -113,8 +306,8 @@ def status():
         if active and time.time() - transfer.get('updated', 0) > 3:
             transfer.update(active=False, phase='failed', message='Send worker stopped unexpectedly.')
             write_state('transfer', transfer)
-    return dict(ok=True, available=True, **state, transfer=transfer,
-                radio_owned=bool(read_state('radio').get('restore_off')), error='')
+    return dict(ok=True, available=True, **state, transfer=transfer, lan=lan_status(),
+                radio_owned=bool(read_state('radio').get('restore_off')), selection=selection_summary(), error='')
 
 
 def restore_radio():
@@ -152,19 +345,28 @@ def send(address):
         _, active = run(['systemctl', '--user', 'is-active', UNIT], check=False)
         if active == 0:
             raise ValueError('A transfer is already running.')
-        write_state('transfer', dict(active=True, phase='choosing', peer=address,
-                                    message='Choose files…', updated=time.time()))
+        job_id = None
+        queued = selection()
+        if queued:
+            import secrets
+            job_id = secrets.token_hex(16)
+            write_state('apple-job-' + job_id, {'paths': selected_files(queued.get('paths'))})
+        write_state('transfer', dict(active=True, phase='preparing' if queued else 'choosing', peer=address,
+                                    message='Preparing selected files…' if queued else 'Choose files…', updated=time.time()))
         try:
             run(['systemd-run', '--user', '--quiet', '--collect', '--unit=' + UNIT,
                  '--property=Type=exec', '--property=TimeoutStopSec=12s',
-                 '--property=KillMode=control-group', sys.argv[0], 'worker', address])
+                 '--property=KillMode=control-group', sys.argv[0], 'worker', address, *([job_id] if job_id else [])])
+            (runtime() / 'selection.json').unlink(missing_ok=True)
         except (OSError, ValueError):
+            if job_id:
+                (runtime() / ('apple-job-' + job_id + '.json')).unlink(missing_ok=True)
             write_state('transfer', dict(active=False, phase='failed', message='Could not start sending.'))
             raise
     return status()
 
 
-def worker(address):
+def worker(address, job_id=None):
     address = peer(address)
     cancelled = False
     process = None
@@ -181,7 +383,17 @@ def worker(address):
     signal.signal(signal.SIGINT, stopping)
     write_state('transfer', state)
     try:
-        process = subprocess.Popen([CLI, 'send', '--pick', '--to', address],
+        arguments = [CLI, 'send', '--pick', '--to', address]
+        if job_id is not None:
+            if not re.fullmatch(r'[0-9a-f]{32}', job_id):
+                raise ValueError('Invalid file-selection job.')
+            paths = selected_files(read_state('apple-job-' + job_id).get('paths'))
+            (runtime() / ('apple-job-' + job_id + '.json')).unlink(missing_ok=True)
+            arguments = [CLI, 'send', '--to', address, '--', *paths]
+            chosen = True
+            state.update(phase='preparing', message='Preparing selected files…')
+            write_state('transfer', state)
+        process = subprocess.Popen(arguments,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         for line in iter(lambda: process.stdout.readline(4096), ''):
             if not line.strip():
@@ -203,7 +415,7 @@ def worker(address):
             if 'self-signed certificates' in detail:
                 detail = 'Could not connect to the Mac’s AirDrop receiver. If Everyone is already enabled, reopen Finder → AirDrop, then Search and retry.'
             state.update(phase='failed', message='Send failed: ' + detail)
-    except OSError:
+    except (OSError, ValueError):
         state.update(phase='failed', message='Send failed: Could not start the sender.')
     finally:
         if process and process.stdout:
@@ -214,10 +426,38 @@ def worker(address):
             notify(state['message'], state['phase'] == 'failed')
 
 
-def action(args):
+def action(args, payload=None):
+    payload = payload or {}
+    if args == ['prepare-selection']:
+        return prepare_selection(payload)
+    if args and args[0] == 'clear-selection' and (len(args) == 1 or (len(args) == 2 and args[1] in ('pc', 'airdrop'))):
+        (runtime() / 'selection.json').unlink(missing_ok=True)
+        return status(None if args[-1] == 'airdrop' else 'lan')
     if not args:
         raise ValueError('Choose a SpectrumDrop action.')
     command = args[0]
+    if command == 'receive-lan' and len(args) == 2:
+        lan_command('receive', args[1], timeout=25)
+        return status('lan')
+    if command == 'stop-lan' and len(args) == 1:
+        lan_command('stop')
+        return status('lan')
+    if command in ('accept-lan', 'decline-lan', 'cancel-incoming-lan') and len(args) == 2:
+        lan_command(command.split('-')[0], args[1])
+        return status('lan')
+    if command == 'scan-lan' and len(args) == 1:
+        return scan_lan()
+    if command == 'send-lan' and len(args) == 2:
+        return send_lan(args[1], payload)
+    if command == 'copy-lan-code' and len(args) == 1:
+        code = lan_status().get('code', '')
+        if code:
+            process = subprocess.run(['wl-copy'], input=code, text=True, timeout=3)
+            if process.returncode:
+                raise ValueError('Could not copy the receiver code.')
+        return status('lan')
+    if command == 'status-lan' and len(args) == 1:
+        return status('lan')
     if command == 'status' and len(args) == 1:
         return status()
     if command == 'receive' and len(args) == 2:
@@ -238,6 +478,10 @@ def action(args):
         return send(args[1])
     if command == 'cancel' and len(args) == 1:
         run(['systemctl', '--user', 'stop', UNIT], timeout=20)
+        transfer = read_state('transfer')
+        if transfer.get('active'):
+            transfer.update(active=False, phase='cancelled', message='Send cancelled.', updated=time.time())
+            write_state('transfer', transfer)
         return status()
     if command == 'folder' and len(args) == 1:
         run([CLI, 'dir', '--pick'], timeout=180)
@@ -248,9 +492,22 @@ def action(args):
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'worker':
         worker(sys.argv[2])
+    elif len(sys.argv) == 4 and sys.argv[1] == 'worker':
+        worker(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 3 and sys.argv[1] == 'worker-lan':
+        worker_lan(sys.argv[2])
     else:
         try:
-            result = action(sys.argv[1:])
+            payload = {}
+            if sys.argv[1:2] in (['send-lan'], ['prepare-selection']):
+                limit = 128 * 1024 if sys.argv[1] == 'prepare-selection' else 8192
+                raw = sys.stdin.buffer.readline(limit + 1)
+                if len(raw) > limit:
+                    raise ValueError('The send request is too large.')
+                payload = json.loads(raw)
+                if not isinstance(payload, dict):
+                    raise ValueError('Invalid send request.')
+            result = action(sys.argv[1:], payload)
         except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
             result = dict(ok=False, error=str(error)[-1000:])
             if sys.argv[1:2] not in (['status'], ['scan']):

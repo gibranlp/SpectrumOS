@@ -20,4 +20,12 @@ if [[ -r /etc/profile.d/flatpak.sh ]]; then
     source /etc/profile.d/flatpak.sh
 fi
 
+if [[ $("${SPECTRUM_SHELL_BACKEND_DIR:-/usr/lib/spectrumos}/spectrum-session-profile" get) == lean ]]; then
+    export SPECTRUM_LEAN_MODE=1
+    export QT_QUICK_CONTROLS_STYLE=${QT_QUICK_CONTROLS_STYLE:-Basic}
+fi
+
+# Evita reservar páginas enormes para asignaciones pequeñas sin cambiar la política del sistema.
+export MALLOC_CONF=${MALLOC_CONF-thp:never}
+
 exec qs --path "$config_dir" --no-duplicate

@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+from importlib.machinery import SourceFileLoader
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+import struct
+import tempfile
+import time
+
+
+root = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_loader("storage", SourceFileLoader("storage", str(root / "installer/spectrum-installer-storage")))
+storage = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(storage)
+output = root / "artifacts/dual-boot-review-20261025"
+output.mkdir(parents=True, exist_ok=True)
+
+
+def run(*arguments):
+    return subprocess.check_output([str(item) for item in arguments], stderr=subprocess.STDOUT, text=True)
+
+
+def table(image):
+    return json.loads(run("sfdisk", "--json", image))["partitiontable"]
+
+
+def fat(image, part, files):
+    run("mkfs.fat", "-F", "32", "-s", "8", "-h", part["start"], "--offset", part["start"], image, part["size"] // 2)
+    with image.open("rb") as handle:
+        handle.seek(part["start"] * 512)
+        bpb = handle.read(512)
+    total = struct.unpack_from("<I", bpb, 32)[0]
+    reserved = struct.unpack_from("<H", bpb, 14)[0]
+    fat_sectors = struct.unpack_from("<I", bpb, 36)[0]
+    assert (total - reserved - bpb[16] * fat_sectors) // bpb[13] >= 65525
+    source = f"{image}@@{part['start'] * 512}"
+    for target, contents in files.items():
+        destination = "::/" + target
+        components = Path(target).parts[:-1]
+        for index in range(1, len(components) + 1):
+            subprocess.run(["mmd", "-i", source, "::/" + "/".join(components[:index])],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if isinstance(contents, bytes):
+            path = image.parent / "temporary-content"
+            path.write_bytes(contents)
+        else:
+            path = contents
+        run("mcopy", "-o", "-i", source, path, destination)
+
+
+with tempfile.TemporaryDirectory(prefix="spectrum-uefi-check-") as temporary:
+    directory = Path(temporary)
+    disk = directory / "target.img"
+    with disk.open("wb") as handle:
+        handle.truncate(80 * storage.GIB)
+    run("sgdisk", "--clear", "--new=1:2048:+512MiB", "--typecode=1:ef00",
+        "--new=3:0:+20GiB", "--typecode=3:8300", disk)
+    before = table(disk)
+    layout = {"disk": str(disk), "disk_guid": before["id"], "sector_size": 512,
+              "blockers": [], "free_extents": storage.aligned_extents(before),
+              "partitions": [{"number": int(item["node"].removeprefix(str(disk))), **item} for item in before["partitions"]],
+              "fingerprint": "disposable-uefi-test"}
+    plan = storage.make_plan(layout, layout["free_extents"][-1]["start"], 40)
+    for arguments in storage.partition_commands(plan)[:1]:
+        run(*arguments)
+    after = table(disk)
+    assert all(part in after["partitions"] for part in before["partitions"])
+    existing = after["partitions"][0]
+    new = next(part for part in after["partitions"] if part["uuid"].lower() == plan["create"][0]["partuuid"])
+    loader = Path("/usr/share/limine/BOOTX64.EFI")
+    fixture_source = directory / "fixture.c"
+    fixture_source.write_text('''
+unsigned long long efi_main(void *image, void *system) {
+    const char *message = "SPECTRUM_PRESERVED_EFI_REACHED\\n";
+    for (; *message; message++) {
+        __asm__ volatile ("outb %0, $0xe9" : : "a" (*message));
+    }
+    for (;;) { __asm__ volatile ("hlt"); }
+}
+''')
+    fixture = directory / "fixture.efi"
+    run("clang", "--target=x86_64-pc-win32-coff", "-ffreestanding", "-mno-red-zone", "-fno-stack-protector",
+        "-c", fixture_source, "-o", directory / "fixture.obj")
+    run("lld-link", "/subsystem:efi_application", "/entry:efi_main", "/nodefaultlib", "/fixed:no",
+        "/out:" + str(fixture), directory / "fixture.obj")
+    foreign_config = b"timeout: no\ninterface_branding: EXISTING LOADER REACHED\n\n/Preserved existing system\n    protocol: efi\n    path: boot():/missing.efi\n"
+    new_config = (f"timeout: 0\ninterface_branding: SpectrumOS test\n\n/Existing system\n    protocol: efi\n"
+                  f"    path: guid({existing['uuid'].lower()}):/EFI/ubuntu/grubx64.efi\n").encode()
+    fat(disk, new, {"EFI/SpectrumOS/limine.efi": loader, "limine.conf": new_config})
+    copied = directory / "verified-limine.efi"
+    run("mcopy", "-i", f"{disk}@@{new['start'] * 512}", "::/EFI/SpectrumOS/limine.efi", copied)
+    assert copied.read_bytes() == loader.read_bytes()
+    launch_config = (f"timeout: 0\n\n/SpectrumOS namespaced loader\n    protocol: efi\n"
+                     f"    path: guid({new['uuid'].lower()}):/EFI/SpectrumOS/limine.efi\n").encode()
+    fat(disk, existing, {"EFI/ubuntu/grubx64.efi": fixture, "limine.conf": foreign_config,
+                         "EFI/BOOT/BOOTX64.EFI": loader, "EFI/BOOT/limine.conf": launch_config})
+    assert "No problems found." in run("sgdisk", "--verify", disk)
+    variables = directory / "OVMF_VARS.fd"
+    shutil.copyfile("/usr/share/edk2/x64/OVMF_VARS.4m.fd", variables)
+    qmp = directory / "qmp.socket"
+    debug = directory / "debug.log"
+    process = subprocess.Popen([
+        "qemu-system-x86_64", "-machine", "q35", "-accel", "tcg", "-m", "256", "-smp", "1",
+        "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd",
+        "-drive", f"if=pflash,format=raw,file={variables}",
+        "-drive", f"if=none,id=target,format=raw,file={disk}",
+        "-device", "ide-hd,drive=target,bus=ide.0,bootindex=1",
+        "-display", "none", "-serial", "none", "-nic", "none",
+        "-debugcon", f"file:{debug}", "-global", "isa-debugcon.iobase=0xe9",
+        "-qmp", f"unix:{qmp},server=on,wait=off", "-no-reboot",
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    try:
+        for _ in range(100):
+            if qmp.exists() or process.poll() is not None:
+                break
+            time.sleep(.1)
+        if process.poll() is not None:
+            raise RuntimeError(process.stderr.read().decode())
+        with socket.socket(socket.AF_UNIX) as connection:
+            connection.settimeout(10)
+            connection.connect(str(qmp))
+            stream = connection.makefile("rwb", buffering=0)
+            stream.readline()
+            def request(name, arguments=None):
+                stream.write((json.dumps({"execute": name, "arguments": arguments or {}}) + "\n").encode())
+                while True:
+                    response = json.loads(stream.readline())
+                    if "return" in response:
+                        return response["return"]
+                    if "error" in response:
+                        raise RuntimeError(response)
+            request("qmp_capabilities")
+            for _ in range(300):
+                if debug.exists() and "SPECTRUM_PRESERVED_EFI_REACHED" in debug.read_text(errors="replace"):
+                    break
+                time.sleep(.1)
+            screenshot = directory / "screen.ppm"
+            request("screendump", {"filename": str(screenshot)})
+            from PIL import Image
+            Image.open(screenshot).save(output / "uefi-chainload.png")
+            request("quit")
+            process.wait(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=10)
+    after = table(disk)
+    reached = "SPECTRUM_PRESERVED_EFI_REACHED" in debug.read_text(errors="replace")
+    assert all(part in after["partitions"] for part in before["partitions"])
+    (output / "uefi-chainload.json").write_text(json.dumps({
+        "scope": "OVMF chainload through namespaced Spectrum loader into a small EFI marker fixture; no Windows/Linux installation",
+        "preserved_partitions": before["partitions"], "created_partitions": plan["create"],
+        "screenshot": "uefi-chainload.png", "preserved_loader_executed": reached,
+    }, indent=2) + "\n")
+    assert reached, "The preserved EFI marker was not executed; inspect artifacts/dual-boot-review-20261025/uefi-chainload.png"
+    print("UEFI preserved-loader marker executed successfully")

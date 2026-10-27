@@ -12,6 +12,7 @@ build() {
     add_binary date
     add_binary find
     add_binary mountpoint
+    add_binary blkid
     add_runscript
 }
 
@@ -20,8 +21,8 @@ help() {
 This hook checks the spectrumos.restore= kernel parameter before the normal
 root-mounting hooks run. When present ("latest" or an explicit restore-point
 id), it promotes that SpectrumOS Btrfs restore point to a new writable @,
-restores the matching /boot archive onto the EFI partition labeled
-SPECTRM_EFI, and lets boot continue normally into the now-restored root. The
+restores the matching /boot archive onto the owned EFI partition (or the
+legacy SPECTRM_EFI partition), and continues into the restored root. The
 previous @ and EFI contents are preserved under @failed/spectrumos/, never
 deleted. Absent the parameter, this hook has no effect on boot.
 

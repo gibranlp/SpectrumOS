@@ -27,7 +27,7 @@ detect_installed_roots() {
     while read -r name fstype; do
         [[ $fstype == btrfs ]] || continue
         scratch=$(mktemp -d)
-        if mount -o subvolid=5 "/dev/$name" "$scratch" 2>/dev/null; then
+        if mount -o ro,nologreplay,subvolid=5 "/dev/$name" "$scratch" 2>/dev/null; then
             [[ -d "$scratch/@" ]] && printf '/dev/%s\n' "$name"
             umount "$scratch"
         fi
@@ -35,10 +35,41 @@ detect_installed_roots() {
     done < <(lsblk -rno NAME,FSTYPE 2>/dev/null)
 }
 
-# Finds the FAT32 SpectrumOS EFI System Partition, if any -- BIOS installs
-# and installs mid-repair may not have one.
+# Usa la identidad guardada en la raíz; una etiqueta repetida no identifica una instalación.
 detect_esp() {
-    lsblk -rno NAME,LABEL 2>/dev/null | awk '$2 == "SPECTRM_EFI" {print "/dev/"$1; exit}'
+    local root_device=$1 scratch owned_uuid boot_source device
+    scratch=$(mktemp -d) || return 1
+    if ! mount -o ro,nologreplay,subvol=@ "$root_device" "$scratch"; then
+        rmdir "$scratch"
+        return 1
+    fi
+    if [[ -f $scratch/etc/spectrumos/boot-ownership ]]; then
+        owned_uuid=$(sed -n 's/^boot_uuid=//p' "$scratch/etc/spectrumos/boot-ownership")
+        umount "$scratch"
+        rmdir "$scratch"
+        [[ $owned_uuid =~ ^[A-Za-z0-9-]+$ ]] || return 1
+        blkid -U "$owned_uuid"
+        return $?
+    fi
+    boot_source=$(awk '$1 !~ /^#/ && $2 == "/boot" {print $1; exit}' "$scratch/etc/fstab" 2>/dev/null)
+    umount "$scratch"
+    rmdir "$scratch"
+    if [[ -n $boot_source ]]; then
+        if [[ -b $boot_source ]]; then
+            readlink -f "$boot_source"
+            return 0
+        fi
+        findfs "$boot_source"
+        return $?
+    fi
+    local -a candidates
+    mapfile -t candidates < <(lsblk -rno NAME,LABEL 2>/dev/null | awk '$2 == "SPECTRM_EFI" {print "/dev/"$1}')
+    if ((${#candidates[@]} == 1)); then
+        printf '%s\n' "${candidates[0]}"
+    else
+        printf 'The EFI partition is missing or ambiguous; select it manually.\n' >&2
+        return 1
+    fi
 }
 
 choose_root_device() {
@@ -64,6 +95,10 @@ choose_root_device() {
 # subvolume layout actually is, rather than assuming one.
 mount_installed_system() {
     local root_device=$1
+    if mountpoint -q "$target"; then
+        printf 'The recovery mountpoint is already in use: %s\n' "$target" >&2
+        return 1
+    fi
     mkdir -p "$target"
     mount -o subvol=@ "$root_device" "$target" || return 1
     [[ -f "$target/etc/fstab" ]] || return 0
@@ -103,7 +138,7 @@ action_chroot() {
 action_restore_snapshot() {
     local root_device boot_device
     root_device=$(choose_root_device) || { pause; return; }
-    boot_device=$(detect_esp)
+    boot_device=$(detect_esp "$root_device")
     printf 'Root device: %s\n' "$root_device"
     printf 'Boot device: %s\n\n' "${boot_device:-none found}"
     spectrum-snapshot list --root-device "$root_device" || true
@@ -131,13 +166,52 @@ action_repair_bootloader() {
         pause
         return
     fi
+    if [[ -f $target/etc/spectrumos/boot-ownership && ! -d /sys/firmware/efi ]]; then
+        printf 'Boot this recovery medium in UEFI mode to repair an alongside installation.\n' >&2
+        unmount_installed_system
+        pause
+        return
+    fi
     if [[ -d /sys/firmware/efi ]]; then
+        local boot_device
+        if ! mountpoint -q "$target/boot"; then
+            printf 'The EFI partition is not mounted; refusing to write boot files.\n' >&2
+            unmount_installed_system
+            pause
+            return
+        fi
+        boot_device=$(findmnt --noheadings --output SOURCE "$target/boot")
+        boot_device=$(readlink -f "$boot_device")
+        if ! spectrum-snapshot verify-boot --root-path "$target" --boot-path "$target/boot" \
+            --root-device "$device" --boot-device "$boot_device"; then
+            unmount_installed_system
+            pause
+            return
+        fi
         if [[ -f /usr/share/limine/BOOTX64.EFI ]]; then
-            mkdir -p "$target/boot/EFI/BOOT"
-            cp /usr/share/limine/BOOTX64.EFI "$target/boot/EFI/BOOT/BOOTX64.EFI"
-            [[ -f /usr/share/limine/BOOTIA32.EFI ]] && cp /usr/share/limine/BOOTIA32.EFI "$target/boot/EFI/BOOT/BOOTIA32.EFI"
+            if [[ -f $target/etc/spectrumos/boot-ownership ]]; then
+                local number partuuid
+                disk=$(lsblk -dnro PKNAME "$boot_device")
+                number=$(cat "/sys/class/block/${boot_device##*/}/partition")
+                partuuid=$(sed -n 's/^boot_partuuid=//p' "$target/etc/spectrumos/boot-ownership")
+                if ! mkdir -p "$target/boot/EFI/SpectrumOS" || \
+                    ! cp /usr/share/limine/BOOTX64.EFI "$target/boot/EFI/SpectrumOS/limine.efi"; then
+                    printf 'Could not restore the SpectrumOS EFI loader.\n' >&2
+                    unmount_installed_system
+                    pause
+                    return
+                fi
+                if ! python /usr/local/lib/spectrumos/spectrum-installer-storage register-boot \
+                    --disk "/dev/$disk" --boot-number "$number" --boot-partuuid "$partuuid" --keep-boot-default; then
+                    printf 'EFI files were restored, but firmware entry repair failed.\n' >&2
+                fi
+            else
+                mkdir -p "$target/boot/EFI/BOOT"
+                cp /usr/share/limine/BOOTX64.EFI "$target/boot/EFI/BOOT/BOOTX64.EFI"
+                [[ -f /usr/share/limine/BOOTIA32.EFI ]] && cp /usr/share/limine/BOOTIA32.EFI "$target/boot/EFI/BOOT/BOOTIA32.EFI"
+            fi
             printf 'Restored the Limine EFI boot files.\n'
-            if [[ ! -f "$target/boot/EFI/BOOT/limine.conf" ]]; then
+            if [[ ! -f "$target/boot/EFI/BOOT/limine.conf" && ! -f "$target/boot/limine/limine.conf" && ! -f "$target/boot/limine.conf" ]]; then
                 printf 'limine.conf itself is missing; the boot files alone are not enough. Use the chroot option to restore it from a backup or restore point.\n'
             fi
         else

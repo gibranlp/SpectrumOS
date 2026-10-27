@@ -46,6 +46,10 @@ current=13
 [[ -f $state_file ]] && IFS= read -r current < "$state_file"
 [[ $current == "$selected" ]] || exit 0
 
+# Comparte el bloqueo con los cambios de wallpaper para no mezclar generaciones.
+mkdir -p -- "${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/theme"
+exec 8>"${XDG_STATE_HOME:-$HOME/.local/state}/spectrumos/theme/.apply.lock"
+flock 8
 PYTHONPATH=/usr/share/spectrumos/theme-engine python -m spectrum_theme.cli rerender-current
 hyprctl reload config-only
 pkill -USR1 -x kitty 2>/dev/null || true

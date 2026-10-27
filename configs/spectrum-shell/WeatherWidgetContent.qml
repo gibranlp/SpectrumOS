@@ -8,7 +8,7 @@ ColumnLayout {
 
     Text {
         Layout.fillWidth: true
-        text: content.theme.weather.location || "Current location"
+        text: content.theme.weather.location || qsTranslate("Spectrum", "Current location")
         elide: Text.ElideRight
         color: content.theme.colors.accent
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize; bold: true }
@@ -18,7 +18,7 @@ ColumnLayout {
         spacing: 12
         Text {
             Layout.fillWidth: true
-            text: (content.theme.weather.icon || "󰖕") + "  " + content.theme.weather.temperature + "\n" + (content.theme.weather.condition || "")
+            text: (content.theme.weather.icon || "󰖕") + "  " + content.theme.weather.temperature + "\n" + qsTranslate("Weather", content.theme.weather.condition || "")
             elide: Text.ElideRight
             color: content.theme.colors.foreground
             font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize + 4; bold: true }
@@ -27,9 +27,9 @@ ColumnLayout {
             spacing: 2
             Repeater {
                 model: [
-                    "Feels like  " + (content.theme.weather.apparent || "—"),
-                    "Humidity  " + (content.theme.weather.humidity || "—"),
-                    "Wind  " + (content.theme.weather.wind || "—")
+                    qsTranslate("Spectrum", "Feels like  ") + (content.theme.weather.apparent || "—"),
+                    qsTranslate("Spectrum", "Humidity  ") + (content.theme.weather.humidity || "—"),
+                    qsTranslate("Spectrum", "Wind  ") + (content.theme.weather.wind || "—")
                 ]
                 Text {
                     required property string modelData
@@ -50,7 +50,7 @@ ColumnLayout {
             color: content.theme.colors.surface_alt
             Text {
                 anchors { fill: parent; margins: 9 }
-                text: modelData.date + "  " + modelData.icon + "  " + modelData.condition + "     " + modelData.high + " / " + modelData.low
+                text: modelData.date + "  " + modelData.icon + "  " + qsTranslate("Weather", modelData.condition) + "     " + modelData.high + " / " + modelData.low
                 elide: Text.ElideRight
                 color: content.theme.colors.foreground
                 font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -58,7 +58,7 @@ ColumnLayout {
         }
     }
     Text {
-        text: "LOCATIONS"
+        text: qsTranslate("Spectrum", "LOCATIONS")
         color: content.theme.colors.accent
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize; bold: true }
     }
@@ -77,7 +77,7 @@ ColumnLayout {
                 onClicked: content.theme.runAction([content.theme.backend("weather-adapter"), "use", modelData.token])
             }
             ShellButton {
-                label: "Remove"
+                label: qsTranslate("Spectrum", "Remove")
                 enabled: (content.theme.weather.locations || []).length > 1
                 fontFamily: content.theme.fontFamily
                 fontSize: content.theme.fontSize - 1
@@ -90,7 +90,7 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         ShellButton {
-            label: "Add location"
+            label: qsTranslate("Spectrum", "Add location")
             fontFamily: content.theme.fontFamily
             fontSize: content.theme.fontSize
             backgroundColor: content.theme.colors.surface_alt
@@ -98,7 +98,7 @@ ColumnLayout {
             onClicked: content.theme.runAction([content.theme.backend("weather-adapter"), "select-native"])
         }
         ShellButton {
-            label: "Refresh"
+            label: qsTranslate("Spectrum", "Refresh")
             fontFamily: content.theme.fontFamily
             fontSize: content.theme.fontSize
             backgroundColor: content.theme.colors.surface_alt

@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import argparse
+import os
+import shutil
+import subprocess
+import tempfile
+
+root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--build', type=Path)
+options = parser.parse_args()
+with tempfile.TemporaryDirectory(prefix='spectrum-time-region-ui-') as temporary:
+    folder = Path(temporary)
+    runtime = folder / 'runtime'
+    runtime.mkdir(mode=0o700)
+    locale = folder / 'locale.conf'
+    locale.write_text('LANG=es_MX.UTF-8\nLC_TIME=pt_BR.UTF-8\n')
+    backend = folder / 'time-region-adapter'
+    backend.write_text('''#!/usr/bin/env python3
+import json,os,sys
+from pathlib import Path
+with (Path(os.environ['SPECTRUM_TIME_REGION_FIXTURE'])/'calls.jsonl').open('a') as output:
+    output.write(json.dumps(sys.argv[1:])+'\\n')
+print(json.dumps({'available':True,'language':'en_US.UTF-8','region':'pt_BR.UTF-8','timezones':[],'locales':[],'ntp':True}))
+''')
+    backend.chmod(0o755)
+    ui = folder / 'ui'
+    ui.mkdir()
+    for name in ('TimeRegionWidgetContent', 'ShellButton', 'KeyboardAction'):
+        shutil.copy2(root / f'configs/spectrum-shell/{name}.qml', ui / (name + '.qml'))
+    qml = folder / 'shell.qml'
+    qml.write_text((root / 'tests/qml/TimeRegionLanguageTests.qml').read_text().replace('../../configs/spectrum-shell', 'ui'))
+    environment = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'QT_QUICK_BACKEND': 'software',
+        'XDG_RUNTIME_DIR': str(runtime), 'SPECTRUM_TIME_REGION_FIXTURE': str(folder),
+        'SPECTRUM_LANGUAGE_FILE': str(folder / 'settings/language.json'),
+        'SPECTRUM_SYSTEM_LOCALE_FILE': str(locale)}
+    if options.build:
+        environment['QML_IMPORT_PATH'] = str(options.build.resolve() / 'qml')
+        environment['SPECTRUM_TRANSLATIONS_DIR'] = str(options.build.resolve() / 'translations')
+    environment.pop('WAYLAND_DISPLAY', None)
+    environment.pop('DISPLAY', None)
+    result = subprocess.run(['qs', '--path', str(qml)], env=environment, capture_output=True, text=True, timeout=45)
+    output = result.stdout + result.stderr
+    print(output)
+    assert result.returncode == 0 and '0 failed' in output and 'FAIL!' not in output, output
+    calls = (folder / 'calls.jsonl').read_text().splitlines()
+    assert calls and all(line == '["--json"]' for line in calls), calls

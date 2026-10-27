@@ -112,7 +112,7 @@ PanelWindow {
         Layout.fillWidth: true
         spacing: 5
         Label {
-            text: parent.device ? "Device level · " + parent.device.volume + "%" + (parent.device.muted ? " · muted" : "") : "Selected device is unavailable"
+            text: parent.device ? qsTranslate("Spectrum", "Device level · ") + parent.device.volume + "%" + (parent.device.muted ? qsTranslate("Spectrum", " · muted") : "") : qsTranslate("Spectrum", "Selected device is unavailable")
             color: panel.theme.colors.muted
             font.pixelSize: panel.theme.fontSize - 1
         }
@@ -136,7 +136,7 @@ PanelWindow {
             }
             Button {
                 readonly property var controls: parent.parent
-                label: controls.device && controls.device.muted ? "Unmute" : "Mute"
+                label: controls.device && controls.device.muted ? qsTranslate("Spectrum", "Unmute") : qsTranslate("Spectrum", "Mute")
                 enabled: !!controls.device && !panel.busy
                 onClicked: panel.runAction(["--device", controls.kind, controls.device.name, "mute", controls.device.muted ? "off" : "on"])
             }
@@ -173,14 +173,14 @@ PanelWindow {
             spacing: 12
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: "AUDIO RECORDER"; font.pixelSize: panel.theme.fontSize + 8; font.bold: true }
+                Label { text: qsTranslate("Spectrum", "AUDIO RECORDER"); font.pixelSize: panel.theme.fontSize + 8; font.bold: true }
                 Button { label: "✕"; enabled: true; onClicked: panel.expanded = false }
             }
             Label {
-                text: panel.state.active ? "● Recording · " + panel.duration(panel.state.elapsed || 0) : panel.state.phase === "saved" ? "Saved · " + panel.duration(panel.state.duration || 0) : "Record an input, desktop output, or both."
+                text: panel.state.active ? qsTranslate("Spectrum", "● Recording · ") + panel.duration(panel.state.elapsed || 0) : panel.state.phase === "saved" ? qsTranslate("Spectrum", "Saved · ") + panel.duration(panel.state.duration || 0) : qsTranslate("Spectrum", "Record an input, desktop output, or both.")
                 color: panel.state.active ? panel.theme.colors.accent : panel.theme.colors.muted
             }
-            Label { visible: !!panel.actionError || !!panel.state.error || !!panel.state.device_error; text: panel.actionError || panel.state.error || panel.state.device_error || ""; color: panel.theme.colors.accent; font.pixelSize: panel.theme.fontSize - 1 }
+            Label { visible: !!panel.actionError || !!panel.state.error || !!panel.state.device_error; text: qsTranslate("Spectrum", panel.actionError) || panel.state.error || panel.state.device_error || ""; color: panel.theme.colors.accent; font.pixelSize: panel.theme.fontSize - 1 }
             Flickable {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -193,11 +193,11 @@ PanelWindow {
                     id: body
                     width: parent.width
                     spacing: 9
-                    Label { text: "AUDIO SOURCE"; color: panel.theme.colors.accent; font.bold: true }
+                    Label { text: qsTranslate("Spectrum", "AUDIO SOURCE"); color: panel.theme.colors.accent; font.bold: true }
                     RowLayout {
                         Layout.fillWidth: true
                         Repeater {
-                            model: [{label: "Input", key: "input"}, {label: "Output", key: "output"}, {label: "Both", key: "both"}]
+                            model: [{label: qsTranslate("Spectrum", "Input"), key: "input"}, {label: qsTranslate("Spectrum", "Output"), key: "output"}, {label: qsTranslate("Spectrum", "Both"), key: "both"}]
                             Button {
                                 required property var modelData
                                 Layout.fillWidth: true
@@ -212,15 +212,15 @@ PanelWindow {
                     ColumnLayout {
                         Layout.fillWidth: true
                         visible: panel.inputSelected
-                        Label { text: "INPUT DEVICE"; color: panel.theme.colors.accent; font.bold: true }
-                        Label { visible: !(panel.state.sources || []).length; text: "No input devices connected"; color: panel.theme.colors.muted }
+                        Label { text: qsTranslate("Spectrum", "INPUT DEVICE"); color: panel.theme.colors.accent; font.bold: true }
+                        Label { visible: !(panel.state.sources || []).length; text: qsTranslate("Spectrum", "No input devices connected"); color: panel.theme.colors.muted }
                         Repeater {
                             model: panel.state.sources || []
                             Button {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 enabled: !panel.busy && !panel.state.active
-                                label: modelData.label + (modelData.default ? " · default" : "")
+                                label: modelData.label + (modelData.default ? qsTranslate("Spectrum", " · default") : "")
                                 backgroundColor: panel.inputName === modelData.name ? panel.theme.colors.accent : panel.theme.colors.surface_alt
                                 foregroundColor: panel.inputName === modelData.name ? panel.theme.colors.background : panel.theme.colors.foreground
                                 onClicked: panel.inputName = modelData.name
@@ -231,15 +231,15 @@ PanelWindow {
                     ColumnLayout {
                         Layout.fillWidth: true
                         visible: panel.outputSelected
-                        Label { text: "OUTPUT DEVICE"; color: panel.theme.colors.accent; font.bold: true }
-                        Label { visible: !(panel.state.sinks || []).length; text: "No output devices connected"; color: panel.theme.colors.muted }
+                        Label { text: qsTranslate("Spectrum", "OUTPUT DEVICE"); color: panel.theme.colors.accent; font.bold: true }
+                        Label { visible: !(panel.state.sinks || []).length; text: qsTranslate("Spectrum", "No output devices connected"); color: panel.theme.colors.muted }
                         Repeater {
                             model: panel.state.sinks || []
                             Button {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 enabled: !panel.busy && !panel.state.active && modelData.recordable
-                                label: modelData.label + (modelData.default ? " · default" : "") + (modelData.recordable ? "" : " · capture unavailable")
+                                label: modelData.label + (modelData.default ? qsTranslate("Spectrum", " · default") : "") + (modelData.recordable ? "" : qsTranslate("Spectrum", " · capture unavailable"))
                                 backgroundColor: panel.outputName === modelData.name ? panel.theme.colors.accent : panel.theme.colors.surface_alt
                                 foregroundColor: panel.outputName === modelData.name ? panel.theme.colors.background : panel.theme.colors.foreground
                                 onClicked: panel.outputName = modelData.name
@@ -247,13 +247,13 @@ PanelWindow {
                         }
                         DeviceControls { device: panel.selectedOutput; kind: "output" }
                     }
-                    Label { text: "Levels and mute affect the selected system devices, including during recording. Both sources are mixed into one file."; color: panel.theme.colors.muted; font.pixelSize: panel.theme.fontSize - 1 }
+                    Label { text: qsTranslate("Spectrum", "Levels and mute affect the selected system devices, including during recording. Both sources are mixed into one file."); color: panel.theme.colors.muted; font.pixelSize: panel.theme.fontSize - 1 }
                     Repeater {
                         model: [
-                            {title: "FORMAT", key: "recordingFormat", choices: [{label: "MP3", value: "mp3"}, {label: "Opus", value: "opus"}, {label: "AAC", value: "aac"}, {label: "FLAC", value: "flac"}, {label: "WAV", value: "wav"}]},
-                            {title: "BITRATE · kbps", key: "bitrate", choices: [64, 96, 128, 192, 256, 320].map(value => ({label: String(value), value: value}))},
-                            {title: "SAMPLE RATE", key: "sampleRate", choices: [{label: "44.1 kHz", value: 44100}, {label: "48 kHz", value: 48000}]},
-                            {title: "CHANNELS", key: "channels", choices: [{label: "Mono", value: 1}, {label: "Stereo", value: 2}]}
+                            {title: qsTranslate("Spectrum", "FORMAT"), key: "recordingFormat", choices: [{label: "MP3", value: "mp3"}, {label: "Opus", value: "opus"}, {label: "AAC", value: "aac"}, {label: "FLAC", value: "flac"}, {label: "WAV", value: "wav"}]},
+                            {title: qsTranslate("Spectrum", "BITRATE · kbps"), key: "bitrate", choices: [64, 96, 128, 192, 256, 320].map(value => ({label: String(value), value: value}))},
+                            {title: qsTranslate("Spectrum", "SAMPLE RATE"), key: "sampleRate", choices: [{label: qsTranslate("Spectrum", "44.1 kHz"), value: 44100}, {label: qsTranslate("Spectrum", "48 kHz"), value: 48000}]},
+                            {title: qsTranslate("Spectrum", "CHANNELS"), key: "channels", choices: [{label: qsTranslate("Spectrum", "Mono"), value: 1}, {label: qsTranslate("Spectrum", "Stereo"), value: 2}]}
                         ]
                         ColumnLayout {
                             id: option
@@ -279,7 +279,7 @@ PanelWindow {
                             }
                         }
                     }
-                    Label { text: panel.recordingFormat === "flac" || panel.recordingFormat === "wav" ? "Lossless audio · bitrate is determined by the sample rate and channels." : "Higher bitrate improves quality and increases file size. AAC saves as .m4a."; color: panel.theme.colors.muted; font.pixelSize: panel.theme.fontSize - 1 }
+                    Label { text: panel.recordingFormat === "flac" || panel.recordingFormat === "wav" ? qsTranslate("Spectrum", "Lossless audio · bitrate is determined by the sample rate and channels.") : qsTranslate("Spectrum", "Higher bitrate improves quality and increases file size. AAC saves as .m4a."); color: panel.theme.colors.muted; font.pixelSize: panel.theme.fontSize - 1 }
                     Label { visible: !!panel.state.file; text: panel.state.file || ""; color: panel.theme.colors.muted; font.pixelSize: panel.theme.fontSize - 2 }
                 }
             }
@@ -288,12 +288,12 @@ PanelWindow {
                 Button {
                     Layout.fillWidth: true
                     enabled: !panel.busy && (panel.state.active || panel.canStart)
-                    label: panel.busy ? "Please wait…" : panel.state.active ? "Stop and save" : "Start recording"
+                    label: panel.busy ? qsTranslate("Spectrum", "Please wait…") : panel.state.active ? qsTranslate("Spectrum", "Stop and save") : qsTranslate("Spectrum", "Start recording")
                     backgroundColor: panel.theme.colors.accent
                     foregroundColor: panel.theme.colors.background
                     onClicked: panel.state.active ? panel.runAction(["--stop"]) : panel.start()
                 }
-                Button { label: "Open folder"; onClicked: Quickshell.execDetached([panel.backendDir + "/audio-recorder", "--open"]) }
+                Button { label: qsTranslate("Spectrum", "Open folder"); onClicked: Quickshell.execDetached([panel.backendDir + "/audio-recorder", "--open"]) }
             }
         }
     }

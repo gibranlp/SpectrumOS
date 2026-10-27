@@ -10,7 +10,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !!content.theme.brightnessActionError
-        text: content.theme.brightnessActionError || ""
+        text: qsTranslate("Spectrum", content.theme.brightnessActionError) || ""
         wrapMode: Text.Wrap
         color: content.theme.colors.muted
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -26,7 +26,7 @@ ColumnLayout {
                 Text {
                     objectName: "brightness-value-" + deviceRow.modelData.id
                     Layout.fillWidth: true
-                    text: "Brightness · " + deviceRow.modelData.name + "  ·  " + (deviceRow.modelData.available ? deviceRow.modelData.percent + "%" : "Unavailable")
+                    text: qsTranslate("Spectrum", "Brightness · ") + deviceRow.modelData.name + "  ·  " + (deviceRow.modelData.available ? deviceRow.modelData.percent + "%" : qsTranslate("Spectrum", "Unavailable"))
                     elide: Text.ElideRight
                     color: content.theme.colors.foreground
                     font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize }
@@ -49,7 +49,7 @@ ColumnLayout {
             Text {
                 Layout.fillWidth: true
                 visible: !!deviceRow.modelData.error
-                text: deviceRow.modelData.error || ""
+                text: qsTranslate("Spectrum", deviceRow.modelData.error) || ""
                 wrapMode: Text.Wrap
                 color: content.theme.colors.muted
                 font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -59,7 +59,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !!content.theme.brightness.error
-        text: content.theme.brightness.error || ""
+        text: qsTranslate("Spectrum", content.theme.brightness.error) || ""
         wrapMode: Text.Wrap
         color: content.theme.colors.muted
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }

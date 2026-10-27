@@ -92,7 +92,7 @@ Item {
             dismiss();
             settings = value;
             error = "";
-        } catch (exception) { error = "Could not read screensaver settings."; }
+        } catch (exception) { error = qsTranslate("Spectrum", "Could not read screensaver settings."); }
     }
     FileView {
         path: saver.theme.configHome + "/spectrumos/screensaver.json"
@@ -105,17 +105,17 @@ Item {
         command: [saver.theme.backend("screensaver-adapter"), "--json"]
         running: true
         stdout: StdioCollector { onStreamFinished: saver.acceptSettings(text) }
-        onExited: exitCode => { if (exitCode !== 0 && !saver.error) saver.error = "Could not load screensaver settings."; }
+        onExited: exitCode => { if (exitCode !== 0 && !saver.error) saver.error = qsTranslate("Spectrum", "Could not load screensaver settings."); }
     }
     Process {
         id: settingsAction
         stdout: StdioCollector { onStreamFinished: saver.acceptSettings(text) }
-        onExited: exitCode => { if (exitCode !== 0 && !saver.error) saver.error = "Could not save screensaver settings."; }
+        onExited: exitCode => { if (exitCode !== 0 && !saver.error) saver.error = qsTranslate("Spectrum", "Could not save screensaver settings."); }
     }
     Process {
         id: maskProcess
         command: [saver.theme.backend("screensaver-adapter"), "masks"]
-        onExited: exitCode => { if (exitCode !== 0) { saver.dismiss(); saver.error = "Could not prepare screensaver branding."; } }
+        onExited: exitCode => { if (exitCode !== 0) { saver.dismiss(); saver.error = qsTranslate("Spectrum", "Could not prepare screensaver branding."); } }
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -125,7 +125,7 @@ Item {
                     saver.maskReady = true;
                     saver.finishStart();
                 } catch (exception) {
-                    saver.error = "Could not prepare screensaver branding.";
+                    saver.error = qsTranslate("Spectrum", "Could not prepare screensaver branding.");
                     saver.dismiss();
                 }
             }
@@ -134,7 +134,7 @@ Item {
     Process {
         id: sessionProcess
         command: [saver.theme.backend("screensaver-adapter"), "session"]
-        onExited: exitCode => { if (exitCode !== 0) { lifecycle.sessionAllowed = false; saver.dismiss(); saver.error = "Could not check the session idle state."; } }
+        onExited: exitCode => { if (exitCode !== 0) { lifecycle.sessionAllowed = false; saver.dismiss(); saver.error = qsTranslate("Spectrum", "Could not check the session idle state."); } }
         stdout: StdioCollector {
             onStreamFinished: {
                 try {

@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../spectrum-shell" as Shell
 import "UkvmModel.js" as Model
 
 Item {
@@ -103,12 +104,11 @@ Item {
         signal clicked()
         onClicked: page.perform(args)
         Action {
+            id: directAction
             text: control.text
             prominent: control.prominent
             onClicked: control.clicked()
-            ToolTip.text: control.description
-            ToolTip.visible: hovered
-            ToolTip.delay: 600
+            Shell.ShellToolTip { parent: directAction; theme: page.theme; text: control.description; visible: directAction.hovered; delay: 600 }
         }
     }
     property string pickerPeer: ""
@@ -152,24 +152,24 @@ Item {
                 objectName: "control-onboarding-title"
                 Layout.fillWidth: true
                 maximumLineCount: 4
-                text: "Allow " + ((page.backend.controlOffer || {}).name || "this peer") + " to control this computer"
+                text: qsTranslate("Spectrum", "Allow ") + ((page.backend.controlOffer || {}).name || qsTranslate("Spectrum", "this peer")) + qsTranslate("Spectrum", " to control this computer")
                 font.bold: true
                 font.pixelSize: page.uiFontSize + 4
             }
             Label {
                 Layout.fillWidth: true
                 maximumLineCount: 6
-                text: "Pairing established trust. Allowing control lets this computer receive keyboard and mouse input from this peer. Clipboard and file permissions stay unchanged."
+                text: qsTranslate("Spectrum", "Pairing established trust. Allowing control lets this computer receive keyboard and mouse input from this peer. Clipboard and file permissions stay unchanged.")
             }
             Label {
                 Layout.fillWidth: true
                 maximumLineCount: 6
-                text: "Allow and apply starts UKVM if needed. Approve the desktop's RemoteDesktop dialog yourself; choose Remember if offered for future logins."
+                text: qsTranslate("Spectrum", "Allow and apply starts UKVM if needed. Approve the desktop's RemoteDesktop dialog yourself; choose Remember if offered for future logins.")
                 color: page.theme.colors.muted
             }
             RowLayout {
-                Action { objectName: "allow-paired-control"; text: "Allow and apply"; prominent: true; onClicked: page.backend.decideControl(true) }
-                Action { objectName: "decline-paired-control"; text: "Not now"; onClicked: page.backend.decideControl(false) }
+                Action { objectName: "allow-paired-control"; text: qsTranslate("Spectrum", "Allow and apply"); prominent: true; onClicked: page.backend.decideControl(true) }
+                Action { objectName: "decline-paired-control"; text: qsTranslate("Spectrum", "Not now"); onClicked: page.backend.decideControl(false) }
             }
         }
     }
@@ -187,8 +187,8 @@ Item {
     component ClipboardToggle: AbstractButton {
         property string permissionKey: "share_clipboard"
         property string permissionArg: "share-clipboard"
-        property string permissionTitle: "Share clipboard"
-        property string permissionHelp: "Share plain text, including sensitive copied text. Enable on both computers. Changes apply immediately."
+        property string permissionTitle: qsTranslate("Spectrum", "Share clipboard")
+        property string permissionHelp: qsTranslate("Spectrum", "Share plain text, including sensitive copied text. Enable on both computers. Changes apply immediately.")
         property string statusKey: "clipboard"
         id: toggle
         objectName: permissionArg + "-toggle"
@@ -204,9 +204,7 @@ Item {
         Accessible.role: Accessible.CheckBox
         Accessible.name: permissionTitle
         Accessible.checked: checked
-        ToolTip.text: permissionHelp
-        ToolTip.visible: hovered
-        ToolTip.delay: 600
+        Shell.ShellToolTip { parent: toggle; theme: page.theme; text: toggle.permissionHelp; visible: toggle.hovered; delay: 600 }
         onClicked: page.backend.action(["peer", checked ? "deny" : "allow", page.selectedId, permissionArg])
         Keys.onReturnPressed: event => { if (enabled && !event.isAutoRepeat) clicked(); }
         Keys.onEnterPressed: event => { if (enabled && !event.isAutoRepeat) clicked(); }
@@ -234,7 +232,7 @@ Item {
                 font.bold: true
                 wrapMode: Text.NoWrap
             }
-            Label { Layout.rightMargin: 10; text: toggle.known ? (toggle.checked ? "On" : "Off") : "Unknown"; color: page.theme.colors.muted }
+            Label { Layout.rightMargin: 10; text: toggle.known ? (toggle.checked ? qsTranslate("Spectrum", "On") : qsTranslate("Spectrum", "Off")) : qsTranslate("Spectrum", "Unknown"); color: page.theme.colors.muted }
         }
     }
 
@@ -247,16 +245,16 @@ Item {
             Layout.fillWidth: true
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 2
-                Label { text: "UNIVERSALKVM"; font.pixelSize: page.uiFontSize + 6; font.bold: true; color: page.theme.colors.accent }
-                Label { text: !page.backend.installed ? "Not installed" : !page.backend.compatible ? "Checking CLI compatibility…" : Model.serviceLabel(page.backend.status); color: page.theme.colors.muted }
+                Label { text: qsTranslate("Spectrum", "UNIVERSALKVM"); font.pixelSize: page.uiFontSize + 6; font.bold: true; color: page.theme.colors.accent }
+                Label { text: !page.backend.installed ? qsTranslate("Spectrum", "Not installed") : !page.backend.compatible ? qsTranslate("Spectrum", "Checking CLI compatibility…") : Model.serviceLabel(page.backend.status); color: page.theme.colors.muted }
             }
-            Action { text: "Refresh"; enabled: !page.backend.busy; onClicked: { page.backend.error = ""; page.backend.refresh(); } }
-            Action { text: "Close"; enabled: true; onClicked: page.closeRequested() }
+            Action { text: qsTranslate("Spectrum", "Refresh"); enabled: !page.backend.busy; onClicked: { page.backend.error = ""; page.backend.refresh(); } }
+            Action { text: qsTranslate("Spectrum", "Close"); enabled: true; onClicked: page.closeRequested() }
         }
         RowLayout {
             visible: !!page.currentTransfer
             Layout.fillWidth: true
-            Label { Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1; text: page.currentTransfer ? page.currentTransfer.name + " · " + page.currentTransfer.direction + " · " + page.currentTransfer.peer_name + " · " + page.currentTransfer.state + " · " + page.currentTransfer.bytes + " / " + page.currentTransfer.total_bytes + " bytes" : "" }
+            Label { Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1; text: page.currentTransfer ? page.currentTransfer.name + " · " + page.currentTransfer.direction + " · " + page.currentTransfer.peer_name + " · " + page.currentTransfer.state + " · " + page.currentTransfer.bytes + " / " + page.currentTransfer.total_bytes + qsTranslate("Spectrum", " bytes") : "" }
             ProgressBar {
                 id: fileProgress
                 objectName: "file-progress"
@@ -265,17 +263,17 @@ Item {
                 background: Rectangle { implicitHeight: 8; radius: 4; color: page.theme.colors.surface_alt }
                 contentItem: Item { implicitHeight: 8; Rectangle { width: parent.width * fileProgress.visualPosition; height: parent.height; radius: 4; color: page.theme.colors.accent } }
             }
-            Action { text: "Cancel"; visible: !!page.currentTransfer && ["preparing", "connecting", "transferring", "verifying"].indexOf(page.currentTransfer.state) >= 0; onClicked: page.backend.action(["files", "cancel", page.currentTransfer.id]) }
+            Action { text: qsTranslate("Spectrum", "Cancel"); visible: !!page.currentTransfer && ["preparing", "connecting", "transferring", "verifying"].indexOf(page.currentTransfer.state) >= 0; onClicked: page.backend.action(["files", "cancel", page.currentTransfer.id]) }
         }
         Flow {
             visible: page.backend.compatible
             Layout.fillWidth: true; spacing: 6
-            Action { text: "Install service"; visible: page.service.load_state !== "loaded"; onClicked: page.backend.action(["service", "install"]) }
-            Action { text: page.service.unit_file_state === "enabled" ? "Disable login start" : "Enable login start"; onClicked: page.backend.action(["service", page.service.unit_file_state === "enabled" ? "disable" : "enable"]) }
-            Action { text: page.service.active_state === "active" ? "Stop" : "Start"; onClicked: page.backend.action(["service", page.service.active_state === "active" ? "stop" : "start"]) }
-            DirectAction { text: "Restart"; description: "Active control will close. Portal consent may be requested again."; args: ["service", "restart"] }
-            DirectAction { text: page.backend.applyPending ? "Apply •" : "Apply"; prominent: page.backend.applyPending; description: "Apply saved changes and restart UKVM. Active control will close."; args: ["apply"] }
-            Action { text: page.showHealthDetails ? "Back" : "Diagnostics"; onClicked: page.showHealthDetails = !page.showHealthDetails }
+            Action { text: qsTranslate("Spectrum", "Install service"); visible: page.service.load_state !== "loaded"; onClicked: page.backend.action(["service", "install"]) }
+            Action { text: page.service.unit_file_state === "enabled" ? qsTranslate("Spectrum", "Disable login start") : qsTranslate("Spectrum", "Enable login start"); onClicked: page.backend.action(["service", page.service.unit_file_state === "enabled" ? "disable" : "enable"]) }
+            Action { text: page.service.active_state === "active" ? qsTranslate("Spectrum", "Stop") : qsTranslate("Spectrum", "Start"); onClicked: page.backend.action(["service", page.service.active_state === "active" ? "stop" : "start"]) }
+            DirectAction { text: qsTranslate("Spectrum", "Restart"); description: qsTranslate("Spectrum", "Active control will close. Portal consent may be requested again."); args: ["service", "restart"] }
+            DirectAction { text: page.backend.applyPending ? qsTranslate("Spectrum", "Apply •") : qsTranslate("Spectrum", "Apply"); prominent: page.backend.applyPending; description: qsTranslate("Spectrum", "Apply saved changes and restart UKVM. Active control will close."); args: ["apply"] }
+            Action { text: page.showHealthDetails ? qsTranslate("Spectrum", "Back") : qsTranslate("Spectrum", "Diagnostics"); onClicked: page.showHealthDetails = !page.showHealthDetails }
         }
         Label {
             id: operationMessage
@@ -284,15 +282,14 @@ Item {
             Layout.fillWidth: true
             text: page.backend.error || (page.backend.status.files || {}).error || page.backend.notice
             color: page.backend.error ? page.theme.colors.accent : page.theme.colors.muted
-            ToolTip.text: text
-            ToolTip.visible: messageHover.hovered
+            Shell.ShellToolTip { parent: operationMessage; theme: page.theme; text: operationMessage.text; visible: messageHover.hovered }
             HoverHandler { id: messageHover }
         }
         Label {
             visible: page.backend.compatible
             Layout.fillWidth: true
-            text: "Clipboard: " + Model.clipboardLabel(page.backend.status.clipboard)
-                + "   ·   Remote control: " + Model.authorizationLabel(page.backend.status, "remote_desktop", page.backend.doctor)
+            text: qsTranslate("Spectrum", "Clipboard: ") + Model.clipboardLabel(page.backend.status.clipboard)
+                + qsTranslate("Spectrum", "   ·   Remote control: ") + Model.authorizationLabel(page.backend.status, "remote_desktop", page.backend.doctor)
             objectName: "clipboard-status"
             color: page.theme.colors.muted
         }
@@ -303,17 +300,17 @@ Item {
             Label {
                 anchors.centerIn: parent; width: parent.width
                 visible: !page.backend.installed
-                text: "Install the SpectrumOS ukvm and spectrum-xdg-desktop-portal-hyprland packages, then refresh."
+                text: qsTranslate("Spectrum", "Install the SpectrumOS ukvm and spectrum-xdg-desktop-portal-hyprland packages, then refresh.")
             }
             ColumnLayout {
                 anchors.centerIn: parent; width: Math.min(480, parent.width)
                 visible: page.backend.compatible && !!page.backend.status.health && !page.backend.status.health.identity_initialized
-                Label { text: "SET UP THIS COMPUTER"; font.bold: true; color: page.theme.colors.accent }
-                Label { text: "Choose a name to get started." }
+                Label { text: qsTranslate("Spectrum", "SET UP THIS COMPUTER"); font.bold: true; color: page.theme.colors.accent }
+                Label { text: qsTranslate("Spectrum", "Choose a name to get started.") }
                 RowLayout {
                     Layout.fillWidth: true
-                    Field { id: nodeName; objectName: "setupNodeName"; Layout.fillWidth: true; placeholderText: (page.backend.status.node || {}).name || "Computer name"; maximumLength: 63 }
-                    Action { objectName: "initializeNode"; text: "Set up"; prominent: true; onClicked: page.backend.action(["setup", "--local", "--name", nodeName.text.trim() || (page.backend.status.node || {}).name || "My computer"]) }
+                    Field { id: nodeName; objectName: "setupNodeName"; Layout.fillWidth: true; placeholderText: (page.backend.status.node || {}).name || qsTranslate("Spectrum", "Computer name"); maximumLength: 63 }
+                    Action { objectName: "initializeNode"; text: qsTranslate("Spectrum", "Set up"); prominent: true; onClicked: page.backend.action(["setup", "--local", "--name", nodeName.text.trim() || (page.backend.status.node || {}).name || "My computer"]) }
                 }
             }
             RowLayout {
@@ -321,8 +318,8 @@ Item {
                 visible: page.backend.compatible && !page.showHealthDetails && !page.backend.pairing && ((page.backend.status.health || {}).identity_initialized !== false)
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.fillHeight: true
-                    Label { text: "YOUR MACHINES"; font.bold: true; color: page.theme.colors.accent }
-                    Label { text: "Select a computer, then + to move it."; Layout.fillWidth: true; color: page.theme.colors.muted }
+                    Label { text: qsTranslate("Spectrum", "YOUR MACHINES"); font.bold: true; color: page.theme.colors.accent }
+                    Label { text: qsTranslate("Spectrum", "Select a computer, then + to move it."); Layout.fillWidth: true; color: page.theme.colors.muted }
                     Item {
                         id: topology
                         objectName: "topology"
@@ -364,7 +361,7 @@ Item {
                                 spacing: 3
                                 Label {
                                     width: machine.width - 12
-                                    text: machine.local ? ((page.backend.status.node || {}).name || "Local computer") : machine.node ? (machine.node.name || "Missing trust") : "+"
+                                    text: machine.local ? ((page.backend.status.node || {}).name || qsTranslate("Spectrum", "Local computer")) : machine.node ? (machine.node.name || qsTranslate("Spectrum", "Missing trust")) : "+"
                                     color: machine.local ? page.theme.colors.background : page.theme.colors.foreground
                                     horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.bold: true; font.pixelSize: Math.min(page.uiFontSize, Math.max(9, topology.cellHeight * 0.24))
                                 }
@@ -388,15 +385,15 @@ Item {
                             }
                         }
                         Action { text: "›"; visible: page.peers.length > page.peerPageSize; enabled: (page.peerPage + 1) * page.peerPageSize < page.peers.length; onClicked: page.peerPage++ }
-                        Label { visible: !page.peers.length; text: "No paired computers yet."; Layout.fillWidth: true; color: page.theme.colors.muted }
+                        Label { visible: !page.peers.length; text: qsTranslate("Spectrum", "No paired computers yet."); Layout.fillWidth: true; color: page.theme.colors.muted }
                     }
                     RowLayout {
                         objectName: "files-actions"
                         visible: true
                         Layout.fillWidth: true
-                        Label { Layout.fillWidth: true; maximumLineCount: 1; text: page.selected ? "Send to " + page.selected.name : "Select a computer to send files"; color: page.theme.colors.muted }
-                        Action { objectName: "send-files"; text: "Send files"; enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.sending && !page.backend.busy && !!page.backend.status.files && page.backend.status.files.state !== "restart_required"; onClicked: page.openPicker("files") }
-                        Action { objectName: "send-folder"; text: "Send folder"; enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.sending && !page.backend.busy && !!page.backend.status.files && page.backend.status.files.state !== "restart_required"; onClicked: page.openPicker("folder") }
+                        Label { Layout.fillWidth: true; maximumLineCount: 1; text: page.selected ? qsTranslate("Spectrum", "Send to ") + page.selected.name : qsTranslate("Spectrum", "Select a computer to send files"); color: page.theme.colors.muted }
+                        Action { objectName: "send-files"; text: qsTranslate("Spectrum", "Send files"); enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.sending && !page.backend.busy && !!page.backend.status.files && page.backend.status.files.state !== "restart_required"; onClicked: page.openPicker("files") }
+                        Action { objectName: "send-folder"; text: qsTranslate("Spectrum", "Send folder"); enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.sending && !page.backend.busy && !!page.backend.status.files && page.backend.status.files.state !== "restart_required"; onClicked: page.openPicker("folder") }
                     }
                 }
                 Rectangle {
@@ -409,31 +406,31 @@ Item {
                         id: inspector
                         anchors { fill: parent; margins: 12 }
                         spacing: 5
-                        Label { Layout.fillWidth: true; text: page.selected ? page.selected.name : "Select a computer"; font.bold: true; color: page.theme.colors.accent }
-                        Label { Layout.fillWidth: true; text: page.selected ? Model.availability(page.selected) : "Select a trusted machine to manage permissions and position."; color: page.theme.colors.muted }
-                        Action { objectName: "open-remote"; text: "Open remote screen"; visible: !!page.selected && !page.showDetails; Layout.fillWidth: true; enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.busy; onClicked: page.backend.action(["remote", page.selectedId]); ToolTip.text: "View this peer's desktop. The peer must allow screen viewing; click its desktop to control it."; ToolTip.visible: hovered }
-                        ClipboardToggle { permissionKey: "view_screen"; permissionArg: "view-screen"; permissionTitle: "Share this screen"; permissionHelp: "Allow this trusted peer to view this computer's screen. Control is separate. Portal consent is still required."; statusKey: "runtime"; visible: !!page.selected && !page.showDetails; Layout.fillWidth: true }
-                        ClipboardToggle { permissionKey: "receive_files"; permissionArg: "receive-files"; permissionTitle: "Receive files"; permissionHelp: "Allow this trusted computer to send files here without asking for each transfer. Changes apply immediately."; statusKey: "files"; visible: !!page.selected && !page.showDetails; Layout.fillWidth: true }
+                        Label { Layout.fillWidth: true; text: page.selected ? page.selected.name : qsTranslate("Spectrum", "Select a computer"); font.bold: true; color: page.theme.colors.accent }
+                        Label { Layout.fillWidth: true; text: page.selected ? Model.availability(page.selected) : qsTranslate("Spectrum", "Select a trusted machine to manage permissions and position."); color: page.theme.colors.muted }
+                        Action { id: remoteAction; objectName: "open-remote"; text: qsTranslate("Spectrum", "Open remote screen"); visible: !!page.selected && !page.showDetails; Layout.fillWidth: true; enabled: !!page.selected && ((page.selected || {}).permissions || {}).connect === true && page.backend.compatible && !page.backend.busy; onClicked: page.backend.action(["remote", page.selectedId]); Shell.ShellToolTip { parent: remoteAction; theme: page.theme; text: qsTranslate("Spectrum", "View this peer's desktop. The peer must allow screen viewing; click its desktop to control it."); visible: remoteAction.hovered } }
+                        ClipboardToggle { permissionKey: "view_screen"; permissionArg: "view-screen"; permissionTitle: qsTranslate("Spectrum", "Share this screen"); permissionHelp: qsTranslate("Spectrum", "Allow this trusted peer to view this computer's screen. Control is separate. Portal consent is still required."); statusKey: "runtime"; visible: !!page.selected && !page.showDetails; Layout.fillWidth: true }
+                        ClipboardToggle { permissionKey: "receive_files"; permissionArg: "receive-files"; permissionTitle: qsTranslate("Spectrum", "Receive files"); permissionHelp: qsTranslate("Spectrum", "Allow this trusted computer to send files here without asking for each transfer. Changes apply immediately."); statusKey: "files"; visible: !!page.selected && !page.showDetails; Layout.fillWidth: true }
                         ClipboardToggle { visible: !!page.selected && !page.showDetails; Layout.fillWidth: true }
-                        Label { visible: !!page.selected && !page.showDetails; Layout.fillWidth: true; text: "This peer may control here: " + Model.permissionLabel(((page.selected || {}).permissions || {}).control_this_node) }
+                        Label { visible: !!page.selected && !page.showDetails; Layout.fillWidth: true; text: qsTranslate("Spectrum", "This peer may control here: ") + Model.permissionLabel(((page.selected || {}).permissions || {}).control_this_node) }
                         DirectAction {
                             visible: !!page.selected && !page.showDetails
-                            text: (page.selected || {}).permissions && page.selected.permissions.control_this_node ? "Revoke control" : "Allow control"
-                            description: "Allow " + ((page.selected || {}).name || "this peer") + " to control this computer and apply. Revoking requires Apply. Portal approval remains separate."
+                            text: (page.selected || {}).permissions && page.selected.permissions.control_this_node ? qsTranslate("Spectrum", "Revoke control") : qsTranslate("Spectrum", "Allow control")
+                            description: qsTranslate("Spectrum", "Allow ") + ((page.selected || {}).name || qsTranslate("Spectrum", "this peer")) + qsTranslate("Spectrum", " to control this computer and apply. Revoking requires Apply. Portal approval remains separate.")
                             args: ["peer", ((page.selected || {}).permissions || {}).control_this_node ? "deny" : "allow", page.selectedId, "control-this-node"]
                         }
 
                         Flow {
                             visible: !!page.selected
                             Layout.fillWidth: true; spacing: 6
-                            DirectAction { text: "Remove position"; visible: !!page.selected && !!page.selected.position && !page.showDetails; description: "Remove this position and retain trust."; args: ["layout", "remove", page.selectedId, "--yes"] }
-                            DirectAction { visible: !page.showDetails; text: "Unpair"; description: "Remove local trust and placement. The other computer retains its trust."; args: ["unpair", page.selectedId, "--yes"] }
-                            Action { text: page.showDetails ? "Less" : "Details"; onClicked: page.showDetails = !page.showDetails }
+                            DirectAction { text: qsTranslate("Spectrum", "Remove position"); visible: !!page.selected && !!page.selected.position && !page.showDetails; description: qsTranslate("Spectrum", "Remove this position and retain trust."); args: ["layout", "remove", page.selectedId, "--yes"] }
+                            DirectAction { visible: !page.showDetails; text: qsTranslate("Spectrum", "Unpair"); description: qsTranslate("Spectrum", "Remove local trust and placement. The other computer retains its trust."); args: ["unpair", page.selectedId, "--yes"] }
+                            Action { text: page.showDetails ? qsTranslate("Spectrum", "Less") : qsTranslate("Spectrum", "Details"); onClicked: page.showDetails = !page.showDetails }
                         }
-                        Label { visible: page.showDetails && !!page.selected; Layout.fillWidth: true; text: page.selected ? (page.selected.endpoint || "No endpoint hint") + " · " + (page.selected.position ? "(" + page.selected.position.x + ", " + page.selected.position.y + ")" : "unplaced") : "" }
-                        Label { visible: page.showDetails && !!page.selected; Layout.fillWidth: true; maximumLineCount: 3; wrapMode: Text.WrapAnywhere; text: "Node ID: " + page.selectedId; font.pixelSize: Math.min(12, page.uiFontSize) }
-                        Label { visible: !!page.selectedNode && !page.selected; text: "This placement has no trusted peer."; Layout.fillWidth: true; color: page.theme.colors.accent }
-                        DirectAction { visible: !!page.selectedNode && !page.selected; text: "Remove position"; description: "Remove the untrusted position."; args: ["layout", "remove-position", String((page.selectedNode || {}).x), String((page.selectedNode || {}).y), "--yes"] }
+                        Label { visible: page.showDetails && !!page.selected; Layout.fillWidth: true; text: page.selected ? (page.selected.endpoint || qsTranslate("Spectrum", "No endpoint hint")) + " · " + (page.selected.position ? "(" + page.selected.position.x + ", " + page.selected.position.y + ")" : qsTranslate("Spectrum", "unplaced")) : "" }
+                        Label { visible: page.showDetails && !!page.selected; Layout.fillWidth: true; maximumLineCount: 3; wrapMode: Text.WrapAnywhere; text: qsTranslate("Spectrum", "Node ID: ") + page.selectedId; font.pixelSize: Math.min(12, page.uiFontSize) }
+                        Label { visible: !!page.selectedNode && !page.selected; text: qsTranslate("Spectrum", "This placement has no trusted peer."); Layout.fillWidth: true; color: page.theme.colors.accent }
+                        DirectAction { visible: !!page.selectedNode && !page.selected; text: qsTranslate("Spectrum", "Remove position"); description: qsTranslate("Spectrum", "Remove the untrusted position."); args: ["layout", "remove-position", String((page.selectedNode || {}).x), String((page.selectedNode || {}).y), "--yes"] }
                         Item { Layout.fillHeight: true }
                     }
                 }
@@ -446,25 +443,25 @@ Item {
                     spacing: 10
                     RowLayout {
                         Layout.fillWidth: true
-                        Action { text: "Overview"; prominent: page.healthPage === 0; onClicked: page.healthPage = 0 }
-                        Action { text: "Authorization"; prominent: page.healthPage === 1; onClicked: page.healthPage = 1 }
-                        Action { text: "Backend"; prominent: page.healthPage === 2; onClicked: page.healthPage = 2 }
+                        Action { text: qsTranslate("Spectrum", "Overview"); prominent: page.healthPage === 0; onClicked: page.healthPage = 0 }
+                        Action { text: qsTranslate("Spectrum", "Authorization"); prominent: page.healthPage === 1; onClicked: page.healthPage = 1 }
+                        Action { text: qsTranslate("Spectrum", "Backend"); prominent: page.healthPage === 2; onClicked: page.healthPage = 2 }
                     }
                     Label { visible: page.healthPage === 0; Layout.fillWidth: true; text: Model.healthLabel(page.backend.status, page.backend.doctor); color: page.theme.colors.accent }
-                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; text: (page.backend.applyPending ? "Saved changes require Apply. " : "") + "Enable controls future logins; Start controls this session." }
-                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; maximumLineCount: 4; text: "Runtime: " + ((page.backend.status.runtime || {}).error || (page.backend.status.runtime || {}).state || "unknown") + "\nService: " + (page.service.error || page.service.active_state || "unavailable") + "\nClipboard: " + ((page.backend.status.clipboard || {}).error || Model.clipboardLabel(page.backend.status.clipboard)); color: page.theme.colors.muted }
-                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; maximumLineCount: 3; wrapMode: Text.WrapAnywhere; text: "Local Node ID: " + ((page.backend.status.node || {}).node_id || "not initialized") }
-                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: "Screen sharing authorization: " + Model.authorizationLabel(page.backend.status, "screen_cast", page.backend.doctor) }
-                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: "Remote control authorization: " + Model.authorizationLabel(page.backend.status, "remote_desktop", page.backend.doctor) }
-                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: "Input capture authorization: " + Model.authorizationLabel(page.backend.status, "input_capture", page.backend.doctor) }
-                    DirectAction { visible: page.healthPage === 1 && !!page.backend.status.desktop_authorization; text: "Forget approval"; description: "Stop UKVM and forget desktop authorization. Portal approval will be required again. Peer permissions stay unchanged."; args: ["authorization", "reset", "--yes"] }
-                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: "Portal consent and peer permissions are independent. Capability checks never approve consent."; color: page.theme.colors.muted }
-                    Label { visible: page.healthPage === 2; Layout.fillWidth: true; maximumLineCount: 6; text: page.backendProblems.join("\n") || "Wayland backend ready"; color: page.theme.colors.accent }
-                    Label { visible: page.healthPage === 2; Layout.fillWidth: true; maximumLineCount: 3; text: "Update the managed SpectrumOS portal package if missing or incompatible, then log out and back in. Hyprland partial external-edge barriers remain a platform limitation."; color: page.theme.colors.muted }
+                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; text: (page.backend.applyPending ? qsTranslate("Spectrum", "Saved changes require Apply. ") : "") + qsTranslate("Spectrum", "Enable controls future logins; Start controls this session.") }
+                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; maximumLineCount: 4; text: qsTranslate("Spectrum", "Runtime: ") + ((page.backend.status.runtime || {}).error || (page.backend.status.runtime || {}).state || qsTranslate("Spectrum", "unknown")) + qsTranslate("Spectrum", "\nService: ") + (page.service.error || page.service.active_state || qsTranslate("Spectrum", "unavailable")) + qsTranslate("Spectrum", "\nClipboard: ") + ((page.backend.status.clipboard || {}).error || Model.clipboardLabel(page.backend.status.clipboard)); color: page.theme.colors.muted }
+                    Label { visible: page.healthPage === 0; Layout.fillWidth: true; maximumLineCount: 3; wrapMode: Text.WrapAnywhere; text: qsTranslate("Spectrum", "Local Node ID: ") + ((page.backend.status.node || {}).node_id || qsTranslate("Spectrum", "not initialized")) }
+                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: qsTranslate("Spectrum", "Screen sharing authorization: ") + Model.authorizationLabel(page.backend.status, "screen_cast", page.backend.doctor) }
+                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: qsTranslate("Spectrum", "Remote control authorization: ") + Model.authorizationLabel(page.backend.status, "remote_desktop", page.backend.doctor) }
+                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: qsTranslate("Spectrum", "Input capture authorization: ") + Model.authorizationLabel(page.backend.status, "input_capture", page.backend.doctor) }
+                    DirectAction { visible: page.healthPage === 1 && !!page.backend.status.desktop_authorization; text: qsTranslate("Spectrum", "Forget approval"); description: qsTranslate("Spectrum", "Stop UKVM and forget desktop authorization. Portal approval will be required again. Peer permissions stay unchanged."); args: ["authorization", "reset", "--yes"] }
+                    Label { visible: page.healthPage === 1; Layout.fillWidth: true; text: qsTranslate("Spectrum", "Portal consent and peer permissions are independent. Capability checks never approve consent."); color: page.theme.colors.muted }
+                    Label { visible: page.healthPage === 2; Layout.fillWidth: true; maximumLineCount: 6; text: page.backendProblems.join("\n") || qsTranslate("Spectrum", "Wayland backend ready"); color: page.theme.colors.accent }
+                    Label { visible: page.healthPage === 2; Layout.fillWidth: true; maximumLineCount: 3; text: qsTranslate("Spectrum", "Update the managed SpectrumOS portal package if missing or incompatible, then log out and back in. Hyprland partial external-edge barriers remain a platform limitation."); color: page.theme.colors.muted }
                     RowLayout {
                         visible: page.healthPage === 2; Layout.fillWidth: true
-                        Field { id: endpoint; Layout.fillWidth: true; placeholderText: "Pair directly: host[:port]"; enabled: !page.backend.busy }
-                        Action { text: "Pair"; enabled: !page.backend.busy && page.backend.compatible && !!endpoint.text.trim(); onClicked: page.backend.startPair(endpoint.text.trim(), "") }
+                        Field { id: endpoint; Layout.fillWidth: true; placeholderText: qsTranslate("Spectrum", "Pair directly: host[:port]"); enabled: !page.backend.busy }
+                        Action { text: qsTranslate("Spectrum", "Pair"); enabled: !page.backend.busy && page.backend.compatible && !!endpoint.text.trim(); onClicked: page.backend.startPair(endpoint.text.trim(), "") }
                     }
                     Item { Layout.fillHeight: true }
                 }
@@ -478,12 +475,12 @@ Item {
                     Label { text: page.backend.pairingPhase; Layout.fillWidth: true; color: page.theme.colors.accent }
                     Label { visible: !!page.backend.offer; text: (page.backend.offer || {}).remote_name || ""; Layout.fillWidth: true; font.bold: true }
                     Label { visible: !!page.backend.offer; text: (page.backend.offer || {}).verification_code || ""; font.pixelSize: page.uiFontSize + 16; color: page.theme.colors.accent; Layout.fillWidth: true }
-                    Label { visible: !!page.backend.offer; text: "Only approve if the code matches on BOTH machines. Both users must approve. Trust never grants control or clipboard permission automatically."; maximumLineCount: 3; Layout.fillWidth: true }
+                    Label { visible: !!page.backend.offer; text: qsTranslate("Spectrum", "Only approve if the code matches on BOTH machines. Both users must approve. Trust never grants control or clipboard permission automatically."); maximumLineCount: 3; Layout.fillWidth: true }
                     Flow {
                         Layout.fillWidth: true; spacing: 8
-                        Action { objectName: "approvePairing"; text: "Codes match · Trust machine"; prominent: true; enabled: page.backend.pairing && !!page.backend.offer; onClicked: page.backend.approve(true) }
-                        Action { objectName: "rejectPairing"; text: "Reject"; enabled: page.backend.pairing && !!page.backend.offer; onClicked: page.backend.approve(false) }
-                        Action { text: "Cancel"; enabled: page.backend.pairing; onClicked: page.backend.cancelPair() }
+                        Action { objectName: "approvePairing"; text: qsTranslate("Spectrum", "Codes match · Trust machine"); prominent: true; enabled: page.backend.pairing && !!page.backend.offer; onClicked: page.backend.approve(true) }
+                        Action { objectName: "rejectPairing"; text: qsTranslate("Spectrum", "Reject"); enabled: page.backend.pairing && !!page.backend.offer; onClicked: page.backend.approve(false) }
+                        Action { text: qsTranslate("Spectrum", "Cancel"); enabled: page.backend.pairing; onClicked: page.backend.cancelPair() }
                     }
                     Item { Layout.fillHeight: true }
                 }
@@ -496,13 +493,13 @@ Item {
             Layout.fillWidth: true; spacing: 4
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: "NEARBY MACHINES"; font.bold: true; color: page.theme.colors.accent; Layout.fillWidth: true }
-                Action { text: page.backend.discovering ? "Discovering…" : "Discover"; onClicked: page.backend.run(["discover"]) }
-                Action { text: "Receive pairing"; onClicked: page.backend.startPair("", "") }
+                Label { text: qsTranslate("Spectrum", "NEARBY MACHINES"); font.bold: true; color: page.theme.colors.accent; Layout.fillWidth: true }
+                Action { text: page.backend.discovering ? qsTranslate("Spectrum", "Discovering…") : qsTranslate("Spectrum", "Discover"); onClicked: page.backend.run(["discover"]) }
+                Action { text: qsTranslate("Spectrum", "Receive pairing"); onClicked: page.backend.startPair("", "") }
                 Action { text: "‹"; visible: page.discoveredMachines.length > 2; enabled: page.discoveryPage > 0; onClicked: page.discoveryPage-- }
                 Action { text: "›"; visible: page.discoveredMachines.length > 2; enabled: (page.discoveryPage + 1) * 2 < page.discoveredMachines.length; onClicked: page.discoveryPage++ }
             }
-            Label { visible: !page.discoveredMachines.length; Layout.fillWidth: true; text: page.backend.discovering ? "Looking for computers…" : "Discover computers, or receive a pairing request."; color: page.theme.colors.muted }
+            Label { visible: !page.discoveredMachines.length; Layout.fillWidth: true; text: page.backend.discovering ? qsTranslate("Spectrum", "Looking for computers…") : qsTranslate("Spectrum", "Discover computers, or receive a pairing request."); color: page.theme.colors.muted }
             Repeater {
                 model: page.listedMachines
                 delegate: RowLayout {
@@ -511,11 +508,11 @@ Item {
                     required property int index
                     Layout.fillWidth: true
                     Label { objectName: "discovery-name-" + discoveryMachine.index; Layout.fillWidth: true; text: discoveryMachine.modelData.name }
-                    Action { text: "Pair"; enabled: !page.backend.busy && discoveryMachine.modelData.pairing_available === true && (discoveryMachine.modelData.addresses || []).length > 0; onClicked: page.backend.startPair(discoveryMachine.modelData.addresses[0], discoveryMachine.modelData.advertised_node_id || "") }
+                    Action { text: qsTranslate("Spectrum", "Pair"); enabled: !page.backend.busy && discoveryMachine.modelData.pairing_available === true && (discoveryMachine.modelData.addresses || []).length > 0; onClicked: page.backend.startPair(discoveryMachine.modelData.addresses[0], discoveryMachine.modelData.advertised_node_id || "") }
                 }
             }
         }
-        Label { visible: page.backend.compatible && !!page.backend.status.layout && !page.backend.status.layout.valid; text: "Topology needs attention. Select the affected machine to remove its position."; Layout.fillWidth: true; color: page.theme.colors.accent }
-        Label { visible: page.backend.recovery.some(r => r.state !== "complete"); text: "Interrupted pairing: inspect ukvm pair status --json for explicit recovery."; Layout.fillWidth: true; color: page.theme.colors.accent }
+        Label { visible: page.backend.compatible && !!page.backend.status.layout && !page.backend.status.layout.valid; text: qsTranslate("Spectrum", "Topology needs attention. Select the affected machine to remove its position."); Layout.fillWidth: true; color: page.theme.colors.accent }
+        Label { visible: page.backend.recovery.some(r => r.state !== "complete"); text: qsTranslate("Spectrum", "Interrupted pairing: inspect ukvm pair status --json for explicit recovery."); Layout.fillWidth: true; color: page.theme.colors.accent }
     }
 }

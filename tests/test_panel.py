@@ -93,7 +93,8 @@ class PanelTests(unittest.TestCase):
 
     def test_area_screenshot_opens_annotation_editor(self):
         content = PANEL.read_text(encoding="utf-8")
-        self.assertIn('grim -g "$geometry" -t ppm - | satty', content)
+        self.assertIn('grim -g "$geometry" "$temporary"', content)
+        self.assertIn('satty --filename "$temporary"', content)
         self.assertIn('--output-filename "$destination"', content)
         self.assertIn("--actions-on-enter save-to-file", content)
 
@@ -128,7 +129,7 @@ class PanelTests(unittest.TestCase):
                     command.write_text("#!/bin/sh\n" + body + "\n")
                     command.chmod(0o755)
                 process = subprocess.Popen(
-                    ("bash", str(PANEL), "--screenshot-monitor"),
+                    ("bash", str(PANEL), "--screenshot-quick-monitor"),
                     env={**os.environ, "PATH": f"{commands}:{os.environ['PATH']}",
                          "TEST_ROOT": str(root), "SELECTED_OUTPUT": selected,
                          "XDG_PICTURES_DIR": str(root / "Pictures")},
@@ -147,9 +148,10 @@ class PanelTests(unittest.TestCase):
                 if selected:
                     args = (root / "grim-args").read_text().splitlines()
                     self.assertEqual(args[:2], ["-o", selected])
-                    self.assertEqual(Path(args[2]).parent, root / "Pictures/Screenshots")
+                    self.assertFalse(Path(args[2]).exists())
+                    self.assertEqual(len(list((root / "Pictures/Screenshots").glob("*.png"))), 1)
                     self.assertEqual((root / "clipboard").read_text(), "image")
-                    self.assertIn("Screenshot captured", (root / "notice").read_text())
+                    self.assertIn("Screenshot saved", (root / "notice").read_text())
                 else:
                     self.assertFalse((root / "grim-args").exists())
                     self.assertFalse((root / "clipboard").exists())

@@ -23,7 +23,7 @@ PanelWindow {
     Connections {target:panel.manager;function onFavoriteOpened(){if(panel.expanded)panel.closeRequested();}}
     onExpandedChanged: {
         manager.active=expanded;
-        if (expanded) { manager.refresh();Qt.callLater(()=>contentArea.focusInitial()); }
+        if (expanded) { manager.refresh();contentLoader.ensureLoaded();Qt.callLater(()=>{if (expanded && contentLoader.item) contentLoader.item.focusInitial();}); }
         else manager.persist();
     }
     MouseArea {anchors.fill:parent;visible:panel.expanded;onClicked:panel.closeRequested()}
@@ -43,11 +43,16 @@ PanelWindow {
             anchors.fill:parent;anchors.margins:22;spacing:12
             RowLayout {
                 Layout.fillWidth:true
-                Text {text:"FAVORITES";color:panel.theme.colors.foreground;font {family:panel.theme.fontFamily;pixelSize:panel.theme.fontSize+8;bold:true}}
+                Text {text:qsTranslate("Spectrum", "FAVORITES");color:panel.theme.colors.foreground;font {family:panel.theme.fontFamily;pixelSize:panel.theme.fontSize+8;bold:true}}
                 Item {Layout.fillWidth:true}
                 ShellButton {label:"✕";fontFamily:panel.theme.fontFamily;fontSize:panel.theme.fontSize;backgroundColor:panel.theme.colors.surface_alt;foregroundColor:panel.theme.colors.foreground;onClicked:panel.closeRequested()}
             }
-            FavoritesContent {id:contentArea;Layout.fillWidth:true;Layout.fillHeight:true;theme:panel.theme;manager:panel.manager}
+            CachedContent {
+                id:contentLoader
+                requested:panel.expanded
+                Layout.fillWidth:true;Layout.fillHeight:true
+                sourceComponent: FavoritesContent {theme:panel.theme;manager:panel.manager}
+            }
         }
     }
 }

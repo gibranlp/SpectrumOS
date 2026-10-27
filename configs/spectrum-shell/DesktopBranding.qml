@@ -10,8 +10,9 @@ PanelWindow {
     property string corner: "bottom-right"
     property int leftInset: 0
     property int topInset: 0
-    readonly property int logoWidth: Math.round(Math.max(128, Math.min(184, targetScreen.height * 0.085)))
+    readonly property int logoWidth: Math.round(Math.max(128, Math.min(184, (targetScreen ? targetScreen.height : 0) * 0.085)))
 
+    visible: !!targetScreen
     screen: targetScreen
     anchors {
         top: branding.corner.startsWith("top-")

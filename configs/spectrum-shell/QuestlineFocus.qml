@@ -14,9 +14,9 @@ ColumnLayout {
     property int duration: focusState.duration || 25
     readonly property bool active: ["starting", "work", "paused"].includes(focusState.phase)
     readonly property var soundscapes: ["Silent", "LoFi Radio", "Forest Sounds", "Rain Sounds", "Ocean Waves", "White Noise", "Music For Programming", "Local Folder"]
-    readonly property var campaigns: catalog.projects.map(project => ({ id: project.id, title: project.name, subtitle: project.count + " open tasks" }))
-    readonly property var tasks: [{ id: "", title: "No specific task", subtitle: "Focus on the campaign" }].concat(catalog.items.map(task => ({ id: task.id, title: task.title, subtitle: task.priority + (task.due_date ? " · " + task.due_date : "") })))
-    readonly property var sounds: soundscapes.map(name => ({ id: name, title: name, subtitle: name === "Silent" ? "No background audio" : name === "Local Folder" ? "Your Questline music folder" : name === "Music For Programming" ? "Music For Programming mixes" : "" }))
+    readonly property var campaigns: catalog.projects.map(project => ({ id: project.id, title: project.name, subtitle: project.count + qsTranslate("Spectrum", " open tasks") }))
+    readonly property var tasks: [{ id: "", title: qsTranslate("Spectrum", "No specific task"), subtitle: qsTranslate("Spectrum", "Focus on the campaign") }].concat(catalog.items.map(task => ({ id: task.id, title: task.title, subtitle: task.priority + (task.due_date ? " · " + task.due_date : "") })))
+    readonly property var sounds: soundscapes.map(name => ({ id: name, title: name, subtitle: name === "Silent" ? qsTranslate("Spectrum", "No background audio") : name === "Local Folder" ? qsTranslate("Spectrum", "Your Questline music folder") : name === "Music For Programming" ? qsTranslate("Spectrum", "Music For Programming mixes") : "" }))
     readonly property int remaining: active ? Math.max(0, focusState.remaining || 0) : duration * 60
     signal focusAction(string action)
     signal focusStart(var request)
@@ -87,7 +87,7 @@ ColumnLayout {
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: focus.active ? (focus.focusState.phase === "paused" ? "Paused" : focus.focusState.phase === "starting" ? "Starting…" : "Focusing") + (focus.focusState.task ? " · " + focus.focusState.task : focus.focusState.campaign ? " · " + focus.focusState.campaign : "") : "Choose a campaign, task, and soundscape for your session."
+                text: focus.active ? (focus.focusState.phase === "paused" ? qsTranslate("Spectrum", "Paused") : focus.focusState.phase === "starting" ? qsTranslate("Spectrum", "Starting…") : qsTranslate("Spectrum", "Focusing")) + (focus.focusState.task ? " · " + focus.focusState.task : focus.focusState.campaign ? " · " + focus.focusState.campaign : "") : qsTranslate("Spectrum", "Choose a campaign, task, and soundscape for your session.")
                 wrapMode: Text.Wrap
                 color: focus.theme.colors.muted
                 font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
@@ -96,7 +96,7 @@ ColumnLayout {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 10
                 Text {
-                    text: "Minutes"
+                    text: qsTranslate("Spectrum", "Minutes")
                     color: focus.theme.colors.muted
                     font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
                 }
@@ -111,7 +111,7 @@ ColumnLayout {
                     palette { base: focus.theme.colors.surface_alt; text: focus.theme.colors.foreground; button: focus.theme.colors.surface_alt; buttonText: focus.theme.colors.foreground }
                 }
                 ShellButton {
-                    label: focus.focusState.phase === "work" ? "Pause" : focus.focusState.phase === "paused" ? "Resume" : focus.focusState.phase === "starting" ? "Starting…" : "Start focus"
+                    label: focus.focusState.phase === "work" ? qsTranslate("Spectrum", "Pause") : focus.focusState.phase === "paused" ? qsTranslate("Spectrum", "Resume") : focus.focusState.phase === "starting" ? qsTranslate("Spectrum", "Starting…") : qsTranslate("Spectrum", "Start focus")
                     enabled: focus.questline.available && focus.focusState.phase !== "starting"
                     fontFamily: focus.theme.fontFamily
                     fontSize: focus.theme.fontSize
@@ -120,7 +120,7 @@ ColumnLayout {
                     onClicked: focus.startOrToggle()
                 }
                 ShellButton {
-                    label: "Reset"
+                    label: qsTranslate("Spectrum", "Reset")
                     fontFamily: focus.theme.fontFamily
                     fontSize: focus.theme.fontSize
                     backgroundColor: focus.theme.colors.surface_alt
@@ -132,7 +132,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 visible: !focus.questline.available || !!focus.focusState.message
                 horizontalAlignment: Text.AlignHCenter
-                text: !focus.questline.available ? "Open Questline and complete onboarding to earn XP." : focus.focusState.message || ""
+                text: !focus.questline.available ? qsTranslate("Spectrum", "Open Questline and complete onboarding to earn XP.") : focus.focusState.message || ""
                 wrapMode: Text.Wrap
                 color: focus.focusState.phase === "error" ? focus.theme.colors.error : focus.theme.colors.accent
                 font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize }
@@ -147,7 +147,7 @@ ColumnLayout {
             Layout.preferredWidth: 250
             Layout.fillHeight: true
             theme: focus.theme
-            title: "Campaigns"
+            title: qsTranslate("Spectrum", "Campaigns")
             items: focus.campaigns
             selectedId: focus.projectId
             selectionEnabled: !focus.active
@@ -157,7 +157,7 @@ ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             theme: focus.theme
-            title: "Tasks · " + catalog.items.length
+            title: qsTranslate("Spectrum", "Tasks · ") + catalog.items.length
             items: focus.tasks
             selectedId: focus.taskId
             selectionEnabled: !focus.active
@@ -167,7 +167,7 @@ ColumnLayout {
             Layout.preferredWidth: 340
             Layout.fillHeight: true
             theme: focus.theme
-            title: "Soundscapes"
+            title: qsTranslate("Spectrum", "Soundscapes")
             items: focus.sounds
             selectedId: focus.soundscape
             selectionEnabled: !focus.active

@@ -22,8 +22,11 @@ class SpectrumDropTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.environment = patch.dict(os.environ, XDG_RUNTIME_DIR=self.tmp.name)
         self.environment.start()
+        self.lan_environment = patch.dict(G, LAN=str(Path(self.tmp.name) / 'missing-lan'))
+        self.lan_environment.start()
 
     def tearDown(self):
+        self.lan_environment.stop()
         self.environment.stop()
         self.tmp.cleanup()
 
@@ -147,7 +150,115 @@ class SpectrumDropTests(unittest.TestCase):
                 process.kill()
                 process.communicate()
 
+    def test_network_send_keeps_access_code_out_of_process_arguments(self):
+        identifier='a'*32
+        MODULE['write_state']('lan-peers',{'peers':[{'mac':'lan:'+identifier,'id':identifier,'name':'Spectrum','addresses':['127.0.0.1'],'port':8857,'fingerprint':'b'*64}]})
+        commands=[]
+        def fake(args,**options):
+            commands.append(args)
+            return ('inactive',1) if 'is-active' in args else ('',0)
+        with patch.dict(G,run=fake,status=lambda *args: {'ok':True}):
+            MODULE['send_lan']('lan:'+identifier,{'code':'ABCD-EFGH-JKLM-NPQR'})
+        self.assertTrue(any('worker-lan' in command for command in commands))
+        self.assertFalse(any('ABCD' in part for command in commands for part in command))
+        jobs=list(MODULE['runtime']().glob('lan-job-*.json'))
+        self.assertEqual(len(jobs),1)
+        self.assertEqual(jobs[0].stat().st_mode & 0o777,0o600)
+        self.assertEqual(json.loads(jobs[0].read_text())['code'],'ABCD-EFGH-JKLM-NPQR')
+
+    def test_network_actions_do_not_toggle_or_require_wifi_radio(self):
+        calls=[]
+        with patch.dict(G,lan_command=lambda *args,**kwargs:calls.append(args) or {'ok':True},status=lambda *args:{'ok':True},run=lambda *args,**kwargs:self.fail('No radio or external process should run')):
+            MODULE['action'](['receive-lan','5'])
+            MODULE['action'](['stop-lan'])
+        self.assertEqual(calls,[('receive','5'),('stop',)])
+
+    def test_network_status_does_not_query_the_apple_backend(self):
+        with patch.dict(G,CLI='/missing-apple-cli',LAN=__file__,lan_status=lambda:{'available':True,'receiving':False},run=lambda *args,**kwargs:self.fail('No Apple backend or radio process should run')):
+            value=MODULE['status']('lan')
+        self.assertTrue(value['available']);self.assertTrue(value['lan']['available'])
+
     def test_unknown_action_and_extra_arguments_rejected(self):
         for args in (['run', 'anything'], ['status', 'unexpected'], ['stop', '--force']):
             with self.assertRaises(ValueError):
                 MODULE['action'](args)
+
+    def selected_fixture(self):
+        source=Path(self.tmp.name)/"file ' $().txt"
+        source.write_text('temporary selected file')
+        return source
+
+    def test_thunar_selection_prepares_private_paths_without_any_network_or_service(self):
+        source=self.selected_fixture()
+        with patch.dict(G,run=lambda *a,**k:self.fail('Preparing must not launch a process')):
+            value=MODULE['action'](['prepare-selection'],{'paths':[str(source)]})
+        self.assertTrue(value['ok']);self.assertEqual(value['selection']['count'],1)
+        self.assertEqual(MODULE['selection']()['paths'],[str(source)])
+        self.assertFalse(MODULE['read_state']('transfer').get('active'))
+        self.assertEqual((MODULE['runtime']()/'selection.json').stat().st_mode & 0o777,0o600)
+
+    def test_selection_rejects_missing_relative_directory_symlink_and_excessive_paths(self):
+        source=self.selected_fixture();link=source.with_name('link');link.symlink_to(source)
+        for values in ([],['relative'],[self.tmp.name],[str(link)],[str(source)+'missing'],[str(source)]*129):
+            with self.subTest(values=values[:2]),self.assertRaises(ValueError):MODULE['selected_files'](values)
+
+    def test_expired_selection_is_not_used(self):
+        source=self.selected_fixture()
+        MODULE['write_state']('selection',{'paths':[str(source)],'expires':time.time()-1})
+        self.assertEqual(MODULE['selection_summary']()['count'],0)
+
+    def test_lan_send_copies_selection_into_private_job_and_does_not_repeat_picker(self):
+        source=self.selected_fixture();MODULE['prepare_selection']({'paths':[str(source)]})
+        identifier='a'*32;MODULE['write_state']('lan-peers',{'peers':[{'mac':'lan:'+identifier,'name':'Other PC','addresses':['127.0.0.1'],'port':8857}]})
+        commands=[]
+        with patch.dict(G,run=lambda args,**kwargs:commands.append(args) or ('',3 if 'is-active' in args else 0),status=lambda *args:{'ok':True}):
+            MODULE['send_lan']('lan:'+identifier,{'code':'ABCDEFGHIJKLMNOP'})
+        job=next(MODULE['runtime']().glob('lan-job-*.json'))
+        self.assertEqual(json.loads(job.read_text())['paths'],[str(source)])
+        self.assertEqual(MODULE['selection'](),{})
+        self.assertTrue(any('worker-lan' in command for command in commands))
+
+    def test_apple_worker_uses_explicit_files_without_file_picker(self):
+        source=self.selected_fixture();job='b'*32
+        MODULE['write_state']('apple-job-'+job,{'paths':[str(source)]})
+        record=Path(self.tmp.name)/'arguments.json';script=Path(self.tmp.name)/'fake-apple'
+        script.write_text('#!/usr/bin/python\nimport json,sys\nfrom pathlib import Path\nPath('+repr(str(record))+').write_text(json.dumps(sys.argv))\nprint("Sent temporary fixture")\n')
+        script.chmod(0o755)
+        with patch.dict(G,CLI=str(script),notify=lambda *a:None),patch('signal.signal'):
+            MODULE['worker'](ADDRESS,job)
+        args=json.loads(record.read_text())
+        self.assertNotIn('--pick',args);self.assertEqual(args[-2:],['--',str(source)])
+        self.assertEqual(MODULE['read_state']('transfer')['phase'],'complete')
+
+    def test_missing_selected_file_does_not_mark_a_transfer_active(self):
+        source=self.selected_fixture();MODULE['prepare_selection']({'paths':[str(source)]});source.unlink()
+        with patch.dict(G,status=lambda *args:{'visible':True},run=lambda *args,**kwargs:('',3)):
+            with self.assertRaises(ValueError):MODULE['send'](ADDRESS)
+        self.assertFalse(MODULE['read_state']('transfer').get('active'))
+
+    def test_launch_failure_preserves_selection_for_retry(self):
+        source=self.selected_fixture();MODULE['prepare_selection']({'paths':[str(source)]})
+        def run(args,**kwargs):
+            if 'is-active' in args:return '',3
+            raise ValueError('fixture launch failed')
+        with patch.dict(G,status=lambda *args:{'visible':True},run=run):
+            with self.assertRaises(ValueError):MODULE['send'](ADDRESS)
+        self.assertEqual(MODULE['selection']()['paths'],[str(source)])
+        self.assertFalse(MODULE['read_state']('transfer').get('active'))
+        self.assertFalse(list(MODULE['runtime']().glob('apple-job-*')))
+
+    def test_lan_worker_reads_large_selection_jobs_without_opening_the_picker(self):
+        paths=[]
+        for index in range(40):
+            source=Path(self.tmp.name)/(str(index)+'-'+'x'*200+'.txt');source.write_text('fixture');paths.append(str(source))
+        job='c'*32;payload={'paths':paths,'code':'ABCDEFGHIJKLMNOP','peer':{'addresses':['127.0.0.1'],'port':8857}}
+        MODULE['write_state']('lan-job-'+job,payload)
+        self.assertGreater((MODULE['runtime']()/('lan-job-'+job+'.json')).stat().st_size,8192)
+        record=Path(self.tmp.name)/'lan-input.json';script=Path(self.tmp.name)/'fake-lan.py'
+        script.write_text('import json,sys\nfrom pathlib import Path\nvalue=json.load(sys.stdin)\nPath('+repr(str(record))+').write_text(json.dumps(value))\nprint(json.dumps({"ok":True,"phase":"complete","message":"Fixture complete"}))\n')
+        with patch.dict(G,LAN=str(script),notify=lambda *a:None,
+                        run=lambda *a,**k:self.fail('No picker should open for explicit files'),
+                        lan_status=lambda:self.fail('No chooser directory is needed')),patch('signal.signal'):
+            MODULE['worker_lan'](job)
+        self.assertEqual(json.loads(record.read_text())['paths'],paths)
+        self.assertEqual(MODULE['read_state']('transfer')['phase'],'complete')

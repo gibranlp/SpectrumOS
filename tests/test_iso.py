@@ -15,6 +15,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class IsoProfileTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("openssl"), "OpenSSL is required to verify the live password hash")
+    def test_live_ssh_starts_with_the_requested_root_password(self):
+        live = ROOT / "iso/spectrumos/airootfs"
+        service = live / "etc/systemd/system/multi-user.target.wants/sshd.service"
+        self.assertTrue(service.is_symlink())
+        self.assertEqual(str(service.readlink()), "/usr/lib/systemd/system/sshd.service")
+        self.assertIn("openssh", (ROOT / "iso/spectrumos/packages.x86_64").read_text().splitlines())
+        settings = (live / "etc/ssh/sshd_config.d/10-archiso.conf").read_text().splitlines()
+        for setting in ("PasswordAuthentication yes", "PermitRootLogin yes", "PermitEmptyPasswords no"):
+            self.assertIn(setting, settings)
+        root = next(row for row in (live / "etc/shadow").read_text().splitlines() if row.startswith("root:"))
+        encoded = root.split(":")[1]
+        self.assertTrue(encoded.startswith("$6$"))
+        calculated = subprocess.check_output(
+            ["openssl", "passwd", "-6", "-salt", encoded.split("$")[2], "-stdin"],
+            input="spectrum\n", text=True,
+        ).strip()
+        self.assertEqual(encoded, calculated)
+
     def test_every_0755_usr_local_install_has_a_matching_profiledef_permission(self):
         # mkarchiso resets every squashfs file's permissions to profiledef.sh's
         # file_permissions table (644 for anything not listed), independent of
@@ -71,7 +90,8 @@ class IsoProfileTests(unittest.TestCase):
             for relative in ("scripts/check-lean-package", "repo/keys/public.asc",
                              "repo/state/gnupg/private-keys-v1.d/example.key", "secrets/credential",
                              "personal/settings", "spectrumos-personal/settings", "state/runtime",
-                             "generated/private-cache", "private.pem"):
+                             "generated/private-cache", "private.pem",
+                             ".comem/comem.py", ".comem/inventory.json", ".comem/records/example.json"):
                 path = fixture / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("synthetic fixture")
@@ -83,7 +103,7 @@ class IsoProfileTests(unittest.TestCase):
             self.assertIn("./scripts/check-lean-package", names)
             self.assertIn("./repo/keys/public.asc", names)
             for prefix in ("./repo/state", "./secrets", "./personal", "./spectrumos-personal",
-                           "./state", "./generated", "./private.pem"):
+                           "./state", "./generated", "./private.pem", "./.comem"):
                 self.assertFalse(any(name == prefix or name.startswith(prefix + "/") for name in names), prefix)
 
     def test_iso_preserves_source_executables_through_archiso_normalization(self):
@@ -202,6 +222,7 @@ class IsoProfileTests(unittest.TestCase):
                 self.assertNotRegex(content, r"vmlinuz-linux(?!-zen)")
                 self.assertNotRegex(content, r"initramfs-linux\.img")
 
+    @unittest.skipUnless(os.environ.get("SPECTRUM_ALLOW_ISO_FIXTURE") == "1", "ISO fixture creation requires explicit ISO-build authorization")
     def test_repacked_hybrid_iso_has_no_bogus_partitions(self):
         # -hfsplus -apm-block-size 2048 used to sit in this xorriso invocation
         # for Mac/APM boot support this project never actually ships (no HFS+

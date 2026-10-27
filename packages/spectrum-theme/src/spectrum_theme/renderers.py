@@ -1398,6 +1398,24 @@ scrollbar slider:hover {{ background-color: @theme_selected_bg_color; }}
 """
 
 
+def render_gtk4(palette: Palette, font_size: int = 13, font_family: str = DEFAULT_FONT_FAMILY) -> str:
+    roles = {
+        "accent-color": "accent", "accent-bg-color": "accent", "accent-fg-color": "background",
+        "destructive-color": "error", "destructive-bg-color": "error", "destructive-fg-color": "background",
+        "success-color": "success", "success-bg-color": "success", "success-fg-color": "background",
+        "warning-color": "warning", "warning-bg-color": "warning", "warning-fg-color": "background",
+        "error-color": "error", "error-bg-color": "error", "error-fg-color": "background",
+        "window-bg-color": "background", "window-fg-color": "foreground",
+        "view-bg-color": "surface", "view-fg-color": "foreground",
+        "headerbar-bg-color": "surface", "headerbar-fg-color": "foreground",
+        "card-bg-color": "surface", "card-fg-color": "foreground",
+        "dialog-bg-color": "background", "dialog-fg-color": "foreground",
+        "popover-bg-color": "surface", "popover-fg-color": "foreground",
+    }
+    variables = "".join(f"    --{name}: {palette.color(role)};\n" for name, role in roles.items())
+    return render_gtk(palette, font_size, font_family) + "\n:root {\n" + variables + "}\n"
+
+
 def _render_folder_icon(palette: Palette, role: str) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <path d="M5 15a6 6 0 0 1 6-6h15l7 7h20a6 6 0 0 1 6 6v29a6 6 0 0 1-6 6H11a6 6 0 0 1-6-6z" fill="{palette.color('surface_alt')}" stroke="{palette.color(role)}" stroke-width="3"/>
@@ -1877,7 +1895,7 @@ RENDERERS = {
     "alacritty.toml": render_alacritty,
     "colors/spectrum.lua": render_neovim,
     "gtk-3.css": render_gtk,
-    "gtk-4.css": render_gtk,
+    "gtk-4.css": render_gtk4,
     "Spectrum-folder.svg": render_folder,
     "Spectrum-folder-documents.svg": render_folder_documents,
     "Spectrum-folder-downloads.svg": render_folder_downloads,

@@ -10,4 +10,6 @@ else
     exit 1
 fi
 
+systemctl --user --no-block start spectrum-questline-notifications.service spectrum-questline-sync.service || true
+
 exec kitty --class questline -e "$questline_binary"

@@ -30,7 +30,7 @@ Item {
             selectedProjectId = data.selectedProjectId === undefined ? projectForView(activeTab,views[activeTab] || {}) || "" : data.selectedProjectId;
             if (data.inFlight && drafts[data.inFlight.key] && data.inFlight.payload.action.indexOf("create_") === 0 && !data.inFlight.payload.autosave_id) {
                 const next = copy(drafts);
-                next[data.inFlight.key].error = "A save was interrupted. Check the full app before retrying to avoid a duplicate.";
+                next[data.inFlight.key].error = qsTranslate("Spectrum", "A save was interrupted. Check the full app before retrying to avoid a duplicate.");
                 drafts = next;
             }
         }
@@ -111,11 +111,11 @@ Item {
     function status(key): string {
         const draft = drafts[key];
         if (storageError) return storageError;
-        if (!draft) return "Changes save automatically.";
+        if (!draft) return qsTranslate("Spectrum", "Changes save automatically.");
         if (draft.error) return draft.error;
-        if (inFlight && inFlight.key === key) return "Saving…";
-        if (!draft.valid) return "Draft kept on this device. " + draft.reason;
-        return draft.saved === JSON.stringify(draft.payload) ? "Autosaved" : "Saving…";
+        if (inFlight && inFlight.key === key) return qsTranslate("Spectrum", "Saving…");
+        if (!draft.valid) return qsTranslate("Spectrum", "Draft kept on this device. ") + draft.reason;
+        return draft.saved === JSON.stringify(draft.payload) ? qsTranslate("Spectrum", "Autosaved") : qsTranslate("Spectrum", "Saving…");
     }
     function flush(): void {
         debounce.stop();

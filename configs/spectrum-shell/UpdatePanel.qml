@@ -117,7 +117,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 Text {
                     Layout.fillWidth: true
-                    text: "SPECTRUMOS UPDATES"
+                    text: qsTranslate("Spectrum", "SPECTRUMOS UPDATES")
                     elide: Text.ElideRight
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 6; bold: true }
@@ -133,26 +133,26 @@ PanelWindow {
             }
             Text {
                 Layout.fillWidth: true
-                text: "Update Arch and SpectrumOS packages together. Update everything also includes AUR packages when Paru is installed, plus system and user Flatpak apps."
+                text: qsTranslate("Spectrum", "Update Arch and SpectrumOS packages together. Update everything also includes AUR packages when Paru is installed, plus system and user Flatpak apps.")
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.muted
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
             }
             Text {
                 Layout.fillWidth: true
-                text: panel.theme.checkingStableUpdates ? "Checking Stable…"
-                    : panel.theme.stableUpdates && panel.theme.stableUpdates.error ? "Stable check unavailable. Try Check again."
-                    : !panel.theme.stableUpdates || !panel.theme.stableUpdates.checked_at ? "Stable check runs shortly."
-                    : !panel.theme.stableUpdates.eligible ? "Stable notifications require the SpectrumOS Stable repository."
-                    : panel.theme.stableUpdates.packages.length ? panel.theme.stableUpdates.packages.length + " SpectrumOS package update(s) ready on Stable."
-                    : "SpectrumOS packages are up to date on Stable."
+                text: panel.theme.checkingStableUpdates ? qsTranslate("Spectrum", "Checking Stable…")
+                    : panel.theme.stableUpdates && panel.theme.stableUpdates.error ? qsTranslate("Spectrum", "Stable check unavailable. Try Check again.")
+                    : !panel.theme.stableUpdates || !panel.theme.stableUpdates.checked_at ? qsTranslate("Spectrum", "Stable check runs shortly.")
+                    : !panel.theme.stableUpdates.eligible ? qsTranslate("Spectrum", "Stable notifications require the SpectrumOS Stable repository.")
+                    : panel.theme.stableUpdates.packages.length ? panel.theme.stableUpdates.packages.length + qsTranslate("Spectrum", " SpectrumOS package update(s) ready on Stable.")
+                    : qsTranslate("Spectrum", "SpectrumOS packages are up to date on Stable.")
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.muted
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
             }
             Text {
                 Layout.fillWidth: true
-                text: planProcess.running ? "Checking update safety…" : panel.ready ? "Safety checks passed" : "Resolve the blockers below, then check again."
+                text: planProcess.running ? qsTranslate("Spectrum", "Checking update safety…") : panel.ready ? qsTranslate("Spectrum", "Safety checks passed") : qsTranslate("Spectrum", "Resolve the blockers below, then check again.")
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.accent
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize; bold: true }
@@ -175,14 +175,14 @@ PanelWindow {
             }
             Text {
                 Layout.fillWidth: true
-                text: "Review and confirm in the terminal before changes begin. System upgrades create a restore point, apply SpectrumOS migrations, and finish with a health check."
+                text: qsTranslate("Spectrum", "Review and confirm in the terminal before changes begin. System upgrades create a restore point, apply SpectrumOS migrations, and finish with a health check.")
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.muted
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
             }
             ShellButton {
                 Layout.fillWidth: true
-                label: "Check again"
+                label: qsTranslate("Spectrum", "Check again")
                 enabled: !planProcess.running
                 fontFamily: panel.theme.fontFamily
                 fontSize: panel.theme.fontSize
@@ -191,7 +191,7 @@ PanelWindow {
                 onClicked: panel.refresh()
             }
             Repeater {
-                model: [{ label: "Update everything", mode: "all" }, { label: "Update Arch + SpectrumOS packages", mode: "official" }]
+                model: [{ label: qsTranslate("Spectrum", "Update everything"), mode: "all" }, { label: qsTranslate("Spectrum", "Update Arch + SpectrumOS packages"), mode: "official" }]
                 ShellButton {
                     required property var modelData
                     Layout.fillWidth: true

@@ -1,5 +1,6 @@
 import subprocess
 import tempfile
+import tarfile
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,71 @@ def make_restore_point(root: Path, identifier: str, *, complete: bool = True) ->
 
 
 class SpectrumosRestoreHookTests(unittest.TestCase):
+    def test_owned_boot_restore_preserves_wrong_partition_and_handles_extract_failure(self):
+        for scenario in ("success", "wrong-marker", "foreign-efi", "extract-failure"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                top = directory / "top"
+                boot = directory / "boot"
+                snapshot = top / "@snapshots/spectrumos/20261025T000000Z/root"
+                ownership = "schema=1\nroot_uuid=root-id\nboot_uuid=boot-id\nboot_partuuid=part-id\n"
+                for root in (top / "@", snapshot):
+                    (root / "etc/spectrumos").mkdir(parents=True)
+                    (root / "etc/spectrumos/boot-ownership").write_text(ownership)
+                (top / "@/current-root").write_text("keep")
+                (snapshot / "restored-root").write_text("snapshot")
+                boot.mkdir()
+                (boot / ".spectrumos-boot-owner").write_text("wrong" if scenario == "wrong-marker" else "root-id")
+                (boot / "current-kernel").write_text("keep")
+                archive_contents = directory / "archived-boot"
+                archive_contents.mkdir()
+                (archive_contents / ".spectrumos-boot-owner").write_text("root-id")
+                (archive_contents / "restored-kernel").write_text("snapshot")
+                archive = snapshot.parent / "boot.tar"
+                with tarfile.open(archive, "w") as handle:
+                    handle.add(archive_contents, arcname=".")
+                if scenario == "foreign-efi":
+                    (boot / "EFI/Microsoft/Boot").mkdir(parents=True)
+                script = '''
+. "$1"
+root=/dev/fake-root
+espdevice=/dev/fake-boot
+mountpoint() { return 0; }
+blkid() {
+    case "$*" in
+        *PARTUUID*) echo part-id ;;
+        */dev/fake-root*) echo root-id ;;
+        *) echo boot-id ;;
+    esac
+}
+btrfs() {
+    case "$2" in
+        snapshot) cp -a "$3" "$4" ;;
+        delete) python -c 'import shutil,sys;shutil.rmtree(sys.argv[1])' "$3" ;;
+    esac
+}
+tar() {
+    case "$*" in
+        *-xpf*20261025T000000Z/boot.tar*)
+            if [ "$SCENARIO" = extract-failure ]; then return 1; fi ;;
+    esac
+    command tar "$@"
+}
+spectrumos_perform_rescue "$2" "$3" 20261025T000000Z
+'''
+                result = subprocess.run(["sh", "-c", script, "sh", str(HOOK), str(top), str(boot)],
+                                        env={**__import__("os").environ, "SCENARIO": scenario},
+                                        text=True, capture_output=True)
+                if scenario == "success":
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue((top / "@/restored-root").is_file())
+                    self.assertTrue((boot / "restored-kernel").is_file())
+                    self.assertFalse((boot / "current-kernel").exists())
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertTrue((top / "@/current-root").is_file())
+                    self.assertEqual((boot / "current-kernel").read_text(), "keep")
+
     def test_install_hook_includes_the_mountpoint_check_used_at_runtime(self):
         content = INSTALL_HOOK.read_text(encoding="utf-8")
         self.assertIn("add_binary mountpoint", content)

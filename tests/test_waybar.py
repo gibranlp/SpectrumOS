@@ -42,7 +42,7 @@ class WaybarTests(unittest.TestCase):
 
     def test_workspace_icons_are_visible_in_control_center(self):
         config = (ROOT / "configs/spectrum-shell/ControlCenter.qml").read_text(encoding="utf-8")
-        self.assertIn('text: "WORKSPACE ICONS"', config)
+        self.assertIn('text: qsTranslate("Spectrum", "WORKSPACE ICONS")', config)
         self.assertIn('model: center.theme.workspaceIcons.sets || []', config)
         self.assertIn('center.theme.backend("waybar-workspace-icons")', config)
 

@@ -85,17 +85,16 @@ exit 0
         self.assertIn("Cancelled", result.stdout)
         self.assertNotIn("sudo", self.log.read_text(encoding="utf-8"))
 
-    def test_official_mode_runs_pacman_through_sudo_then_doctor(self):
+    def test_official_mode_runs_pacman_through_sudo_then_migrations(self):
         write_stub(self.bin_dir, "sudo", f"echo \"sudo $*\" >> '{self.log}'\nexit 0\n")
         result = run("official", self.bin_dir)
         self.assertEqual(result.returncode, 0)
         calls = self.log.read_text(encoding="utf-8")
         self.assertIn("sudo pacman -Syu", calls)
         self.assertIn("sudo spectrum migrate apply", calls)
-        self.assertIn("spectrum doctor", calls)
+        self.assertNotIn("spectrum doctor", calls)
         self.assertLess(calls.index("sudo pacman -Syu"), calls.index("sudo spectrum migrate apply"))
-        self.assertLess(calls.index("sudo spectrum migrate apply"), calls.index("spectrum doctor"))
-        self.assertIn("Update complete and healthy", result.stdout)
+        self.assertIn("Update complete.", result.stdout)
 
     def test_aur_mode_without_paru_installed_fails_clearly(self):
         result = run("aur", self.bin_dir)
@@ -147,15 +146,15 @@ exit 0
         self.assertIn("flatpak update --system", calls)
         self.assertIn("flatpak update --user", calls)
         self.assertLess(calls.index("sudo spectrum migrate apply"), calls.index("flatpak update --system"))
-        self.assertLess(calls.index("flatpak update --user"), calls.index("spectrum doctor"))
+        self.assertNotIn("spectrum doctor", calls)
 
-    def test_flatpak_failure_is_reported_and_still_runs_doctor(self):
+    def test_flatpak_failure_is_reported_without_automatic_doctor(self):
         write_stub(self.bin_dir, "sudo", f'echo "sudo $*" >> \'{self.log}\'')
         write_stub(self.bin_dir, "flatpak", f'echo "flatpak $*" >> \'{self.log}\'\nif [ "$2" = --system ]; then exit 8; fi\nexit 0')
         result = run("all", self.bin_dir)
         self.assertEqual(result.returncode, 8)
         self.assertIn("Flatpak updates failed", result.stdout)
-        self.assertIn("spectrum doctor", self.log.read_text())
+        self.assertNotIn("spectrum doctor", self.log.read_text())
 
     def test_failed_system_update_skips_flatpaks(self):
         write_stub(self.bin_dir, "sudo", f'echo "sudo $*" >> \'{self.log}\'\nexit 7')
@@ -186,7 +185,7 @@ exit 0
         self.assertIn('backendDir + "/spectrum-update-run"', panel)
         self.assertIn('enabled: panel.ready && !planProcess.running', panel)
 
-    def test_a_failed_migration_reports_failure_and_still_runs_doctor(self):
+    def test_a_failed_migration_reports_its_own_failure(self):
         write_stub(
             self.bin_dir,
             "sudo",
@@ -195,21 +194,22 @@ exit 0
         result = run("official", self.bin_dir)
         self.assertEqual(result.returncode, 9)
         self.assertIn("ordered migrations failed", result.stdout)
-        self.assertIn("spectrum doctor", self.log.read_text(encoding="utf-8"))
+        self.assertNotIn("spectrum doctor", self.log.read_text(encoding="utf-8"))
 
-    def test_a_failed_update_still_runs_doctor_and_reports_its_own_status(self):
+    def test_a_failed_update_reports_its_own_status(self):
         write_stub(self.bin_dir, "sudo", f"echo \"sudo $*\" >> '{self.log}'\nexit 7\n")
         result = run("official", self.bin_dir)
         self.assertEqual(result.returncode, 7)
-        self.assertIn("doctor output", result.stdout)
+        self.assertNotIn("doctor output", result.stdout)
         self.assertIn("did not complete successfully", result.stdout)
         self.assertNotIn("sudo spectrum migrate apply", self.log.read_text(encoding="utf-8"))
 
-    def test_a_failed_doctor_is_the_final_status_after_a_successful_update(self):
+    def test_manual_doctor_failures_do_not_fail_a_successful_update(self):
         write_stub(self.bin_dir, "sudo", f"echo \"sudo $*\" >> '{self.log}'\nexit 0\n")
         result = run("official", self.bin_dir, extra_env={"SPECTRUM_DOCTOR_EXIT": "1"})
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("doctor reports problems", result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Update complete.", result.stdout)
+        self.assertNotIn("spectrum doctor", self.log.read_text())
 
 
 if __name__ == "__main__":

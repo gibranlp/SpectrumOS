@@ -7,6 +7,8 @@ Item {
     property string fontFamily: "monospace"
     property int fontPixelSize: 13
     property color textColor: "white"
+    property bool animationsEnabled: true
+    onAnimationsEnabledChanged: if (!animationsEnabled) scrollOffset = 0
     property bool autoScroll: false
     property bool centered: false
     property bool bold: false
@@ -44,7 +46,7 @@ Item {
         Timer {
             interval: 30
             repeat: true
-            running: control.visible && (control.autoScroll || titleHover.hovered) && control.measuredTextWidth > viewport.width
+            running: control.animationsEnabled && control.visible && (control.autoScroll || titleHover.hovered) && control.measuredTextWidth > viewport.width
             onTriggered: {
                 const maxOffset = Math.max(0, control.measuredTextWidth - viewport.width);
                 control.scrollOffset = control.scrollOffset >= maxOffset ? 0 : control.scrollOffset + 1;

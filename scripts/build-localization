@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import argparse
+import json
+import gettext
+import re
+import shutil
+import subprocess
+from string import Formatter
+import xml.etree.ElementTree as ET
+
+import polib
+
+
+def placeholders(value):
+    fields = {field for _, field, _, _ in Formatter().parse(value) if field is not None}
+    fields.update(re.findall(r'%(?:L?[1-9][0-9]*|n)', value))
+    return fields
+
+root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description='Compile Spectrum translation catalogs and the QML language module')
+parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--catalogs-only', action='store_true')
+options = parser.parse_args()
+output = options.output.resolve()
+translations = output / 'translations'
+translations.mkdir(parents=True, exist_ok=True)
+registry = json.loads((root / 'translations/languages.json').read_text())
+shutil.copy2(root / 'translations/languages.json', translations / 'languages.json')
+all_messages = {}
+for row in registry:
+    source = root / 'translations' / (row['id'] + '.po')
+    if not source.exists():
+        continue
+    for entry in polib.pofile(str(source)):
+        if not entry.obsolete:
+            all_messages[(entry.msgctxt or 'Spectrum', entry.msgid)] = entry
+for row in registry:
+    locale = row['id']
+    if not re.fullmatch(r'[a-z]{2,3}(?:_[A-Z][a-z]{3})?(?:_(?:[A-Z]{2}|[0-9]{3}))?', locale):
+        raise SystemExit('Invalid language registry locale')
+    source = root / 'translations' / (locale + '.po')
+    catalog = polib.pofile(str(source)) if source.exists() else polib.POFile()
+    forms = row.get('plural_forms') or catalog.metadata.get('Plural-Forms')
+    if not forms:
+        raise SystemExit('Set plural_forms for language: ' + locale)
+    match = re.fullmatch(r'nplurals\s*=\s*([1-6]);\s*plural\s*=\s*(.+);', forms)
+    if not match:
+        raise SystemExit('Invalid plural_forms: ' + locale)
+    count = int(match[1])
+    rule = gettext.c2py(match[2])
+    if any(not 0 <= rule(number) < count for number in range(201)):
+        raise SystemExit('Plural index out of range: ' + locale)
+    catalog.metadata.update({'Language': locale, 'Content-Type': 'text/plain; charset=UTF-8',
+        'Plural-Forms': forms})
+    if locale == 'en_US':
+        for (context, message), entry in all_messages.items():
+            english = polib.POEntry(msgctxt=context, msgid=message, msgid_plural=entry.msgid_plural)
+            if entry.msgid_plural:
+                english.msgstr_plural = {0: message, 1: entry.msgid_plural}
+            else:
+                english.msgstr = message
+            catalog.append(english)
+    contexts = {}
+    tree = ET.Element('TS', version='2.1', language=locale)
+    for entry in catalog:
+        if entry.obsolete:
+            continue
+        if 'fuzzy' in entry.flags:
+            entry.msgstr = ''
+            entry.msgstr_plural = {index: '' for index in entry.msgstr_plural}
+        targets = list(entry.msgstr_plural.values()) if entry.msgid_plural else [entry.msgstr]
+        expected = placeholders(entry.msgid)
+        if entry.msgid_plural and placeholders(entry.msgid_plural) != expected:
+            raise SystemExit('Plural placeholders differ: ' + entry.msgid)
+        for target in targets:
+            if target and placeholders(target) != expected:
+                raise SystemExit('Translation placeholders differ: ' + locale + ': ' + entry.msgid)
+        context = entry.msgctxt or 'Spectrum'
+        if context not in contexts:
+            contexts[context] = ET.SubElement(tree, 'context')
+            ET.SubElement(contexts[context], 'name').text = context
+        node = ET.SubElement(contexts[context], 'message', **({'numerus': 'yes'} if entry.msgid_plural else {}))
+        ET.SubElement(node, 'source').text = entry.msgid
+        text = ET.SubElement(node, 'translation')
+        if entry.msgid_plural:
+            for index in range(count):
+                ET.SubElement(text, 'numerusform').text = entry.msgstr_plural.get(index, '')
+            if not all(entry.msgstr_plural.get(index) for index in range(count)):
+                text.set('type', 'unfinished')
+        else:
+            text.text = entry.msgstr
+            if not entry.msgstr:
+                text.set('type', 'unfinished')
+    ts = output / ('spectrum_' + locale + '.ts')
+    ET.ElementTree(tree).write(ts, encoding='utf-8', xml_declaration=True)
+    qm = translations / ('spectrum_' + locale + '.qm')
+    subprocess.run(['/usr/lib/qt6/bin/lrelease', '-nounfinished', str(ts), '-qm', str(qm)], check=True)
+    destination = translations / locale / 'LC_MESSAGES/spectrum.mo'
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    catalog.save_as_mofile(str(destination))
+if not options.catalogs_only:
+    native = output / 'native'
+    subprocess.run(['cmake', '-S', str(root / 'integrations/i18n'), '-B', str(native), '-DCMAKE_BUILD_TYPE=Release'], check=True)
+    subprocess.run(['cmake', '--build', str(native), '--parallel', '2'], check=True)
+    shutil.copytree(native / 'qml', output / 'qml', dirs_exist_ok=True)
+print('Localization output:', output)

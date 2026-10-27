@@ -59,7 +59,7 @@ PanelWindow {
     }
     function state(): var {
         return {visible: expanded, kind: kind, percent: percent, muted: muted, trackPending: trackPending, artworkReady: trackArt.hasArtwork,
-            monitor: targetScreen.name, position: barPosition, x: card.x, y: card.y, width: card.width, height: card.height};
+            monitor: targetScreen ? targetScreen.name : "", position: barPosition, x: card.x, y: card.y, width: card.width, height: card.height};
     }
     Timer {
         id: dismissDelay
@@ -71,8 +71,8 @@ PanelWindow {
     }
 
     screen: targetScreen
-    implicitWidth: targetScreen.width
-    implicitHeight: targetScreen.height
+    implicitWidth: targetScreen ? targetScreen.width : 0
+    implicitHeight: targetScreen ? targetScreen.height : 0
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
@@ -80,7 +80,7 @@ PanelWindow {
     WlrLayershell.namespace: "spectrum-level-indicator"
     focusable: false
     color: "transparent"
-    visible: motion.active
+    visible: !!targetScreen && motion.active
     mask: Region {}
 
     ShellSurface {
@@ -123,13 +123,13 @@ PanelWindow {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: indicator.kind === "brightness" ? "Brightness" + (indicator.deviceLabel ? " · " + indicator.deviceLabel : "") : "Volume"
+                    text: indicator.kind === "brightness" ? qsTranslate("Spectrum", "Brightness") + (indicator.deviceLabel ? " · " + indicator.deviceLabel : "") : qsTranslate("Spectrum", "Volume")
                     elide: Text.ElideRight
                     color: indicator.theme.colors.foreground
                     font { family: indicator.theme.fontFamily; pixelSize: indicator.theme.fontSize; bold: true }
                 }
                 Text {
-                    text: indicator.muted ? "Muted" : indicator.percent + "%"
+                    text: indicator.muted ? qsTranslate("Spectrum", "Muted") : indicator.percent + "%"
                     color: indicator.theme.colors.foreground
                     font { family: indicator.theme.fontFamily; pixelSize: indicator.theme.fontSize; bold: true }
                 }
@@ -151,7 +151,7 @@ PanelWindow {
                     spacing: 6
                     Text {
                         Layout.fillWidth: true
-                        text: indicator.track.title || "Unknown track"
+                        text: indicator.track.title || qsTranslate("Spectrum", "Unknown track")
                         textFormat: Text.PlainText
                         wrapMode: Text.Wrap
                         maximumLineCount: 2
@@ -161,7 +161,7 @@ PanelWindow {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: indicator.track.artist || "Unknown artist"
+                        text: indicator.track.artist || qsTranslate("Spectrum", "Unknown artist")
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         color: indicator.theme.colors.muted

@@ -25,7 +25,6 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-o
 -- variant, and gowall filter all keep applying to it. "Surprise me" in the control center
 -- is the one that rerolls every axis at once; this is a quicker, narrower "next wallpaper".
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("/usr/lib/spectrumos/theme-menu --random-wallpaper"))
-hl.bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open control"))
 hl.bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open power"))
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open audio"))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open network"))
@@ -54,11 +53,13 @@ hl.bind(mainMod .. " + SHIFT + A", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open recorder"))
 
 hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open appimages"))
-hl.bind(mainMod .. " + SHIFT + G", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open appearance"))
 hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open bluetooth"))
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open dashboard"))
 hl.bind(mainMod .. " + SHIFT + O", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open displays"))
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open focus"))
+hl.bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open breaks"))
+hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open services"))
+hl.bind(mainMod .. " + SHIFT + G", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open default-apps"))
 hl.bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open more"))
 hl.bind(mainMod .. " + SHIFT + Y", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open typography"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open weather"))

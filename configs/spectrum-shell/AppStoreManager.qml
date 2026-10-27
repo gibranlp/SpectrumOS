@@ -79,7 +79,7 @@ Item {
                     const result = JSON.parse(manager.searchOutput);
                     if (!result.ok) manager.error = result.error;
                     else { manager.results = result.results; manager.backends = result.backends; manager.warnings = result.warnings.join("\n"); }
-                } catch (error) { manager.error = "Could not read the application search. Try again."; }
+                } catch (error) { manager.error = qsTranslate("Spectrum", "Could not read the application search. Try again."); }
             }
             Qt.callLater(() => manager.pump());
         }
@@ -95,7 +95,7 @@ Item {
                 if (!result.ok) manager.error = result.error || "The action could not be completed.";
                 else if (manager.actionName === "details" && manager.selected && manager.selected.key === manager.detailKey) manager.detail = result.detail;
                 else if (manager.actionName === "start") { manager.page = "activity"; manager.installationRequested(); }
-            } catch (error) { manager.error = "Could not read the App Store response."; }
+            } catch (error) { manager.error = qsTranslate("Spectrum", "Could not read the App Store response."); }
             manager.refreshJobs();
         }
     }
@@ -105,7 +105,7 @@ Item {
         onStarted: write("{}\n")
         stdout: StdioCollector { onStreamFinished: {
             try { const result = JSON.parse(text); if (result.ok) manager.jobs = result.jobs; }
-            catch(error) { manager.error = "Could not read installation activity."; }
+            catch(error) { manager.error = qsTranslate("Spectrum", "Could not read installation activity."); }
         } }
     }
 }

@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import os,subprocess,tempfile,shutil
+root=Path(__file__).resolve().parents[1]
+with tempfile.TemporaryDirectory(prefix='spectrum-default-apps-ui-') as temporary:
+ folder=Path(temporary);runtime=folder/'runtime';runtime.mkdir(mode=0o700)
+ backend=folder/'default-apps-adapter';backend.write_text('''#!/usr/bin/env python3
+import json,sys
+request=json.loads(sys.argv[2])
+if request.get('desktop')=='fail.desktop':
+ print(json.dumps({'ok':False,'error':'Unable to update associations'}));sys.exit(1)
+types=[request['mime']] if 'mime' in request else ['video/mp4','video/x-matroska']
+selection={'mime':request['mime'],'label':'Matroska','types':types} if 'mime' in request else {'group':request['group'],'label':'Videos','types':types}
+result={'ok':True,'selection':selection,'defaults':[{'mime':mime,'desktop':request.get('desktop','other.desktop' if i==0 else 'different.desktop'),'name':'Other player'} for i,mime in enumerate(types)],'apps':[{'id':'test-player.desktop','name':'Test Player','icon':''}]}
+if request.get('catalogue'):result.update(groups=[{'id':'video','name':'Videos'}],file_types=[{'id':'application/pdf','name':'PDF','extensions':['.pdf']},{'id':'video/x-matroska','name':'Matroska','extensions':['.mkv']}])
+if sys.argv[1]=='set':result['message']='Saved explicitly'
+print(json.dumps(result))
+''');backend.chmod(0o755)
+ ui=folder/'ui';ui.mkdir()
+ for name in ['DefaultApps','FocusChoice','ShellButton','KeyboardAction']:
+  shutil.copy2(root/f'configs/spectrum-shell/{name}.qml',ui/(name+'.qml'))
+ test=folder/'shell.qml';test.write_text((root/'tests/qml/DefaultAppsTests.qml').read_text().replace('../../configs/spectrum-shell','ui'))
+ env={**os.environ,'QT_QPA_PLATFORM':'offscreen','QT_QUICK_BACKEND':'software','XDG_RUNTIME_DIR':str(runtime),'SPECTRUM_DEFAULT_APPS_FIXTURE':str(folder)}
+ env.pop('WAYLAND_DISPLAY',None);env.pop('DISPLAY',None)
+ result=subprocess.run(['qs','--path',str(test)],env=env,capture_output=True,text=True,timeout=60)
+ output=result.stdout+result.stderr
+ print(output)
+ assert '0 failed' in output and 'FAIL!' not in output,output
+ raise SystemExit(result.returncode)

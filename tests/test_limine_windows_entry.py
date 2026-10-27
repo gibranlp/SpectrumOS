@@ -15,6 +15,32 @@ SPEC.loader.exec_module(MODULE)
 
 
 class LimineWindowsEntryTests(unittest.TestCase):
+    def test_same_disk_discovery_excludes_only_the_new_spectrum_esp(self):
+        first = "11111111-2222-3333-4444-555555555555"
+        new = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        devices = {"blockdevices": [{"path": "/dev/sda", "type": "disk", "children": [
+            {"path": path, "type": "part", "parttype": MODULE.EFI_SYSTEM_PARTITION,
+             "partuuid": value, "fstype": "vfat"}
+            for path, value in (("/dev/sda1", first), ("/dev/sda4", new))
+        ]}]}
+        self.assertEqual(MODULE.candidates(devices, "", new), [("/dev/sda1", first)])
+
+    def test_linux_discovery_prefers_shim_and_ignores_unrecognized_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for vendor, names in (("ubuntu", ["shimx64.efi", "grubx64.efi"]),
+                                  ("systemd", ["systemd-bootx64.efi"]),
+                                  ("Microsoft", ["shimx64.efi"]), ("BOOT", ["grubx64.efi"]),
+                                  ("bad\nentry", ["grubx64.efi"]), ("broken", ["grubx64.efi"])):
+                folder = root / "EFI" / vendor
+                folder.mkdir(parents=True)
+                for name in names:
+                    (folder / name).write_bytes(b"MZtest" if vendor != "broken" else b"invalid")
+            self.assertEqual(MODULE.linux_loaders(root), [
+                ("systemd", "/EFI/systemd/systemd-bootx64.efi"),
+                ("ubuntu", "/EFI/ubuntu/shimx64.efi"),
+            ])
+
     def test_candidates_include_only_other_disks_valid_efi_partitions(self):
         devices = {"blockdevices": [
             {"path": "/dev/sda", "type": "disk", "children": [

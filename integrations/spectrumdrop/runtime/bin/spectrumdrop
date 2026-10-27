@@ -42,6 +42,11 @@ CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/spectrumdrop/receiver.toml"
 SELF="$(readlink -f "$0")"
 PROJ="$(cd "$(dirname "$SELF")/.." && pwd)"
 
+if [[ ${1:-} == lan ]]; then
+  shift
+  exec python3 "$PROJ/bin/lan.py" "$@"
+fi
+
 # The version a bug report needs. manifest.json is the single source of truth
 # -- the marketplace reads it -- and the constant below is only a last resort.
 #

@@ -114,7 +114,7 @@ class LiveInstallerTests(unittest.TestCase):
         content = backend.read_text(encoding="utf-8")
         self.assertIn('[[ $confirm_erase == "$disk" ]]', content)
         self.assertIn('[[ $(lsblk -dn -o TYPE "$disk") == disk ]]', content)
-        self.assertIn("Refusing to erase a disk with mounted filesystems", content)
+        self.assertIn("Refusing to install on a disk with mounted filesystems", content)
         self.assertIn("/usr/local/share/spectrumos/source", content)
         self.assertIn("pacman -Sy --noconfirm", content)
         self.assertLess(content.index("pacman -Sy --noconfirm"), content.index("wipefs --all --force"))
@@ -162,7 +162,7 @@ class LiveInstallerTests(unittest.TestCase):
             with self.subTest(disk=disk):
                 result = subprocess.run(
                     ("bash", "-c", 'die() { printf "%s\\n" "$*" >&2; exit 1; }\nvalidate() {' + validation + "\nvalidate"),
-                    env={**os.environ, "disk": disk}, capture_output=True, text=True,
+                    env={**os.environ, "disk": disk, "install_mode": "erase", "target": "/tmp/spectrum-installer-unused"}, capture_output=True, text=True,
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("Refusing a floppy or RAM-backed installation device", result.stderr)
@@ -223,13 +223,14 @@ class LiveInstallerTests(unittest.TestCase):
         self.assertIn("Everything on the selected disk will be permanently erased", frontend)
         self.assertNotIn("Wi-Fi & network settings", frontend)
         self.assertIn("SpectrumOS downloads packages during installation", frontend)
-        self.assertIn('"--keyboard", self.keyboard_profiles', frontend)
+        self.assertIn('"keyboard": self.keyboard_profiles', frontend)
+        self.assertIn('"--keyboard", options["keyboard"]', frontend)
         self.assertIn('"Spanish (Latin America)"', frontend)
-        self.assertIn('Gtk.Entry(text="igor")', frontend)
+        self.assertIn('tr_widget(Gtk.Entry, text="igor")', frontend)
         self.assertIn("Adds laptop power management, battery support, brightness controls", frontend)
-        self.assertIn('label="Exit installer"', frontend)
-        self.assertIn('label="Restart"', frontend)
-        self.assertIn('label="Power off"', frontend)
+        self.assertIn("label=msg('Exit installer')", frontend)
+        self.assertIn("label=msg('Restart')", frontend)
+        self.assertIn("label=msg('Power off')", frontend)
         # GTK4's default CSD reserves an invisible shadow/resize margin around the whole
         # toplevel surface -- Hyprland doesn't crop it the way Mutter does, so it rendered
         # live as a ~30px genuinely transparent frame outside this window's own custom
@@ -346,9 +347,10 @@ class LiveInstallerTests(unittest.TestCase):
     def test_optional_browsers_are_opt_in_via_checkboxes(self):
         frontend = (INSTALLER / "spectrum-installer").read_text(encoding="utf-8")
         backend = (INSTALLER / "spectrum-installer-backend").read_text(encoding="utf-8")
-        for label in ('label="Google Chrome"', 'label="Brave"', 'label="Zen Browser"'):
+        for label in ("label=msg('Google Chrome')", "label=msg('Brave')", "label=msg('Zen Browser')"):
             self.assertIn(label, frontend)
-        self.assertIn('"--browsers", ",".join(self.selected_browsers())', frontend)
+        self.assertIn('"browsers": ",".join(self.selected_browsers())', frontend)
+        self.assertIn('"--browsers", options["browsers"]', frontend)
         self.assertIn("browser_packages=([chrome]=google-chrome [brave]=brave-bin [zen]=zen-browser-bin)", backend)
         self.assertIn("aur_packages=(gowall-bin vesktop-bin)", backend)
         self.assertIn("if [[ $lean == false ]]; then", backend)

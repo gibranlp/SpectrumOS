@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Local Services
+Comment=Manage selected development user services and local containers
+Exec=/usr/lib/spectrumos/spectrum-shell-open services
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;
+Keywords=Development;Docker;Podman;Services;Containers;

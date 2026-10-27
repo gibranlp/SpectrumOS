@@ -60,14 +60,14 @@ ColumnLayout {
         Label { text: "󰌌"; font.pixelSize: 48; color: editor.theme.colors.accent }
         ColumnLayout {
             Layout.fillWidth: true
-            Label { text: "Repeat your keys"; font.pixelSize: editor.theme.fontSize + 6; font.bold: true }
-            Label { text: "One shortcut to start or stop"; color: editor.theme.colors.muted }
+            Label { text: qsTranslate("Spectrum", "Repeat your keys"); font.pixelSize: editor.theme.fontSize + 6; font.bold: true }
+            Label { text: qsTranslate("Spectrum", "One shortcut to start or stop"); color: editor.theme.colors.muted }
         }
     }
     RowLayout {
         Layout.fillWidth: true
-        Label { text: "󰌌  Keys"; Layout.preferredWidth: 130 }
-        Field { id: sequence; objectName: "hotkey-sequence"; placeholderText: "2 or 234"; maximumLength: 256; Accessible.name: "Key sequence" }
+        Label { text: qsTranslate("Spectrum", "󰌌  Keys"); Layout.preferredWidth: 130 }
+        Field { id: sequence; objectName: "hotkey-sequence"; placeholderText: qsTranslate("Spectrum", "2 or 234"); maximumLength: 256; Accessible.name: qsTranslate("Spectrum", "Key sequence") }
         Controls.ComboBox {
             id: keySelector
             objectName: "hotkey-key-selector"
@@ -85,7 +85,7 @@ ColumnLayout {
             }
             contentItem: Text {
                 objectName: "hotkey-selector-text"
-                text: keySelector.displayText
+                text: keySelector.currentIndex === 0 ? qsTranslate("Spectrum", "Select key…") : keySelector.displayText
                 color: editor.theme.colors.foreground
                 font: keySelector.font
                 leftPadding: 10
@@ -145,19 +145,19 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true
-        Label { text: "󰥔  Interval"; Layout.preferredWidth: 130 }
-        Field { id: interval; objectName: "hotkey-interval"; text: "50"; maximumLength: 5; validator: IntValidator { bottom: 10; top: 60000 } Accessible.name: "Interval in milliseconds" }
-        Label { text: "ms after sequence"; color: editor.theme.colors.muted }
+        Label { text: qsTranslate("Spectrum", "󰥔  Interval"); Layout.preferredWidth: 130 }
+        Field { id: interval; objectName: "hotkey-interval"; text: "50"; maximumLength: 5; validator: IntValidator { bottom: 10; top: 60000 } Accessible.name: qsTranslate("Spectrum", "Interval in milliseconds") }
+        Label { text: qsTranslate("Spectrum", "ms after sequence"); color: editor.theme.colors.muted }
     }
     RowLayout {
         Layout.fillWidth: true
-        Label { text: "󰌑  Shortcut"; Layout.preferredWidth: 130 }
+        Label { text: qsTranslate("Spectrum", "󰌑  Shortcut"); Layout.preferredWidth: 130 }
         Field {
             id: shortcut
             objectName: "hotkey-shortcut"
-            placeholderText: editor.recordingShortcut ? "Press a key or chord…" : "2 or Ctrl+Shift+2"
+            placeholderText: editor.recordingShortcut ? qsTranslate("Spectrum", "Press a key or chord…") : qsTranslate("Spectrum", "2 or Ctrl+Shift+2")
             maximumLength: 80
-            Accessible.name: "Toggle shortcut"
+            Accessible.name: qsTranslate("Spectrum", "Toggle shortcut")
             Keys.onPressed: event => {
                 const mods = [];
                 if (event.modifiers & Qt.ControlModifier) mods.push("Control");
@@ -178,7 +178,7 @@ ColumnLayout {
                 }
             }
         }
-        Button { objectName: "hotkey-record-shortcut"; label: editor.recordingShortcut ? "Cancel" : "Record"; onClicked: { editor.recordingShortcut = !editor.recordingShortcut; shortcut.forceActiveFocus(); } }
+        Button { objectName: "hotkey-record-shortcut"; label: editor.recordingShortcut ? qsTranslate("Spectrum", "Cancel") : qsTranslate("Spectrum", "Record"); onClicked: { editor.recordingShortcut = !editor.recordingShortcut; shortcut.forceActiveFocus(); } }
     }
     RowLayout {
         Layout.fillWidth: true
@@ -186,22 +186,22 @@ ColumnLayout {
             Layout.fillWidth: true
             objectName: "hotkey-save"
             icon: editor.editingId ? "󰆓" : "󰐕"
-            label: editor.editingId ? "Save" : "Add"
-            hint: editor.editingId ? "Save changes" : "Add sequence and register shortcut"
+            label: editor.editingId ? qsTranslate("Spectrum", "Save") : qsTranslate("Spectrum", "Add")
+            hint: editor.editingId ? qsTranslate("Spectrum", "Save changes") : qsTranslate("Spectrum", "Add sequence and register shortcut")
             enabled: !editor.backend.busy && sequence.text.length > 0 && interval.acceptableInput && shortcut.text.length > 0
             onClicked: editor.backend.command(["save", JSON.stringify({id:editor.editingId, keys:sequence.text, interval_ms:Number(interval.text), shortcut:shortcut.text})])
         }
-        Action { Layout.fillWidth: true; icon: "󰑓"; label: "Clear"; hint: "Clear the form for a new sequence"; onClicked: editor.clearForm() }
-        Action { Layout.fillWidth: true; objectName: "hotkey-stop-all"; icon: "󰓛"; label: "Stop all"; onClicked: editor.backend.command(["stop-all"]) }
+        Action { Layout.fillWidth: true; icon: "󰑓"; label: qsTranslate("Spectrum", "Clear"); hint: qsTranslate("Spectrum", "Clear the form for a new sequence"); onClicked: editor.clearForm() }
+        Action { Layout.fillWidth: true; objectName: "hotkey-stop-all"; icon: "󰓛"; label: qsTranslate("Spectrum", "Stop all"); onClicked: editor.backend.command(["stop-all"]) }
     }
-    Label { Layout.fillWidth: true; text: editor.backend.error; visible: text.length > 0; color: editor.theme.colors.accent }
+    Label { Layout.fillWidth: true; text: qsTranslate("Spectrum", editor.backend.error); visible: text.length > 0; color: editor.theme.colors.accent }
     RowLayout {
         Layout.fillWidth: true
-        Label { Layout.fillWidth: true; text: "󰓛  Ctrl+Alt+Pause stops all"; color: editor.theme.colors.muted }
-        Button { label: editor.showDetails ? "Hide details" : "Details"; onClicked: editor.showDetails = !editor.showDetails }
+        Label { Layout.fillWidth: true; text: qsTranslate("Spectrum", "󰓛  Ctrl+Alt+Pause stops all"); color: editor.theme.colors.muted }
+        Button { label: editor.showDetails ? qsTranslate("Spectrum", "Hide details") : qsTranslate("Spectrum", "Details"); onClicked: editor.showDetails = !editor.showDetails }
     }
-    Label { Layout.fillWidth: true; visible: editor.showDetails; text: "Play all keys, wait the interval, then repeat. Type a shortcut or use Record for a single key or chord. Start closes this widget; release shortcut keys. Sequences start stopped after login."; color: editor.theme.colors.muted }
-    Label { Layout.fillWidth: true; visible: editor.showDetails && editor.backend.diagnostics !== undefined; color: editor.theme.colors.muted; text: "Toggle requests: " + ((editor.backend.diagnostics || {}).toggle_requests || 0) + " · Sent presses: " + ((editor.backend.diagnostics || {}).delivered_keys || 0) }
+    Label { Layout.fillWidth: true; visible: editor.showDetails; text: qsTranslate("Spectrum", "Play all keys, wait the interval, then repeat. Type a shortcut or use Record for a single key or chord. Start closes this widget; release shortcut keys. Sequences start stopped after login."); color: editor.theme.colors.muted }
+    Label { Layout.fillWidth: true; visible: editor.showDetails && editor.backend.diagnostics !== undefined; color: editor.theme.colors.muted; text: qsTranslate("Spectrum", "Toggle requests: ") + ((editor.backend.diagnostics || {}).toggle_requests || 0) + qsTranslate("Spectrum", " · Sent presses: ") + ((editor.backend.diagnostics || {}).delivered_keys || 0) }
     Controls.ScrollView {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -226,16 +226,16 @@ ColumnLayout {
                         ColumnLayout {
                             Layout.fillWidth: true
                             Label { Layout.fillWidth: true; text: row.modelData.keys; font.pixelSize: editor.theme.fontSize + 8; font.bold: true }
-                            Label { Layout.fillWidth: true; text: row.modelData.interval_ms + " ms · " + row.modelData.shortcut; color: row.modelData.active ? editor.theme.colors.accent : editor.theme.colors.muted }
-                            Label { Layout.fillWidth: true; visible: !!row.modelData.error; text: row.modelData.error || ""; color: editor.theme.colors.accent }
+                            Label { Layout.fillWidth: true; text: row.modelData.interval_ms + qsTranslate("Spectrum", " ms · ") + row.modelData.shortcut; color: row.modelData.active ? editor.theme.colors.accent : editor.theme.colors.muted }
+                            Label { Layout.fillWidth: true; visible: !!row.modelData.error; text: qsTranslate("Spectrum", row.modelData.error) || ""; color: editor.theme.colors.accent }
                         }
-                        Action { objectName: "hotkey-toggle-" + row.modelData.id; implicitWidth: 72; icon: row.modelData.active ? "󰓛" : "󰐊"; active: !!row.modelData.active; label: row.modelData.active ? "Stop" : "Start"; onClicked: editor.backend.command(["toggle", row.modelData.id]) }
-                        Action { objectName: "hotkey-edit-" + row.modelData.id; implicitWidth: 72; icon: "󰏫"; label: "Edit"; onClicked: editor.editRule(row.modelData) }
-                        Action { objectName: "hotkey-remove-" + row.modelData.id; implicitWidth: 72; icon: "󰆴"; label: "Remove"; onClicked: editor.backend.command(["remove", row.modelData.id]) }
+                        Action { objectName: "hotkey-toggle-" + row.modelData.id; implicitWidth: 72; icon: row.modelData.active ? "󰓛" : "󰐊"; active: !!row.modelData.active; label: row.modelData.active ? qsTranslate("Spectrum", "Stop") : qsTranslate("Spectrum", "Start"); onClicked: editor.backend.command(["toggle", row.modelData.id]) }
+                        Action { objectName: "hotkey-edit-" + row.modelData.id; implicitWidth: 72; icon: "󰏫"; label: qsTranslate("Spectrum", "Edit"); onClicked: editor.editRule(row.modelData) }
+                        Action { objectName: "hotkey-remove-" + row.modelData.id; implicitWidth: 72; icon: "󰆴"; label: qsTranslate("Spectrum", "Remove"); onClicked: editor.backend.command(["remove", row.modelData.id]) }
                     }
                 }
             }
-            Label { visible: !editor.backend.rules.length; Layout.fillWidth: true; text: "󰐕  Add your first sequence"; color: editor.theme.colors.muted }
+            Label { visible: !editor.backend.rules.length; Layout.fillWidth: true; text: qsTranslate("Spectrum", "󰐕  Add your first sequence"); color: editor.theme.colors.muted }
         }
     }
 }

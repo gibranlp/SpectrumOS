@@ -21,7 +21,7 @@ PanelWindow {
     ShellFocus { id: panelFocus; window: panel; enabled: expanded && !manager.authenticating }
     EscapeDismissal { active:panel.expanded && !panel.manager.authenticating; onDismissed:panel.closeRequested() }
     Connections { target:panel.manager; function onInstallationRequested() { if (panel.expanded) panel.closeRequested(); } }
-    onExpandedChanged: if (expanded) { manager.refresh(); Qt.callLater(() => content.focusInitial()); }
+    onExpandedChanged: if (expanded) { manager.refresh(); contentLoader.ensureLoaded(); Qt.callLater(() => { if (expanded && contentLoader.item) contentLoader.item.focusInitial(); }); }
     MouseArea { anchors.fill:parent; visible:panel.expanded; onClicked:panel.closeRequested() }
     ShellSurface {
         id: frame
@@ -46,7 +46,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth:true
                 Text {
-                    text:"APP STORE"; color:panel.theme.colors.foreground
+                    text:qsTranslate("Spectrum", "APP STORE"); color:panel.theme.colors.foreground
                     font { family:panel.theme.fontFamily; pixelSize:panel.theme.fontSize+8; bold:true }
                 }
                 Item { Layout.fillWidth:true }
@@ -56,9 +56,15 @@ PanelWindow {
                     onClicked:panel.closeRequested()
                 }
             }
-            AppStoreContent {
-                id:content; Layout.fillWidth:true; Layout.fillHeight:true; theme:panel.theme; manager:panel.manager
-                onRouteRequested: route => { panel.closeRequested(); Quickshell.execDetached([panel.theme.backend("spectrum-shell-open"), route]); }
+            CachedContent {
+                id: contentLoader
+                requested: panel.expanded
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                sourceComponent: AppStoreContent {
+                    id:content; Layout.fillWidth:true; Layout.fillHeight:true; theme:panel.theme; manager:panel.manager
+                    onRouteRequested: route => { panel.closeRequested(); Quickshell.execDetached([panel.theme.backend("spectrum-shell-open"), route]); }
+                }
             }
         }
     }

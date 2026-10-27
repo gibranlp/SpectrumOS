@@ -1,5 +1,11 @@
 # Production repository ceremony
 
+## October 25 package-only Stable update
+
+Stable snapshot `20261025T2311430000-106e5134679bc151` publishes Base **1.0.0-5**, Hyprland **1.0.0-12** and Desktop **1.0.0-26**. It includes the recovery safeguards, Default Apps widget, configurable file-search locations and updated widget shortcuts. Other package versions are unchanged. Matching source revision: `364d2aae1bf13dfa`; archive SHA-256: `ab31c3355927f50efc39301a484ccd4c137ddabaede9254a2551dcddf7195775`.
+
+Publication used the existing clean-chroot packages and prior validation evidence. No further tests or rebuilds ran at the owner's request. Full server checksums and HTTPS release metadata/database delivery passed verification. Testing is unchanged. The owner clarified packages only: the partial ISO staging upload was canceled and removed before publication, and the public ISO and download page were preserved. Evidence: `artifacts/stable-v1.1-20261025`.
+
 SpectrumOS production packages use an offline Ed25519 certification key and a separate, expiring Ed25519 signing subkey. The primary secret key never enters the development workstation, build worker, web server, ISO tree, or repository checkout. Pacman trusts the primary public fingerprint; repository automation signs with and verifies the designated subkey fingerprint.
 
 Do not perform this ceremony merely to test the workflow. Use disposable keys for rehearsals. The real ceremony begins only after the repository domain and responsible key custodians are settled.
@@ -128,6 +134,10 @@ Before the first public release, test all of these cases:
 Stable remains closed until the real HTTPS origin, production-key audit, independent fingerprint publication, and these tests are complete.
 
 ## Current status
+
+Published **Stable only**: spectrum-base 1.0.0-4, spectrum-theme 1.0.0-4, spectrum-hyprland 1.0.0-11, spectrumdrop 1.0.0-5, spectrum-desktop 1.0.0-25. Snapshot `20261025T0318180000-e928320aba1f6f94` includes today's shell/widget productivity and memory updates, theme pipeline improvements, SpectrumDrop transfers and update-flow fixes. All five clean-chroot packages have verified production signatures, source/payload parity and HTTPS checksums; the other four package artifacts and all of Testing are unchanged.
+
+The selected 17 isolated Lean checks and complete 816-package dependency plan pass; broad suites remained disabled. Source `spectrumos-source-1.0.0-a448d6c9e778e350.tar.zst` includes future Lean installer corrections. Existing ISO unchanged; no ISO build/upload. Signed HTTPS packages were installed locally with preserved settings and verified shell/services. Update through Updates or `sudo pacman -Syu`. Evidence: `artifacts/stable-all-updates-20261024`.
 
 Published Desktop **1.0.0-24** and Hyprland **1.0.0-10** to **Stable only**. Removes the redundant standalone Calendar widget, its IPC/command entries and Super+Shift+C shortcut; the dashboard calendar and Questline date picker remain available. All earlier updates are included; other seven package artifacts are unchanged. Update through Updates or `sudo pacman -Syu`.
 

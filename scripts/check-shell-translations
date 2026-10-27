@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+import argparse
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--build', type=Path, required=True)
+options = parser.parse_args()
+with tempfile.TemporaryDirectory(prefix='spectrum-shell-translations-') as temporary:
+    folder = Path(temporary)
+    runtime = folder / 'runtime'
+    runtime.mkdir(mode=0o700)
+    shutil.copytree(root / 'configs/spectrum-shell', folder / 'ui')
+    test = folder / 'shell.qml'
+    test.write_text((root / 'tests/qml/ShellTranslationTests.qml').read_text().replace('../../configs/spectrum-shell', 'ui'))
+    locale = folder / 'locale.conf'
+    locale.write_text('LANG=en_US.UTF-8\n')
+    environment = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'QT_QUICK_BACKEND': 'software',
+        'XDG_RUNTIME_DIR': str(runtime), 'QML_IMPORT_PATH': str(options.build.resolve() / 'qml'),
+        'SPECTRUM_TRANSLATIONS_DIR': str(options.build.resolve() / 'translations'),
+        'SPECTRUM_LANGUAGE_FILE': str(folder / 'language.json'), 'SPECTRUM_SYSTEM_LOCALE_FILE': str(locale)}
+    environment.pop('WAYLAND_DISPLAY', None)
+    environment.pop('DISPLAY', None)
+    result = subprocess.run(['qs', '--path', str(test)], env=environment, capture_output=True, text=True, timeout=30)
+    output = result.stdout + result.stderr
+    print(output)
+    assert result.returncode == 0 and '0 failed' in output and 'FAIL!' not in output, output

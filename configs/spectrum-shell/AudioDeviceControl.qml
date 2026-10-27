@@ -14,7 +14,7 @@ ColumnLayout {
     spacing: 3
     ShellButton {
         Layout.fillWidth: true
-        label: (control.device["default"] ? "✓ " : "") + control.device.label
+        label: (control.device[qsTranslate("Spectrum", "default")] ? "✓ " : "") + control.device.label
         fontFamily: control.theme.fontFamily
         fontSize: control.theme.fontSize - 1
         enabled: !control.theme.actionBusy

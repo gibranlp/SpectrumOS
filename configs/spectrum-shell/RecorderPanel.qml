@@ -132,7 +132,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "SCREEN RECORDER"
+                    text: qsTranslate("Spectrum", "SCREEN RECORDER")
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 8; bold: true }
                 }
@@ -149,7 +149,7 @@ PanelWindow {
 
             Text {
                 Layout.fillWidth: true
-                text: panel.recording.active ? "Recording in progress" : "Choose what to record and where to capture audio."
+                text: panel.recording.active ? qsTranslate("Spectrum", "Recording in progress") : qsTranslate("Spectrum", "Choose what to record and where to capture audio.")
                 color: panel.recording.active ? panel.theme.colors.accent : panel.theme.colors.muted
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 1 }
             }
@@ -157,14 +157,14 @@ PanelWindow {
             Text {
                 Layout.fillWidth: true
                 visible: panel.actionError !== ""
-                text: panel.actionError
+                text: qsTranslate("Spectrum", panel.actionError)
                 wrapMode: Text.Wrap
                 color: panel.theme.colors.accent
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
             }
 
             Text {
-                text: "VIDEO SOURCE"
+                text: qsTranslate("Spectrum", "VIDEO SOURCE")
                 color: panel.theme.colors.accent
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize; bold: true }
             }
@@ -173,9 +173,9 @@ PanelWindow {
                 spacing: 8
                 Repeater {
                     model: [
-                        { label: "Monitor", mode: "monitor" },
-                        { label: "Area", mode: "area" },
-                        { label: "Window", mode: "window" }
+                        { label: qsTranslate("Spectrum", "Monitor"), mode: "monitor" },
+                        { label: qsTranslate("Spectrum", "Area"), mode: "area" },
+                        { label: qsTranslate("Spectrum", "Window"), mode: "window" }
                     ]
                     ShellButton {
                         required property var modelData
@@ -214,10 +214,10 @@ PanelWindow {
                     spacing: 10
                     Repeater {
                         model: [
-                            { title: "FORMAT", key: "recordingFormat", choices: [{ label: "MP4", value: "mp4" }, { label: "MKV", value: "mkv" }, { label: "WebM", value: "webm" }] },
-                            { title: "VIDEO QUALITY", key: "videoQuality", choices: [{ label: "Small file", value: "small" }, { label: "Balanced", value: "balanced" }, { label: "High", value: "high" }] },
-                            { title: "FRAME RATE", key: "frameRate", choices: [{ label: "Auto", value: "auto" }, { label: "24 fps", value: "24" }, { label: "30 fps", value: "30" }, { label: "60 fps", value: "60" }] },
-                            { title: "AUDIO BITRATE · kbps", key: "audioBitrate", choices: [{ label: "96", value: "96" }, { label: "128", value: "128" }, { label: "192", value: "192" }, { label: "256", value: "256" }, { label: "320", value: "320" }] }
+                            { title: qsTranslate("Spectrum", "FORMAT"), key: "recordingFormat", choices: [{ label: qsTranslate("Spectrum", "MP4"), value: "mp4" }, { label: qsTranslate("Spectrum", "MKV"), value: "mkv" }, { label: qsTranslate("Spectrum", "WebM"), value: "webm" }] },
+                            { title: qsTranslate("Spectrum", "VIDEO QUALITY"), key: "videoQuality", choices: [{ label: qsTranslate("Spectrum", "Small file"), value: "small" }, { label: qsTranslate("Spectrum", "Balanced"), value: "balanced" }, { label: qsTranslate("Spectrum", "High"), value: "high" }] },
+                            { title: qsTranslate("Spectrum", "FRAME RATE"), key: "frameRate", choices: [{ label: qsTranslate("Spectrum", "Auto"), value: "auto" }, { label: qsTranslate("Spectrum", "24 fps"), value: "24" }, { label: qsTranslate("Spectrum", "30 fps"), value: "30" }, { label: qsTranslate("Spectrum", "60 fps"), value: "60" }] },
+                            { title: qsTranslate("Spectrum", "AUDIO BITRATE · kbps"), key: "audioBitrate", choices: [{ label: "96", value: "96" }, { label: "128", value: "128" }, { label: "192", value: "192" }, { label: "256", value: "256" }, { label: "320", value: "320" }] }
                         ]
                         ColumnLayout {
                             id: optionRow
@@ -251,25 +251,25 @@ PanelWindow {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: (panel.recordingFormat === "webm" ? "WebM uses VP9 + Opus. Encoding may use more CPU." : "MP4 and MKV use H.264 + AAC.") + "\nHigher quality makes larger files. Auto records frames as the screen changes. Audio bitrate applies when audio is enabled."
+                        text: (panel.recordingFormat === "webm" ? qsTranslate("Spectrum", "WebM uses VP9 + Opus. Encoding may use more CPU.") : qsTranslate("Spectrum", "MP4 and MKV use H.264 + AAC.")) + qsTranslate("Spectrum", "\nHigher quality makes larger files. Auto records frames as the screen changes. Audio bitrate applies when audio is enabled.")
                         wrapMode: Text.Wrap
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
                     }
                     Text {
-                        text: "AUDIO SOURCE"
+                        text: qsTranslate("Spectrum", "AUDIO SOURCE")
                         color: panel.theme.colors.accent
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize; bold: true }
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "Choose one source for this recording."
+                        text: qsTranslate("Spectrum", "Choose one source for this recording.")
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
                     }
                     ShellButton {
                         Layout.fillWidth: true
-                        label: "No audio"
+                        label: qsTranslate("Spectrum", "No audio")
                         fontFamily: panel.theme.fontFamily
                         fontSize: panel.theme.fontSize
                         backgroundColor: panel.audioSource === "none" ? panel.theme.colors.accent : panel.theme.colors.surface_alt
@@ -279,7 +279,7 @@ PanelWindow {
                     }
 
                     Text {
-                        text: "Desktop audio output"
+                        text: qsTranslate("Spectrum", "Desktop audio output")
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                     }
@@ -288,7 +288,7 @@ PanelWindow {
                         ShellButton {
                             required property var modelData
                             Layout.fillWidth: true
-                            label: modelData.label + (modelData.default ? " · default" : "")
+                            label: modelData.label + (modelData.default ? qsTranslate("Spectrum", " · default") : "")
                             fontFamily: panel.theme.fontFamily
                             fontSize: panel.theme.fontSize
                             backgroundColor: panel.audioSource === modelData.name + ".monitor" ? panel.theme.colors.accent : panel.theme.colors.surface_alt
@@ -298,7 +298,7 @@ PanelWindow {
                         }
                     }
                     Text {
-                        text: "Microphone input"
+                        text: qsTranslate("Spectrum", "Microphone input")
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                     }
@@ -307,7 +307,7 @@ PanelWindow {
                         ShellButton {
                             required property var modelData
                             Layout.fillWidth: true
-                            label: modelData.label + (modelData.default ? " · default" : "")
+                            label: modelData.label + (modelData.default ? qsTranslate("Spectrum", " · default") : "")
                             fontFamily: panel.theme.fontFamily
                             fontSize: panel.theme.fontSize
                             backgroundColor: panel.audioSource === modelData.name ? panel.theme.colors.accent : panel.theme.colors.surface_alt
@@ -323,7 +323,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 ShellButton {
                     Layout.fillWidth: true
-                    label: panel.recording.active ? "Stop and save recording" : "Open recordings folder"
+                    label: panel.recording.active ? qsTranslate("Spectrum", "Stop and save recording") : qsTranslate("Spectrum", "Open recordings folder")
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
                     backgroundColor: panel.recording.active ? panel.theme.colors.accent : panel.theme.colors.surface_alt

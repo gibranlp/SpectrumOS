@@ -6,11 +6,13 @@ install -d -m 0755 "$destination/usr/share/spectrumos/spectrum-ukvm" "$destinati
 install -m 0644 "$project"/configs/spectrum-ukvm/*.qml "$project"/configs/spectrum-ukvm/*.js "$destination/usr/share/spectrumos/spectrum-ukvm/"
 frame="$destination/usr/share/spectrumos/spectrum-ukvm/frame"
 install -d -m 0755 "$frame"
-for component in ShellSurface ShellMotion ShellCorner ShellGeometry ShellFocus KeyboardNavigation; do
+for component in ShellSurface ShellMotion ShellCorner ShellGeometry ShellFocus KeyboardNavigation ShellToolTip; do
     install -m 0644 "$project/configs/spectrum-shell/$component.qml" "$frame/"
 done
-sed 's@import "../spectrum-shell" as Shell@import "frame" as Shell@' \
-    "$project/configs/spectrum-ukvm/shell.qml" > "$destination/usr/share/spectrumos/spectrum-ukvm/shell.qml"
+for component in shell UkvmPage; do
+    sed 's@import "../spectrum-shell" as Shell@import "frame" as Shell@' \
+        "$project/configs/spectrum-ukvm/$component.qml" > "$destination/usr/share/spectrumos/spectrum-ukvm/$component.qml"
+done
 install -m 0755 "$project/scripts/ukvm-adapter" "$destination/usr/lib/spectrumos/ukvm-adapter"
 install -m 0755 "$project/scripts/spectrum-ukvm" "$destination/usr/bin/spectrum-ukvm"
 install -m 0644 "$project/integrations/ukvm/spectrum-ukvm.desktop" "$destination/usr/share/applications/spectrum-ukvm.desktop"

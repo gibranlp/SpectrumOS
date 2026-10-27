@@ -29,12 +29,12 @@ Item {
                     }
                     if (result.applications) controller.applications = result.applications;
                     if (result.cancelled) return;
-                    if (controller.operation === "choose-add") controller.message = "AppImage added to the launcher.";
-                    if (controller.operation === "choose-replace") controller.message = "AppImage replaced.";
-                    if (controller.operation === "remove") controller.message = "Managed AppImage removed. Application settings were preserved.";
-                } catch (error) { controller.error = "Could not read the AppImage manager response."; }
+                    if (controller.operation === "choose-add") controller.message = qsTranslate("Spectrum", "AppImage added to the launcher.");
+                    if (controller.operation === "choose-replace") controller.message = qsTranslate("Spectrum", "AppImage replaced.");
+                    if (controller.operation === "remove") controller.message = qsTranslate("Spectrum", "Managed AppImage removed. Application settings were preserved.");
+                } catch (error) { controller.error = qsTranslate("Spectrum", "Could not read the AppImage manager response."); }
             }
         }
-        onExited: (code) => { if (code !== 0 && !controller.error) controller.error = "AppImage operation failed."; }
+        onExited: (code) => { if (code !== 0 && !controller.error) controller.error = qsTranslate("Spectrum", "AppImage operation failed."); }
     }
 }

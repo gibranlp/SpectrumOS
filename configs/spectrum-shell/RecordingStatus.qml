@@ -24,7 +24,7 @@ Item {
             width: 24
             height: 34
             Accessible.role: Accessible.Button
-            Accessible.name: "Open screen recorder"
+            Accessible.name: qsTranslate("Spectrum", "Open screen recorder")
             Accessible.onPressAction: status.screenRequested()
             Text {
                 anchors.centerIn: parent
@@ -44,7 +44,7 @@ Item {
             width: 24
             height: 34
             Accessible.role: Accessible.Button
-            Accessible.name: "Open audio recorder"
+            Accessible.name: qsTranslate("Spectrum", "Open audio recorder")
             Accessible.onPressAction: status.audioRequested()
             Text {
                 anchors.centerIn: parent

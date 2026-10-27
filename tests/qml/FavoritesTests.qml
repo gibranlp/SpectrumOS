@@ -97,9 +97,9 @@ Scope {
                     tryCompare(grid,"moving",false,2000);
                 }
                 const scroll=field("links-scroll");const thumb=scroll.contentItem;
-                mousePress(scroll,scroll.width/2,thumb.y+thumb.height/2,Qt.LeftButton);
-                mouseMove(scroll,scroll.width/2,scroll.height-1,100,Qt.LeftButton);
-                mouseRelease(scroll,scroll.width/2,scroll.height-1,Qt.LeftButton);wait(100);
+                const handleCenter=thumb.y+thumb.height/2;
+                mouseDrag(scroll,scroll.width/2,handleCenter,0,scroll.height-1-handleCenter,Qt.LeftButton,Qt.NoModifier,100);
+                wait(100);
                 verify(grid.contentY>start,"Scrollbar did not scroll "+category);
                 tryVerify(()=>grid.itemAtIndex(grid.count-1)!==null,1000,"Last favorite is unreachable in "+category);
                 verify(grid.contentY+grid.height>=grid.contentHeight-2);

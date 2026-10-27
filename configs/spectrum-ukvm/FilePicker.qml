@@ -97,21 +97,21 @@ Rectangle {
         spacing: 8
         RowLayout {
             Layout.fillWidth: true
-            Label { Layout.fillWidth: true; text: (picker.folderMode ? "SEND FOLDER" : "SEND FILES") + " → " + picker.peerName; color: picker.theme.colors.accent; font.bold: true }
-            Action { objectName: "file-picker-cancel"; text: "Cancel"; onClicked: picker.cancelled() }
+            Label { Layout.fillWidth: true; text: (picker.folderMode ? qsTranslate("Spectrum", "SEND FOLDER") : qsTranslate("Spectrum", "SEND FILES")) + " → " + picker.peerName; color: picker.theme.colors.accent; font.bold: true }
+            Action { objectName: "file-picker-cancel"; text: qsTranslate("Spectrum", "Cancel"); onClicked: picker.cancelled() }
         }
         RowLayout {
             Layout.fillWidth: true
-            Action { text: "Home"; onClicked: picker.navigate(picker.homeFolder) }
-            Action { text: "Downloads"; onClicked: picker.navigate(picker.localUrl(StandardPaths.writableLocation(StandardPaths.DownloadLocation))) }
-            Action { objectName: "file-picker-up"; text: "Up"; enabled: entries.parentFolder.toString().length > 0; onClicked: picker.navigate(entries.parentFolder) }
+            Action { text: qsTranslate("Spectrum", "Home"); onClicked: picker.navigate(picker.homeFolder) }
+            Action { text: qsTranslate("Spectrum", "Downloads"); onClicked: picker.navigate(picker.localUrl(StandardPaths.writableLocation(StandardPaths.DownloadLocation))) }
+            Action { objectName: "file-picker-up"; text: qsTranslate("Spectrum", "Up"); enabled: entries.parentFolder.toString().length > 0; onClicked: picker.navigate(entries.parentFolder) }
             Label { Layout.fillWidth: true; text: decodeURIComponent(picker.currentFolder.toString().replace(/^file:\/\//, "")); color: picker.theme.colors.muted }
         }
         TextField {
             id: query
             objectName: "file-picker-filter"
             Layout.fillWidth: true
-            placeholderText: picker.folderMode ? "Find a folder…" : "Find a file…"
+            placeholderText: picker.folderMode ? qsTranslate("Spectrum", "Find a folder…") : qsTranslate("Spectrum", "Find a file…")
             color: picker.theme.colors.foreground
             placeholderTextColor: picker.theme.colors.muted
             font { family: picker.theme.fontFamily; pixelSize: picker.fontSize }
@@ -151,16 +151,16 @@ Rectangle {
                     spacing: 8
                     Label { text: entry.fileIsDir ? "›" : entry.marked ? "✓" : "□"; color: picker.theme.colors.accent }
                     Label { Layout.fillWidth: true; text: entry.fileName }
-                    Label { visible: entry.fileIsDir; text: "Folder"; color: picker.theme.colors.muted }
+                    Label { visible: entry.fileIsDir; text: qsTranslate("Spectrum", "Folder"); color: picker.theme.colors.muted }
                 }
             }
-            Label { anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; visible: files.count === 0; text: entries.status === FolderListModel.Loading ? "Reading folder…" : "No matching entries, or folder unavailable."; color: picker.theme.colors.muted }
+            Label { anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; visible: files.count === 0; text: entries.status === FolderListModel.Loading ? qsTranslate("Spectrum", "Reading folder…") : qsTranslate("Spectrum", "No matching entries, or folder unavailable."); color: picker.theme.colors.muted }
         }
         Label { visible: picker.error.length > 0; Layout.fillWidth: true; text: picker.error; color: picker.theme.colors.accent }
         RowLayout {
             Layout.fillWidth: true
-            Label { Layout.fillWidth: true; text: picker.folderMode ? "Open a folder, then send this folder." : picker.selectedUrls.length + " selected · click folders to open"; color: picker.theme.colors.muted }
-            Action { objectName: "file-picker-send"; text: picker.folderMode ? "Send this folder" : "Send selected"; prominent: true; enabled: picker.folderMode ? entries.status === FolderListModel.Ready : picker.selectedUrls.length > 0; onClicked: picker.submit() }
+            Label { Layout.fillWidth: true; text: picker.folderMode ? qsTranslate("Spectrum", "Open a folder, then send this folder.") : picker.selectedUrls.length + qsTranslate("Spectrum", " selected · click folders to open"); color: picker.theme.colors.muted }
+            Action { objectName: "file-picker-send"; text: picker.folderMode ? qsTranslate("Spectrum", "Send this folder") : qsTranslate("Spectrum", "Send selected"); prominent: true; enabled: picker.folderMode ? entries.status === FolderListModel.Ready : picker.selectedUrls.length > 0; onClicked: picker.submit() }
         }
     }
 }

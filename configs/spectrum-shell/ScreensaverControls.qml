@@ -8,20 +8,20 @@ ColumnLayout {
     required property var theme
     spacing: 8
     Text {
-        text: "SCREENSAVER"
+        text: qsTranslate("Spectrum", "SCREENSAVER")
         color: controls.theme.colors.accent
         font { family: controls.theme.fontFamily; pixelSize: controls.theme.fontSize; bold: true }
     }
     ShellCheckBox {
         objectName: "screensaver-enabled"
         theme: controls.theme
-        label: "Start when idle"
+        label: qsTranslate("Spectrum", "Start when idle")
         value: controls.theme.screensaverSettings.enabled
         enabled: !controls.theme.screensaverBusy
         onChangeRequested: value => controls.theme.configureScreensaver("enabled", value ? "on" : "off")
     }
     Text {
-        text: "Wait before starting"
+        text: qsTranslate("Spectrum", "Wait before starting")
         color: controls.theme.colors.muted
         font { family: controls.theme.fontFamily; pixelSize: controls.theme.fontSize - 1 }
     }
@@ -33,7 +33,7 @@ ColumnLayout {
             ShellButton {
                 required property int modelData
                 objectName: "screensaver-timeout-" + modelData
-                label: (modelData / 60) + " min"
+                label: (modelData / 60) + qsTranslate("Spectrum", " min")
                 enabled: !controls.theme.screensaverBusy
                 fontFamily: controls.theme.fontFamily
                 fontSize: controls.theme.fontSize - 1
@@ -44,7 +44,7 @@ ColumnLayout {
         }
     }
     Text {
-        text: "Effect"
+        text: qsTranslate("Spectrum", "Effect")
         color: controls.theme.colors.muted
         font { family: controls.theme.fontFamily; pixelSize: controls.theme.fontSize - 1 }
     }
@@ -52,8 +52,8 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 5
         Repeater {
-            model: [{id: "matrix", label: "Matrix"}, {id: "rain", label: "Rain"},
-                    {id: "constellation", label: "Constellation"}, {id: "cycle", label: "Cycle effects"}]
+            model: [{id: "matrix", label: qsTranslate("Spectrum", "Matrix")}, {id: "rain", label: qsTranslate("Spectrum", "Rain")},
+                    {id: "constellation", label: qsTranslate("Spectrum", "Constellation")}, {id: "cycle", label: qsTranslate("Spectrum", "Cycle effects")}]
             ShellButton {
                 required property var modelData
                 objectName: "screensaver-effect-" + modelData.id
@@ -68,7 +68,7 @@ ColumnLayout {
         }
     }
     Text {
-        text: "Form into"
+        text: qsTranslate("Spectrum", "Form into")
         color: controls.theme.colors.muted
         font { family: controls.theme.fontFamily; pixelSize: controls.theme.fontSize - 1 }
     }
@@ -76,8 +76,8 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 5
         Repeater {
-            model: [{id: "wordmark", label: "SpectrumOS"}, {id: "logo", label: "Current logo"},
-                    {id: "alternate", label: "Alternate both"}]
+            model: [{id: "wordmark", label: "SpectrumOS"}, {id: "logo", label: qsTranslate("Spectrum", "Current logo")},
+                    {id: "alternate", label: qsTranslate("Spectrum", "Alternate both")}]
             ShellButton {
                 required property var modelData
                 objectName: "screensaver-branding-" + modelData.id
@@ -94,7 +94,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
-        text: "Move the pointer or press a key to return. Uses your current theme. Existing screen lock and display-off timers still apply."
+        text: qsTranslate("Spectrum", "Move the pointer or press a key to return. Uses your current theme. Existing screen lock and display-off timers still apply.")
         color: controls.theme.colors.muted
         font { family: controls.theme.fontFamily; pixelSize: controls.theme.fontSize - 2 }
     }

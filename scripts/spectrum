@@ -789,7 +789,7 @@ def collect_update_plan(release_file: Path, manifest_file: Path, system_root: Pa
             "create and validate a paired root and EFI restore point",
             "perform one complete Pacman transaction",
             "apply ordered pending migrations idempotently",
-            "run post-transaction spectrum doctor checks",
+            "run spectrum doctor separately when system diagnostics are needed",
             "record reboot and offline rollback guidance",
         ],
     }

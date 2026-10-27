@@ -17,6 +17,35 @@ LOADER.exec_module(SNAPSHOT)
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_boot_ownership_requires_matching_devices_and_marker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "root"
+            boot = Path(temporary) / "boot"
+            metadata = root / "etc/spectrumos/boot-ownership"
+            metadata.parent.mkdir(parents=True)
+            boot.mkdir()
+            metadata.write_text("schema=1\nroot_uuid=root-id\nboot_uuid=boot-id\nboot_partuuid=part-id\n")
+            (boot / ".spectrumos-boot-owner").write_text("root-id\n")
+            with mock.patch.object(SNAPSHOT, "run", side_effect=["root-id", "boot-id", "part-id"]):
+                SNAPSHOT.validate_boot_ownership(root, boot, "/dev/test2", "/dev/test1")
+            for values in (["other-root", "boot-id", "part-id"], ["root-id", "other-boot", "part-id"],
+                           ["root-id", "boot-id", "other-part"]):
+                with mock.patch.object(SNAPSHOT, "run", side_effect=values):
+                    with self.assertRaises(SNAPSHOT.SnapshotError):
+                        SNAPSHOT.validate_boot_ownership(root, boot, "/dev/test2", "/dev/test1")
+            (boot / ".spectrumos-boot-owner").unlink()
+            with mock.patch.object(SNAPSHOT, "run", side_effect=["root-id", "boot-id", "part-id"]):
+                with self.assertRaises(SNAPSHOT.SnapshotError):
+                    SNAPSHOT.validate_boot_ownership(root, boot, "/dev/test2", "/dev/test1")
+
+    def test_foreign_efi_files_block_whole_boot_restore_even_for_legacy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "root"
+            boot = Path(temporary) / "boot"
+            (boot / "EFI/Microsoft/Boot").mkdir(parents=True)
+            with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "another system"):
+                SNAPSHOT.validate_boot_ownership(root, boot, "/dev/test2", "/dev/test1")
+
     def test_identifier_is_utc_and_normalizes_label(self):
         moment = dt.datetime(2026, 8, 31, 20, 15, 12, tzinfo=dt.timezone.utc)
         self.assertEqual(

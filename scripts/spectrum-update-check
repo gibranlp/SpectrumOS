@@ -11,6 +11,9 @@ import sys
 import time
 from urllib.parse import urlsplit
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from spectrum_i18n import translate, plural
+
 STATE = Path(os.environ.get('XDG_STATE_HOME') or Path.home()/'.local/state')/'spectrumos/stable-updates'
 DATABASE = Path(os.environ.get('XDG_CACHE_HOME') or Path.home()/'.cache')/'spectrumos/stable-updates/database'
 
@@ -77,10 +80,11 @@ def fingerprint(packages):
 
 def notify(packages):
     count = len(packages)
-    noun = 'update is' if count == 1 else 'updates are'
     result = run('notify-send', '--app-name=SpectrumOS Updates', '--icon=system-software-update',
                  '--expire-time=15000', '--hint=string:x-spectrumos-kind:stable-updates',
-                 'Fresh loot on Stable', f'{count} SpectrumOS package {noun} ready.\nOpen Updates to review and install.')
+                 translate('Fresh loot on Stable'),
+                 plural('%n SpectrumOS package update is ready.\nOpen Updates to review and install.',
+                        '%n SpectrumOS package updates are ready.\nOpen Updates to review and install.', count))
     return result.returncode == 0
 
 

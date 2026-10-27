@@ -9,7 +9,7 @@ Rectangle {
     color: theme.igorEnabled ? theme.colors.accent : (mouse.containsMouse ? theme.colors.surface_alt : "transparent")
     Accessible.role: Accessible.CheckBox
     Accessible.name: "Igor"
-    Accessible.description: "Show occasional visits from Igor"
+    Accessible.description: qsTranslate("Spectrum", "Show occasional visits from Igor")
     Accessible.checked: theme.igorEnabled
 
     Image {

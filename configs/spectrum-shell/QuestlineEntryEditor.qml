@@ -41,10 +41,10 @@ Controls.ScrollView {
         else if (key === "related_task_id")
             options = tasks.filter(item => item.project_id === campaignId).map(item => ({id:item.id,name:item.title}));
         else options = ["None","Weekly","Monthly","Yearly","Custom"].map(item => ({id:item,name:item}));
-        if (key !== "recurrence") options = [{id:"",name:key === "category_id" ? "Default category" : key === "account_id" || key === "transfer_account_id" ? "Choose account" : "None"}].concat(options);
+        if (key !== "recurrence") options = [{id:"",name:key === "category_id" ? qsTranslate("Spectrum", "Default category") : key === "account_id" || key === "transfer_account_id" ? qsTranslate("Spectrum", "Choose account") : qsTranslate("Spectrum", "None")}].concat(options);
         const selected = fields[key] || "";
         if (selected && !options.some(item => item.id === selected))
-            options.push({id:selected,name:"Unavailable selection"});
+            options.push({id:selected,name:qsTranslate("Spectrum", "Unavailable selection")});
         return options;
     }
 
@@ -59,11 +59,11 @@ Controls.ScrollView {
             rowSpacing: 12
             Repeater {
                 model: [
-                    {key:"account_id",label:editor.entryType === "Transfer" ? "From account" : "Account"},
-                    {key:"category_id",label:"Category"},
-                    {key:"transfer_account_id",label:"To account"},
-                    {key:"related_task_id",label:"Related task"},
-                    {key:"recurrence",label:"Recurrence"}
+                    {key:"account_id",label:editor.entryType === "Transfer" ? qsTranslate("Spectrum", "From account") : qsTranslate("Spectrum", "Account")},
+                    {key:"category_id",label:qsTranslate("Spectrum", "Category")},
+                    {key:"transfer_account_id",label:qsTranslate("Spectrum", "To account")},
+                    {key:"related_task_id",label:qsTranslate("Spectrum", "Related task")},
+                    {key:"recurrence",label:qsTranslate("Spectrum", "Recurrence")}
                 ]
                 ColumnLayout {
                     required property var modelData
@@ -80,6 +80,7 @@ Controls.ScrollView {
                         objectName: "questline-entry-" + modelData.key
                         Layout.fillWidth: true
                         theme: editor.theme
+                        translateModel: modelData.key === "recurrence"
                         model: editor.choices(modelData.key)
                         textRole: "name"
                         currentIndex: Math.max(0, model.findIndex(item => item.id === (editor.fields[modelData.key] || (modelData.key === "recurrence" ? "None" : ""))))
@@ -89,14 +90,14 @@ Controls.ScrollView {
             }
             Repeater {
                 model: [
-                    {key:"entry_date",label:"Entry date",hint:"YYYY-MM-DD"},
-                    {key:"due_date",label:"Due date",hint:"Optional · YYYY-MM-DD"},
-                    {key:"payment_date",label:"Payment date",hint:"Optional · YYYY-MM-DD"},
-                    {key:"vendor_source",label:"Vendor / source",hint:"Optional"},
-                    {key:"custom_recurrence",label:"Custom recurrence",hint:"Describe the schedule"},
-                    {key:"description",label:"Description",hint:"Optional"},
-                    {key:"notes",label:"Notes",hint:"Optional"},
-                    {key:"attachment_ref",label:"Attachment reference",hint:"Optional path or reference"}
+                    {key:"entry_date",label:qsTranslate("Spectrum", "Entry date"),hint:qsTranslate("Spectrum", "YYYY-MM-DD")},
+                    {key:"due_date",label:qsTranslate("Spectrum", "Due date"),hint:qsTranslate("Spectrum", "Optional · YYYY-MM-DD")},
+                    {key:"payment_date",label:qsTranslate("Spectrum", "Payment date"),hint:qsTranslate("Spectrum", "Optional · YYYY-MM-DD")},
+                    {key:"vendor_source",label:qsTranslate("Spectrum", "Vendor / source"),hint:qsTranslate("Spectrum", "Optional")},
+                    {key:"custom_recurrence",label:qsTranslate("Spectrum", "Custom recurrence"),hint:qsTranslate("Spectrum", "Describe the schedule")},
+                    {key:"description",label:qsTranslate("Spectrum", "Description"),hint:qsTranslate("Spectrum", "Optional")},
+                    {key:"notes",label:qsTranslate("Spectrum", "Notes"),hint:qsTranslate("Spectrum", "Optional")},
+                    {key:"attachment_ref",label:qsTranslate("Spectrum", "Attachment reference"),hint:qsTranslate("Spectrum", "Optional path or reference")}
                 ]
                 ColumnLayout {
                     required property var modelData

@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls as Controls
 
 Rectangle {
     id: action
@@ -44,9 +43,13 @@ Rectangle {
         }
     }
     HoverHandler { id: hover }
-    Controls.ToolTip.visible: hover.hovered && action.hint !== action.label
-    Controls.ToolTip.text: hint
-    Controls.ToolTip.delay: 600
+    ShellToolTip {
+        parent: action
+        theme: action.theme
+        visible: hover.hovered && action.hint !== action.label
+        text: action.hint
+        delay: 600
+    }
     KeyboardAction {
         id: keyboard
         anchors.fill: parent

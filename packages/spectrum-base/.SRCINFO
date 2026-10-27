@@ -1,7 +1,7 @@
 pkgbase = spectrum-base
 	pkgdesc = Core identity and shared appearance handoff for SpectrumOS
 	pkgver = 1.0.0
-	pkgrel = 3
+	pkgrel = 6
 	url = https://spectrum.gibranlp.dev
 	install = spectrum-base.install
 	arch = any
@@ -22,7 +22,7 @@ pkgbase = spectrum-base
 	depends = zsh-syntax-highlighting
 	options = !strip
 	options = !debug
-	source = spectrumos-source-1.0.0-70168ad0b8e7ec5d.tar.zst
-	sha256sums = 08ad8a259c9b1c1810dce95e00897d1fdba0163f85853e008f672a6e6ce044c2
+	source = spectrumos-source-1.0.0-a1d68347eb8e7fe9.tar.zst
+	sha256sums = 223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20
 
 pkgname = spectrum-base

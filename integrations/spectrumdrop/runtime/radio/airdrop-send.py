@@ -25,6 +25,10 @@ import socket
 import ssl
 import sys
 import threading
+import tempfile
+import shutil
+from pathlib import Path
+from dvzip import DVZipReader
 import time
 import uuid
 from http.client import HTTPSConnection
@@ -112,6 +116,9 @@ class Config:
     def dump(self, name, data):
         """Write explicitly requested protocol diagnostics without identity data."""
         try:
+            # El diagnóstico no consume el stream ni vuelve a cargar el archivo completo en memoria.
+            if hasattr(data, 'read') and not hasattr(data, 'getvalue'):
+                data = b'<streamed transfer body; contents not captured>'
             dump_protocol(name, data, verbose=self.debug_verbose)
         except (OSError, ValueError) as exc:
             wire.warning('protocol dump skipped: %s', exc)
@@ -363,26 +370,58 @@ class AirDropClient:
         application/x-cpio + gzip, which sharingd rejects (406 seen 09-07 the other
         way round). Same TLS connection as the Ask (post reuses http_conn)."""
         import libarchive
-        stream = io.BytesIO()
-        cwd = os.getcwd()
-        with libarchive.custom_writer(stream.write, 'cpio') as archive:
-            for f in files:
-                # Store as "./<basename>", as sharingd does, whatever the source path.
-                d, b = os.path.split(os.path.abspath(f))
-                os.chdir(d)
+        directory = Path(os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))) / 'spectrumdrop/send'
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        required = sum(os.path.getsize(filename) for filename in files if os.path.isfile(filename))
+        if required > max(0, shutil.disk_usage(directory).free - 64 * 1024 * 1024):
+            raise OSError('Not enough free cache space to stage the AirDrop transfer.')
+        with tempfile.TemporaryFile(dir=directory) as stream:
+            cwd = os.getcwd()
+            written = 0
+            last_report = time.monotonic()
+            write_error = None
+            def write_chunk(data):
+                nonlocal written, last_report, write_error
                 try:
-                    archive.add_files(b)
-                finally:
-                    os.chdir(cwd)
-        body = dvzip_encode(stream.getvalue())
-        headers = {
-            'Content-Type': 'application/x-dvzip',
-            'TotalBytes': str(sum(os.path.getsize(f) for f in files)),
-            'TransferID': self.transfer_id or str(uuid.uuid4()).upper(),
-        }
-        log.info('%s UPLOAD %d B dvzip (%d B cpio) TransferID %s', t(), len(body), stream.getbuffer().nbytes, headers['TransferID'])
-        ok, _ = self.post('/Upload', io.BytesIO(body), headers=headers)
-        return ok
+                    count = stream.write(data)
+                except OSError as error:
+                    write_error = error
+                    return -1
+                written += count
+                now = time.monotonic()
+                if now - last_report >= 0.5:
+                    log.info('%s PREPARE %.1f MiB', t(), written / (1024 * 1024))
+                    last_report = now
+                return count
+            log.info('%s PREPARE %d files', t(), len(files))
+            try:
+                with libarchive.custom_writer(write_chunk, 'cpio') as archive:
+                    for filename in files:
+                        parent, name = os.path.split(os.path.abspath(filename))
+                        os.chdir(parent)
+                        try:
+                            archive.add_files(name)
+                        finally:
+                            os.chdir(cwd)
+            except Exception:
+                if write_error:
+                    raise OSError('Could not stage the transfer archive. Check free disk space.') from write_error
+                raise
+            if write_error:
+                raise OSError('Could not stage the transfer archive. Check free disk space.') from write_error
+            stream.flush()
+            archive_size = stream.tell()
+            stream.seek(0)
+            body = DVZipReader(stream)
+            headers = {
+                'Content-Type': 'application/x-dvzip',
+                'TotalBytes': str(sum(os.path.getsize(f) for f in files)),
+                'TransferID': self.transfer_id or str(uuid.uuid4()).upper(),
+            }
+            log.info('%s UPLOAD streaming dvzip (%d B cpio) TransferID %s', t(), archive_size, headers['TransferID'])
+            ok, _ = self.post('/Upload', body, headers=headers)
+            log.info('%s UPLOAD streamed %d B', t(), body.bytes_read)
+            return ok
 
 
 found = threading.Event()
@@ -586,6 +625,8 @@ if not ok:
 t1 = time.monotonic()
 size = sum(os.path.getsize(f) for f in args.files)
 try:
+    if client.http_conn is not None and client.http_conn.sock is not None:
+        client.http_conn.sock.settimeout(args.op_timeout)
     ok = client.send_upload(args.files)
 except Exception as e:
     log.info('%s UPLOAD failed: %r', t(), e)

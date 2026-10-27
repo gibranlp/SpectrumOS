@@ -49,7 +49,7 @@ reply=$3
                 events = (root / "events").read_text().splitlines()
                 if shell_active and reply == "false":
                     self.assertNotEqual(result.returncode, 0)
-                    self.assertFalse(any(event.startswith("wallpaper") for event in events))
+                    self.assertTrue(any(event.startswith("wallpaper") for event in events))
                     self.assertNotIn("success", events)
                 else:
                     self.assertEqual(result.returncode, 0, result.stderr)
@@ -181,21 +181,12 @@ notify-send() { :; }
 
     def test_theme_consumers_reload_after_activation(self):
         content = MENU.read_text(encoding="utf-8")
-        self.assertIn("pkill -USR1 -x kitty", content)
-        self.assertIn("waybar-menu --restart", content)
-        self.assertIn("appearance-sync --apply", content)
+        self.assertIn('pkill -USR1 -u "$(id -u)" -x kitty', content)
+        self.assertIn("appearance-sync --desktop-only", content)
         # The dunst restart-with-fallback chain and its is-paused poll loop are shared with
         # font-size-menu and font-family-menu -- see scripts/dunst-reload and
         # tests/test_dunst_reload.py for that logic itself.
         self.assertNotIn("/usr/lib/spectrumos/dunst-reload", content)
-
-    def test_a_failed_waybar_restart_does_not_abort_the_rest_of_the_pipeline(self):
-        # waybar-menu --restart can fail (waybar not reappearing in hyprctl layers within
-        # its own retry window) -- under set -e an unguarded call here would abort before
-        # appearance-stage, the dunst restart, and the final eww-refresh ever ran.
-        content = MENU.read_text(encoding="utf-8")
-        generation = content.split("apply_generation() {", 1)[1].split("\nrestore_previous()", 1)[0]
-        self.assertIn("if ! /usr/lib/spectrumos/waybar-menu --restart; then", generation)
 
     def test_wallpaper_menu_uses_shell_picker(self):
         content = MENU.read_text(encoding="utf-8")

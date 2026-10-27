@@ -45,7 +45,7 @@ canonical_tar=$temporary/source.tar
 
 while IFS= read -r -d '' path; do
     case $path in
-        repo/sources/*|packages/*/PKGBUILD|packages/*/.SRCINFO|packages/*/*.tar.zst|packages/*/*.tar.gz|packages/*/pkg/*|packages/*/src/spectrumos-source-*/*|packages/*/questline-*-linux-*|packages/*/stash-*-linux-*) continue ;;
+        .comem/*|repo/sources/*|packages/*/PKGBUILD|packages/*/.SRCINFO|packages/*/*.tar.zst|packages/*/*.tar.gz|packages/*/pkg/*|packages/*/src/spectrumos-source-*/*|packages/*/questline-*-linux-*|packages/*/stash-*-linux-*) continue ;;
     esac
     [[ -f $project_root/$path || -L $project_root/$path ]] && printf '%s\0' "$path"
 done < <(git -C "$project_root" ls-files --cached --others --exclude-standard -z) \

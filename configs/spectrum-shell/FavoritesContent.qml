@@ -84,23 +84,23 @@ ColumnLayout {
     }
     Flow {
         Layout.fillWidth:true; spacing:8
-        Button { objectName:"favorites-new"; label:"+ Favorite"; onClicked:content.manager.editFavorite(null) }
-        Button { objectName:"favorites-category-new"; label:"+ Category"; onClicked:content.manager.editCategory(null) }
-        Button { objectName:"favorites-import"; label:"Import"; onClicked: { content.manager.persist(); content.manager.run("choose-import"); } }
-        Button { objectName:"favorites-export"; label:"Export"; onClicked: { content.manager.persist(); content.manager.run("choose-export"); } }
+        Button { objectName:"favorites-new"; label:qsTranslate("Spectrum", "+ Favorite"); onClicked:content.manager.editFavorite(null) }
+        Button { objectName:"favorites-category-new"; label:qsTranslate("Spectrum", "+ Category"); onClicked:content.manager.editCategory(null) }
+        Button { objectName:"favorites-import"; label:qsTranslate("Spectrum", "Import"); onClicked: { content.manager.persist(); content.manager.run("choose-import"); } }
+        Button { objectName:"favorites-export"; label:qsTranslate("Spectrum", "Export"); onClicked: { content.manager.persist(); content.manager.run("choose-export"); } }
     }
-    Label { visible:content.manager.error.length>0; Layout.fillWidth:true; text:content.manager.error; color:content.theme.colors.accent }
+    Label { visible:content.manager.error.length>0; Layout.fillWidth:true; text:qsTranslate("Spectrum", content.manager.error); color:content.theme.colors.accent }
     RowLayout {
         visible:content.manager.preview!==null
         Layout.fillWidth:true
-        Label { Layout.fillWidth:true; text:content.manager.preview ? content.manager.preview.added+" new · "+content.manager.preview.existing+" duplicates · "+content.manager.preview.invalid+" skipped" : "" }
-        Button { objectName:"favorites-import-confirm"; label:"Import"; enabled:!content.manager.busy; onClicked:content.manager.run("import-apply",{path:content.manager.preview.path}) }
-        Button { label:"Cancel"; onClicked:content.manager.preview=null }
+        Label { Layout.fillWidth:true; text:content.manager.preview ? content.manager.preview.added+qsTranslate("Spectrum", " new · ")+content.manager.preview.existing+qsTranslate("Spectrum", " duplicates · ")+content.manager.preview.invalid+qsTranslate("Spectrum", " skipped") : "" }
+        Button { objectName:"favorites-import-confirm"; label:qsTranslate("Spectrum", "Import"); enabled:!content.manager.busy; onClicked:content.manager.run("import-apply",{path:content.manager.preview.path}) }
+        Button { label:qsTranslate("Spectrum", "Cancel"); onClicked:content.manager.preview=null }
     }
     Field {
         id:search;objectName:"favorites-search"
         visible:!content.manager.view.editor
-        placeholderText:"Search…"
+        placeholderText:qsTranslate("Spectrum", "Search…")
         maximumLength:200
         text:content.manager.view.search
         onTextEdited:content.manager.change({search:text})
@@ -166,9 +166,9 @@ ColumnLayout {
             RowLayout {
                 visible:!content.manager.view.editor
                 Layout.fillWidth:true
-                Label { Layout.fillWidth:true; text:content.manager.view.search?"Search results":content.manager.view.category==="top"?"TOP":content.manager.categoryName(content.manager.view.category);font.bold:true;color:content.theme.colors.accent }
-                Button { objectName:"favorites-category-edit";visible:!["top","uncategorized"].includes(content.manager.view.category);label:"Edit";onClicked:content.manager.editCategory(content.manager.categories.find(c=>c.id===content.manager.view.category)) }
-                Button { objectName:"favorites-category-delete";visible:!["top","uncategorized"].includes(content.manager.view.category);label:"Delete";enabled:content.manager.ready && !content.manager.choosing && !content.selectedCategoryHasFavorites;onClicked:{content.manager.persist();content.manager.run("category-delete",{id:content.manager.view.category});} }
+                Label { Layout.fillWidth:true; text:content.manager.view.search?qsTranslate("Spectrum", "Search results"):content.manager.view.category==="top"?qsTranslate("Spectrum", "TOP"):content.manager.categoryName(content.manager.view.category);font.bold:true;color:content.theme.colors.accent }
+                Button { objectName:"favorites-category-edit";visible:!["top","uncategorized"].includes(content.manager.view.category);label:qsTranslate("Spectrum", "Edit");onClicked:content.manager.editCategory(content.manager.categories.find(c=>c.id===content.manager.view.category)) }
+                Button { objectName:"favorites-category-delete";visible:!["top","uncategorized"].includes(content.manager.view.category);label:qsTranslate("Spectrum", "Delete");enabled:content.manager.ready && !content.manager.choosing && !content.selectedCategoryHasFavorites;onClicked:{content.manager.persist();content.manager.run("category-delete",{id:content.manager.view.category});} }
             }
             GridView {
                 id:grid;objectName:"favorites-grid"
@@ -243,10 +243,13 @@ ColumnLayout {
                                     objectName:"favorites-browser-"+card.modelData.id+"-"+modelData.id
                                     implicitWidth:30
                                     label:browserIcon.status===Image.Ready?"":modelData.name.slice(0,1)
-                                    Accessible.name:"Open in "+modelData.name
-                                    Controls.ToolTip.visible:browserHover.hovered
-                                    Controls.ToolTip.text:"Open in "+modelData.name
-                                    Controls.ToolTip.delay:400
+                                    Accessible.name:qsTranslate("Spectrum", "Open in ")+modelData.name
+                                    ShellToolTip {
+                                        parent: browserButton
+                                        theme: content.theme
+                                        visible: browserHover.hovered
+                                        text: qsTranslate("Spectrum", "Open in ") + browserButton.modelData.name
+                                    }
                                     HoverHandler {id:browserHover}
                                     Image {
                                         id:browserIcon
@@ -259,7 +262,7 @@ ColumnLayout {
                                     onClicked:content.manager.run("open",{id:card.modelData.id,browser:modelData.id})
                                 }
                             }
-                            Button { objectName:"favorites-edit-"+card.modelData.id;label:"Edit";fontSize:Math.max(10,content.theme.fontSize-2);onClicked:content.manager.editFavorite(card.modelData) }
+                            Button { objectName:"favorites-edit-"+card.modelData.id;label:qsTranslate("Spectrum", "Edit");fontSize:Math.max(10,content.theme.fontSize-2);onClicked:content.manager.editFavorite(card.modelData) }
                             Button { objectName:"favorites-remove-"+card.modelData.id;label:"×";onClicked:{content.manager.persist();content.manager.run("favorite-delete",{id:card.modelData.id});} }
                         }
                     }
@@ -274,9 +277,9 @@ ColumnLayout {
                 Controls.ScrollBar.horizontal.policy:Controls.ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:editorScroll.availableWidth;spacing:12
-                    Field { id:titleField;objectName:"favorites-title";placeholderText:content.manager.view.editor==="favorite"?"Favorite title":"Category name";maximumLength:content.manager.view.editor==="favorite"?200:80;text:content.manager.view.editor==="favorite"?(content.manager.view.draft.title||""):(content.manager.view.draft.name||"");onTextEdited:content.manager.draft(content.manager.view.editor==="favorite"?{title:text}:{name:text}) }
+                    Field { id:titleField;objectName:"favorites-title";placeholderText:content.manager.view.editor==="favorite"?qsTranslate("Spectrum", "Favorite title"):qsTranslate("Spectrum", "Category name");maximumLength:content.manager.view.editor==="favorite"?200:80;text:content.manager.view.editor==="favorite"?(content.manager.view.draft.title||""):(content.manager.view.draft.name||"");onTextEdited:content.manager.draft(content.manager.view.editor==="favorite"?{title:text}:{name:text}) }
                     Field { objectName:"favorites-url";visible:content.manager.view.editor==="favorite";placeholderText:"https://example.com/";maximumLength:4096;text:content.manager.view.draft.url||"";onTextEdited:content.manager.draft({url:text}) }
-                    Label { visible:content.manager.view.editor==="favorite";text:"Category" }
+                    Label { visible:content.manager.view.editor==="favorite";text:qsTranslate("Spectrum", "Category") }
                     Choice {
                         objectName:"favorites-category-choice"
                         visible:content.manager.view.editor==="favorite"
@@ -288,8 +291,8 @@ ColumnLayout {
                     Label {visible:content.manager.draftError.length>0;Layout.fillWidth:true;text:content.manager.draftError;color:content.theme.colors.accent}
                     RowLayout {
                         Layout.fillWidth:true
-                        Button {objectName:"favorites-save";label:"Save";enabled:content.manager.ready && !content.manager.busy && !content.manager.choosing;onClicked:content.manager.save()}
-                        Button { objectName:"favorites-back";label:"Back";onClicked:content.manager.back() }
+                        Button {objectName:"favorites-save";label:qsTranslate("Spectrum", "Save");enabled:content.manager.ready && !content.manager.busy && !content.manager.choosing;onClicked:content.manager.save()}
+                        Button { objectName:"favorites-back";label:qsTranslate("Spectrum", "Back");onClicked:content.manager.back() }
                     }
                 }
             }
@@ -298,13 +301,13 @@ ColumnLayout {
     Rectangle { Layout.fillWidth:true;implicitHeight:1;color:content.theme.colors.surface_alt }
     RowLayout {
         Layout.fillWidth:true;spacing:10
-        Label { text:"Default browser";font.bold:true }
+        Label { text:qsTranslate("Spectrum", "Default browser");font.bold:true }
         Choice {
             objectName:"favorites-browser"
             Layout.fillWidth:true
             model:content.manager.browsers
             currentIndex:content.manager.browsers.findIndex(b=>b.id===content.manager.defaultBrowser)
-            displayText:currentIndex<0?"Select browser…":currentText
+            displayText:currentIndex<0?qsTranslate("Spectrum", "Select browser…"):currentText
             enabled:!content.manager.busy
             onActivated:index=>content.manager.run("browser-set",{id:content.manager.browsers[index].id})
         }

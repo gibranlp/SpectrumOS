@@ -112,7 +112,7 @@ ShellSurface {
                     ShellButton {
                         required property var modelData
                         objectName:"notification-action-"+modelData.identifier
-                        label:modelData.text
+                        label: ["spectrum-open-updates", "questline-drink"].includes(modelData.identifier) ? qsTranslate("Spectrum", modelData.text) : modelData.text
                         enabled:!card.notification.actionBusy
                         fontFamily:card.theme.fontFamily
                         fontSize:card.theme.fontSize

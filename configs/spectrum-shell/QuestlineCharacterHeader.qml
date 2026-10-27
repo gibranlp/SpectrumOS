@@ -13,7 +13,7 @@ ColumnLayout {
     Text {
         objectName: "questline-character-name"
         Layout.fillWidth: true
-        text: header.profile.username || "Your hero"
+        text: header.profile.username || qsTranslate("Spectrum", "Your hero")
         textFormat: Text.PlainText
         elide: Text.ElideRight
         color: header.theme.colors.foreground
@@ -22,7 +22,7 @@ ColumnLayout {
     Text {
         objectName: "questline-character-class"
         Layout.fillWidth: true
-        text: (header.profile.class || "Class unavailable") + " · Level " + (header.profile.level || 1)
+        text: (header.profile.class || qsTranslate("Spectrum", "Class unavailable")) + qsTranslate("Spectrum", " · Level ") + (header.profile.level || 1)
         textFormat: Text.PlainText
         elide: Text.ElideRight
         color: header.theme.colors.accent
@@ -47,9 +47,9 @@ ColumnLayout {
         }
         Text {
             objectName: "questline-character-xp-label"
-            text: header.maximumLevel ? "Maximum level · " + (header.profile.xp || 0) + " XP"
-                : header.profile.xp_next_level > 0 ? (header.profile.xp || 0) + " / " + header.profile.xp_next_level + " XP"
-                : (header.profile.xp || 0) + " XP"
+            text: header.maximumLevel ? qsTranslate("Spectrum", "Maximum level · ") + (header.profile.xp || 0) + qsTranslate("Spectrum", " XP")
+                : header.profile.xp_next_level > 0 ? (header.profile.xp || 0) + " / " + header.profile.xp_next_level + qsTranslate("Spectrum", " XP")
+                : (header.profile.xp || 0) + qsTranslate("Spectrum", " XP")
             color: header.theme.colors.muted
             font { family: header.theme.fontFamily; pixelSize: header.theme.fontSize }
         }

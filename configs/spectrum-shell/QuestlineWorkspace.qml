@@ -101,8 +101,8 @@ QuestlineDrafts {
         onExited: (code, status) => {
             let result;
             try { result = JSON.parse(workspace.actionResponse); }
-            catch (error) { result = {error:"Autosave failed. Your draft is kept on this device."}; }
-            if (code !== 0 && !result.error) result.error = "Autosave failed. Your draft is kept on this device.";
+            catch (error) { result = {error:qsTranslate("Spectrum", "Autosave failed. Your draft is kept on this device.")}; }
+            if (code !== 0 && !result.error) result.error = qsTranslate("Spectrum", "Autosave failed. Your draft is kept on this device.");
             workspace.finish(result);
         }
     }

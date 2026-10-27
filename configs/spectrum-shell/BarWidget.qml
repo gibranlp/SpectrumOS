@@ -45,7 +45,7 @@ PanelWindow {
     color: "transparent"
     visible: motion.active
     WlrLayershell.keyboardFocus: panelFocus.mode
-    ShellFocus { id: panelFocus; window: widget; enabled: expanded && !(page === "time" && timeRegionContent.busy) && !(page === "appimages" && appImageContent.busy) }
+    ShellFocus { id: panelFocus; window: widget; enabled: expanded && !(page === "time" && timeRegionLoader.item && timeRegionLoader.item.busy) && !(page === "appimages" && appImagesLoader.item && appImagesLoader.item.busy) }
 
     function open(name): void {
         page = name;
@@ -53,7 +53,7 @@ PanelWindow {
         passwordInput.text = "";
         theme.actionError = "";
         expanded = true;
-        theme.refreshControls();
+        theme.refreshControls(name);
     }
 
     AppImageManager { id: appImageManager; theme: widget.theme }
@@ -111,7 +111,7 @@ PanelWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: widget.page === "appimages" ? "APPIMAGES" : widget.page === "extras" ? "MORE" : widget.page === "mouse" ? "MOUSE" : widget.page === "time" ? "TIME & REGION" : widget.page === "typography" ? "TYPOGRAPHY" : widget.page === "wifi" ? "NETWORK" : widget.page === "bluetooth" ? "BLUETOOTH" : widget.page === "displays" ? "DISPLAYS" : widget.page === "weather" ? "WEATHER" : widget.page === "battery" ? (widget.hasBattery ? "POWER & BATTERY" : "POWER & SYSTEM") : "AUDIO"
+                        text: widget.page === "appimages" ? qsTranslate("Spectrum", "APPIMAGES") : widget.page === "extras" ? qsTranslate("Spectrum", "MORE") : widget.page === "mouse" ? qsTranslate("Spectrum", "MOUSE") : widget.page === "time" ? qsTranslate("Spectrum", "TIME & REGION") : widget.page === "typography" ? qsTranslate("Spectrum", "TYPOGRAPHY") : widget.page === "wifi" ? qsTranslate("Spectrum", "NETWORK") : widget.page === "bluetooth" ? qsTranslate("Spectrum", "BLUETOOTH") : widget.page === "displays" ? qsTranslate("Spectrum", "DISPLAYS") : widget.page === "weather" ? qsTranslate("Spectrum", "WEATHER") : widget.page === "battery" ? (widget.hasBattery ? qsTranslate("Spectrum", "POWER & BATTERY") : qsTranslate("Spectrum", "POWER & SYSTEM")) : qsTranslate("Spectrum", "AUDIO")
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize + 3; bold: true }
                     }
@@ -127,40 +127,56 @@ PanelWindow {
                 }
                 Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: widget.theme.colors.surface_alt }
 
-                BarExtras {
+                CachedContent {
+                    id: extrasContent
+                    requested: widget.expanded && widget.page === "extras"
                     visible: widget.page === "extras"
                     Layout.fillWidth: true
-                    theme: widget.theme
-                    window: widget
-                    trayItems: SystemTray.items
-                    onChosen: action => { widget.expanded = false; widget.extraRequested(action); }
+                    sourceComponent: BarExtras {
+                        theme: widget.theme
+                        window: widget
+                        trayItems: SystemTray.items
+                        onChosen: action => { widget.expanded = false; widget.extraRequested(action); }
+                    }
                 }
-                AppImageWidgetContent {
-                    id: appImageContent
-                    manager: appImageManager
-                    Layout.fillWidth: true
+                CachedContent {
+                    id: appImagesLoader
+                    requested: widget.expanded && widget.page === "appimages"
                     visible: widget.page === "appimages"
-                    active: widget.expanded && visible
-                    theme: widget.theme
-                }
-                MouseWidgetContent {
                     Layout.fillWidth: true
+                    sourceComponent: AppImageWidgetContent {
+                        id: appImageContent
+                        manager: appImageManager
+                        active: widget.expanded && visible
+                        theme: widget.theme
+                    }
+                }
+                CachedContent {
+                    id: mouseContent
+                    requested: widget.expanded && widget.page === "mouse"
                     visible: widget.page === "mouse"
-                    active: widget.expanded && visible
-                    theme: widget.theme
+                    Layout.fillWidth: true
+                    sourceComponent: MouseWidgetContent {
+                        active: widget.expanded && visible
+                        theme: widget.theme
+                    }
                 }
 
-                TimeRegionWidgetContent {
-                    id: timeRegionContent
-                    Layout.fillWidth: true
+                CachedContent {
+                    id: timeRegionLoader
+                    requested: widget.expanded && widget.page === "time"
                     visible: widget.page === "time"
-                    active: widget.expanded && visible
-                    theme: widget.theme
+                    Layout.fillWidth: true
+                    sourceComponent: TimeRegionWidgetContent {
+                        id: timeRegionContent
+                        active: widget.expanded && visible
+                        theme: widget.theme
+                    }
                 }
 
                 Text {
                     visible: widget.page === "typography"
-                    text: "GLOBAL FONT SIZE  ·  " + widget.theme.fontSize + "px"
+                    text: qsTranslate("Spectrum", "GLOBAL FONT SIZE  ·  ") + widget.theme.fontSize + "px"
                     color: widget.theme.colors.foreground
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
                 }
@@ -184,7 +200,7 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "typography"
-                    text: "MONOSPACE FONT FAMILY"
+                    text: qsTranslate("Spectrum", "MONOSPACE FONT FAMILY")
                     color: widget.theme.colors.foreground
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
                 }
@@ -215,14 +231,14 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "typography"
-                    text: "KEYBOARD LAYOUT"
+                    text: qsTranslate("Spectrum", "KEYBOARD LAYOUT")
                     color: widget.theme.colors.accent
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
                 }
                 Text {
                     visible: widget.page === "typography"
                     Layout.fillWidth: true
-                    text: "Current: " + widget.theme.keyboardLayout.label
+                    text: qsTranslate("Spectrum", "Current: ") + widget.theme.keyboardLayout.label
                     wrapMode: Text.Wrap
                     color: widget.theme.colors.muted
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
@@ -234,13 +250,13 @@ PanelWindow {
                     spacing: 6
                     Repeater {
                         model: [
-                            { id: "us", label: "English (US)" },
-                            { id: "us-intl", label: "US International" },
-                            { id: "latam", label: "Spanish (Latin America)" },
-                            { id: "es", label: "Spanish (Spain)" },
-                            { id: "us,latam", label: "US + Latin America" },
-                            { id: "us-intl,latam", label: "US International + Latin America" },
-                            { id: "us-intl,es", label: "US International + Spain" }
+                            { id: "us", label: qsTranslate("Spectrum", "English (US)") },
+                            { id: "us-intl", label: qsTranslate("Spectrum", "US International") },
+                            { id: "latam", label: qsTranslate("Spectrum", "Spanish (Latin America)") },
+                            { id: "es", label: qsTranslate("Spectrum", "Spanish (Spain)") },
+                            { id: "us,latam", label: qsTranslate("Spectrum", "US + Latin America") },
+                            { id: "us-intl,latam", label: qsTranslate("Spectrum", "US International + Latin America") },
+                            { id: "us-intl,es", label: qsTranslate("Spectrum", "US International + Spain") }
                         ]
                         ShellButton {
                             required property var modelData
@@ -260,7 +276,7 @@ PanelWindow {
                     spacing: 7
                     Text {
                         Layout.fillWidth: true
-                        text: widget.theme.mediaChoiceRequired ? "Choose which app media keys control" : "Media keys control"
+                        text: widget.theme.mediaChoiceRequired ? qsTranslate("Spectrum", "Choose which app media keys control") : qsTranslate("Spectrum", "Media keys control")
                         wrapMode: Text.Wrap
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
@@ -268,7 +284,7 @@ PanelWindow {
                     Text {
                         Layout.fillWidth: true
                         visible: !!widget.theme.mediaPendingAction
-                        text: "Select an app to " + ({toggle: "play / pause", next: "skip to the next track", previous: "go to the previous track", stop: "stop playback"}[widget.theme.mediaPendingAction] || "control playback") + "."
+                        text: qsTranslate("Spectrum", "Select an app to ") + ({toggle: qsTranslate("Spectrum", "play / pause"), next: qsTranslate("Spectrum", "skip to the next track"), previous: qsTranslate("Spectrum", "go to the previous track"), stop: qsTranslate("Spectrum", "stop playback")}[widget.theme.mediaPendingAction] || qsTranslate("Spectrum", "control playback")) + "."
                         wrapMode: Text.Wrap
                         color: widget.theme.colors.muted
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
@@ -287,7 +303,7 @@ PanelWindow {
                                 spacing: 4
                                 Text {
                                     Layout.fillWidth: true
-                                    text: modelData.name + (modelData.selected ? " · Selected" : "")
+                                    text: modelData.name + (modelData.selected ? qsTranslate("Spectrum", " · Selected") : "")
                                     elide: Text.ElideRight
                                     color: widget.theme.colors.foreground
                                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
@@ -434,7 +450,7 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "audio"
-                    text: "OUTPUT DEVICE"
+                    text: qsTranslate("Spectrum", "OUTPUT DEVICE")
                     color: widget.theme.colors.accent
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
@@ -452,7 +468,7 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "audio"
-                    text: "INPUT DEVICE"
+                    text: qsTranslate("Spectrum", "INPUT DEVICE")
                     color: widget.theme.colors.accent
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
@@ -471,14 +487,14 @@ PanelWindow {
 
                 Text {
                     visible: widget.page === "wifi" && (widget.theme.network.profiles || []).length > 0
-                    text: "CONNECTION PROTOCOLS"
+                    text: qsTranslate("Spectrum", "CONNECTION PROTOCOLS")
                     color: widget.theme.colors.accent
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
                 Text {
                     visible: widget.page === "wifi" && (widget.theme.network.profiles || []).length > 0
                     Layout.fillWidth: true
-                    text: "Choose IPv4, IPv6 or both. Changes may reconnect that connection."
+                    text: qsTranslate("Spectrum", "Choose IPv4, IPv6 or both. Changes may reconnect that connection.")
                     color: widget.theme.colors.muted
                     wrapMode: Text.WordWrap
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
@@ -497,13 +513,13 @@ PanelWindow {
                     Layout.fillWidth: true
                     Text {
                         Layout.fillWidth: true
-                        text: widget.theme.network.status
+                        text: qsTranslate("Spectrum", widget.theme.network.status)
                         elide: Text.ElideRight
                         color: widget.theme.colors.foreground
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                     }
                     ShellButton {
-                        label: widget.theme.network.wifi_enabled ? "Wi-Fi on" : "Wi-Fi off"
+                        label: widget.theme.network.wifi_enabled ? qsTranslate("Spectrum", "Wi-Fi on") : qsTranslate("Spectrum", "Wi-Fi off")
                         enabled: widget.theme.network.available
                         fontFamily: widget.theme.fontFamily
                         fontSize: widget.theme.fontSize - 1
@@ -514,7 +530,7 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "wifi" && widget.theme.network.ethernet.connected
-                    text: "ETHERNET  ·  " + widget.theme.network.ethernet.connection
+                    text: qsTranslate("Spectrum", "ETHERNET  ·  ") + widget.theme.network.ethernet.connection
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     color: widget.theme.colors.accent
@@ -523,7 +539,7 @@ PanelWindow {
                 Text {
                     visible: widget.page === "wifi" && widget.theme.network.ethernet.connected
                     Layout.fillWidth: true
-                    text: "Interface  " + widget.theme.network.ethernet.interface + "    Link  " + widget.theme.network.ethernet.speed
+                    text: qsTranslate("Spectrum", "Interface  ") + widget.theme.network.ethernet.interface + qsTranslate("Spectrum", "    Link  ") + widget.theme.network.ethernet.speed
                     elide: Text.ElideRight
                     color: widget.theme.colors.muted
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
@@ -537,14 +553,14 @@ PanelWindow {
                 Text {
                     visible: widget.page === "wifi" && widget.theme.network.ethernet.connected
                     Layout.fillWidth: true
-                    text: "IPv4  " + widget.theme.network.ethernet.ipv4 + "\nIPv6  " + widget.theme.network.ethernet.ipv6 + "\nGateway  " + widget.theme.network.ethernet.gateway + "\nPublic IP  " + (widget.theme.network.public_ip || "—")
+                    text: qsTranslate("Spectrum", "IPv4  ") + widget.theme.network.ethernet.ipv4 + qsTranslate("Spectrum", "\nIPv6  ") + widget.theme.network.ethernet.ipv6 + qsTranslate("Spectrum", "\nGateway  ") + widget.theme.network.ethernet.gateway + qsTranslate("Spectrum", "\nPublic IP  ") + (widget.theme.network.public_ip || "—")
                     wrapMode: Text.WrapAnywhere
                     color: widget.theme.colors.muted
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
                 }
                 Text {
                     visible: widget.page === "wifi"
-                    text: "WI-FI" + (widget.theme.network.wifi.connected ? "  ·  " + widget.theme.network.wifi.ssid : "")
+                    text: qsTranslate("Spectrum", "WI-FI") + (widget.theme.network.wifi.connected ? "  ·  " + widget.theme.network.wifi.ssid : "")
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     color: widget.theme.colors.accent
@@ -553,7 +569,7 @@ PanelWindow {
                 Text {
                     visible: widget.page === "wifi" && widget.theme.network.wifi.connected
                     Layout.fillWidth: true
-                    text: "Interface  " + widget.theme.network.wifi.interface + "    Rate  " + widget.theme.network.wifi.speed + "    Signal  " + widget.theme.network.wifi.signal + "%"
+                    text: qsTranslate("Spectrum", "Interface  ") + widget.theme.network.wifi.interface + qsTranslate("Spectrum", "    Rate  ") + widget.theme.network.wifi.speed + qsTranslate("Spectrum", "    Signal  ") + widget.theme.network.wifi.signal + "%"
                     elide: Text.ElideRight
                     color: widget.theme.colors.muted
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
@@ -567,7 +583,7 @@ PanelWindow {
                 Text {
                     visible: widget.page === "wifi" && widget.theme.network.wifi.connected
                     Layout.fillWidth: true
-                    text: "IPv4  " + widget.theme.network.wifi.ipv4 + "\nIPv6  " + widget.theme.network.wifi.ipv6 + "\nGateway  " + widget.theme.network.wifi.gateway + (widget.theme.network.ethernet.connected ? "" : "\nPublic IP  " + (widget.theme.network.public_ip || "—"))
+                    text: qsTranslate("Spectrum", "IPv4  ") + widget.theme.network.wifi.ipv4 + qsTranslate("Spectrum", "\nIPv6  ") + widget.theme.network.wifi.ipv6 + qsTranslate("Spectrum", "\nGateway  ") + widget.theme.network.wifi.gateway + (widget.theme.network.ethernet.connected ? "" : qsTranslate("Spectrum", "\nPublic IP  ") + (widget.theme.network.public_ip || "—"))
                     wrapMode: Text.WrapAnywhere
                     color: widget.theme.colors.muted
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
@@ -576,13 +592,13 @@ PanelWindow {
                     visible: widget.page === "wifi"
                     Layout.fillWidth: true
                     Text {
-                        text: "NEARBY NETWORKS"
+                        text: qsTranslate("Spectrum", "NEARBY NETWORKS")
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                     }
                     Item { Layout.fillWidth: true }
                     ShellButton {
-                        label: "Rescan"
+                        label: qsTranslate("Spectrum", "Rescan")
                         fontFamily: widget.theme.fontFamily
                         fontSize: widget.theme.fontSize - 1
                         backgroundColor: widget.theme.colors.surface_alt
@@ -615,7 +631,7 @@ PanelWindow {
                 }
                 Text {
                     visible: widget.page === "wifi" && widget.pendingSsid.length > 0
-                    text: "Password · " + widget.pendingSsid
+                    text: qsTranslate("Spectrum", "Password · ") + widget.pendingSsid
                     color: widget.theme.colors.foreground
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                 }
@@ -644,7 +660,7 @@ PanelWindow {
                 ShellButton {
                     visible: widget.page === "wifi" && widget.pendingSsid.length > 0
                     Layout.fillWidth: true
-                    label: "Connect"
+                    label: qsTranslate("Spectrum", "Connect")
                     enabled: passwordInput.text.length > 0
                     fontFamily: widget.theme.fontFamily
                     fontSize: widget.theme.fontSize - 1
@@ -661,7 +677,7 @@ PanelWindow {
                     Layout.fillWidth: true
                     ShellButton {
                         Layout.fillWidth: true
-                        label: "Manage networks"
+                        label: qsTranslate("Spectrum", "Manage networks")
                         fontFamily: widget.theme.fontFamily
                         fontSize: widget.theme.fontSize - 1
                         backgroundColor: widget.theme.colors.surface_alt
@@ -670,7 +686,7 @@ PanelWindow {
                     }
                     ShellButton {
                         Layout.fillWidth: true
-                        label: "Edit connections"
+                        label: qsTranslate("Spectrum", "Edit connections")
                         fontFamily: widget.theme.fontFamily
                         fontSize: widget.theme.fontSize - 1
                         backgroundColor: widget.theme.colors.surface_alt
@@ -725,25 +741,25 @@ PanelWindow {
                             }
                         }
                         Text {
-                            text: widget.battery.state === UPowerDeviceState.Charging ? "Charging" : widget.battery.state === UPowerDeviceState.FullyCharged ? "Fully charged" : widget.battery.state === UPowerDeviceState.Discharging ? "On battery" : "Battery status unavailable"
+                            text: widget.battery.state === UPowerDeviceState.Charging ? qsTranslate("Spectrum", "Charging") : widget.battery.state === UPowerDeviceState.FullyCharged ? qsTranslate("Spectrum", "Fully charged") : widget.battery.state === UPowerDeviceState.Discharging ? qsTranslate("Spectrum", "On battery") : qsTranslate("Spectrum", "Battery status unavailable")
                             color: widget.theme.colors.foreground
                             font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize; bold: true }
                         }
                         Text {
                             visible: (widget.battery.state === UPowerDeviceState.Charging && widget.battery.timeToFull > 0) || (widget.battery.state === UPowerDeviceState.Discharging && widget.battery.timeToEmpty > 0)
-                            text: widget.battery.state === UPowerDeviceState.Charging ? widget.batteryTime(widget.battery.timeToFull) + " until full" : widget.batteryTime(widget.battery.timeToEmpty) + " remaining"
+                            text: widget.battery.state === UPowerDeviceState.Charging ? widget.batteryTime(widget.battery.timeToFull) + qsTranslate("Spectrum", " until full") : widget.batteryTime(widget.battery.timeToEmpty) + qsTranslate("Spectrum", " remaining")
                             color: widget.theme.colors.muted
                             font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                         }
                         Text {
                             visible: widget.battery.healthSupported
-                            text: "Battery health  " + Math.round(widget.battery.healthPercentage) + "%"
+                            text: qsTranslate("Spectrum", "Battery health  ") + Math.round(widget.battery.healthPercentage) + "%"
                             color: widget.theme.colors.muted
                             font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                         }
                         Text {
                             visible: widget.battery.changeRate > 0
-                            text: "Power rate  " + widget.battery.changeRate.toFixed(1) + " W"
+                            text: qsTranslate("Spectrum", "Power rate  ") + widget.battery.changeRate.toFixed(1) + qsTranslate("Spectrum", " W")
                             color: widget.theme.colors.muted
                             font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                         }
@@ -761,10 +777,10 @@ PanelWindow {
                         }
                         Repeater {
                             model: [
-                                { label: "CPU load", value: widget.theme.overview.load },
-                                { label: "Memory", value: widget.theme.overview.memory_detail || widget.theme.overview.memory },
-                                { label: "Temperature", value: widget.theme.overview.temperature },
-                                { label: "Uptime", value: widget.theme.overview.uptime_long || widget.theme.overview.uptime }
+                                { label: qsTranslate("Spectrum", "CPU load"), value: widget.theme.overview.load },
+                                { label: qsTranslate("Spectrum", "Memory"), value: widget.theme.overview.memory_detail || widget.theme.overview.memory },
+                                { label: qsTranslate("Spectrum", "Temperature"), value: widget.theme.overview.temperature },
+                                { label: qsTranslate("Spectrum", "Uptime"), value: widget.theme.overview.uptime_long || widget.theme.overview.uptime }
                             ]
                             RowLayout {
                                 required property var modelData
@@ -788,14 +804,14 @@ PanelWindow {
                     }
                     Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: widget.theme.colors.surface_alt }
                     Text {
-                        text: "POWER MODE"
+                        text: qsTranslate("Spectrum", "POWER MODE")
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                     }
                     RowLayout {
                         spacing: 8
                         ShellButton {
-                            label: "Balanced"
+                            label: qsTranslate("Spectrum", "Balanced")
                             enabled: widget.theme.performance.available && !widget.theme.performancePending && (widget.theme.performance.modes || []).includes("balanced")
                             fontFamily: widget.theme.fontFamily
                             fontSize: widget.theme.fontSize
@@ -804,7 +820,7 @@ PanelWindow {
                             onClicked: widget.theme.setPerformanceMode("balanced")
                         }
                         ShellButton {
-                            label: "Performance"
+                            label: qsTranslate("Spectrum", "Performance")
                             enabled: widget.theme.performance.available && !widget.theme.performancePending && (widget.theme.performance.modes || []).includes("performance")
                             fontFamily: widget.theme.fontFamily
                             fontSize: widget.theme.fontSize
@@ -815,7 +831,7 @@ PanelWindow {
                     }
                     ShellButton {
                         Layout.fillWidth: true
-                        label: "Power Saver"
+                        label: qsTranslate("Spectrum", "Power Saver")
                         enabled: widget.theme.performance.available && !widget.theme.performancePending && (widget.theme.performance.modes || []).includes("power-saver")
                         fontFamily: widget.theme.fontFamily
                         fontSize: widget.theme.fontSize
@@ -825,7 +841,7 @@ PanelWindow {
                     }
                     Text {
                         visible: !widget.theme.performance.available
-                        text: "Power mode control is unavailable"
+                        text: qsTranslate("Spectrum", "Power mode control is unavailable")
                         color: widget.theme.colors.muted
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                     }
@@ -834,7 +850,7 @@ PanelWindow {
                 Text {
                     visible: widget.theme.actionError.length > 0
                     Layout.fillWidth: true
-                    text: widget.theme.actionError
+                    text: qsTranslate("Spectrum", widget.theme.actionError)
                     wrapMode: Text.Wrap
                     color: widget.theme.colors.error || "#ff8c9a"
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }

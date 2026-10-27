@@ -1,15 +1,18 @@
 pkgbase = spectrum-desktop
 	pkgdesc = Integrated SpectrumOS desktop frontends and visual defaults
 	pkgver = 1.0.0
-	pkgrel = 24
+	pkgrel = 27
 	url = https://spectrum.gibranlp.dev
 	arch = x86_64
 	license = MIT
+	makedepends = cmake
 	makedepends = desktop-file-utils
 	makedepends = git
 	makedepends = pkgconf
+	makedepends = python-polib
+	makedepends = qt6-tools
 	depends = ukvm>=0.1.0.r21
-	depends = spectrumdrop
+	depends = spectrumdrop>=1.0.0-5
 	depends = acl
 	depends = adwaita-cursors
 	depends = alacritty
@@ -37,6 +40,7 @@ pkgbase = spectrum-desktop
 	depends = gvfs
 	depends = gvfs-mtp
 	depends = hyprpicker
+	depends = git
 	depends = imagemagick
 	depends = htop
 	depends = hypridle
@@ -70,14 +74,14 @@ pkgbase = spectrum-desktop
 	depends = qt5ct
 	depends = qt6-wayland
 	depends = qt6ct
-	depends = satty
+	depends = satty>=0.21
 	depends = sddm
 	depends = slurp
 	depends = spectrum-base
-	depends = spectrum-hyprland>=1.0.0-10
+	depends = spectrum-hyprland>=1.0.0-11
 	depends = spectrum-plymouth
 	depends = spectrum-sddm
-	depends = spectrum-theme>=1.0.0-3
+	depends = spectrum-theme>=1.0.0-4
 	depends = swayimg
 	depends = systemd-libs
 	depends = thunar
@@ -101,6 +105,7 @@ pkgbase = spectrum-desktop
 	depends = gst-plugins-ugly
 	depends = gnome-epub-thumbnailer
 	depends = poppler
+	depends = qpdf
 	depends = poppler-glib
 	depends = libgsf
 	depends = libgepub
@@ -118,6 +123,7 @@ pkgbase = spectrum-desktop
 	depends = spectrum-xdg-desktop-portal-hyprland
 	depends = xdg-user-dirs
 	depends = xdg-utils
+	depends = xdg-terminal-exec
 	depends = quickshell>=0.3.0
 	depends = qt6-declarative
 	depends = gamemode
@@ -145,6 +151,8 @@ pkgbase = spectrum-desktop
 	depends = arj
 	depends = lhasa
 	depends = bzip3
+	optdepends = docker: Manage containers through an existing local Docker socket
+	optdepends = podman: Manage containers through an existing rootless Podman socket
 	optdepends = gowall-bin: optional wallpaper recoloring
 	optdepends = vesktop-bin: Spectrum-themed Discord client
 	optdepends = brave-bin: Brave browser
@@ -173,12 +181,13 @@ pkgbase = spectrum-desktop
 	backup = etc/NetworkManager/conf.d/20-spectrumos.conf
 	backup = etc/samba/smb.conf
 	backup = etc/xdg/mimeapps.list
+	backup = etc/xdg/xdg-terminals.list
 	backup = etc/xdg/fastfetch/config.jsonc
-	source = spectrumos-source-1.0.0-0703354473d943af.tar.zst
+	source = spectrumos-source-1.0.0-8ddd53c56301770d.tar.zst
 	source = questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst
 	source = questline.LICENSE
 	source = stash-0.7.0-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v0.7.0/stash-linux-x86_64
-	sha256sums = c4a4192711affac73afcc8462ba96d6dc2fe84acee5f6f180e75ef363f4eacac
+	sha256sums = c5423788c9be82af0593224a034768d3d36ed3efeffbdd2a47c62f65fc7af314
 	sha256sums = a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495
 	sha256sums = 3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa
 	sha256sums = 01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802

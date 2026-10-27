@@ -27,9 +27,9 @@ Translate {
         : edge === "top" ? surface.y + surface.height + overhang
         : viewportHeight - surface.y + overhang
 
-    // El rebote llega a unos tres píxeles, sin crecer con el tamaño del panel.
+    // El rebote llega a unos cinco píxeles, sin crecer con el tamaño del panel.
     function openingOvershoot(distance): real {
-        const fraction = Math.min(3, distance * 0.02) / Math.max(1, distance);
+        const fraction = Math.min(5, distance * 0.025) / Math.max(1, distance);
         let low = 0, high = 2;
         for (let i = 0; i < 18; i++) {
             const value = (low + high) / 2;

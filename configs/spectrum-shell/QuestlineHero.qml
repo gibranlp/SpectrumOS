@@ -27,21 +27,21 @@ ColumnLayout {
                 spacing: 8
                 Text {
                     Layout.fillWidth: true
-                    text: heroView.profile.username || "Your hero"
+                    text: heroView.profile.username || qsTranslate("Spectrum", "Your hero")
                     wrapMode: Text.Wrap
                     color: heroView.theme.colors.foreground
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize + 18; bold: true }
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: (heroView.profile.class || "Class unavailable") + (heroView.profile.title ? " · " + heroView.profile.title : "")
+                    text: (heroView.profile.class || qsTranslate("Spectrum", "Class unavailable")) + (heroView.profile.title ? " · " + heroView.profile.title : "")
                     wrapMode: Text.Wrap
                     color: heroView.theme.colors.accent
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize + 3; bold: true }
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: heroView.profile.description || "Your Questline character and class progression."
+                    text: heroView.profile.description || qsTranslate("Spectrum", "Your Questline character and class progression.")
                     wrapMode: Text.Wrap
                     color: heroView.theme.colors.muted
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize }
@@ -60,9 +60,9 @@ ColumnLayout {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: heroView.maximumLevel ? "Maximum level · " + (heroView.profile.xp || 0) + " XP"
-                        : heroView.profile.xp_next_level > 0 ? (heroView.profile.xp || 0) + " / " + heroView.profile.xp_next_level + " XP · " + Math.max(0, heroView.profile.xp_next_level - (heroView.profile.xp || 0)) + " XP to level " + ((heroView.profile.level || 1) + 1)
-                        : (heroView.profile.xp || 0) + " XP"
+                    text: heroView.maximumLevel ? qsTranslate("Spectrum", "Maximum level · ") + (heroView.profile.xp || 0) + qsTranslate("Spectrum", " XP")
+                        : heroView.profile.xp_next_level > 0 ? (heroView.profile.xp || 0) + " / " + heroView.profile.xp_next_level + qsTranslate("Spectrum", " XP · ") + Math.max(0, heroView.profile.xp_next_level - (heroView.profile.xp || 0)) + qsTranslate("Spectrum", " XP to level ") + ((heroView.profile.level || 1) + 1)
+                        : (heroView.profile.xp || 0) + qsTranslate("Spectrum", " XP")
                     wrapMode: Text.Wrap
                     color: heroView.theme.colors.foreground
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize }
@@ -72,7 +72,7 @@ ColumnLayout {
                 Layout.preferredWidth: 180
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "LEVEL"
+                    text: qsTranslate("Spectrum", "LEVEL")
                     color: heroView.theme.colors.muted
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize; bold: true }
                 }
@@ -105,14 +105,14 @@ ColumnLayout {
                     spacing: 16
                     Repeater {
                         model: [
-                            { title: "Class passive", body: heroView.profile.passive || "Class details are unavailable in this Questline version." },
-                            { title: "Specialization", body: heroView.profile.specialization || ((heroView.profile.level || 1) < 10 ? "Unlocks at level 10" : "Choose your specialization in Questline") },
-                            { title: "Next power", body: heroView.nextPower ? "Level " + heroView.nextPower.level + " · " + heroView.nextPower.name + "\n" + heroView.nextPower.description : heroView.powers.length ? "All class powers unlocked" : "Class powers unavailable" },
-                            { title: "Adventure", body: (heroView.profile.tasks_completed === undefined ? "" : heroView.profile.tasks_completed + " tasks completed\n")
-                                + (heroView.profile.scrolls_written === undefined ? "" : heroView.profile.scrolls_written + " scrolls written\n")
-                                + (heroView.profile.current_streak === undefined ? "" : heroView.profile.current_streak + " day streak · Best " + heroView.profile.best_streak + "\n")
-                                + (heroView.profile.created_at ? "Hero since " + heroView.profile.created_at.slice(0, 10) : "") },
-                            { title: heroView.profile.order || "Class", body: heroView.profile.flavor || "" }
+                            { title: qsTranslate("Spectrum", "Class passive"), body: heroView.profile.passive || qsTranslate("Spectrum", "Class details are unavailable in this Questline version.") },
+                            { title: qsTranslate("Spectrum", "Specialization"), body: heroView.profile.specialization || ((heroView.profile.level || 1) < 10 ? qsTranslate("Spectrum", "Unlocks at level 10") : qsTranslate("Spectrum", "Choose your specialization in Questline")) },
+                            { title: qsTranslate("Spectrum", "Next power"), body: heroView.nextPower ? qsTranslate("Spectrum", "Level ") + heroView.nextPower.level + " · " + heroView.nextPower.name + "\n" + heroView.nextPower.description : heroView.powers.length ? qsTranslate("Spectrum", "All class powers unlocked") : qsTranslate("Spectrum", "Class powers unavailable") },
+                            { title: qsTranslate("Spectrum", "Adventure"), body: (heroView.profile.tasks_completed === undefined ? "" : heroView.profile.tasks_completed + qsTranslate("Spectrum", " tasks completed\n"))
+                                + (heroView.profile.scrolls_written === undefined ? "" : heroView.profile.scrolls_written + qsTranslate("Spectrum", " scrolls written\n"))
+                                + (heroView.profile.current_streak === undefined ? "" : heroView.profile.current_streak + qsTranslate("Spectrum", " day streak · Best ") + heroView.profile.best_streak + "\n")
+                                + (heroView.profile.created_at ? qsTranslate("Spectrum", "Hero since ") + heroView.profile.created_at.slice(0, 10) : "") },
+                            { title: heroView.profile.order || qsTranslate("Spectrum", "Class"), body: heroView.profile.flavor || "" }
                         ]
                         ColumnLayout {
                             required property var modelData
@@ -139,7 +139,7 @@ ColumnLayout {
                         Text {
                             required property var modelData
                             Layout.fillWidth: true
-                            text: modelData.name + (heroView.profile.specialization === modelData.name ? " · Selected" : "") + "\n" + modelData.description
+                            text: modelData.name + (heroView.profile.specialization === modelData.name ? qsTranslate("Spectrum", " · Selected") : "") + "\n" + modelData.description
                             wrapMode: Text.Wrap
                             color: heroView.profile.specialization === modelData.name ? heroView.theme.colors.accent : heroView.theme.colors.muted
                             font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize }
@@ -158,14 +158,14 @@ ColumnLayout {
                 spacing: 12
                 Text {
                     Layout.fillWidth: true
-                    text: "Class powers · " + heroView.unlockedPowers.length + " / " + heroView.powers.length + " unlocked"
+                    text: qsTranslate("Spectrum", "Class powers · ") + heroView.unlockedPowers.length + " / " + heroView.powers.length + qsTranslate("Spectrum", " unlocked")
                     color: heroView.theme.colors.foreground
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize + 2; bold: true }
                 }
                 Text {
                     Layout.fillWidth: true
                     visible: heroView.powers.length === 0
-                    text: "Class progression details are unavailable in this Questline version."
+                    text: qsTranslate("Spectrum", "Class progression details are unavailable in this Questline version.")
                     wrapMode: Text.Wrap
                     color: heroView.theme.colors.muted
                     font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize }
@@ -188,7 +188,7 @@ ColumnLayout {
                             spacing: 6
                             Text {
                                 Layout.fillWidth: true
-                                text: "Level " + modelData.level + " · " + modelData.name + (modelData.unlocked ? " · Unlocked" : " · Locked")
+                                text: qsTranslate("Spectrum", "Level ") + modelData.level + " · " + modelData.name + (modelData.unlocked ? qsTranslate("Spectrum", " · Unlocked") : qsTranslate("Spectrum", " · Locked"))
                                 wrapMode: Text.Wrap
                                 color: modelData.unlocked ? heroView.theme.colors.accent : heroView.theme.colors.muted
                                 font { family: heroView.theme.fontFamily; pixelSize: heroView.theme.fontSize + 1; bold: true }

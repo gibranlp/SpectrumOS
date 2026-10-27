@@ -10,7 +10,7 @@ Column {
 
     Text {
         objectName: "display-scale-current-" + control.monitorName
-        text: "Scaling · current " + Number(control.currentScale.toFixed(2)) + "×"
+        text: qsTranslate("Spectrum", "Scaling · current ") + Number(control.currentScale.toFixed(2)) + "×"
         color: control.theme.colors.muted
         font { family: control.theme.fontFamily; pixelSize: control.theme.fontSize - 1 }
     }
@@ -36,7 +36,7 @@ Column {
     }
     Text {
         width: parent.width
-        text: "Some resolutions use the nearest supported scale."
+        text: qsTranslate("Spectrum", "Some resolutions use the nearest supported scale.")
         wrapMode: Text.Wrap
         color: control.theme.colors.muted
         font { family: control.theme.fontFamily; pixelSize: control.theme.fontSize - 2 }

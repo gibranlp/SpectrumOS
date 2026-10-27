@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import fcntl
 import hashlib
 import json
 import os
@@ -147,7 +148,8 @@ def thumbnail_for(path: Path) -> Path:
     except OSError:
         pass
     with Image.open(path) as source:
-        image = source if source.mode == "RGB" else source.convert("RGB")
+        image = ImageOps.exif_transpose(source)
+        image = image if image.mode == "RGB" else image.convert("RGB")
         preview = ImageOps.fit(image, (300, 168), method=Image.Resampling.LANCZOS)
         temporary = thumbnail.with_suffix(".new.jpg")
         preview.save(temporary, "JPEG", quality=82, optimize=True)
@@ -194,22 +196,27 @@ def launch(args: list[str]) -> None:
     backend_dir = os.environ.get("SPECTRUM_SHELL_BACKEND_DIR")
     if backend_dir and args and args[0] == "/usr/lib/spectrumos/theme-menu":
         args[0] = str(Path(backend_dir) / "theme-menu")
-    subprocess.Popen(
-        args,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    log_path = preferences_file().parent / "apply.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if log_path.exists() and log_path.stat().st_size > 1024 * 1024:
+        log_path.replace(log_path.with_suffix(".log.1"))
+    with log_path.open("a", encoding="utf-8") as log:
+        subprocess.Popen(
+            args,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
 
 
-def apply_to_current_wallpaper(mode: str, variant: str) -> None:
+def apply_to_current_wallpaper() -> None:
     # Vuelve a correr todo el pipeline del tema sobre el wallpaper que ya está activo, para que
     # cambiar de backend o de variante en el centro de control se vea reflejado de inmediato en
     # vez de esperar hasta la próxima vez que se (re)aplique un wallpaper a mano.
     current = current_wallpaper()
     if current is not None:
-        launch(["/usr/lib/spectrumos/theme-menu", "--apply", str(current), mode, variant])
+        launch(["/usr/lib/spectrumos/theme-menu", "--refresh"])
 
 
 def main() -> int:
@@ -227,10 +234,14 @@ def main() -> int:
             return 2
         if field == "scheme" and value != "none" and value not in gowall_scheme_names():
             return 2
-        values = preferences()
-        values[field] = value
-        save_preferences(values)
-        apply_to_current_wallpaper(values["mode"], values["variant"])
+        directory = preferences_file().parent
+        directory.mkdir(parents=True, exist_ok=True)
+        with (directory / ".apply.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            values = preferences()
+            values[field] = value
+            save_preferences(values)
+            apply_to_current_wallpaper()
         return 0
     if len(sys.argv) == 5 and sys.argv[1] == "apply":
         token, mode, variant = sys.argv[2:]

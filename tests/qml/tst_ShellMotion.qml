@@ -65,7 +65,7 @@ Item {
                 peak = Math.max(peak, offset());
             }
             verify(peak > 0.5, "Opening should bounce slightly: peak=" + peak + " travel=" + motion.travelDistance + " overshoot=" + motion.openingOvershoot(motion.travelDistance) + " progress=" + motion.progress);
-            verify(peak <= 3.1, "Opening bounce must stay within three pixels");
+            verify(peak <= 5.1, "Opening bounce must stay within five pixels");
             fuzzyCompare(offset(), 0, 0.01);
             verify(motion.active);
             motion.expanded = false;
@@ -114,7 +114,7 @@ Item {
                 peak = Math.max(peak, offset());
             }
             verify(peak > 2.5, "Every widget should visibly rebound: " + peak);
-            verify(peak <= 3.1, "Resolved geometry must keep the rebound within the attachment overlap: " + peak);
+            verify(peak <= 5.1, "Resolved geometry must keep the rebound within the attachment overlap: " + peak);
         }
     }
 }

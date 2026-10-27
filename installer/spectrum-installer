@@ -6,11 +6,20 @@ import re
 import subprocess
 import tempfile
 import threading
+import sys
+
+for module_directory in (Path(__file__).resolve().parents[1] / 'scripts',
+                         Path('/usr/local/lib/spectrumos'), Path('/usr/lib/spectrumos')):
+    if (module_directory / 'spectrum_i18n.py').is_file():
+        sys.path.insert(0, str(module_directory))
+        break
+from spectrum_i18n import (language, languages, set_language, translate, msg,
+                           tr_widget, tr_set, retranslate_widgets, clear_widget_bindings)
 
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import GLib, Gtk
+from gi.repository import GLib, Gtk, Pango
 
 
 DATA_DIR = Path(os.environ.get("SPECTRUM_INSTALLER_DATA", "/usr/share/spectrumos/installer"))
@@ -36,14 +45,66 @@ PACMAN_STEP_RE = re.compile(r"^(?:installing|upgrading) \S+")
 # for most of pacstrap's real duration once installed count overtook it.
 PACMAN_RESOLVED_RE = re.compile(r"^Packages \((\d+)\)")
 
+INSTALL_STAGES = (
+    (0, "Getting ready"),
+    (2, "Checking package mirrors"),
+    (5, "Preparing the selected disk"),
+    (10, "Creating the filesystems"),
+    (15, "Preparing boot files"),
+    (18, "Preparing the package list"),
+    (20, "Downloading packages"),
+    (65, "Saving system configuration"),
+    (70, "Installing the SpectrumOS desktop"),
+    (73, "Creating your account"),
+    (75, "Applying desktop settings"),
+    (90, "Installing optional applications"),
+    (93, "Setting up the bootloader"),
+    (98, "Finishing up"),
+    (100, "Installation complete"),
+)
+INSTALL_TIPS = (
+    ("Your shortcut spellbook", "Super + K opens the shortcut guide. The Planning Council has approved looking things up."),
+    ("Give your backlog a quest", "Super + T creates a Questline task. 'Remember to remember' has been rejected as a planning strategy."),
+    ("Find the missing artifact", "Super + S searches files, including folders on other drives. Your missing artifact need not live in Home."),
+    ("One quest at a time", "Super + Shift + F opens the focus timer. The Council can schedule its next meeting after your session."),
+    ("Open a portal", "Super + Shift + V opens Favorites. Reach your favorite links without excavating forty browser tabs."),
+    ("Rest is a valid side quest", "Super + Shift + B opens break reminders. Even a well-organized hero is allowed to leave the chair."),
+    ("Theme the realm", "Super + W opens Wallpapers. Match your desktop colors to your wallpaper; the Committee on Beige will recover."),
+    ("A place for your spells", "Super + Enter opens a terminal. Commands welcome. Wizard license optional."),
+    ("Send the loot", "Super + Shift + D opens SpectrumDrop for sharing files. Carrier pigeons may apply for reassignment."),
+    ("Consult the dashboard", "Super + Shift + H opens your dashboard and calendar. A meeting to locate the calendar is no longer necessary."),
+    ("Choose your tools", "Super + Shift + G opens Default Applications. Your videos deserve a player, not an unexpected editing session."),
+    ("Let the calculator remember", "Super + C opens Calculator. Continue working with your previous result; mental arithmetic has requested a day off."),
+)
+LOG_BUFFER_CHARS = 200_000
+
 
 class SpectrumInstaller(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="dev.spectrumos.Installer")
         self.disks = []
+        self.storage_layout = None
+        self.storage_plan = None
+        self.storage_busy = False
+        self.install_running = False
+        self.install_log_path = None
+        self.install_log_stream = None
+        self.log_window = None
+        self.tip_timer = 0
+        self.network_timer = 0
+        self.tip_index = 0
+        self.package_total = 0
+        self.package_seen = 0
+        self.package_floor = 0
+        self.package_ceiling = 0
+        self.awaiting_package_floor = False
         self.connect("activate", self.on_activate)
+        self.connect("shutdown", self.on_shutdown)
 
     def on_activate(self, _application):
+        if getattr(self, "window", None) is not None:
+            self.window.present()
+            return
         css = Gtk.CssProvider()
         css.load_from_path(str(DATA_DIR / "style.css"))
         Gtk.StyleContext.add_provider_for_display(
@@ -52,40 +113,52 @@ class SpectrumInstaller(Gtk.Application):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
-        self.window = Gtk.ApplicationWindow(application=self)
-        self.window.set_title("Install SpectrumOS")
-        self.window.set_default_size(760, 560)
+        self.window = tr_widget(Gtk.ApplicationWindow, application=self)
+        tr_set(self.window, 'set_title', msg('Install SpectrumOS'))
+        self.window.set_default_size(680, 560)
         self.window.set_size_request(480, 360)
         self.window.set_decorated(False)
 
         shell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         shell.add_css_class("installer-shell")
         shell.append(self.hero())
-        rescue_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        rescue_description = Gtk.Label(
-            label="Recover an existing system without starting an installation.",
-            xalign=0, wrap=True, hexpand=True,
-        )
-        rescue_description.add_css_class("muted")
-        rescue_row.append(rescue_description)
-        rescue_button = Gtk.Button(label="Rescue system")
-        rescue_button.connect("clicked", self.open_rescue)
-        rescue_row.append(rescue_button)
-        shell.append(rescue_row)
-
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.stack.set_hexpand(True)
         self.stack.set_vexpand(True)
-        self.setup_page = self.build_setup_page()
-        self.stack.add_named(self.setup_page, "setup")
-        confirm_scroll = Gtk.ScrolledWindow()
-        confirm_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        confirm_scroll.set_child(self.build_confirm_page())
-        self.stack.add_named(confirm_scroll, "confirm")
+        self.wizard_steps = ("language", "disk", "account", "preferences", "confirm")
+        self.step_titles = ("Language", "Disk", "Account", "Preferences", "Review")
+        for name, build in (("language", self.build_language_page), ("disk", self.build_disk_page),
+                            ("account", self.build_account_page), ("preferences", self.build_preferences_page),
+                            ("confirm", self.build_confirm_page)):
+            scroll = Gtk.ScrolledWindow()
+            scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            scroll.set_child(build())
+            self.stack.add_named(scroll, name)
         self.stack.add_named(self.build_progress_page(), "progress")
         self.stack.add_named(self.build_done_page(), "done")
         shell.append(self.stack)
+        self.error = tr_widget(Gtk.Label, xalign=0, wrap=True)
+        self.error.add_css_class("warning")
+        self.error.set_visible(False)
+        shell.append(self.error)
+        self.navigation = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.exit_button = tr_widget(Gtk.Button, label=msg('Exit installer'))
+        self.exit_button.connect("clicked", lambda *_: self.quit())
+        self.navigation.append(self.exit_button)
+        self.navigation.append(Gtk.Box(hexpand=True))
+        self.back_button = tr_widget(Gtk.Button, label=msg('Back'))
+        self.back_button.connect("clicked", self.previous_step)
+        self.navigation.append(self.back_button)
+        self.next_button = tr_widget(Gtk.Button, label=msg('Continue'))
+        self.next_button.add_css_class("accent")
+        self.next_button.connect("clicked", self.next_step)
+        self.navigation.append(self.next_button)
+        self.navigation.append(self.confirm_actions)
+        shell.append(self.navigation)
+        self.stack.connect("notify::visible-child-name", self.update_navigation)
+        self.stack.set_visible_child_name("language")
+        self.update_navigation()
 
         self.window.set_child(shell)
         self.window.present()
@@ -97,9 +170,80 @@ class SpectrumInstaller(Gtk.Application):
                 "/usr/local/bin/spectrum-rescue-shell",
             ])
         except OSError as error:
-            Gtk.AlertDialog(
-                message="Could not open the rescue terminal", detail=str(error),
+            tr_widget(Gtk.AlertDialog, 
+                message=msg('Could not open the rescue terminal'), detail=str(error),
             ).show(self.window)
+
+    def update_navigation(self, *_arguments):
+        if not hasattr(self, "navigation"):
+            return
+        name = self.stack.get_visible_child_name()
+        editing = name in self.wizard_steps
+        self.navigation.set_visible(editing)
+        if not editing:
+            self.error.set_visible(False)
+            tr_set(self.step_indicator, 'set_text', msg('Installing SpectrumOS') if name == 'progress' else msg('Installation complete'))
+            return
+        index = self.wizard_steps.index(name)
+        tr_set(self.step_indicator, 'set_text', msg('Step {step} of {total} · {title}',
+               step=index + 1, total=len(self.wizard_steps), title=translate(self.step_titles[index])))
+        self.back_button.set_visible(index > 0 and name != 'confirm')
+        self.next_button.set_visible(name != 'confirm')
+        self.confirm_actions.set_visible(name == 'confirm')
+        self.exit_button.set_visible(name != 'confirm')
+        self.navigation.set_sensitive(not self.storage_busy and not self.install_running)
+        tr_set(self.next_button, 'set_label', msg('Review installation') if name == 'preferences' else msg('Continue'))
+
+    def show_step(self, name):
+        if self.storage_busy or self.install_running:
+            return
+        self.error.set_visible(False)
+        self.stack.set_visible_child_name(name)
+
+    def previous_step(self, _button):
+        name = self.stack.get_visible_child_name()
+        if name in self.wizard_steps and self.wizard_steps.index(name) > 0:
+            self.show_step(self.wizard_steps[self.wizard_steps.index(name) - 1])
+
+    def disk_validation_error(self):
+        error = ""
+        if not self.disks or self.disk_dropdown.get_selected() >= len(self.disks):
+            error = "No eligible installation disk was found."
+        elif not self.connected():
+            error = "Connect to Wi-Fi or Ethernet. SpectrumOS downloads packages during installation."
+        elif self.install_mode.get_selected() == 0 and (
+            not self.storage_layout or self.storage_layout["blockers"] or not getattr(self, "extents", [])
+            or self.extent_dropdown.get_selected() >= len(self.extents)
+        ):
+            error = "Read the partitions and select supported unallocated space before continuing."
+        return error
+
+    def account_validation_error(self):
+        error = ""
+        if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", self.username.get_text()):
+            error = "Enter a simple lowercase username."
+        elif not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}", self.hostname.get_text()):
+            error = "Enter a valid computer name."
+        elif len(self.password.get_text()) < 8:
+            error = "Use a password with at least 8 characters."
+        elif self.password.get_text() != self.password_confirm.get_text():
+            error = "The passwords do not match."
+        return error
+
+    def next_step(self, _button):
+        if self.storage_busy or self.install_running:
+            return
+        name = self.stack.get_visible_child_name()
+        if name == 'preferences':
+            self.review(None)
+            return
+        error = self.disk_validation_error() if name == 'disk' else self.account_validation_error() if name == 'account' else ''
+        if error:
+            tr_set(self.error, 'set_text', msg(error))
+            self.error.set_visible(True)
+            return
+        if name in self.wizard_steps and self.wizard_steps.index(name) < len(self.wizard_steps) - 1:
+            self.show_step(self.wizard_steps[self.wizard_steps.index(name) + 1])
 
     @staticmethod
     def _display():
@@ -112,10 +256,11 @@ class SpectrumInstaller(Gtk.Application):
         logo = Gtk.Picture.new_for_filename(str(DATA_DIR / "logo.svg"))
         logo.set_halign(Gtk.Align.CENTER)
         box.append(logo)
-        title = Gtk.Label(label="SpectrumOS")
+        title = tr_widget(Gtk.Label, label=msg('SpectrumOS'))
         title.add_css_class("hero-title")
         box.append(title)
-        version = Gtk.Label(label="Installer · erase-disk mode")
+        version = tr_widget(Gtk.Label, wrap=True, xalign=1)
+        self.step_indicator = version
         version.add_css_class("muted")
         version.set_hexpand(True)
         version.set_halign(Gtk.Align.END)
@@ -123,37 +268,88 @@ class SpectrumInstaller(Gtk.Application):
         return box
 
     def field(self, box, title, widget):
-        label = Gtk.Label(label=title, xalign=0)
+        if isinstance(widget, Gtk.DropDown):
+            selected = Gtk.SignalListItemFactory()
+            selected.connect('setup', lambda _factory, item: item.set_child(
+                Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=28)))
+            selected.connect('bind', lambda _factory, item: item.get_child().set_text(item.get_item().get_string()))
+            popup = Gtk.SignalListItemFactory()
+            popup.connect('setup', lambda _factory, item: item.set_child(
+                Gtk.Label(xalign=0, wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=38)))
+            popup.connect('bind', lambda _factory, item: item.get_child().set_text(item.get_item().get_string()))
+            widget.set_factory(selected)
+            widget.set_list_factory(popup)
+        label = tr_widget(Gtk.Label, label=msg(title), xalign=0)
+        label.set_wrap(True)
         label.add_css_class("muted")
         box.append(label)
         box.append(widget)
 
-    def build_setup_page(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
-        title = Gtk.Label(label="Install SpectrumOS", xalign=0)
-        title.add_css_class("step-title")
-        page.append(title)
-        subtitle = Gtk.Label(
-            label="Choose the destination and create your administrator account.", xalign=0
-        )
-        subtitle.set_wrap(True)
+    def build_language_controls(self, shell):
+        self.language_rows = languages()
+        self.changing_language = False
+        self.region_edited = False
+        self.translated_choices = []
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        language_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True)
+        region_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True)
+        self.language_choice = Gtk.DropDown.new_from_strings([item['name'] for item in self.language_rows])
+        self.language_choice.set_selected(next((index for index, item in enumerate(self.language_rows)
+                                               if item['id'] == language()), 0))
+        self.language_choice.set_hexpand(True)
+        self.field(language_box, 'Installation and system language', self.language_choice)
+        self.region_choice = Gtk.DropDown.new_from_strings([item['locale'] for item in self.language_rows])
+        self.region_choice.set_selected(self.language_choice.get_selected())
+        self.region_choice.set_hexpand(True)
+        self.field(region_box, 'Regional formats', self.region_choice)
+        self.region_choice.connect('notify::selected', self.region_changed)
+        self.language_choice.connect('notify::selected', self.language_changed)
+        row.append(language_box)
+        row.append(region_box)
+        shell.append(row)
+
+    def region_changed(self, *_arguments):
+        if not self.changing_language:
+            self.region_edited = True
+
+    def language_changed(self, *_arguments):
+        selected = self.language_choice.get_selected()
+        if selected >= len(self.language_rows):
+            return
+        set_language(self.language_rows[selected]['id'])
+        self.changing_language = True
+        try:
+            if not self.region_edited:
+                self.region_choice.set_selected(selected)
+            retranslate_widgets()
+            for dropdown, sources in self.translated_choices:
+                index = dropdown.get_selected()
+                dropdown.set_model(Gtk.StringList.new([translate(value) for value in sources]))
+                dropdown.set_selected(index)
+            self.update_navigation()
+            if self.stack.get_visible_child_name() == 'confirm':
+                self.show_review()
+        finally:
+            self.changing_language = False
+
+    def translated_dropdown(self, sources):
+        dropdown = Gtk.DropDown.new_from_strings([translate(value) for value in sources])
+        self.translated_choices.append((dropdown, sources))
+        return dropdown
+
+    def wizard_page(self, title, description):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        heading = tr_widget(Gtk.Label, label=msg(title), xalign=0, wrap=True)
+        heading.add_css_class("step-title")
+        page.append(heading)
+        subtitle = tr_widget(Gtk.Label, label=msg(description), xalign=0, wrap=True)
         subtitle.add_css_class("muted")
         page.append(subtitle)
+        return page
 
-        network_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.network_status = Gtk.Label(xalign=0, hexpand=True)
-        self.network_status.add_css_class("muted")
-        network_row.append(self.network_status)
-        page.append(network_row)
-        self.refresh_network_status()
-        GLib.timeout_add_seconds(3, self.refresh_network_status)
-
-        self.load_disks()
-        labels = [self.disk_label(item) for item in self.disks] or ["No eligible disks found"]
-        self.disk_dropdown = Gtk.DropDown.new_from_strings(labels)
-        self.disk_dropdown.set_sensitive(bool(self.disks))
-        self.field(page, "Installation disk", self.disk_dropdown)
-
+    def build_language_page(self):
+        page = self.wizard_page("Welcome to SpectrumOS", "Choose your language and keyboard to get started.")
+        self.build_language_controls(page)
         self.keyboard_names = [
             "English (US)",
             "English (US, international accents)",
@@ -162,111 +358,164 @@ class SpectrumInstaller(Gtk.Application):
             "English (US) + Spanish (Latin America)",
             "US International + Spanish (Latin America)",
             "US International + Spanish (Spain)",
+            "Portuguese (Brazil, ABNT2)",
         ]
-        self.keyboard_profiles = ["us", "us-intl", "latam", "es", "us,latam", "us-intl,latam", "us-intl,es"]
-        self.keyboard = Gtk.DropDown.new_from_strings(self.keyboard_names)
+        self.keyboard_profiles = ["us", "us-intl", "latam", "es", "us,latam", "us-intl,latam", "us-intl,es", "br"]
+        self.keyboard = self.translated_dropdown(self.keyboard_names)
         self.keyboard.connect("notify::selected", self.keyboard_changed)
         self.field(page, "Keyboard", self.keyboard)
 
-        self.username = Gtk.Entry(text="igor")
+        rescue_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        description = tr_widget(Gtk.Label, label=msg('Recover an existing system without starting an installation.'), xalign=0, wrap=True, hexpand=True)
+        description.add_css_class("muted")
+        rescue_row.append(description)
+        rescue = tr_widget(Gtk.Button, label=msg('Rescue system'))
+        rescue.connect("clicked", self.open_rescue)
+        rescue_row.append(rescue)
+        page.append(rescue_row)
+        session_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        restart_button = tr_widget(Gtk.Button, label=msg('Restart'))
+        restart_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
+        poweroff_button = tr_widget(Gtk.Button, label=msg('Power off'))
+        poweroff_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "poweroff"]))
+        session_buttons.append(restart_button)
+        session_buttons.append(poweroff_button)
+        page.append(session_buttons)
+        return page
+
+    def build_disk_page(self):
+        page = self.wizard_page("Choose where to install", "Select a disk and how SpectrumOS should use it. No disk changes happen until you confirm installation.")
+        network_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.network_status = tr_widget(Gtk.Label, xalign=0, hexpand=True)
+        self.network_status.add_css_class("muted")
+        network_row.append(self.network_status)
+        page.append(network_row)
+        self.refresh_network_status()
+        self.network_timer = GLib.timeout_add_seconds(3, self.refresh_network_status)
+
+        self.load_disks()
+        labels = [self.disk_label(item) for item in self.disks] or [translate("No eligible disks found")]
+        self.disk_dropdown = Gtk.DropDown.new_from_strings(labels)
+        self.disk_dropdown.set_sensitive(bool(self.disks))
+        self.field(page, "Installation disk", self.disk_dropdown)
+
+        self.install_mode = self.translated_dropdown([
+            "Install alongside — use unallocated space", "Erase the entire disk",
+        ])
+        self.field(page, "Installation method", self.install_mode)
+        self.alongside_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.storage_status = tr_widget(Gtk.Label, 
+            label=msg('Read the partition layout to find unallocated space. Existing partitions will be preserved.'),
+            xalign=0, wrap=True, selectable=True,
+        )
+        self.alongside_box.append(self.storage_status)
+        self.read_partitions = tr_widget(Gtk.Button, label=msg('Read partitions / rescan'))
+        self.read_partitions.connect("clicked", self.probe_storage)
+        self.alongside_box.append(self.read_partitions)
+        self.extent_dropdown = Gtk.DropDown.new_from_strings([translate("Read partitions first")])
+        self.extent_dropdown.set_sensitive(False)
+        self.extent_dropdown.connect("notify::selected", self.extent_changed)
+        self.field(self.alongside_box, "Unallocated space", self.extent_dropdown)
+        self.allocation = Gtk.SpinButton.new_with_range(34, 34, 1)
+        self.allocation.set_sensitive(False)
+        self.field(self.alongside_box, "Space for SpectrumOS (GiB, includes 2 GiB for boot files)", self.allocation)
+        self.default_boot = tr_widget(Gtk.CheckButton, label=msg('Show the SpectrumOS boot menu first'))
+        self.default_boot.set_active(True)
+        self.alongside_box.append(self.default_boot)
+        storage_hint = tr_widget(Gtk.Label, 
+            label=msg('Requires UEFI/GPT and at least 34 GiB of unallocated space. To make space on a full Windows disk, shrink its volume in Windows Disk Management, then rescan. Existing filesystems are not resized. Back up important files and keep your BitLocker recovery key available before changing boot settings.'),
+            xalign=0, wrap=True,
+        )
+        storage_hint.add_css_class("muted")
+        self.alongside_box.append(storage_hint)
+        page.append(self.alongside_box)
+        self.install_mode.connect("notify::selected", self.storage_mode_changed)
+        self.disk_dropdown.connect("notify::selected", self.storage_disk_changed)
+
+        return page
+
+    def build_account_page(self):
+        page = self.wizard_page("Create your account", "Choose your login details and computer name.")
+        self.username = tr_widget(Gtk.Entry, text="igor")
         self.field(page, "Username", self.username)
-        self.hostname = Gtk.Entry(text="spectrum")
+        self.hostname = tr_widget(Gtk.Entry, text="spectrum")
         self.field(page, "Computer name", self.hostname)
-        self.password = Gtk.PasswordEntry(show_peek_icon=True, placeholder_text="Password")
+        self.password = tr_widget(Gtk.PasswordEntry, show_peek_icon=True, placeholder_text=msg('Password'))
         self.field(page, "Password", self.password)
-        self.password_confirm = Gtk.PasswordEntry(
-            show_peek_icon=True, placeholder_text="Repeat password"
+        self.password_confirm = tr_widget(Gtk.PasswordEntry, 
+            show_peek_icon=True, placeholder_text=msg('Repeat password')
         )
         page.append(self.password_confirm)
 
-        self.timezones = ["America/Cancun", "America/Mexico_City", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Madrid", "UTC"]
+        return page
+
+    def build_preferences_page(self):
+        page = self.wizard_page("Make it yours", "Check your hardware, timezone and optional software.")
+        self.timezones = ["America/Cancun", "America/Mexico_City", "America/Sao_Paulo", "America/Manaus", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Madrid", "UTC"]
         self.timezone = Gtk.DropDown.new_from_strings(self.timezones)
         self.field(page, "Timezone", self.timezone)
 
         self.gpus = ["AMD", "Intel", "NVIDIA", "NVIDIA + Intel (hybrid)", "NVIDIA + AMD (hybrid)", "Virtual machine"]
         self.gpu_profiles = ["amd", "intel", "nvidia", "nvidia-intel", "nvidia-amd", "vm"]
-        self.gpu = Gtk.DropDown.new_from_strings(self.gpus)
+        self.gpu = self.translated_dropdown(self.gpus)
         self.gpu.set_selected(self.detect_gpu())
         self.field(page, "Graphics", self.gpu)
 
-        self.laptop = Gtk.CheckButton(label="This computer is a laptop")
+        self.laptop = tr_widget(Gtk.CheckButton, label=msg('This computer is a laptop'))
         page.append(self.laptop)
-        laptop_description = Gtk.Label(
-            label="Adds laptop power management, battery support, brightness controls, and portable hardware defaults.",
+        laptop_description = tr_widget(Gtk.Label, 
+            label=msg('Adds laptop power management, battery support, brightness controls, and portable hardware defaults.'),
             xalign=0,
         )
         laptop_description.set_wrap(True)
         laptop_description.add_css_class("muted")
         page.append(laptop_description)
 
-        self.lean = Gtk.CheckButton(label="Install lean SpectrumOS")
+        self.lean = tr_widget(Gtk.CheckButton, label=msg('Install lean SpectrumOS'))
         page.append(self.lean)
-        lean_description = Gtk.Label(
-            label="Keeps the Spectrum desktop and recovery tools; skips background transfers, printer discovery, phone integration, and other optional services.",
+        lean_description = tr_widget(Gtk.Label, 
+            label=msg('Keeps apps, widgets and recovery tools. Uses lighter visuals and starts optional integrations only when needed, with fewer background services.'),
             xalign=0,
         )
         lean_description.set_wrap(True)
         lean_description.add_css_class("muted")
         page.append(lean_description)
 
-        browsers_label = Gtk.Label(label="Optional browsers", xalign=0)
+        browsers_label = tr_widget(Gtk.Label, label=msg('Optional browsers'), xalign=0)
         browsers_label.add_css_class("muted")
         page.append(browsers_label)
         browsers_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-        self.browser_chrome = Gtk.CheckButton(label="Google Chrome")
-        self.browser_brave = Gtk.CheckButton(label="Brave")
-        self.browser_zen = Gtk.CheckButton(label="Zen Browser")
+        self.browser_chrome = tr_widget(Gtk.CheckButton, label=msg('Google Chrome'))
+        self.browser_brave = tr_widget(Gtk.CheckButton, label=msg('Brave'))
+        self.browser_zen = tr_widget(Gtk.CheckButton, label=msg('Zen Browser'))
         browsers_row.append(self.browser_chrome)
         browsers_row.append(self.browser_brave)
         browsers_row.append(self.browser_zen)
         page.append(browsers_row)
-        browsers_description = Gtk.Label(
-            label="Each one is built from AUR after the base install; none are installed unless checked.",
+        browsers_description = tr_widget(Gtk.Label, 
+            label=msg('Each one is built from AUR after the base install; none are installed unless checked.'),
             xalign=0,
         )
         browsers_description.set_wrap(True)
         browsers_description.add_css_class("muted")
         page.append(browsers_description)
 
-        self.error = Gtk.Label(xalign=0)
-        self.error.add_css_class("warning")
-        self.error.set_visible(False)
-        page.append(self.error)
-
-        next_button = Gtk.Button(label="Review installation")
-        next_button.add_css_class("accent")
-        next_button.set_halign(Gtk.Align.END)
-        next_button.connect("clicked", self.review)
-        page.append(next_button)
-        session_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        quit_button = Gtk.Button(label="Exit installer")
-        quit_button.connect("clicked", lambda *_: self.quit())
-        restart_button = Gtk.Button(label="Restart")
-        restart_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
-        poweroff_button = Gtk.Button(label="Power off")
-        poweroff_button.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "poweroff"]))
-        session_buttons.append(quit_button)
-        session_buttons.append(restart_button)
-        session_buttons.append(poweroff_button)
-        page.append(session_buttons)
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_child(page)
-        return scroll
+        return page
 
     def build_confirm_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        title = Gtk.Label(label="Ready to install", xalign=0)
+        title = tr_widget(Gtk.Label, label=msg('Ready to install'), xalign=0)
         title.add_css_class("step-title")
         page.append(title)
-        warning = Gtk.Label(
-            label="Everything on the selected disk will be permanently erased. This cannot be undone.",
+        warning = tr_widget(Gtk.Label, 
+            label=msg('Everything on the selected disk will be permanently erased. This cannot be undone.'),
             xalign=0,
         )
         warning.set_wrap(True)
         warning.add_css_class("warning")
         page.append(warning)
-        self.summary = Gtk.Label(xalign=0, yalign=0)
+        self.confirm_warning = warning
+        self.summary = tr_widget(Gtk.Label, xalign=0, yalign=0)
         self.summary.set_wrap(True)
         self.summary.set_selectable(True)
         page.append(self.summary)
@@ -274,45 +523,144 @@ class SpectrumInstaller(Gtk.Application):
         spacer.set_vexpand(True)
         page.append(spacer)
         buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        back = Gtk.Button(label="Back")
-        back.connect("clicked", lambda *_: self.stack.set_visible_child_name("setup"))
-        install = Gtk.Button(label="Erase disk and install")
+        back = tr_widget(Gtk.Button, label=msg('Back'))
+        self.confirm_back = back
+        back.connect("clicked", lambda *_: self.show_step("preferences"))
+        install = tr_widget(Gtk.Button, label=msg('Erase disk and install'))
         install.add_css_class("install-button")
         install.connect("clicked", self.start_install)
+        self.install_button = install
         buttons.append(back)
         buttons.append(install)
-        page.append(buttons)
+        self.confirm_actions = buttons
         return page
 
     def build_progress_page(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        title = Gtk.Label(label="Installing SpectrumOS", xalign=0)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, vexpand=True)
+        page.append(Gtk.Box(vexpand=True))
+        title = tr_widget(Gtk.Label, label=msg('Installing SpectrumOS'), xalign=0)
         title.add_css_class("step-title")
         page.append(title)
-        text = Gtk.Label(
-            label="Keep this computer connected to power and the internet. Packages are downloaded during installation.", xalign=0
-        )
-        text.set_wrap(True)
-        text.add_css_class("muted")
-        page.append(text)
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        card.add_css_class("install-progress-card")
+        status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.install_status = tr_widget(Gtk.Label, label=msg('Getting ready'), xalign=0, hexpand=True, wrap=True)
+        self.install_status.add_css_class("install-status")
+        self.install_percent = tr_widget(Gtk.Label, label="0%", xalign=1)
+        self.install_percent.add_css_class("muted")
+        status_row.append(self.install_status)
+        status_row.append(self.install_percent)
+        card.append(status_row)
         self.progress = Gtk.ProgressBar()
         self.progress.set_fraction(0)
-        page.append(self.progress)
+        card.append(self.progress)
+        self.install_note = tr_widget(Gtk.Label, label=msg('Keep power and internet connected. This may take a little while.'), xalign=0, wrap=True)
+        self.install_note.add_css_class("muted")
+        card.append(self.install_note)
+        page.append(card)
+
+        self.tip_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.tip_card.add_css_class("install-tip-card")
+        context = tr_widget(Gtk.Label, label=msg('ON YOUR NEW DESKTOP'), xalign=0)
+        context.add_css_class("install-tip-context")
+        self.tip_card.append(context)
+        self.tip_title = tr_widget(Gtk.Label, xalign=0, wrap=True)
+        self.tip_title.add_css_class("install-tip-title")
+        self.tip_body = tr_widget(Gtk.Label, xalign=0, wrap=True)
+        self.tip_body.set_max_width_chars(68)
+        self.tip_card.append(self.tip_title)
+        self.tip_card.append(self.tip_body)
+        self.show_tip()
+        page.append(self.tip_card)
+
+        self.terminal_log_button = tr_widget(Gtk.Button, label=msg('Open terminal log'))
+        self.terminal_log_button.set_halign(Gtk.Align.END)
+        self.terminal_log_button.set_sensitive(False)
+        self.terminal_log_button.connect("clicked", self.open_install_log)
+        page.append(Gtk.Box(vexpand=True))
         self.log = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
         self.log.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_child(self.log)
-        page.append(scroll)
-        return page
+        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vscrollbar_policy=Gtk.PolicyType.AUTOMATIC, vexpand=True)
+        scroll.set_child(page)
+        layout = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        layout.append(scroll)
+        layout.append(self.terminal_log_button)
+        return layout
+
+    def show_tip(self):
+        title, body = INSTALL_TIPS[self.tip_index]
+        tr_set(self.tip_title, 'set_text', msg(title))
+        tr_set(self.tip_body, 'set_text', msg(body))
+
+    def rotate_tip(self):
+        if not self.install_running:
+            self.tip_timer = 0
+            return False
+        self.tip_index = (self.tip_index + 1) % len(INSTALL_TIPS)
+        self.show_tip()
+        return True
+
+    def stop_tip_timer(self):
+        if self.tip_timer:
+            GLib.source_remove(self.tip_timer)
+            self.tip_timer = 0
+
+    def on_shutdown(self, *_arguments):
+        self.stop_tip_timer()
+        if self.network_timer:
+            GLib.source_remove(self.network_timer)
+            self.network_timer = 0
+        self.close_install_log()
+        clear_widget_bindings()
+
+    def close_install_log(self):
+        if self.install_log_stream is not None:
+            try:
+                self.install_log_stream.close()
+            except OSError:
+                pass
+            self.install_log_stream = None
+
+    def show_log_window(self):
+        if self.log_window is None:
+            self.log_window = tr_widget(Gtk.ApplicationWindow, application=self, title=msg('Installation log'), transient_for=self.window)
+            self.log_window.set_default_size(720, 420)
+            self.log_window.set_hide_on_close(True)
+            self.log_window.set_destroy_with_parent(True)
+            scroll = Gtk.ScrolledWindow(vexpand=True)
+            scroll.set_child(self.log)
+            self.log_window.set_child(scroll)
+        self.log_window.present()
+        self.log.scroll_to_iter(self.log.get_buffer().get_end_iter(), 0.0, False, 0.0, 0.0)
+
+    def open_install_log(self, _button):
+        if self.install_log_path is None:
+            return
+        try:
+            process = subprocess.Popen([
+                "foot", "--title=SpectrumOS installation log", "-e",
+                "tail", "--lines=200", "--follow=name", "--retry", "--", str(self.install_log_path),
+            ])
+        except OSError:
+            self.show_log_window()
+            return
+
+        def watch_launch():
+            try:
+                if process.wait(timeout=3) != 0:
+                    GLib.idle_add(self.show_log_window)
+            except subprocess.TimeoutExpired:
+                pass
+
+        threading.Thread(target=watch_launch, daemon=True).start()
 
     def build_done_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        title = Gtk.Label(label="SpectrumOS is ready", xalign=0)
+        title = tr_widget(Gtk.Label, label=msg('SpectrumOS is ready'), xalign=0)
         title.add_css_class("step-title")
         page.append(title)
-        message = Gtk.Label(
-            label="Installation finished successfully. Restart the computer and remove the USB drive.",
+        message = tr_widget(Gtk.Label, 
+            label=msg('Installation finished successfully. Restart the computer and remove the USB drive.'),
             xalign=0,
         )
         message.set_wrap(True)
@@ -320,7 +668,12 @@ class SpectrumInstaller(Gtk.Application):
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
         page.append(spacer)
-        reboot = Gtk.Button(label="Restart now")
+        self.done_log_button = tr_widget(Gtk.Button, label=msg('Open terminal log'))
+        self.done_log_button.set_halign(Gtk.Align.END)
+        self.done_log_button.set_sensitive(False)
+        self.done_log_button.connect("clicked", self.open_install_log)
+        page.append(self.done_log_button)
+        reboot = tr_widget(Gtk.Button, label=msg('Restart now'))
         reboot.add_css_class("accent")
         reboot.connect("clicked", lambda *_: subprocess.Popen(["systemctl", "reboot"]))
         page.append(reboot)
@@ -332,6 +685,87 @@ class SpectrumInstaller(Gtk.Application):
             self.disks = json.loads(output)
         except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
             self.disks = []
+
+    def storage_mode_changed(self, *_arguments):
+        if self.changing_language:
+            return
+        self.alongside_box.set_visible(self.install_mode.get_selected() == 0)
+        self.storage_plan = None
+
+    def storage_disk_changed(self, *_arguments):
+        self.storage_layout = None
+        self.storage_plan = None
+        self.extents = []
+        self.extent_dropdown.set_model(Gtk.StringList.new([translate("Read partitions first")]))
+        self.extent_dropdown.set_sensitive(False)
+        self.allocation.set_sensitive(False)
+        tr_set(self.storage_status, 'set_text', msg('Read the partition layout for the selected disk.'))
+
+    def probe_storage(self, *_arguments):
+        if self.storage_busy or not self.disks:
+            return
+        disk = self.disks[self.disk_dropdown.get_selected()]["path"]
+        self.storage_disk_changed()
+        self.set_storage_busy(True)
+        tr_set(self.storage_status, 'set_text', msg('Reading partitions…'))
+
+        def worker():
+            try:
+                result = subprocess.run(["pkexec", BACKEND, "--inspect-disk", disk],
+                                        text=True, capture_output=True, timeout=90)
+                if result.returncode:
+                    raise ValueError(result.stderr.strip() or "Could not read the disk layout")
+                layout = json.loads(result.stdout)
+                GLib.idle_add(self.finish_storage_probe, layout, "")
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                GLib.idle_add(self.finish_storage_probe, None, str(error))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def set_storage_busy(self, busy):
+        self.storage_busy = busy
+        self.read_partitions.set_sensitive(not busy)
+        self.disk_dropdown.set_sensitive(not busy and bool(self.disks))
+        self.install_mode.set_sensitive(not busy)
+        self.update_navigation()
+
+    def finish_storage_probe(self, layout, error):
+        self.set_storage_busy(False)
+        if error:
+            tr_set(self.storage_status, 'set_text', msg(error))
+            return False
+        self.storage_layout = layout
+        self.extents = [item for item in layout["free_extents"] if item["bytes"] >= 34 * 1024**3]
+        labels = [f"{item['bytes'] / 1024**3:.1f} GiB · start sector {item['start']}" for item in self.extents]
+        self.extent_dropdown.set_model(Gtk.StringList.new(labels or [translate("No sufficiently large unallocated area")]))
+        self.extent_dropdown.set_selected(0)
+        usable = bool(self.extents) and not layout["blockers"]
+        self.extent_dropdown.set_sensitive(usable)
+        self.allocation.set_sensitive(usable)
+        partitions = self.partition_description(layout["partitions"], layout["sector_size"])
+        messages = "\n".join(layout["blockers"])
+        tr_set(self.storage_status, 'set_text', msg('Current partitions (preserved):\n{partitions}\n\n{messages}', partitions=partitions or translate('None'), messages=messages))
+        self.extent_changed()
+        return False
+
+    def extent_changed(self, *_arguments):
+        if self.changing_language:
+            return
+        extents = getattr(self, "extents", [])
+        index = self.extent_dropdown.get_selected()
+        if index < len(extents):
+            maximum = extents[index]["bytes"] // 1024**3
+            self.allocation.set_range(34, maximum)
+            self.allocation.set_value(maximum)
+        self.storage_plan = None
+
+    @staticmethod
+    def partition_description(partitions, sector_size):
+        return "\n".join(
+            f"{part['path']} · {part.get('label') or part.get('name') or part.get('fstype') or 'Unknown'} · "
+            f"{part['size'] * sector_size / 1024**3:.1f} GiB"
+            for part in sorted(partitions, key=lambda item: item["start"])
+        )
 
     def connected(self):
         try:
@@ -346,13 +780,15 @@ class SpectrumInstaller(Gtk.Application):
 
     def refresh_network_status(self):
         online = self.connected()
-        self.network_status.set_text(
+        tr_set(self.network_status, 'set_text', msg(
             "Network connected · internet is required" if online
             else "Connect to Wi-Fi or Ethernet before installing"
-        )
+        ))
         return True
 
     def keyboard_changed(self, _dropdown, _parameter):
+        if self.changing_language:
+            return
         profile = self.keyboard_profiles[self.keyboard.get_selected()]
         if profile == "us-intl":
             layouts, variants, options = "us", "intl", ""
@@ -417,40 +853,116 @@ class SpectrumInstaller(Gtk.Application):
         ]
 
     def review(self, _button):
-        error = ""
-        if not self.disks:
-            error = "No eligible installation disk was found."
-        elif not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", self.username.get_text()):
-            error = "Enter a simple lowercase username."
-        elif not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}", self.hostname.get_text()):
-            error = "Enter a valid computer name."
-        elif len(self.password.get_text()) < 8:
-            error = "Use a password with at least 8 characters."
-        elif self.password.get_text() != self.password_confirm.get_text():
-            error = "The passwords do not match."
-        elif not self.connected():
-            error = "Connect to Wi-Fi or Ethernet. SpectrumOS downloads packages during installation."
+        if self.storage_busy:
+            return
+        disk_error = self.disk_validation_error()
+        error = disk_error or self.account_validation_error()
         if error:
-            self.error.set_text(error)
+            self.show_step('disk' if disk_error else 'account')
+            tr_set(self.error, 'set_text', msg(error))
             self.error.set_visible(True)
             return
         self.error.set_visible(False)
+        if self.install_mode.get_selected() == 0:
+            self.set_storage_busy(True)
+            extent = self.extents[self.extent_dropdown.get_selected()]
+            arguments = ["pkexec", BACKEND, "--storage-plan", "--disk",
+                         self.disks[self.disk_dropdown.get_selected()]["path"],
+                         "--extent-start", str(extent["start"]), "--size-gib", str(self.allocation.get_value_as_int())]
+            if not self.default_boot.get_active():
+                arguments.append("--keep-boot-default")
+
+            def worker():
+                try:
+                    result = subprocess.run(arguments, text=True, capture_output=True, timeout=90)
+                    if result.returncode:
+                        raise ValueError(result.stderr.strip() or "Could not plan installation")
+                    GLib.idle_add(self.finish_storage_plan, json.loads(result.stdout), "")
+                except (OSError, ValueError, subprocess.SubprocessError) as failure:
+                    GLib.idle_add(self.finish_storage_plan, None, str(failure))
+
+            threading.Thread(target=worker, daemon=True).start()
+            return
+        self.storage_plan = None
+        self.show_review()
+
+    def finish_storage_plan(self, plan, error):
+        self.set_storage_busy(False)
+        if error:
+            self.storage_plan = None
+            self.show_step('disk')
+            tr_set(self.error, 'set_text', msg(error))
+            self.error.set_visible(True)
+        else:
+            self.storage_plan = plan
+            self.show_review()
+        return False
+
+    def show_review(self):
         disk = self.disks[self.disk_dropdown.get_selected()]
+        if self.storage_plan:
+            plan = self.storage_plan
+            tr_set(self.confirm_warning, 'set_text', msg('Only the two new SpectrumOS partitions will be formatted. Existing partitions are preserved. Keep a backup of important files before partitioning.'))
+            tr_set(self.install_button, 'set_label', msg('Install alongside'))
+            created = "\n".join(translate("Create {path} ({role}) · sectors {start}–{end}",
+                path=part['path'], role=part['role'], start=part['start'], end=part['end']) for part in plan["create"])
+            storage_summary = translate(
+                "Install alongside · {size} GiB\n\nBefore (all preserved)\n{before}\n\nAfter\nExisting partitions unchanged\n{created}\n\nBoot\n{boot}\nExisting Windows/Linux EFI loaders will be added when detected.",
+                size=plan['size_gib'], before=self.partition_description(plan['preserve'], self.storage_layout['sector_size']),
+                created=created, boot=translate('SpectrumOS menu first') if plan['default_boot'] else translate('Keep existing firmware entries first'))
+
+        else:
+            tr_set(self.confirm_warning, 'set_text', msg('Everything on the selected disk will be permanently erased. This cannot be undone.'))
+            tr_set(self.install_button, 'set_label', msg('Erase disk and install'))
+            storage_summary = translate("Erase the entire selected disk")
         browser_labels = {"chrome": "Google Chrome", "brave": "Brave", "zen": "Zen Browser"}
-        browsers = ", ".join(browser_labels[name] for name in self.selected_browsers()) or "None"
-        self.summary.set_text(
-            f"Disk\n{self.disk_label(disk)}\n\nAccount\n{self.username.get_text()} on {self.hostname.get_text()}\n\n"
-            f"Timezone\n{self.timezones[self.timezone.get_selected()]}\n\nGraphics\n{self.gpus[self.gpu.get_selected()]}\n\n"
-            f"Keyboard\n{self.keyboard_names[self.keyboard.get_selected()]}\n\n"
-            f"Installation\n{'Lean' if self.lean.get_active() else 'Full'}\n\n"
-            f"Optional browsers\n{browsers}\n\n"
-            "Filesystem\nBtrfs with separate home and snapshots subvolumes"
-        )
+        browsers = ", ".join(browser_labels[name] for name in self.selected_browsers()) or translate("None")
+        tr_set(self.summary, 'set_text', msg('Disk\n{value0}\n\n{value1}\n\nAccount\n{value2} on {value3}\n\nTimezone\n{value4}\n\nGraphics\n{value5}\n\nKeyboard\n{value6}\n\nInstallation\n{value7}\n\nOptional browsers\n{value8}\n\nLanguage\n{interface}\n\nRegional formats\n{region}\n\nFilesystem\nBtrfs with separate home and snapshots subvolumes', value0=self.disk_label(disk), value1=storage_summary, value2=self.username.get_text(), value3=self.hostname.get_text(), value4=self.timezones[self.timezone.get_selected()], value5=translate(self.gpus[self.gpu.get_selected()]), value6=translate(self.keyboard_names[self.keyboard.get_selected()]), value7=translate('Lean') if self.lean.get_active() else translate('Full'), value8=browsers, interface=self.language_rows[self.language_choice.get_selected()]['name'], region=self.language_rows[self.region_choice.get_selected()]['locale']))
         self.stack.set_visible_child_name("confirm")
+        self.confirm_back.grab_focus()
+        self.summary.select_region(0, 0)
 
     def start_install(self, _button):
+        if self.install_running:
+            return
+        self.close_install_log()
+        try:
+            directory = Path(tempfile.mkdtemp(prefix="spectrum-installer-log-"))
+            self.install_log_path = directory / "installation.log"
+            descriptor = os.open(self.install_log_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            self.install_log_stream = os.fdopen(descriptor, "w", encoding="utf-8", buffering=1)
+        except OSError as error:
+            tr_set(self.confirm_warning, 'set_text', msg('Could not prepare the installation log: {value0}', value0=error))
+            return
+        self.install_options = {
+            "locale": self.language_rows[self.language_choice.get_selected()]['locale'],
+            "region": self.language_rows[self.region_choice.get_selected()]['locale'],
+            "disk": self.disks[self.disk_dropdown.get_selected()]["path"],
+            "gpu": self.gpu_profiles[self.gpu.get_selected()], "username": self.username.get_text(),
+            "hostname": self.hostname.get_text(), "password": self.password.get_text(),
+            "timezone": self.timezones[self.timezone.get_selected()],
+            "keyboard": self.keyboard_profiles[self.keyboard.get_selected()],
+            "form_factor": "laptop" if self.laptop.get_active() else "desktop",
+            "browsers": ",".join(self.selected_browsers()), "lean": self.lean.get_active(),
+            "storage_plan": self.storage_plan,
+        }
         self.stack.set_visible_child_name("progress")
         self.progress.set_fraction(0)
+        self.install_percent.set_text("0%")
+        tr_set(self.install_status, 'set_text', msg('Getting ready'))
+        tr_set(self.install_note, 'set_text', msg('Keep power and internet connected. This may take a little while.'))
+        self.log.get_buffer().set_text("")
+        self.install_running = True
+        self.language_choice.set_sensitive(False)
+        self.region_choice.set_sensitive(False)
+        self.terminal_log_button.set_sensitive(True)
+        self.done_log_button.set_sensitive(True)
+        self.append_log("SpectrumOS installation log. Closing the log viewer does not stop installation.\n")
+        self.tip_card.set_visible(True)
+        self.tip_index = 0
+        self.show_tip()
+        self.stop_tip_timer()
+        self.tip_timer = GLib.timeout_add_seconds(14, self.rotate_tip)
         self.package_total = 0
         self.package_seen = 0
         self.package_floor = 0
@@ -460,24 +972,32 @@ class SpectrumInstaller(Gtk.Application):
         thread.start()
 
     def install_worker(self):
-        disk = self.disks[self.disk_dropdown.get_selected()]["path"]
-        gpu = self.gpu_profiles[self.gpu.get_selected()]
+        options = self.install_options
+        disk = options["disk"]
         password_path = None
         try:
             descriptor, password_path = tempfile.mkstemp(prefix="spectrum-password-", dir="/tmp")
             os.fchmod(descriptor, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                handle.write(self.password.get_text() + "\n")
+                handle.write(options["password"] + "\n")
             command = [
-                "pkexec", BACKEND, "--apply", "--disk", disk, "--confirm-erase", disk,
-                "--username", self.username.get_text(), "--hostname", self.hostname.get_text(),
-                "--timezone", self.timezones[self.timezone.get_selected()], "--password-file", password_path,
-                "--cpu", self.detect_cpu(), "--gpu", gpu,
-                "--keyboard", self.keyboard_profiles[self.keyboard.get_selected()],
-                "--form-factor", "laptop" if self.laptop.get_active() else "desktop",
-                "--browsers", ",".join(self.selected_browsers()),
+                "pkexec", BACKEND, "--apply", "--disk", disk,
+                "--username", options["username"], "--hostname", options["hostname"],
+                "--timezone", options["timezone"], "--password-file", password_path,
+                "--cpu", self.detect_cpu(), "--gpu", options["gpu"],
+                "--keyboard", options["keyboard"], "--form-factor", options["form_factor"],
+                "--browsers", options["browsers"],
+                "--locale", options["locale"], "--region", options["region"],
             ]
-            if self.lean.get_active():
+            plan = options["storage_plan"]
+            if plan:
+                command.extend(["--install-mode", "alongside", "--extent-start", str(plan["extent_start"]),
+                                "--size-gib", str(plan["size_gib"]), "--confirm-plan", plan["confirmation"]])
+                if not plan["default_boot"]:
+                    command.append("--keep-boot-default")
+            else:
+                command.extend(["--install-mode", "erase", "--confirm-erase", disk])
+            if options["lean"]:
                 command.append("--lean")
             # errors="replace": paru/makepkg builds an AUR helper from source when
             # optional browsers are requested, and cargo/rustc output isn't
@@ -506,17 +1026,27 @@ class SpectrumInstaller(Gtk.Application):
                     pass
 
     def append_log(self, line):
+        if self.install_log_stream is not None:
+            try:
+                self.install_log_stream.write(line)
+            except OSError as error:
+                self.close_install_log()
+                line = f"[installer] Could not save further log output: {error}\n" + line
+                self.show_log_window()
         buffer = self.log.get_buffer()
         buffer.insert(buffer.get_end_iter(), line)
-        # Without this the view stays wherever it was scrolled to (the top, on
-        # first open) as new lines keep landing below the visible area --
-        # confirmed live: the log never auto-followed the install, so watching
-        # progress meant repeatedly scrolling down by hand.
-        self.log.scroll_to_iter(buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
+        if buffer.get_char_count() > LOG_BUFFER_CHARS:
+            end = buffer.get_start_iter()
+            end.forward_chars(buffer.get_char_count() - LOG_BUFFER_CHARS)
+            buffer.delete(buffer.get_start_iter(), end)
+        if self.log_window is not None and self.log_window.get_visible():
+            self.log.scroll_to_iter(buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
         return False
 
     def set_progress(self, percent):
-        self.progress.set_fraction(max(0.0, min(1.0, percent / 100)))
+        fraction = max(0.0, min(1.0, percent / 100))
+        self.progress.set_fraction(fraction)
+        tr_set(self.install_percent, 'set_text', msg('{value0:.0f}%', value0=fraction * 100))
         return False
 
     def handle_line(self, raw_line):
@@ -555,6 +1085,7 @@ class SpectrumInstaller(Gtk.Application):
         if progress_match:
             pct = int(progress_match.group(1))
             self.set_progress(pct)
+            tr_set(self.install_status, 'set_text', msg(next(title for threshold, title in reversed(INSTALL_STAGES) if pct >= threshold)))
             if self.awaiting_package_floor:
                 self.package_floor = pct
                 self.awaiting_package_floor = False
@@ -566,6 +1097,8 @@ class SpectrumInstaller(Gtk.Application):
             return
         self.append_log(line)
         if self.package_total:
+            if line.strip().lower().startswith(("downloading ", ":: retrieving packages")):
+                tr_set(self.install_status, 'set_text', msg('Downloading packages'))
             resolved_match = PACMAN_RESOLVED_RE.match(line.strip())
             if resolved_match:
                 self.package_total = int(resolved_match.group(1))
@@ -575,6 +1108,7 @@ class SpectrumInstaller(Gtk.Application):
         # floor for however long pacstrap -- by far the slowest single step
         # -- takes.
         if self.package_total and PACMAN_STEP_RE.match(line.strip()):
+            tr_set(self.install_status, 'set_text', msg('Installing the base system'))
             self.package_seen = min(self.package_seen + 1, self.package_total)
             span = self.package_ceiling - self.package_floor
             estimate = self.package_floor + span * (self.package_seen / self.package_total)
@@ -582,13 +1116,23 @@ class SpectrumInstaller(Gtk.Application):
         return False
 
     def finish_install(self, result):
+        self.install_running = False
+        if result != 0:
+            self.language_choice.set_sensitive(True)
+            self.region_choice.set_sensitive(True)
+        self.stop_tip_timer()
         if result == 0:
             self.set_progress(100)
+            tr_set(self.install_status, 'set_text', msg('Installation complete'))
+            self.append_log("\nSpectrumOS installation completed successfully.\n")
+            self.close_install_log()
             self.stack.set_visible_child_name("done")
         else:
-            # Left wherever it stopped rather than reset to 0 -- that still
-            # shows how far the install got before failing.
-            self.append_log("\nInstallation stopped. Review the message above; no restart is required.\n")
+            tr_set(self.install_status, 'set_text', msg('Installation stopped'))
+            tr_set(self.install_note, 'set_text', msg('Open the terminal log for details. You can also use Rescue system; no restart is required.'))
+            self.tip_card.set_visible(False)
+            self.append_log("\nInstallation stopped. Review the log before taking further action; no restart is required.\n")
+            self.close_install_log()
         return False
 
 

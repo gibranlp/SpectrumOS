@@ -8,6 +8,7 @@ import Quickshell.Services.UPower
 
 PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "spectrum-bar"
     id: bar
     required property var targetScreen
     required property var theme
@@ -31,6 +32,7 @@ PanelWindow {
     }
     property bool active: false
     property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
+    signal widgetRequested(string action)
     signal extrasRequested()
     signal spectrumDropRequested()
     signal launcherRequested()
@@ -81,6 +83,7 @@ PanelWindow {
     Timer {
         interval: 60000
         running: bar.active
+        triggeredOnStart: true
         repeat: true
         onTriggered: bar.currentTime = Qt.formatDateTime(new Date(), "HH:mm")
     }
@@ -146,7 +149,7 @@ PanelWindow {
                 color: selected ? bar.theme.colors.accent : occupied || workspaceMouse.containsMouse ? bar.theme.colors.surface_alt : "transparent"
                 Text {
                     anchors.centerIn: parent
-                    text: bar.theme.workspaceGlyph(parent.modelData, parent.selected ? "active" : parent.occupied ? "occupied" : "empty")
+                    text: bar.theme.workspaceGlyph(parent.modelData, parent.selected ? qsTranslate("Spectrum", "active") : parent.occupied ? qsTranslate("Spectrum", "occupied") : qsTranslate("Spectrum", "empty"))
                     color: parent.selected ? bar.theme.colors.background : parent.occupied ? bar.theme.colors.foreground : bar.theme.colors.muted
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize; bold: parent.selected }
                 }
@@ -166,6 +169,7 @@ PanelWindow {
             implicitWidth: visible ? 42 : 0
             implicitHeight: visible ? bar.theme.barStyle === "islands" ? Math.min(100, bar.height * 0.06) : Math.min(240, bar.height * 0.25) : 0
             ScrollingTitle {
+                animationsEnabled: bar.active && bar.theme.animationsEnabled !== false
                 anchors.centerIn: parent
                 vertical: true
                 verticalExtent: parent.height
@@ -207,11 +211,12 @@ PanelWindow {
                     implicitWidth: 42
                     implicitHeight: bar.theme.barStyle === "islands" ? Math.max(90, Math.min(240, bar.height * 0.1)) : 135
                     ScrollingTitle {
+                        animationsEnabled: bar.active && bar.theme.animationsEnabled !== false
                         anchors.centerIn: parent
                         vertical: true
                         verticalExtent: parent.height - 8
                         centered: true
-                        title: bar.media.available ? [bar.media.artist, bar.media.title].filter(Boolean).join(" - ") : "No media"
+                        title: bar.media.available ? [bar.media.artist, bar.media.title].filter(Boolean).join(" - ") : qsTranslate("Spectrum", "No media")
                         fontFamily: bar.theme.fontFamily
                         fontPixelSize: Math.max(9, bar.theme.fontSize - 2)
                         textColor: bar.theme.colors.foreground
@@ -263,7 +268,7 @@ PanelWindow {
                 spacing: 3
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "CPU"
+                    text: qsTranslate("Spectrum", "CPU")
                     color: bar.theme.colors.accent
                     font { family: bar.theme.fontFamily; pixelSize: Math.max(9, bar.theme.fontSize - 3); bold: true }
                 }
@@ -278,7 +283,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "RAM"
+                    text: qsTranslate("Spectrum", "RAM")
                     color: bar.theme.colors.accent
                     font { family: bar.theme.fontFamily; pixelSize: Math.max(9, bar.theme.fontSize - 3); bold: true }
                 }
@@ -316,186 +321,205 @@ PanelWindow {
 
         ColumnLayout {
             id: statusGroup
+            Layout.fillHeight: bar.barProfile === "detailed"
+            Layout.minimumHeight: bar.barProfile === "detailed" ? 80 : implicitHeight
+            Layout.maximumHeight: bar.barProfile === "detailed" ? detailedWidgets.naturalHeight : Infinity
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 44
             Layout.maximumWidth: 44
             spacing: bar.theme.barStyle === "islands" ? 5 : 7
             HoverHandler { id: minimalStatusHover }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile === "minimal" && !minimalStatusHover.hovered
-                text: "󰕮"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+            WidgetIcons {
+                id: detailedWidgets
+                visible: bar.barProfile === "detailed"
+                theme: bar.theme
+                vertical: true
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 80
+                Layout.maximumHeight: naturalHeight
+                onChosen: action => bar.widgetRequested(action)
             }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && bar.theme.performance.available && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                text: bar.theme.performance.mode === "performance" ? "󰓅" : bar.theme.performance.mode === "power-saver" ? "󰌪" : ""
-                color: bar.theme.performance.mode === "performance" ? bar.theme.colors.accent : bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.performanceRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                text: bar.theme.idle.active ? "󰅶" : "󰾪"
-                color: bar.theme.idle.active ? bar.theme.colors.accent : bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.idleRequested() }
-            }
-            Item {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                implicitWidth: 44
-                implicitHeight: weatherTemperature.visible ? 36 : 24
+            ColumnLayout {
+                visible: bar.barProfile !== "detailed"
+                Layout.fillWidth: true
+                spacing: bar.theme.barStyle === "islands" ? 5 : 7
                 Text {
-                    anchors { top: parent.top; horizontalCenter: parent.horizontalCenter }
-                    text: bar.weather.icon || "󰖕"
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile === "minimal" && !minimalStatusHover.hovered
+                    text: "󰕮"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
                 }
                 Text {
-                    id: weatherTemperature
-                    anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
-                    width: parent.width
-                    visible: (bar.barProfile === "standard" || bar.barProfile === "detailed") && bar.weather.temperature !== "—"
-                    text: bar.weather.temperature
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                    color: bar.theme.colors.muted
-                    font { family: bar.theme.fontFamily; pixelSize: Math.max(9, bar.theme.fontSize - 3) }
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && bar.theme.performance.available && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    text: bar.theme.performance.mode === "performance" ? "󰓅" : bar.theme.performance.mode === "power-saver" ? "󰌪" : ""
+                    color: bar.theme.performance.mode === "performance" ? bar.theme.colors.accent : bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.performanceRequested() }
                 }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.weatherRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                text: bar.network.connection_type === "ethernet" ? "󰈀" : bar.network.connection_type === "wifi" ? "󰖩" : "󰖪"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.wifiRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                text: "󰂯"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.bluetoothRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                text: "󰍹"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.displaysRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                text: "󰍽"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.mouseRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                text: "Aa"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5); bold: true }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.typographyRequested() }
-            }
-            VolumeIndicator {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal"
-                compact: true
-                percent: bar.theme.volumePercent
-                muted: bar.theme.volumeMuted
-                available: bar.theme.volumeAvailable
-                theme: bar.theme
-                onClicked: bar.audioRequested()
-            }
-
-            Item {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                implicitWidth: 44
-                implicitHeight: batteryContent.height
-                Column {
-                    id: batteryContent
-                    width: parent.width
-                    spacing: 2
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    text: bar.theme.idle.active ? "󰅶" : "󰾪"
+                    color: bar.theme.idle.active ? bar.theme.colors.accent : bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.idleRequested() }
+                }
+                Item {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    implicitWidth: 44
+                    implicitHeight: weatherTemperature.visible ? 36 : 24
                     Text {
-                        width: parent.width
-                        text: UPower.onBattery ? "󰁹" : "󰂄"
-                        horizontalAlignment: Text.AlignHCenter
+                        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter }
+                        text: bar.weather.icon || "󰖕"
                         color: bar.theme.colors.foreground
                         font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
                     }
                     Text {
+                        id: weatherTemperature
+                        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
                         width: parent.width
-                        text: Math.round(UPower.displayDevice.percentage * 100) + "%"
+                        visible: (bar.barProfile === "standard" || bar.barProfile === "detailed") && bar.weather.temperature !== "—"
+                        text: bar.weather.temperature
                         horizontalAlignment: Text.AlignHCenter
-                        color: bar.theme.colors.foreground
-                        font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize - 1 }
-                        fontSizeMode: Text.Fit
-                        minimumPixelSize: 8
+                        elide: Text.ElideRight
+                        color: bar.theme.colors.muted
+                        font { family: bar.theme.fontFamily; pixelSize: Math.max(9, bar.theme.fontSize - 3) }
                     }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.weatherRequested() }
                 }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.batteryRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                text: "󰂚"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
-                KeyboardAction { anchors.fill: parent; onActivated: bar.notificationsRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile === "standard"
-                text: "󰇘"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 5 }
-                Accessible.name: "More bar controls"
-                KeyboardAction { anchors.fill: parent; onActivated: bar.extrasRequested() }
-            }
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
-                text: "󰒡"
-                color: bar.theme.colors.foreground
-                font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 3 }
-                Accessible.name: "SpectrumDrop"
-                KeyboardAction { anchors.fill: parent; onActivated: bar.spectrumDropRequested() }
-            }
-            Repeater {
-                model: bar.barProfile === "standard" ? [] : SystemTray.items
-                Item {
-                    required property var modelData
+                Text {
                     Layout.alignment: Qt.AlignHCenter
-                    implicitWidth: 36
-                    implicitHeight: 28
-                    Image {
-                        anchors.centerIn: parent
-                        width: 20
-                        height: 20
-                        source: modelData.icon
-                        fillMode: Image.PreserveAspectFit
+                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    text: bar.network.connection_type === "ethernet" ? "󰈀" : bar.network.connection_type === "wifi" ? "󰖩" : "󰖪"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.wifiRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    text: "󰂯"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.bluetoothRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    text: "󰍹"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.displaysRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    text: "󰍽"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.mouseRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    text: qsTranslate("Spectrum", "Aa")
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5); bold: true }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.typographyRequested() }
+                }
+                VolumeIndicator {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "minimal"
+                    compact: true
+                    percent: bar.theme.volumePercent
+                    muted: bar.theme.volumeMuted
+                    available: bar.theme.volumeAvailable
+                    theme: bar.theme
+                    onClicked: bar.audioRequested()
+                }
+
+                Item {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    implicitWidth: 44
+                    implicitHeight: batteryContent.height
+                    Column {
+                        id: batteryContent
+                        width: parent.width
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: UPower.onBattery ? "󰁹" : "󰂄"
+                            horizontalAlignment: Text.AlignHCenter
+                            color: bar.theme.colors.foreground
+                            font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                        }
+                        Text {
+                            width: parent.width
+                            text: Math.round(UPower.displayDevice.percentage * 100) + "%"
+                            horizontalAlignment: Text.AlignHCenter
+                            color: bar.theme.colors.foreground
+                            font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize - 1 }
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: 8
+                        }
                     }
-                    KeyboardAction {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onActivated: button => {
-                            const position = bar.itemPosition(parent);
-                            if (button === Qt.RightButton || modelData.onlyMenu)
-                                modelData.display(bar, position.x + parent.width, position.y + parent.height / 2);
-                            else
-                                modelData.activate();
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.batteryRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    text: "󰂚"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.notificationsRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: ["standard", "multimedia"].includes(bar.barProfile)
+                    text: "󰇘"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 5 }
+                    Accessible.name: qsTranslate("Spectrum", "More bar controls")
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.extrasRequested() }
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
+                    text: "󰒡"
+                    color: bar.theme.colors.foreground
+                    font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 3 }
+                    Accessible.name: "SpectrumDrop"
+                    KeyboardAction { anchors.fill: parent; onActivated: bar.spectrumDropRequested() }
+                }
+                Repeater {
+                    model: bar.barProfile === "standard" ? [] : SystemTray.items
+                    Item {
+                        required property var modelData
+                        Layout.alignment: Qt.AlignHCenter
+                        implicitWidth: 36
+                        implicitHeight: 28
+                        Image {
+                            anchors.centerIn: parent
+                            width: 20
+                            height: 20
+                            source: modelData.icon
+                            fillMode: Image.PreserveAspectFit
+                        }
+                        KeyboardAction {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onActivated: button => {
+                                const position = bar.itemPosition(parent);
+                                if (button === Qt.RightButton || modelData.onlyMenu)
+                                    modelData.display(bar, position.x + parent.width, position.y + parent.height / 2);
+                                else
+                                    modelData.activate();
+                            }
                         }
                     }
                 }
@@ -503,7 +527,7 @@ PanelWindow {
         }
 
         Repeater {
-            model: bar.barProfile === "standard" ? [] : [
+            model: ["standard", "detailed"].includes(bar.barProfile) ? [] : [
                 { icon: "󰒓", action: "control" },
                 { icon: "󰐥", action: "session" }
             ]

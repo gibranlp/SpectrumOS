@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from spectrum_i18n import translate
+
+DIRECTORY = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'spectrumos'
+DEFAULT = {'enabled': False, 'eye_minutes': 20, 'movement_minutes': 50, 'pause_focus': True}
+
+
+def main():
+    DIRECTORY.mkdir(parents=True, exist_ok=True)
+    with (DIRECTORY / 'break-reminders.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        path = DIRECTORY / 'break-reminders.json'
+        settings = {**DEFAULT, **(json.loads(path.read_text()) if path.exists() else {})}
+        action = sys.argv[1] if len(sys.argv) > 1 else 'status'
+        if action == 'configure':
+            request = json.loads(sys.argv[2])
+            for key, value in request.items():
+                if key in ('enabled', 'pause_focus') and isinstance(value, bool):
+                    settings[key] = value
+                elif key in ('eye_minutes', 'movement_minutes') and type(value) is int and 5 <= value <= 120:
+                    settings[key] = value
+                else:
+                    raise ValueError('Invalid break reminder setting.')
+            descriptor, temporary = tempfile.mkstemp(dir=DIRECTORY, prefix='.break-reminders-')
+            try:
+                with os.fdopen(descriptor, 'w') as stream:
+                    json.dump(settings, stream)
+                os.replace(temporary, path)
+            finally:
+                Path(temporary).unlink(missing_ok=True)
+        elif action == 'notify':
+            kind = sys.argv[2]
+            messages = {'eyes': ('Rest your eyes', 'Look at something about 6 metres away for 20 seconds.'),
+                        'movement': ('Time to move', 'Take a short break, stand up if comfortable, and change your position.')}
+            title, message = messages[kind]
+            subprocess.run(['notify-send', '--app-name=SpectrumOS', '--icon=preferences-desktop-accessibility',
+                            '--expire-time=12000', translate(title), translate(message)], check=True, timeout=5)
+        elif action != 'status':
+            raise ValueError('Unknown break reminder action.')
+        print(json.dumps({'ok': True, 'settings': settings}))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        print(json.dumps({'ok': False, 'error': str(error)[:400]}))
+        sys.exit(1)

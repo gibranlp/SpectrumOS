@@ -297,7 +297,7 @@ class AppStoreTests(unittest.TestCase):
         bindings = (ROOT/'configs/hyprland/keybindings.lua').read_text()
         shortcuts = (ROOT/'configs/spectrum-shell/UtilityPanel.qml').read_text()
         self.assertIn('" + SHIFT + U", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open app-store")', bindings)
-        self.assertIn('combo: "Super + Shift + U", action: "App Store"', shortcuts)
+        self.assertIn('combo: "Super + Shift + U", action: qsTranslate("Spectrum", "App Store")', shortcuts)
         self.assertIn('app-store) method=toggleAppStore;', (ROOT/'scripts/spectrum-shell-open').read_text())
 
 

@@ -28,6 +28,9 @@ class PackagingTests(unittest.TestCase):
             for name in packages: (root/"packages"/name).mkdir(parents=True)
             (root/"packages/spectrum-theme/src").mkdir()
             (root/"packages/spectrum-theme/src/engine.py").write_text("source = True\n")
+            (root/".comem/records").mkdir(parents=True)
+            (root/".comem/comem.py").write_text("developer_memory = True\n")
+            (root/".comem/records/example.json").write_text('{"key":"developer.note"}\n')
             for name in ("questline-2.0.1-linux-x86_64","stash-0.7.0-linux-x86_64","cached.tar.gz"):
                 (root/"packages/spectrum-desktop"/name).write_text("download")
             subprocess.run(["git","init","-q",str(root)],check=True,capture_output=True)
@@ -36,6 +39,7 @@ class PackagingTests(unittest.TestCase):
             self.assertEqual(archive.stat().st_mode & 0o777,0o644)
             files=subprocess.check_output(["bsdtar","-tf",str(archive)],text=True).splitlines()
             self.assertIn("spectrumos-source-1.0.0/packages/spectrum-theme/src/engine.py",files)
+            self.assertFalse(any("/.comem/" in name for name in files))
             self.assertFalse(any("linux-x86_64" in name or "cached.tar.gz" in name for name in files))
             repeated=subprocess.run([str(root/"scripts/build-source-archive"),"--build"],capture_output=True,text=True)
             self.assertEqual(repeated.returncode,0,repeated.stderr)

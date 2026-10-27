@@ -12,6 +12,13 @@ hl.window_rule({ name = "spectrum-file-dialog-border", match = { title = fileDia
 -- de un dialogo chico.
 hl.window_rule({ name = "spectrum-portal-file-chooser-blur", match = { class = "^(xdg-desktop-portal-gtk)$" }, no_blur = true })
 hl.window_rule({
+    name = "spectrum-file-tools-dialogs",
+    match = { class = "^(zenity|org.gnome.Zenity)$", title = "^(SpectrumOS file tools|Destination folder)$" },
+    float = true,
+    center = true,
+    no_blur = true,
+})
+hl.window_rule({
     name = "spectrum-gamescope",
     match = { class = "^(gamescope)$" },
     fullscreen = true,
@@ -29,5 +36,12 @@ hl.layer_rule({
 hl.layer_rule({
     name = "spectrum-widget-content-motion",
     match = { namespace = "^spectrum-widget-.*$" },
+    no_anim = true,
+})
+
+-- El marco y las barras deben reaparecer juntos; sus contenidos animan por su cuenta.
+hl.layer_rule({
+    name = "spectrum-shell-structural-motion",
+    match = { namespace = "^spectrum-(bar|frame(-reservation)?|focus-countdown|level-indicator|desktop-branding|igor|dashboard-hover)$" },
     no_anim = true,
 })

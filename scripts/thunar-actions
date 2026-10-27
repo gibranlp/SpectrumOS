@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import copy
+import ctypes
+import errno
 import importlib.machinery
 import importlib.util
 import os
@@ -13,6 +15,14 @@ import xml.etree.ElementTree as ET
 from PIL import Image
 
 FORMATS = ('pdf', 'png', 'jpeg', 'webp', 'tiff', 'bmp')
+AUDIO_FORMATS = {
+    'mp3': ('mp3', ['-c:a', 'libmp3lame', '-q:a', '2', '-ac', '2']),
+    'flac': ('flac', ['-c:a', 'flac', '-compression_level', '5']),
+    'wav': ('wav', ['-c:a', 'pcm_s24le']),
+    'ogg': ('ogg', ['-c:a', 'libvorbis', '-q:a', '6']),
+    'opus': ('opus', ['-c:a', 'libopus', '-b:a', '160k', '-ar', '48000']),
+    'm4a': ('ipod', ['-c:a', 'aac', '-b:a', '192k']),
+}
 BACKEND = Path('/usr/lib/spectrumos')
 
 
@@ -31,18 +41,62 @@ def definitions():
                         for suffix in (suffix, suffix.upper()))
     items.extend((fmt, f'Convert to {fmt.upper()}', 'image-x-generic', patterns,
                   'Convert image', 'image-files', '') for fmt in FORMATS)
+    audio_patterns = ';'.join(f'*.{suffix}' for extension in
+                             ('mp3', 'flac', 'wav', 'wave', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aiff', 'aif', 'wma', 'ape', 'wv', 'mka')
+                             for suffix in (extension, extension.upper()))
+    items.extend((f'audio-{fmt}', f'Convert to {fmt.upper()}', 'audio-x-generic', audio_patterns,
+                  'Convert audio', 'audio-files', '') for fmt in AUDIO_FORMATS)
     pdf_patterns = ';'.join(f'*.{p}{d}{f}' for p in 'pP' for d in 'dD' for f in 'fF')
-    items.append(('merge-pdf', 'Merge PDFs', 'application-pdf', pdf_patterns, '', 'other-files', '2-999999'))
+    items.append(('merge-pdf', 'Merge PDFs', 'application-pdf', pdf_patterns, 'PDF tools', 'other-files', '2-999999'))
     for action, name, icon, pattern, submenu, kind, selection in items:
         node = ET.SubElement(root, 'action')
         command = f'{BACKEND}/thunar-actions '
-        command += f'convert {action} %F' if action in FORMATS else 'merge-pdf %F' if action == 'merge-pdf' else f'{action} %f'
+        if action in FORMATS:
+            command += f'convert {action} %F'
+        elif action.startswith('audio-'):
+            command += f'convert-audio {action.removeprefix("audio-")} %F'
+        else:
+            command += 'merge-pdf %F' if action == 'merge-pdf' else f'{action} %f'
         for tag, value in {'icon': icon, 'name': name, 'submenu': submenu,
                            'unique-id': f'spectrumos-{action}', 'command': command,
                            'description': 'Use current Spectrum theme settings' if action == 'wallpaper' else name,
                            'range': selection, 'patterns': pattern}.items():
             ET.SubElement(node, tag).text = value
         ET.SubElement(node, kind)
+    all_types = ('directories', 'audio-files', 'image-files', 'other-files', 'text-files', 'video-files')
+    file_types = all_types[1:]
+    extras = []
+    for key, label in [('absolute', 'Absolute path'), ('relative', 'Relative path'),
+                       ('shell', 'Shell-quoted paths'), ('url', 'File URLs')]:
+        extras.append(('copy-' + key, label, 'edit-copy', '*', 'Copy path', all_types, '',
+                       ('%d ' if key == 'relative' else '') + '%F'))
+    extras.append(('project', 'Open folder in Neovim', 'nvim', '*', '', all_types, '1', '%f'))
+    for key, label in [('status', 'Status'), ('history', 'History'), ('diff', 'View changes'),
+                       ('stage', 'Stage selected files…'), ('branch', 'Create branch…')]:
+        extras.append(('git-' + key, label, 'git', '*', 'Git', all_types, '', '%F'))
+    for key, label in [('resize', 'Resize images…'), ('optimize', 'Optimize as WebP'),
+                       ('metadata', 'Remove EXIF and location'), ('palette', 'Export color palette')]:
+        extras.append(('image-' + key, label, 'image-x-generic', patterns, 'Image preparation', ('image-files',), '', '%F'))
+    for key, label in [('extract', 'Extract pages…'), ('split', 'Split into pages'),
+                       ('rotate', 'Rotate pages…'), ('optimize', 'Optimize PDF')]:
+        extras.append(('pdf-' + key, label, 'application-pdf', pdf_patterns, 'PDF tools', ('other-files',), '', '%F'))
+    for key, label in [('normalize', 'Normalize volume'), ('trim', 'Trim recording…'),
+                       ('tags', 'Edit tags…'), ('info', 'Audio information')]:
+        extras.append(('audio-' + key, label, 'audio-x-generic', audio_patterns, 'Audio tools', ('audio-files',),
+                       '' if key == 'normalize' else '1', '%F'))
+    extras.extend([
+        ('organize', 'Organize selected files…', 'folder-move', '*', 'Organize files', file_types, '', '%F'),
+        ('organize-undo', 'Undo last organization…', 'edit-undo', '*', 'Organize files', all_types, '', '%F'),
+        ('share', 'Share with SpectrumDrop', 'document-send', '*', '', file_types, '', '%F'),
+    ])
+    for action, name, icon, pattern, submenu, kinds, selection, arguments in extras:
+        node = ET.SubElement(root, 'action')
+        for tag, value in {'icon': icon, 'name': name, 'submenu': submenu, 'unique-id': 'spectrumos-tools-' + action,
+                           'command': f'{BACKEND}/thunar-productivity {action} {arguments}',
+                           'description': name, 'range': selection, 'patterns': pattern}.items():
+            ET.SubElement(node, tag).text = value
+        for kind in kinds:
+            ET.SubElement(node, kind)
     return root
 
 
@@ -72,11 +126,21 @@ def sync():
         staged.unlink(missing_ok=True)
 
 
+def rename_no_replace(source, destination):
+    library = ctypes.CDLL(None, use_errno=True)
+    function = library.renameat2
+    function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    function.restype = ctypes.c_int
+    if function(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(destination))
+
+
 def publish(staged, desired):
     for index in range(10000):
         destination = desired if index == 0 else desired.with_name(f'{desired.stem} ({index}){desired.suffix}')
         try:
-            os.link(staged, destination)
+            rename_no_replace(staged, destination)
             return destination
         except FileExistsError:
             continue
@@ -138,6 +202,40 @@ def convert(fmt, sources):
     return 1 if failures else 0
 
 
+def convert_audio(fmt, sources):
+    if fmt not in AUDIO_FORMATS or not sources:
+        raise ValueError('Select audio files and a supported output format')
+    container, codec = AUDIO_FORMATS[fmt]
+    failures, completed = [], 0
+    notify(f'Converting {len(sources)} audio file(s) to {fmt.upper()}…')
+    for source in sources:
+        staged = None
+        try:
+            source = source.resolve(strict=True)
+            if not source.is_file():
+                raise ValueError('Select a regular audio file')
+            with tempfile.NamedTemporaryFile(dir=source.parent, prefix='.spectrum-audio-', delete=False) as temporary:
+                staged = Path(temporary.name)
+            result = subprocess.run(
+                ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(source),
+                 '-map', '0:a:0', '-vn', '-sn', '-dn', '-map_metadata', '0', *codec,
+                 '-threads', '2', '-f', container, str(staged)],
+                capture_output=True, text=True, timeout=3600,
+            )
+            if result.returncode or not staged.stat().st_size:
+                raise ValueError(result.stderr.strip()[-1000:] or 'Audio conversion failed')
+            publish(staged, source.with_suffix('.' + fmt))
+            completed += 1
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            failures.append(f'{source.name}: {error}')
+        finally:
+            if staged is not None:
+                staged.unlink(missing_ok=True)
+    notify(f'Converted {completed} audio file(s) to {fmt.upper()}.'
+           + ('\n' + '\n'.join(failures[:10]) if failures else ''), bool(failures))
+    return 1 if failures else 0
+
+
 def merge_pdfs(sources):
     if len(sources) < 2:
         raise ValueError('Select at least two PDF files to merge')
@@ -178,8 +276,10 @@ def main(args):
             merge_pdfs([Path(value) for value in args[1:]])
         elif len(args) >= 3 and args[0] == 'convert':
             return convert(args[1], [Path(value) for value in args[2:]])
+        elif len(args) >= 3 and args[0] == 'convert-audio':
+            return convert_audio(args[1], [Path(value) for value in args[2:]])
         else:
-            raise ValueError('Usage: thunar-actions sync|terminal FOLDER|wallpaper IMAGE|convert FORMAT IMAGE...|merge-pdf PDF PDF...')
+            raise ValueError('Usage: thunar-actions sync|terminal FOLDER|wallpaper IMAGE|convert FORMAT IMAGE...|convert-audio FORMAT AUDIO...|merge-pdf PDF PDF...')
         return 0
     except (OSError, ValueError, ET.ParseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         notify(str(error), True)

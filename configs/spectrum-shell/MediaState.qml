@@ -19,14 +19,14 @@ QtObject {
         || controllablePlayers[0] || null
     readonly property var choices: controllablePlayers.map(item => ({
         id: playerId(item), name: item.identity || item.desktopEntry || item.dbusName || "Media player",
-        title: item.trackTitle || "No track loaded",
+        title: item.trackTitle || qsTranslate("Spectrum", "No track loaded"),
         status: MprisPlaybackState.toString(item.playbackState), selected: playerId(item) === selectedId && !choiceRequired
     }))
     readonly property var state: ({
         available: player !== null,
         playing: player ? player.isPlaying : false,
         kind: MediaKind.classify(player),
-        title: player ? (player.trackTitle || "Unknown track") : "Nothing playing",
+        title: player ? (player.trackTitle || qsTranslate("Spectrum", "Unknown track")) : qsTranslate("Spectrum", "Nothing playing"),
         artist: player ? (player.trackArtist || "Unknown artist") : "",
         album: player ? player.trackAlbum : "",
         artUrl: player ? (player.trackArtUrl || "") : ""

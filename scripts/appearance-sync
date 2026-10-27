@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import configparser
+import fcntl
 import hashlib
 import io
 import json
@@ -350,7 +351,9 @@ def ensure_zen_browser() -> None:
     xpi_path = extensions_dir / f"{ZEN_EXTENSION_ID}.xpi"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("manifest.json", manifest)
+        entry = zipfile.ZipInfo("manifest.json", (1980, 1, 1, 0, 0, 0))
+        entry.compress_type = zipfile.ZIP_DEFLATED
+        archive.writestr(entry, manifest)
     packaged = buffer.getvalue()
     if not xpi_path.exists() or xpi_path.read_bytes() != packaged:
         temporary_xpi = extensions_dir / f".{ZEN_EXTENSION_ID}.xpi.new"
@@ -377,23 +380,23 @@ def ensure_zen_browser() -> None:
     })
 
 
-def ensure_icon_theme() -> None:
+def ensure_icon_theme() -> bool:
     root = DATA_HOME / "icons/Spectrum"
     marker = root / ".spectrum-managed"
     if root.exists() and not marker.exists() and any(root.iterdir()):
         raise RuntimeError(f"Cannot adopt user-owned icon theme: {root}")
     places = root / "scalable/places"
     places.mkdir(parents=True, exist_ok=True)
-    marker.touch()
     index = root / "index.theme"
-    temporary = root / ".index.theme.new"
-    temporary.write_text(
+    contents = (
         "[Icon Theme]\nName=Spectrum\nComment=Generated Spectrum folder and Places colors\n"
         "Inherits=Adwaita,hicolor\nDirectories=scalable/places\n\n"
-        "[scalable/places]\nSize=64\nMinSize=16\nMaxSize=256\nType=Scalable\nContext=Places\n",
-        encoding="utf-8",
+        "[scalable/places]\nSize=64\nMinSize=16\nMaxSize=256\nType=Scalable\nContext=Places\n"
     )
-    os.replace(temporary, index)
+    if not index.is_file() or index.read_text(encoding="utf-8") != contents:
+        temporary = root / ".index.theme.new"
+        temporary.write_text(contents, encoding="utf-8")
+        os.replace(temporary, index)
     sources = {
         "folder": "folder",
         "inode-directory": "folder",
@@ -415,6 +418,14 @@ def ensure_icon_theme() -> None:
     for icon, source in sources.items():
         for suffix in ("", "-symbolic"):
             ensure_link(places / f"{icon}{suffix}.svg", CURRENT / f"Spectrum-{source}.svg")
+    digest = hashlib.sha256()
+    for filename in sorted(sources):
+        digest.update((places / f"{filename}.svg").read_bytes())
+    identity = digest.hexdigest()
+    changed = not marker.is_file() or marker.read_text(encoding="utf-8") != identity
+    if not changed:
+        return False
+    marker.write_text(identity, encoding="utf-8")
     try:
         subprocess.run(
             ("gtk-update-icon-cache", "--force", "--ignore-theme-index", str(root)),
@@ -423,6 +434,8 @@ def ensure_icon_theme() -> None:
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
+
+    return True
 
 
 GAMEMODE_BEGIN = "# >>> SpectrumOS generated: edits outside this block are preserved >>>"
@@ -590,36 +603,51 @@ def sync_rgb() -> None:
     sync_win60_rgb()
 
 
-def apply() -> str:
+def apply(include_rgb: bool = True) -> str:
     metadata = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))
-    sync_rgb()
+    if include_rgb:
+        sync_rgb()
     variant = metadata.get("variant", "dark")
-    theme = ensure_gtk_theme(variant)
-    for version in ("3", "4"):
-        ensure_import(version)
-        ensure_gtk_settings(version, theme, variant)
-    select_kvantum()
-    ensure_cava()
-    ensure_vencord()
-    ensure_zen_browser()
-    ensure_icon_theme()
-    ensure_gamemode_hook()
-    preferred = "prefer-dark" if variant == "dark" else "prefer-light"
-    setting("org.gnome.desktop.interface", "color-scheme", preferred)
-    setting("org.gnome.desktop.interface", "gtk-theme", theme)
-    setting("org.gnome.desktop.interface", "icon-theme", "Adwaita")
-    setting("org.gnome.desktop.interface", "icon-theme", "Spectrum")
-    mouse_state = CONFIG_HOME / "spectrumos/mouse.json"
-    if mouse_state.exists():
-        helper = Path(__file__).resolve().with_name("mouse-adapter")
-        subprocess.run((str(helper), "--cursor"), check=True, timeout=30)
+    failures = []
+
+    def refresh(name, action):
+        try:
+            action()
+        except (OSError, ValueError, KeyError, RuntimeError, configparser.Error, subprocess.SubprocessError) as error:
+            failures.append(name)
+            print(f"Appearance {name}: {error}", file=sys.stderr)
+
+    def gtk():
+        theme = ensure_gtk_theme(variant)
+        for version in ("3", "4"):
+            refresh("GTK " + version, lambda version=version: (ensure_import(version), ensure_gtk_settings(version, theme, variant)))
+        setting("org.gnome.desktop.interface", "gtk-theme", theme)
+        setting("org.gnome.desktop.interface", "color-scheme", "prefer-dark" if variant == "dark" else "prefer-light")
+
+    def icons():
+        if ensure_icon_theme():
+            setting("org.gnome.desktop.interface", "icon-theme", "Adwaita")
+        setting("org.gnome.desktop.interface", "icon-theme", "Spectrum")
+
+    def cursor():
+        if (CONFIG_HOME / "spectrumos/mouse.json").exists():
+            helper = Path(__file__).resolve().with_name("mouse-adapter")
+            subprocess.run((str(helper), "--cursor"), check=True, timeout=30)
+
     size = font_size()
-    sync_gtk_font_size(size)
-    sync_qt_font_size(size)
+    for name, action in (
+        ("GTK", gtk), ("Qt/Kvantum", select_kvantum), ("icons", icons),
+        ("cursor", cursor), ("GTK fonts", lambda: sync_gtk_font_size(size)),
+        ("Qt fonts", lambda: sync_qt_font_size(size)), ("Cava", ensure_cava),
+        ("Vencord", ensure_vencord), ("Zen", ensure_zen_browser), ("GameMode", ensure_gamemode_hook),
+    ):
+        refresh(name, action)
     try:
         subprocess.run(("pkill", "-USR1", "-u", str(os.getuid()), "-x", "cava"), check=False, timeout=2)
     except (OSError, subprocess.TimeoutExpired):
         pass
+    if failures:
+        raise RuntimeError("Could not refresh: " + ", ".join(failures))
     return variant
 
 
@@ -655,10 +683,14 @@ if __name__ == "__main__":
             status()
         elif sys.argv[1:] == ["--rgb-only"]:
             sync_rgb()
-        elif not sys.argv[1:] or sys.argv[1:] == ["--apply"]:
-            apply()
+        elif not sys.argv[1:] or sys.argv[1:] in (["--apply"], ["--desktop-only"]):
+            directory = CONFIG_HOME / "spectrumos"
+            directory.mkdir(parents=True, exist_ok=True)
+            with (directory / ".appearance.lock").open("a") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                apply(include_rgb=sys.argv[1:] != ["--desktop-only"])
         else:
-            raise SystemExit(f"Usage: {sys.argv[0]} [--apply|--rgb-only|--status]")
+            raise SystemExit(f"Usage: {sys.argv[0]} [--apply|--desktop-only|--rgb-only|--status]")
     except (OSError, KeyError, json.JSONDecodeError, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

@@ -17,17 +17,65 @@ palette=${SPECTRUM_PALETTE:-${XDG_CACHE_HOME:-$HOME/.cache}/spectrumos/theme/cur
     exit 1
 }
 
+wordmark_template=${SPECTRUM_WORDMARK_TEMPLATE:-/usr/share/spectrumos/branding/spectrum-wordmark.svg}
+username=$(id -un)
+user_picture="$HOME/$username.png"
+previous_umask=$(umask)
+umask 0002
+exec 8>"$appearance_dir/.stage.lock"
+umask "$previous_umask"
+flock 8
+signature=$(python - "$wallpaper" "$palette" "$wordmark_template" "$user_picture" <<'CACHE'
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+def identity(name):
+    path = Path(name)
+    if not path.is_file():
+        return None
+    info = path.stat()
+    return [str(path.resolve()), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns]
+
+wallpaper = identity(sys.argv[1])
+branding = [2, json.loads(Path(sys.argv[2]).read_text())["roles"], identity(sys.argv[3]), identity(sys.argv[4])]
+print(":".join(hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest() for value in (wallpaper, branding)))
+CACHE
+)
+previous_signature=""
+[[ ! -r $appearance_dir/asset-signature ]] || IFS= read -r previous_signature < "$appearance_dir/asset-signature"
+wallpaper_changed=true
+branding_changed=true
+if [[ ${previous_signature%%:*} == "${signature%%:*}" && -s $appearance_dir/current.png ]]; then
+    wallpaper_changed=false
+fi
+if [[ ${previous_signature#*:} == "${signature#*:}" ]] &&
+        [[ -s $appearance_dir/colors.conf && -s $appearance_dir/logo.svg && -s $appearance_dir/logo.png &&
+           -s $appearance_dir/wordmark.svg && -s $appearance_dir/wordmark.png && -s $appearance_dir/lock-branding.png ]] &&
+        { [[ ! -r $user_picture ]] || [[ -s $appearance_dir/$username.png ]]; }; then
+    branding_changed=false
+fi
+# No vuelve a codificar el wallpaper ni las marcas cuando sus entradas siguen iguales.
+if [[ $wallpaper_changed == false && $branding_changed == false ]]; then
+    exit 0
+fi
+
 wallpaper_staging=$(mktemp --tmpdir="$appearance_dir" .wallpaper.XXXXXX.png)
 colors_staging=$(mktemp --tmpdir="$appearance_dir" .colors.XXXXXX.conf)
 logo_svg_staging=$(mktemp --tmpdir="$appearance_dir" .logo.XXXXXX.svg)
 logo_png_staging=$(mktemp --tmpdir="$appearance_dir" .logo.XXXXXX.png)
-wordmark_template=${SPECTRUM_WORDMARK_TEMPLATE:-/usr/share/spectrumos/branding/spectrum-wordmark.svg}
 wordmark_svg_staging=$(mktemp --tmpdir="$appearance_dir" .wordmark.XXXXXX.svg)
 wordmark_png_staging=$(mktemp --tmpdir="$appearance_dir" .wordmark.XXXXXX.png)
 lock_branding_staging=$(mktemp --tmpdir="$appearance_dir" .lock-branding.XXXXXX.png)
 trap 'rm -f -- "$wallpaper_staging" "$colors_staging" "$logo_svg_staging" "$logo_png_staging" "$wordmark_svg_staging" "$wordmark_png_staging" "$lock_branding_staging"' EXIT
 
-ffmpeg -hide_banner -loglevel error -y -i "$wallpaper" -frames:v 1 "$wallpaper_staging"
+if [[ $wallpaper_changed == true ]]; then
+    ffmpeg -hide_banner -loglevel error -y -i "$wallpaper" -frames:v 1 "$wallpaper_staging"
+    chmod 0644 "$wallpaper_staging"
+    mv -f -- "$wallpaper_staging" "$appearance_dir/current.png"
+fi
+if [[ $branding_changed == true ]]; then
 python - "$palette" "$colors_staging" "$logo_svg_staging" "$wordmark_template" "$wordmark_svg_staging" <<'PY'
 import json
 from pathlib import Path
@@ -83,16 +131,13 @@ ffmpeg -hide_banner -loglevel error -y -i "$logo_png_staging" -i "$wordmark_png_
     -filter_complex '[0:v]pad=278:346:0:0:color=0x00000000[logo];[1:v]scale=250:84[wordmark];[logo][wordmark]overlay=14:250:format=auto' \
     -frames:v 1 "$lock_branding_staging"
 chmod 0644 "$wordmark_svg_staging" "$wordmark_png_staging" "$lock_branding_staging"
-chmod 0644 "$wallpaper_staging" "$colors_staging" "$logo_svg_staging" "$logo_png_staging"
-mv -f -- "$wallpaper_staging" "$appearance_dir/current.png"
+chmod 0644 "$colors_staging" "$logo_svg_staging" "$logo_png_staging"
 mv -f -- "$colors_staging" "$appearance_dir/colors.conf"
 mv -f -- "$logo_svg_staging" "$appearance_dir/logo.svg"
 mv -f -- "$logo_png_staging" "$appearance_dir/logo.png"
 mv -f -- "$wordmark_svg_staging" "$appearance_dir/wordmark.svg"
 mv -f -- "$wordmark_png_staging" "$appearance_dir/wordmark.png"
 mv -f -- "$lock_branding_staging" "$appearance_dir/lock-branding.png"
-username=$(id -un)
-user_picture="$HOME/$username.png"
 if [[ -r $user_picture ]]; then
     avatar_staging=$(mktemp --tmpdir="$appearance_dir" .avatar.XXXXXX.png)
     if ffmpeg -hide_banner -loglevel error -y -i "$user_picture" -vf 'scale=256:256:force_original_aspect_ratio=increase,crop=256:256' -frames:v 1 "$avatar_staging"; then
@@ -104,4 +149,9 @@ if [[ -r $user_picture ]]; then
 else
     rm -f -- "$appearance_dir/$username.png"
 fi
+fi
+signature_staging=$(mktemp --tmpdir="$appearance_dir" .signature.XXXXXX)
+printf '%s\n' "$signature" > "$signature_staging"
+chmod 0644 "$signature_staging"
+mv -f -- "$signature_staging" "$appearance_dir/asset-signature"
 touch "$appearance_dir/request"

@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import os
+import json
+import shutil
+import subprocess
+import tempfile
+import time
+import sys
+import socket
+
+
+if len(sys.argv) > 1 and sys.argv[1] == "--preview-child":
+    from importlib.machinery import SourceFileLoader
+    import importlib.util
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
+    spec = importlib.util.spec_from_loader("installer_preview", SourceFileLoader("installer_preview", str(root / "installer/spectrum-installer")))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    wizard = os.environ.get("SPECTRUM_INSTALLER_PREVIEW_STEP")
+    module.set_language(os.environ.get("SPECTRUM_INSTALLER_PREVIEW_LANGUAGE", "en_US"))
+    module.SpectrumInstaller.load_disks = lambda app: setattr(app, "disks", [
+        {"path":"/dev/nvme0n1", "size":80*1024**3, "model":"Preview disk"}
+    ] if wizard else [])
+    module.SpectrumInstaller.connected = lambda app: True
+    module.SpectrumInstaller.detect_gpu = lambda app: 5
+    activate = module.SpectrumInstaller.on_activate
+    def preview(app, application):
+        activate(app, application)
+        if wizard:
+            from tests.test_installer_storage import layout_fixture, planned
+            app.finish_storage_probe(layout_fixture()[1], "")
+            app.username.set_text("spectrum")
+            app.password.set_text("preview-password")
+            app.password_confirm.set_text("preview-password")
+            if wizard == "confirm":
+                app.finish_storage_plan(planned(), "")
+            else:
+                app.show_step(wizard)
+            if os.environ.get("SPECTRUM_INSTALLER_PREVIEW_NARROW") == "1":
+                app.window.set_default_size(480, 360)
+            def ready():
+                Path(os.environ["SPECTRUM_INSTALLER_PREVIEW_READY"]).write_text(json.dumps({
+                    "step": app.stack.get_visible_child_name(), "language": module.language(),
+                    "width": app.window.get_width(), "height": app.window.get_height(),
+                    "navigation_width": app.navigation.get_width(),
+                }))
+                return False
+            module.GLib.timeout_add(150, ready)
+            return
+        app.stack.set_visible_child_name("progress")
+        app.install_running = True
+        app.terminal_log_button.set_sensitive(True)
+        app.handle_line("##PACKAGES 400 65\n")
+        app.handle_line("##PROGRESS 20\n")
+        app.handle_line("installing example-package...\n")
+        app.set_progress(53)
+        if os.environ.get("SPECTRUM_INSTALLER_PREVIEW_NARROW") == "1":
+            app.window.set_default_size(480, 360)
+    module.SpectrumInstaller.on_activate = preview
+    raise SystemExit(module.SpectrumInstaller().run(None))
+
+
+root = Path(__file__).resolve().parents[1]
+with tempfile.TemporaryDirectory(prefix="spectrum-installer-ui-") as temporary:
+    directory = Path(temporary)
+    runtime = directory / "runtime"
+    runtime.mkdir(mode=0o700)
+    data = directory / "data"
+    data.mkdir()
+    palette = directory / "palette.json"
+    roles = {"background": "#14171c", "foreground": "#f2f4f8", "muted": "#abb3be",
+             "error": "#ef6670", "surface": "#252b35", "accent": "#79b8ff", "accent_alt": "#b497f5"}
+    palette.write_text(json.dumps({"roles": roles}))
+    subprocess.run(["python", str(root / "installer/render-style"), str(palette),
+                    str(root / "installer/style.css"), str(data / "style.css")], check=True)
+    logo = (root / "assets/branding/logo.svg").read_text()
+    import re
+    logo = re.sub(r'width="[^"]+"', 'width="16"', logo, count=1)
+    logo = re.sub(r'height="[^"]+"', 'height="14"', logo, count=1)
+    (data / "logo.svg").write_text(logo)
+    environment = {**os.environ, "GDK_BACKEND": "broadway", "BROADWAY_DISPLAY": ":77",
+                   "XDG_RUNTIME_DIR": str(runtime), "GTK_A11Y": "none", "GSETTINGS_BACKEND": "memory",
+                   "SPECTRUM_INSTALLER_DATA": str(data), "SPECTRUM_INSTALLER_UI_TEST": "1",
+                   "XDG_CONFIG_HOME": str(directory / "config"), "XDG_DATA_HOME": str(directory / "user-data"),
+                   "XDG_CACHE_HOME": str(directory / "cache"),
+                   "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "no-session-bus")}
+    (directory / 'locale.conf').write_text('LANG=en_US.UTF-8\n')
+    environment['SPECTRUM_LANGUAGE_FILE'] = str(directory / 'language.json')
+    environment['SPECTRUM_SYSTEM_LOCALE_FILE'] = str(directory / 'locale.conf')
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        broadway_port = reservation.getsockname()[1]
+    daemon = subprocess.Popen(["gtk4-broadwayd", "--address=127.0.0.1", f"--port={broadway_port}", ":77"],
+                              env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    try:
+        for _ in range(100):
+            if (runtime / "broadway77.socket").exists() or daemon.poll() is not None:
+                break
+            time.sleep(.03)
+        if daemon.poll() is not None:
+            raise RuntimeError(daemon.stderr.read().decode())
+        if len(sys.argv) > 1 and sys.argv[1] == "--preview-wizard":
+            from playwright.sync_api import sync_playwright
+            output = root / "artifacts/installer-wizard-20261026/previews"
+            output.mkdir(parents=True, exist_ok=True)
+            ready = directory / "preview-ready.json"
+            environment["SPECTRUM_INSTALLER_PREVIEW_READY"] = str(ready)
+            reports = []
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={"width":900,"height":700})
+                    page.goto(f"http://127.0.0.1:{broadway_port}")
+                    for locale in ("en_US", "es_MX", "pt_BR"):
+                        for step in ("language", "disk", "account", "preferences", "confirm"):
+                            environment["SPECTRUM_INSTALLER_PREVIEW_STEP"] = step
+                            environment["SPECTRUM_INSTALLER_PREVIEW_LANGUAGE"] = locale
+                            environment.pop("SPECTRUM_INSTALLER_PREVIEW_NARROW", None)
+                            ready.unlink(missing_ok=True)
+                            child = subprocess.Popen(["python", __file__, "--preview-child"], cwd=root, env=environment)
+                            try:
+                                page.wait_for_timeout(1000)
+                                if child.poll() is not None:
+                                    raise RuntimeError("Wizard preview exited unexpectedly")
+                                report = json.loads(ready.read_text())
+                                assert report['step'] == step and report['language'] == locale
+                                assert report['width'] <= 680, report
+                                reports.append(report)
+                                page.screenshot(path=str(output / f"{locale}-{step}.png"))
+                            finally:
+                                child.terminate(); child.wait(timeout=5)
+                        for step in ("language", "disk", "account", "preferences", "confirm"):
+                            environment["SPECTRUM_INSTALLER_PREVIEW_STEP"] = step
+                            environment["SPECTRUM_INSTALLER_PREVIEW_NARROW"] = "1"
+                            ready.unlink(missing_ok=True)
+                            child = subprocess.Popen(["python", __file__, "--preview-child"], cwd=root, env=environment)
+                            try:
+                                page.wait_for_timeout(1000)
+                                report = json.loads(ready.read_text())
+                                assert report['step'] == step and report['language'] == locale
+                                assert report['width'] <= 480, report
+                                reports.append(report)
+                                page.screenshot(path=str(output / f"{locale}-{step}-narrow.png"))
+                            finally:
+                                child.terminate(); child.wait(timeout=5)
+                finally:
+                    browser.close()
+            (output / 'layout-checks.json').write_text(json.dumps(reports, indent=2)+'\n')
+            print("Wizard previews saved in " + str(output))
+        elif len(sys.argv) > 1 and sys.argv[1] == "--preview":
+            from playwright.sync_api import sync_playwright
+            output = root / "artifacts/installer-progress-20261025"
+            output.mkdir(parents=True, exist_ok=True)
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={"width": 900, "height": 700})
+                    page.goto(f"http://127.0.0.1:{broadway_port}")
+                    child = subprocess.Popen(["python", __file__, "--preview-child"], cwd=root, env=environment)
+                    try:
+                        page.wait_for_timeout(1800)
+                        page.screenshot(path=str(output / "progress-dark.png"))
+                    finally:
+                        child.terminate()
+                        child.wait(timeout=5)
+                    environment["SPECTRUM_INSTALLER_PREVIEW_NARROW"] = "1"
+                    child = subprocess.Popen(["python", __file__, "--preview-child"], cwd=root, env=environment)
+                    try:
+                        page.wait_for_timeout(1800)
+                        page.screenshot(path=str(output / "progress-narrow.png"))
+                    finally:
+                        child.terminate()
+                        child.wait(timeout=5)
+                finally:
+                    browser.close()
+            print("Installer progress previews saved in " + str(output))
+        else:
+            result = subprocess.run(["python", "-m", "unittest", "tests.test_installer_ui", "-v"],
+                                    cwd=root, env=environment, timeout=60)
+            raise SystemExit(result.returncode)
+    finally:
+        daemon.terminate()
+        daemon.wait(timeout=5)

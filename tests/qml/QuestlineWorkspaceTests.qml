@@ -7,6 +7,7 @@ Scope {
     Shell.UtilityPanel {
         id: panel
         questlineWorkspace: workspace
+        breakState: ({settings:{enabled:false,eye_minutes:20,movement_minutes:50,pause_focus:true},ready:true,busy:false,status:"Off",error:"",eyeElapsed:0,movementElapsed:0,minutesLeft:function(){return "";}})
         backendDir: Quickshell.env("SPECTRUM_QUESTLINE_TEST_DIR")
         focusState: ({phase:"idle"})
         theme: ({panelLeftInset:52,barPosition:"top",barStyle:"full",animationsEnabled:false,widgetBounceEnabled:false,gamingActive:false,fontSize:12,fontFamily:"monospace",colors:{background:"#111111",surface:"#222222",surface_alt:"#333333",foreground:"#eeeeee",muted:"#aaaaaa",accent:"#66ccee",accent_alt:"#eecc66",error:"#ff6666"}})

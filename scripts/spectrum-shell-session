@@ -3,6 +3,10 @@ set -euo pipefail
 
 command -v qs >/dev/null || { printf 'Quickshell is required for SpectrumShell.\n' >&2; exit 1; }
 [[ -f /usr/share/spectrumos/spectrum-shell/shell.qml ]] || { printf 'SpectrumShell configuration is missing.\n' >&2; exit 1; }
+if [[ $(/usr/lib/spectrumos/spectrum-session-profile get) != lean ]]; then
+    systemctl --user --no-block start spectrum-questline-notifications.service spectrum-questline-sync.service \
+        || printf 'Optional Questline services could not be queued.\n' >&2
+fi
 /usr/lib/spectrumos/spectrum-shell &
 shell_pid=$!
 for ((attempt = 0; attempt < 20; attempt++)); do

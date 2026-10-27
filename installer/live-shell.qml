@@ -4,9 +4,11 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
+import Spectrum.I18n 1.0
 
 ShellRoot {
     id: shell
+    readonly property var languageController: Translator
     property var colors: ({ background: "#111827", surface: "#1e293b", foreground: "#f8fafc", muted: "#a6b0c0", accent: "#70a0d0" })
     property var network: ({ available: false, wifi_enabled: false, status: "Checking network…", networks: [] })
     property string pendingPassword: ""
@@ -100,6 +102,7 @@ ShellRoot {
             implicitHeight: 40
             color: shell.colors.surface
             WlrLayershell.layer: WlrLayer.Top
+            WlrLayershell.namespace: "spectrum-live-bar"
 
             RowLayout {
                 anchors.fill: parent
@@ -115,7 +118,7 @@ ShellRoot {
                     Text {
                         id: installLabel
                         anchors.centerIn: parent
-                        text: "Install SpectrumOS"
+                        text: qsTranslate("Spectrum", "Install SpectrumOS")
                         color: shell.colors.background
                         font { pixelSize: 13; bold: true }
                     }
@@ -123,7 +126,7 @@ ShellRoot {
                 }
 
                 Text {
-                    text: "Rescue system"
+                    text: qsTranslate("Spectrum", "Rescue system")
                     color: shell.colors.foreground
                     font.pixelSize: 13
                     MouseArea { anchors.fill: parent; onClicked: Quickshell.execDetached(["uwsm", "app", "--", "foot", "--title=Rescue system", "-e", "/usr/local/bin/spectrum-rescue-shell"]) }
@@ -134,7 +137,7 @@ ShellRoot {
                 Item { Layout.fillWidth: true }
 
                 Text {
-                    text: shell.network.status || "Network unavailable"
+                    text: qsTranslate("Spectrum", shell.network.status || "Network unavailable")
                     color: shell.colors.foreground
                     font.pixelSize: 13
                     MouseArea { anchors.fill: parent; onClicked: bar.networkOpen = !bar.networkOpen }
@@ -169,6 +172,7 @@ ShellRoot {
                 anchors { top: true; bottom: true; left: true; right: true }
                 exclusionMode: ExclusionMode.Ignore
                 WlrLayershell.layer: WlrLayer.Overlay
+                WlrLayershell.namespace: "spectrum-live-network"
                 color: "transparent"
 
                 MouseArea { anchors.fill: parent; onClicked: bar.networkOpen = false }
@@ -189,15 +193,15 @@ ShellRoot {
                         spacing: 12
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: "Network"; color: shell.colors.foreground; font { pixelSize: 18; bold: true } }
+                            Text { text: qsTranslate("Spectrum", "Network"); color: shell.colors.foreground; font { pixelSize: 18; bold: true } }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: shell.network.wifi_enabled ? "Wi-Fi on" : "Wi-Fi off"
+                                text: shell.network.wifi_enabled ? qsTranslate("Spectrum", "Wi-Fi on") : qsTranslate("Spectrum", "Wi-Fi off")
                                 color: shell.colors.accent
                                 MouseArea { anchors.fill: parent; onClicked: shell.networkAction(["toggle"]) }
                             }
                         }
-                        Text { text: shell.network.status || "Unavailable"; color: shell.colors.muted; font.pixelSize: 12 }
+                        Text { text: shell.network.status || qsTranslate("Spectrum", "Unavailable"); color: shell.colors.muted; font.pixelSize: 12 }
                         Text {
                             visible: shell.actionError.length > 0
                             text: shell.actionError
@@ -229,7 +233,7 @@ ShellRoot {
                                         Layout.fillWidth: true
                                     }
                                     Text {
-                                        text: modelData.active ? "Connected" : modelData.security + " · " + modelData.signal + "%"
+                                        text: modelData.active ? qsTranslate("Spectrum", "Connected") : modelData.security + " · " + modelData.signal + "%"
                                         color: modelData.active ? shell.colors.background : shell.colors.muted
                                         font.pixelSize: 11
                                     }
@@ -262,7 +266,7 @@ ShellRoot {
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 8
-                                Text { text: "Password for " + bar.selectedSsid; color: shell.colors.foreground; font.pixelSize: 12 }
+                                Text { text: qsTranslate("Spectrum", "Password for ") + bar.selectedSsid; color: shell.colors.foreground; font.pixelSize: 12 }
                                 TextInput {
                                     id: passwordInput
                                     Layout.fillWidth: true
@@ -281,9 +285,9 @@ ShellRoot {
                         }
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: "Rescan"; color: shell.colors.accent; MouseArea { anchors.fill: parent; onClicked: shell.networkAction(["rescan"]) } }
+                            Text { text: qsTranslate("Spectrum", "Rescan"); color: shell.colors.accent; MouseArea { anchors.fill: parent; onClicked: shell.networkAction(["rescan"]) } }
                             Item { Layout.fillWidth: true }
-                            Text { text: "Connection editor"; color: shell.colors.accent; MouseArea { anchors.fill: parent; onClicked: Quickshell.execDetached(["nm-connection-editor"]) } }
+                            Text { text: qsTranslate("Spectrum", "Connection editor"); color: shell.colors.accent; MouseArea { anchors.fill: parent; onClicked: Quickshell.execDetached(["nm-connection-editor"]) } }
                         }
                     }
                 }

@@ -1,12 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-database=$1
-exclusions=$2
-entry=$(bsdtar -tf "$database" | awk '/^spectrum-desktop-[^/]+\/desc$/ { print; exit }')
-[[ -n $entry ]] || { printf 'The signed repository has no spectrum-desktop metadata.\n' >&2; exit 1; }
-dependencies=$(bsdtar -xOf "$database" "$entry" | awk '/^%DEPENDS%$/ { active=1; next } /^%/ { active=0 } active && NF { print $1 }')
-if printf '%s\n' "$dependencies" | grep -Fxf "$exclusions" >/dev/null; then
-    printf 'The signed spectrum-desktop package still requires packages excluded by Lean mode. Publish an updated signed package before using this installer.\n' >&2
-    exit 1
-fi
+python - "$1" "$2" <<'PY'
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+archive, exclusions = sys.argv[1:]
+excluded = {line.split('#', 1)[0].strip() for line in Path(exclusions).read_text().splitlines()} - {''}
+entries = subprocess.check_output(['bsdtar', '-tf', archive], text=True).splitlines()
+packages = {}
+for entry in entries:
+    if not re.fullmatch(r'[^/]+/desc', entry):
+        continue
+    data = subprocess.check_output(['bsdtar', '-xOf', archive, entry], text=True)
+    fields = {}
+    section = None
+    for line in data.splitlines():
+        if line.startswith('%') and line.endswith('%'):
+            section = line.strip('%')
+            fields[section] = []
+        elif line and section:
+            fields[section].append(line)
+    if fields.get('NAME'):
+        packages[fields['NAME'][0]] = [re.split(r'[<>=]', value, 1)[0] for value in fields.get('DEPENDS', [])]
+if 'spectrum-desktop' not in packages:
+    raise SystemExit('The signed repository has no spectrum-desktop metadata.')
+queue = [('spectrum-desktop', ['spectrum-desktop'])]
+seen = set()
+conflicts = []
+while queue:
+    package, chain = queue.pop()
+    if package in seen:
+        continue
+    seen.add(package)
+    for dependency in packages.get(package, []):
+        path = chain + [dependency]
+        if dependency in excluded:
+            conflicts.append(' -> '.join(path))
+        elif dependency in packages:
+            queue.append((dependency, path))
+if conflicts:
+    raise SystemExit('Lean exclusions are required by the signed Spectrum packages:\n' + '\n'.join(sorted(conflicts)))
+print('Lean package policy verified across ' + str(len(seen)) + ' Spectrum packages.')
+PY

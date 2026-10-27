@@ -65,7 +65,9 @@ class RescueShellTests(unittest.TestCase):
         klass = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'SpectrumInstaller')
         method = next(node for node in klass.body if isinstance(node, ast.FunctionDef) and node.name == 'open_rescue')
         dialog = Mock()
-        namespace = dict(subprocess=subprocess, Gtk=types.SimpleNamespace(AlertDialog=dialog))
+        namespace = dict(subprocess=subprocess, Gtk=types.SimpleNamespace(AlertDialog=dialog),
+                         msg=lambda value: value,
+                         tr_widget=lambda factory, **values: factory(**values))
         exec(compile(ast.Module(body=[method], type_ignores=[]), '<installer rescue method>', 'exec'), namespace)
         return namespace['open_rescue'], dialog
 

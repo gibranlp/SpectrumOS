@@ -8,7 +8,7 @@ ColumnLayout {
     spacing: 4
     Text {
         Layout.fillWidth: true
-        text: control.profile.name + " · " + (control.profile.type === "wifi" ? "Wi-Fi" : "Ethernet")
+        text: control.profile.name + " · " + (control.profile.type === "wifi" ? qsTranslate("Spectrum", "Wi-Fi") : qsTranslate("Spectrum", "Ethernet"))
         elide: Text.ElideRight
         color: control.theme.colors.foreground
         font { family: control.theme.fontFamily; pixelSize: control.theme.fontSize - 1 }
@@ -16,7 +16,7 @@ ColumnLayout {
     RowLayout {
         ShellCheckBox {
             objectName: "connection-ipv4"
-            theme: control.theme; label: "IPv4"
+            theme: control.theme; label: qsTranslate("Spectrum", "IPv4")
             known: typeof control.profile.ipv4_enabled === "boolean"
             value: control.profile.ipv4_enabled === true
             enabled: known && !control.theme.actionBusy && (!value || control.profile.ipv6_enabled === true)
@@ -24,7 +24,7 @@ ColumnLayout {
         }
         ShellCheckBox {
             objectName: "connection-ipv6"
-            theme: control.theme; label: "IPv6"
+            theme: control.theme; label: qsTranslate("Spectrum", "IPv6")
             known: typeof control.profile.ipv6_enabled === "boolean"
             value: control.profile.ipv6_enabled === true
             enabled: known && !control.theme.actionBusy && (!value || control.profile.ipv4_enabled === true)
@@ -34,7 +34,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: text.length > 0
-        text: control.profile.error || ""
+        text: qsTranslate("Spectrum", control.profile.error) || ""
         wrapMode: Text.WordWrap
         color: control.theme.colors.foreground
         font { family: control.theme.fontFamily; pixelSize: control.theme.fontSize - 1 }

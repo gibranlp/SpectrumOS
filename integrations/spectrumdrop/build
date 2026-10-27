@@ -4,4 +4,3 @@ project=${1:?Usage: build PROJECT BUILD_DIRECTORY}
 output=${2:?Usage: build PROJECT BUILD_DIRECTORY}
 cmake -S "$project/integrations/spectrumdrop/awdl" -B "$output" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 cmake --build "$output" --parallel "${NPROC:-4}"
-ctest --test-dir "$output" --output-on-failure

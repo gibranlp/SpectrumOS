@@ -35,7 +35,7 @@ ColumnLayout {
     RowLayout {
         Layout.minimumWidth:0; Layout.fillWidth:true
         Repeater {
-            model:[{id:"discover",label:"Discover"},{id:"installed",label:"Installed"},{id:"activity",label:"Activity"}]
+            model:[{id:"discover",label:qsTranslate("Spectrum", "Discover")},{id:"installed",label:qsTranslate("Spectrum", "Installed")},{id:"activity",label:qsTranslate("Spectrum", "Activity")}]
             Button {
                 required property var modelData
                 label:modelData.label+(modelData.id === "activity" && content.job && content.job.active ? " ●" : "")
@@ -45,16 +45,16 @@ ColumnLayout {
             }
         }
         Item { Layout.minimumWidth:0; Layout.fillWidth:true }
-        Button { label:"↻"; Accessible.name:"Refresh App Store"; onClicked:content.manager.refresh() }
+        Button { label:"↻"; Accessible.name:qsTranslate("Spectrum", "Refresh App Store"); onClicked:content.manager.refresh() }
     }
-    Label { visible:content.manager.error !== ""; text:content.manager.error; color:content.theme.colors.error || content.theme.colors.foreground }
+    Label { visible:content.manager.error !== ""; text:qsTranslate("Spectrum", content.manager.error); color:content.theme.colors.error || content.theme.colors.foreground }
     ColumnLayout {
         visible:content.manager.page !== "activity" && !content.manager.selected
         Layout.minimumWidth:0; Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
         Field {
             id:searchField
             objectName:"app-store-search"
-            Layout.minimumWidth:0; Layout.fillWidth:true; placeholderText:"Search applications and packages…"
+            Layout.minimumWidth:0; Layout.fillWidth:true; placeholderText:qsTranslate("Spectrum", "Search applications and packages…")
             text:content.manager.query
             onTextEdited:content.manager.query=text
             onAccepted:content.manager.search()
@@ -62,7 +62,7 @@ ColumnLayout {
         Flow {
             Layout.minimumWidth:0; Layout.fillWidth:true; spacing:6
             Repeater {
-                model:content.manager.page === "installed" ? [{id:"all",label:"All"},{id:"pacman",label:"System packages"},{id:"flatpak",label:"Flatpak"}] : [{id:"all",label:"All sources"},{id:"pacman",label:"System packages"},{id:"aur",label:"AUR · community"},{id:"flatpak",label:"Flatpak"}]
+                model:content.manager.page === "installed" ? [{id:"all",label:qsTranslate("Spectrum", "All")},{id:"pacman",label:qsTranslate("Spectrum", "System packages")},{id:"flatpak",label:"Flatpak"}] : [{id:"all",label:qsTranslate("Spectrum", "All sources")},{id:"pacman",label:qsTranslate("Spectrum", "System packages")},{id:"aur",label:qsTranslate("Spectrum", "AUR · community")},{id:"flatpak",label:"Flatpak"}]
                 Button {
                     required property var modelData
                     label:modelData.label
@@ -73,7 +73,7 @@ ColumnLayout {
             }
         }
         Label {
-            text:content.manager.busy ? "Searching sources…" : content.manager.results.length+" results · Choose a source before installing."
+            text:content.manager.busy ? qsTranslate("Spectrum", "Searching sources…") : content.manager.results.length+qsTranslate("Spectrum", " results · Choose a source before installing.")
             color:content.theme.colors.muted
         }
         Label { visible:content.manager.warnings !== ""; text:content.manager.warnings; color:content.theme.colors.warning || content.theme.colors.foreground }
@@ -107,7 +107,7 @@ ColumnLayout {
                     spacing:4
                     Label { text:resultRow.modelData.title; font.bold:true; color:action.activeFocus ? content.theme.colors.background : content.theme.colors.foreground }
                     Label { text:resultRow.modelData.description || resultRow.modelData.name; maximumLineCount:2; elide:Text.ElideRight; color:action.activeFocus ? content.theme.colors.background : content.theme.colors.muted }
-                    Label { text:(resultRow.modelData.source === "aur" ? "AUR · community" : resultRow.modelData.source === "flatpak" ? "Flatpak" : "System")+" · "+resultRow.modelData.label+(resultRow.modelData.installed ? " · Installed" : ""); font.pixelSize:Math.max(10,content.theme.fontSize-1); color:action.activeFocus ? content.theme.colors.background : content.theme.colors.accent }
+                    Label { text:(resultRow.modelData.source === "aur" ? qsTranslate("Spectrum", "AUR · community") : resultRow.modelData.source === "flatpak" ? "Flatpak" : qsTranslate("Spectrum", "System"))+" · "+resultRow.modelData.label+(resultRow.modelData.installed ? qsTranslate("Spectrum", " · Installed") : ""); font.pixelSize:Math.max(10,content.theme.fontSize-1); color:action.activeFocus ? content.theme.colors.background : content.theme.colors.accent }
                 }
                 KeyboardAction { id:action; anchors.fill:parent; Accessible.name:resultRow.modelData.title+" · "+resultRow.modelData.label; onActivated:content.manager.choose(resultRow.modelData) }
             }
@@ -117,7 +117,7 @@ ColumnLayout {
     ColumnLayout {
         visible:content.manager.page !== "activity" && content.manager.selected !== null
         Layout.minimumWidth:0; Layout.fillWidth:true; Layout.fillHeight:true; spacing:12
-        Button { label:"← Results"; onClicked:content.manager.selected=null }
+        Button { label:qsTranslate("Spectrum", "← Results"); onClicked:content.manager.selected=null }
         Label { text:content.manager.selected ? content.manager.selected.title : ""; font.pixelSize:content.theme.fontSize+7; font.bold:true }
         Label { text:content.manager.selected ? content.manager.selected.label+" · "+content.manager.selected.version : ""; color:content.theme.colors.accent }
         Controls.ScrollView {
@@ -130,8 +130,8 @@ ColumnLayout {
             }
         }
         Label {
-            text:content.manager.selected && content.manager.selected.source === "flatpak" ? "Installation opens in a separate terminal. Review permissions and dependencies there."
-                : "Installation opens in a separate terminal and includes a full system upgrade. Review packages, passwords and AUR build files there."
+            text:content.manager.selected && content.manager.selected.source === "flatpak" ? qsTranslate("Spectrum", "Installation opens in a separate terminal. Review permissions and dependencies there.")
+                : qsTranslate("Spectrum", "Installation opens in a separate terminal and includes a full system upgrade. Review packages, passwords and AUR build files there.")
             color:content.theme.colors.muted
         }
         RowLayout {
@@ -139,7 +139,7 @@ ColumnLayout {
             Button {
                 objectName:"app-store-install"
                 Layout.minimumWidth:0; Layout.fillWidth:true
-                label:content.manager.selected && content.manager.selected.installed ? content.manager.selected.launchable ? "Open application" : "Installed" : "Install in terminal"
+                label:content.manager.selected && content.manager.selected.installed ? content.manager.selected.launchable ? qsTranslate("Spectrum", "Open application") : qsTranslate("Spectrum", "Installed") : qsTranslate("Spectrum", "Install in terminal")
                 enabled:!content.manager.acting && (!content.manager.selected || !content.manager.selected.installed || content.manager.selected.launchable === true) && (!content.job || !content.job.active || (content.manager.selected && content.manager.selected.installed))
                 onClicked: {
                     if (content.manager.selected.installed) content.manager.action("launch",{target:content.manager.selected});
@@ -151,9 +151,9 @@ ColumnLayout {
     ColumnLayout {
         visible:content.manager.page === "activity"
         Layout.minimumWidth:0; Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
-        Label { text:content.job ? content.job.target.title || content.job.target.name : "No installations yet."; font.bold:true }
-        Label { text:content.job ? content.job.message : "Choose an application in Discover to start."; color:content.theme.colors.accent }
-        Label { visible:content.job !== null && content.job.active; text:content.job && content.job.mode === "terminal" ? "Passwords and confirmations stay in the installation terminal. This is a read-only copy of its recent output." : "An earlier graphical installation is still active. Answer its questions here."; color:content.theme.colors.muted }
+        Label { text:content.job ? content.job.target.title || content.job.target.name : qsTranslate("Spectrum", "No installations yet."); font.bold:true }
+        Label { text:content.job ? content.job.message : qsTranslate("Spectrum", "Choose an application in Discover to start."); color:content.theme.colors.accent }
+        Label { visible:content.job !== null && content.job.active; text:content.job && content.job.mode === "terminal" ? qsTranslate("Spectrum", "Passwords and confirmations stay in the installation terminal. This is a read-only copy of its recent output.") : qsTranslate("Spectrum", "An earlier graphical installation is still active. Answer its questions here."); color:content.theme.colors.muted }
         Controls.ScrollView {
             id:activityScroll
             Layout.minimumWidth:0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; contentWidth:availableWidth
@@ -191,21 +191,21 @@ ColumnLayout {
         RowLayout {
             visible:content.prompt !== null && content.prompt.kind !== "selection"
             Layout.minimumWidth:0; Layout.fillWidth:true
-            Button { objectName:"app-store-yes"; Layout.minimumWidth:0; Layout.fillWidth:true; label:content.prompt && content.prompt.kind === "review" ? "Approve reviewed files" : "Yes"; enabled:!content.manager.acting; onClicked:content.manager.answer("y") }
-            Button { objectName:"app-store-no"; Layout.minimumWidth:0; Layout.fillWidth:true; label:content.prompt && content.prompt.kind === "review" ? "Decline review" : "No"; enabled:!content.manager.acting; onClicked:content.manager.answer("n") }
+            Button { objectName:"app-store-yes"; Layout.minimumWidth:0; Layout.fillWidth:true; label:content.prompt && content.prompt.kind === "review" ? qsTranslate("Spectrum", "Approve reviewed files") : qsTranslate("Spectrum", "Yes"); enabled:!content.manager.acting; onClicked:content.manager.answer("y") }
+            Button { objectName:"app-store-no"; Layout.minimumWidth:0; Layout.fillWidth:true; label:content.prompt && content.prompt.kind === "review" ? qsTranslate("Spectrum", "Decline review") : qsTranslate("Spectrum", "No"); enabled:!content.manager.acting; onClicked:content.manager.answer("n") }
         }
         RowLayout {
             visible:content.prompt !== null && content.prompt.kind === "selection"
             Layout.minimumWidth:0; Layout.fillWidth:true
-            Field { id:choice; Layout.minimumWidth:0; Layout.fillWidth:true; placeholderText:"Selection number (blank uses the displayed default)"; validator:RegularExpressionValidator { regularExpression:/[0-9 ,\-]{0,80}/ } }
-            Button { label:"Continue"; enabled:!content.manager.acting; onClicked:{ content.manager.answer(choice.text);choice.text=""; } }
+            Field { id:choice; Layout.minimumWidth:0; Layout.fillWidth:true; placeholderText:qsTranslate("Spectrum", "Selection number (blank uses the displayed default)"); validator:RegularExpressionValidator { regularExpression:/[0-9 ,\-]{0,80}/ } }
+            Button { label:qsTranslate("Spectrum", "Continue"); enabled:!content.manager.acting; onClicked:{ content.manager.answer(choice.text);choice.text=""; } }
         }
-        Button { visible:content.job !== null && !content.job.active; label:"Refresh installed applications"; onClicked:{content.manager.source="all";content.manager.page="installed";content.manager.refresh();} }
+        Button { visible:content.job !== null && !content.job.active; label:qsTranslate("Spectrum", "Refresh installed applications"); onClicked:{content.manager.source="all";content.manager.page="installed";content.manager.refresh();} }
     }
     RowLayout {
         Layout.minimumWidth:0; Layout.fillWidth:true
         Button { label:"AppImages"; onClicked:content.routeRequested("appimages") }
-        Button { label:"System updates"; onClicked:content.routeRequested("updates") }
+        Button { label:qsTranslate("Spectrum", "System updates"); onClicked:content.routeRequested("updates") }
         Item { Layout.minimumWidth:0; Layout.fillWidth:true }
     }
 }

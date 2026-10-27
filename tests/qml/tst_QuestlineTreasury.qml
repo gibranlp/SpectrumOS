@@ -10,8 +10,8 @@ Item {
             treasury.campaigns = [{ id: "a", name: "Alpha" }, { id: "b", name: "Beta" }, { id: "c", name: "Empty" }];
             treasury.entries = [{ id: "one", campaign_id: "a", campaign: "Alpha" },
                                 { id: "two", campaign_id: "b", campaign: "Beta" }];
-            treasury.accounts = [{ id: "cash-a", campaign_id: "a", balance_minor: 100 },
-                                 { id: "zero-a", campaign_id: "a", balance_minor: 0 },
+            treasury.accounts = [{ id: "cash-a", campaign_id: "a", balance_minor: 100, is_default: true },
+                                 { id: "zero-a", campaign_id: "a", balance_minor: 0, is_default: true },
                                  { id: "cash-b", campaign_id: "b", balance_minor: -200 }];
             treasury.campaignId = "a";
         }
@@ -28,7 +28,7 @@ Item {
             compare(treasury.resolveCampaign("c"), "c");
         }
         function test_refreshPreservesSelectionAndUpdatesBalances() {
-            treasury.accounts = [{ id: "cash-a", campaign_id: "a", balance_minor: 0 }];
+            treasury.accounts = [{ id: "cash-a", campaign_id: "a", balance_minor: 0, is_default: true }];
             treasury.entries = [];
             compare(treasury.currentAccounts.length, 0);
             compare(treasury.resolveCampaign("a"), "a");
@@ -49,6 +49,10 @@ Item {
             treasury.accounts = [];
             treasury.campaigns = [];
             compare(treasury.resolveCampaign("missing"), "");
+        }
+        function test_explicitZeroAccountsRemainAccessible() {
+            treasury.accounts = [{ id: "personal", campaign_id: "a", balance_minor: 0, is_default: false }];
+            compare(treasury.currentAccounts.map(account => account.id), ["personal"]);
         }
     }
 }

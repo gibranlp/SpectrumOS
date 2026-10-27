@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'spectrumos/local-services.json'
+UNIT = re.compile(r'[A-Za-z0-9_.@:\\-]{1,240}\.service')
+PROTECTED = ('spectrum-', 'dbus', 'pipewire', 'wireplumber', 'xdg-', 'gvfs', 'at-spi', 'gnome-keyring', 'polkit', 'app-')
+
+
+def run(arguments, timeout=8):
+    result = subprocess.run(arguments, capture_output=True, text=True, errors='replace', timeout=timeout, env={**os.environ, 'LC_ALL': 'C'})
+    if result.returncode:
+        raise ValueError((result.stderr or result.stdout or 'Command failed.').strip()[-1200:])
+    return result.stdout
+
+
+def watched():
+    if not CONFIG.exists():
+        return []
+    value = json.loads(CONFIG.read_text()).get('units', [])
+    return [name for name in value if isinstance(name, str) and UNIT.fullmatch(name)][:64]
+
+
+def save(units):
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=CONFIG.parent, prefix='.local-services-')
+    try:
+        with os.fdopen(descriptor, 'w') as stream:
+            json.dump({'units': units}, stream)
+        os.replace(temporary, CONFIG)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def engine(name):
+    if name == 'docker':
+        candidates = [Path(f'/run/user/{os.getuid()}/docker.sock'), Path('/var/run/docker.sock')]
+        for path in candidates:
+            if path.is_socket() and shutil.which('docker'):
+                return ['docker', '--host', 'unix://' + str(path)]
+    elif name == 'podman':
+        path = Path(f'/run/user/{os.getuid()}/podman/podman.sock')
+        if path.is_socket() and shutil.which('podman'):
+            return ['podman', '--remote', '--url', 'unix://' + str(path)]
+    raise ValueError('No accessible local ' + name.title() + ' socket. Start it outside this widget if needed.')
+
+
+def list_units():
+    return json.loads(run(['systemctl', '--user', 'list-units', '--all', '--type=service', '--output=json', '--no-pager']))
+
+
+def unit_details(names):
+    if not names:
+        return {}
+    data = run(['systemctl', '--user', 'show', *names, '--property=Id,ActiveState,SubState,Description,MainPID'])
+    rows = [dict(line.split('=', 1) for line in block.splitlines() if '=' in line) for block in data.strip().split('\n\n')]
+    return {row.get('Id', ''): row for row in rows}
+
+
+def status(kind):
+    if kind == 'user':
+        units = watched()
+        available = list_units()
+        # Se incluyen unidades instaladas que todavía no están cargadas.
+        installed = json.loads(run(['systemctl', '--user', 'list-unit-files', '--type=service', '--output=json', '--no-pager']))
+        names = sorted(set([row['unit'] for row in available] + [row['unit_file'] for row in installed]))
+        rows = []
+        details_by_name = unit_details(units)
+        try:
+            listening = run(['ss', '-H', '-ltnp']) if units else ''
+        except (OSError, ValueError):
+            listening = ''
+        for name in units:
+            details = details_by_name.get(name, {})
+            pid = details.get('MainPID', '0')
+            ports = sorted({line.split()[3] for line in listening.splitlines() if pid != '0' and re.search(r'pid=' + pid + r'[,)]', line)})
+            rows.append({'id': name, 'name': name.removesuffix('.service'), 'description': details.get('Description', ''),
+                         'state': details.get('ActiveState', 'unknown'), 'detail': details.get('SubState', ''),
+                         'ports': ', '.join(ports), 'manageable': not name.startswith(PROTECTED)})
+        return {'ok': True, 'rows': rows, 'available': [name for name in names if name not in units and not name.startswith(PROTECTED)]}
+    command = engine(kind)
+    rows = []
+    if kind == 'docker':
+        raw = run(command + ['ps', '--all', '--no-trunc', '--format', '{{json .}}'])
+        for line in raw.splitlines():
+            value = json.loads(line)
+            rows.append({'id': value['ID'], 'name': value['Names'], 'state': value['State'], 'detail': value['Status'],
+                         'ports': value.get('Ports', ''), 'description': value.get('Image', ''), 'manageable': True})
+    else:
+        for value in json.loads(run(command + ['ps', '--all', '--no-trunc', '--format=json'])):
+            rows.append({'id': value['Id'], 'name': ', '.join(value.get('Names') or []), 'state': value.get('State', ''),
+                         'detail': value.get('Status', ''), 'ports': ', '.join(str(p.get('host_port', '')) for p in (value.get('Ports') or [])),
+                         'description': value.get('Image', ''), 'manageable': True})
+    return {'ok': True, 'rows': rows, 'available': []}
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else 'status'
+    request = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
+    kind = request.get('kind', 'user')
+    if kind not in ('user', 'docker', 'podman'):
+        raise ValueError('Unknown local service type.')
+    if action in ('add', 'remove'):
+        name = request['id']
+        if not isinstance(name, str) or not UNIT.fullmatch(name) or name.startswith(PROTECTED):
+            raise ValueError('Choose a development user service.')
+        CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        with CONFIG.with_suffix('.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            units = watched()
+            if action == 'add' and name not in units:
+                if len(units) >= 64:
+                    raise ValueError('You can watch up to 64 user services.')
+                units.append(name)
+            if action == 'remove' and name in units:
+                units.remove(name)
+            save(units)
+    elif action in ('start', 'stop', 'restart', 'logs'):
+        identifier = request['id']
+        if kind == 'user':
+            if identifier not in watched() or not UNIT.fullmatch(identifier):
+                raise ValueError('Add this user service before controlling it.')
+            if action != 'logs' and identifier.startswith(PROTECTED):
+                raise ValueError('Core desktop services cannot be controlled here.')
+            if action == 'logs':
+                text = run(['journalctl', '--user', '--unit', identifier, '--lines=80', '--no-pager', '--output=short'], timeout=10)
+            else:
+                run(['systemctl', '--user', action, identifier], timeout=35)
+        else:
+            if not isinstance(identifier, str) or not re.fullmatch(r'[0-9a-f]{12,64}', identifier):
+                raise ValueError('Invalid container identifier.')
+            command = engine(kind)
+            if action == 'logs':
+                result = subprocess.run(command + ['logs', '--tail=80', identifier], capture_output=True, text=True, errors='replace', timeout=10)
+                if result.returncode:
+                    raise ValueError(result.stderr[-1200:])
+                text = result.stdout + result.stderr
+            else:
+                run(command + [action, identifier], timeout=35)
+        if action == 'logs':
+            print(json.dumps({'ok': True, 'logs': text[-24000:], 'log_id': identifier}))
+            return
+    elif action != 'status':
+        raise ValueError('Unknown local service action.')
+    print(json.dumps(status(kind)))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError) as error:
+        print(json.dumps({'ok': False, 'error': str(error)[:1200]}))
+        sys.exit(1)

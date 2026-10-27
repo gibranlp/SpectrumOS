@@ -1,0 +1,498 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import datetime
+import errno
+import hashlib
+import html
+import importlib.machinery
+import importlib.util
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import uuid
+
+from PIL import Image, ImageOps
+
+BACKEND = Path(__file__).resolve().parent
+loader = importlib.machinery.SourceFileLoader('thunar_core', str(BACKEND / 'thunar-actions'))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+core = importlib.util.module_from_spec(spec)
+loader.exec_module(core)
+STATE = Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local/state') / 'spectrumos/thunar'
+
+
+class Cancelled(Exception):
+    pass
+
+
+def run(args, *, timeout=300, **kwargs):
+    result = subprocess.run([str(value) for value in args], capture_output=True, text=True, timeout=timeout, **kwargs)
+    if result.returncode:
+        raise ValueError((result.stderr.strip() or result.stdout.strip() or 'Operation failed')[-1500:])
+    return result.stdout
+
+
+def dialog(*args):
+    args = list(map(str, args))
+    if '--list' in args:
+        args.append('--no-markup')
+    else:
+        args = ['--text=' + html.escape(value[7:]) if value.startswith('--text=') else value for value in args]
+    result = subprocess.run(['zenity', '--title=SpectrumOS file tools', *args], capture_output=True, text=True)
+    if result.returncode == 1:
+        raise Cancelled()
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or 'Could not open the file tools dialog')
+    return result.stdout.rstrip('\n')
+
+
+def choose(prompt, choices):
+    return dialog('--list', '--text=' + prompt, '--column=Choice', '--height=330', *choices)
+
+
+def files(values):
+    result = [Path(value).absolute() for value in values]
+    if not result or any(not path.is_file() or path.is_symlink() for path in result):
+        raise ValueError('Select regular files; symbolic links and folders are not supported by this action')
+    return result
+
+
+def temporary_output(source, desired, writer):
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=source.parent, prefix='.spectrum-tool-', delete=False) as stream:
+            staged = Path(stream.name)
+        writer(staged)
+        if not staged.stat().st_size:
+            raise ValueError('The operation produced an empty file')
+        return core.publish(staged, desired)
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
+def batch(paths, operation):
+    errors, outputs = [], []
+    paths = files(paths)
+    core.notify(f'Processing {len(paths)} selected file(s)…')
+    for source in paths:
+        try:
+            outputs.append(operation(source))
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            errors.append(source.name + ': ' + str(error))
+    core.notify(f'Completed {len(outputs)} file(s).' + ('\n' + '\n'.join(errors[:8]) if errors else ''), bool(errors))
+    return 1 if errors else 0
+
+
+def copy_paths(mode, values):
+    if mode == 'relative':
+        base, *values = values
+        base = Path(base).absolute()
+    paths = [Path(value).absolute() for value in values]
+    if not paths or any(not path.exists() for path in paths):
+        raise ValueError('Select existing files or folders')
+    if mode == 'shell':
+        text = shlex.join([str(path) for path in paths])
+    elif mode == 'url':
+        text = '\n'.join(path.as_uri() for path in paths)
+    elif mode == 'relative':
+        text = '\n'.join(os.path.relpath(path, base) for path in paths)
+    elif mode == 'absolute':
+        text = '\n'.join(str(path) for path in paths)
+    else:
+        raise ValueError('Unknown path format')
+    run(['wl-copy', '--type', 'text/plain;charset=utf-8'], input=text, timeout=10)
+    core.notify(f'Copied {len(paths)} path(s).')
+
+
+def open_project(value):
+    path = Path(value).resolve(strict=True)
+    directory = path if path.is_dir() else path.parent
+    subprocess.Popen(['xdg-terminal-exec', '--dir=' + str(directory), '--', 'nvim', '--', str(directory)], start_new_session=True)
+
+
+def git_context(values):
+    paths = [Path(value).resolve(strict=True) for value in values]
+    if not paths:
+        raise ValueError('Select a project folder or files')
+    directory = paths[0] if paths[0].is_dir() else paths[0].parent
+    root = Path(run(['git', '-C', directory, 'rev-parse', '--show-toplevel']).strip())
+    relative = []
+    for path in paths:
+        if not path.is_relative_to(root):
+            raise ValueError('Select files inside one Git working tree')
+        relative.append(str(path.relative_to(root)))
+    return root, relative
+
+
+def git_action(action, values):
+    root, relative = git_context(values)
+    if action in ('status', 'history', 'diff'):
+        subprocess.Popen(['xdg-terminal-exec', '--dir=' + str(root), '--', str(BACKEND / 'thunar-productivity'),
+                          'git-view', action, *[str(Path(value).absolute()) for value in values]], start_new_session=True)
+    elif action == 'stage':
+        run(['git', '--literal-pathspecs', '-C', root, 'add', '--', *relative])
+        core.notify('Selected files staged in Git.')
+    elif action == 'branch':
+        name = dialog('--entry', '--text=Create and switch to a new branch', '--entry-text=feature/')
+        if not name or name.startswith('-'):
+            raise ValueError('Enter a branch name')
+        run(['git', 'check-ref-format', '--branch', name])
+        run(['git', '-C', root, 'switch', '-c', name])
+        core.notify('Switched to branch ' + name)
+    else:
+        raise ValueError('Unknown Git action')
+
+
+def git_view(action, values):
+    root, relative = git_context(values)
+    commands = {'status': ['status', '--short', '--branch'],
+                'history': ['log', '--graph', '--oneline', '--decorate', '-40', '--', *relative],
+                'diff': ['diff', '--no-ext-diff', '--no-textconv', 'HEAD', '--', *relative]}
+    if action not in commands:
+        raise ValueError('Unknown Git view')
+    result = subprocess.run(['git', '--no-pager', '--literal-pathspecs', '-C', str(root), *commands[action]], check=False)
+    if result.returncode:
+        print('Git could not complete this view. A repository with no commits has no HEAD diff yet.')
+    input('\nPress Enter to close… ')
+
+
+def image_operation(action, source, size=None):
+    with Image.open(source) as image:
+        if getattr(image, 'n_frames', 1) > 1:
+            raise ValueError('This preparation action requires a still image')
+    if action == 'palette':
+        with Image.open(source) as image:
+            image = ImageOps.exif_transpose(image).convert('RGB')
+            image.thumbnail((160, 160))
+            palette = image.quantize(colors=8)
+            colors = palette.getpalette()
+            entries = sorted(palette.getcolors(), reverse=True)
+            values = ['#' + ''.join(f'{channel:02x}' for channel in colors[index * 3:index * 3 + 3]) for _, index in entries]
+        document = {'source': source.name, 'colors': values}
+        def write(staged):
+            staged.write_text(json.dumps(document, indent=2) + '\n')
+        output = temporary_output(source, source.with_name(source.stem + '-palette.json'), write)
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{len(values) * 100}" height="120"><title>' + html.escape(source.name) + '</title>'
+        for index, color in enumerate(values):
+            x = index * 100
+            svg += f'<rect x="{x}" width="100" height="120" fill="{color}"/><rect x="{x}" y="90" width="100" height="30" fill="white"/><text x="{x+10}" y="110" font-size="14">{color}</text>'
+        svg += '</svg>\n'
+        temporary_output(source, source.with_name(source.stem + '-palette.svg'), lambda staged: staged.write_text(svg))
+        return output
+    output_format = source.suffix.lstrip('.').lower()
+    output_format = {'jpg': 'jpeg', 'tif': 'tiff'}.get(output_format, output_format)
+    options = ['-auto-orient']
+    if action == 'resize':
+        options += ['-resize', size + '>']
+    elif action == 'optimize':
+        output_format = 'webp'
+        options += ['-quality', '85']
+    elif action == 'metadata':
+        options += ['+profile', 'exif', '+profile', 'iptc', '+profile', 'xmp', '+set', 'comment']
+    else:
+        raise ValueError('Unknown image preparation')
+    suffix = '.jpg' if output_format == 'jpeg' else '.' + output_format
+    desired = source.with_name(source.stem + '-' + action + suffix)
+    def write(staged):
+        with source.open('rb') as stream:
+            run(['magick', '-[0]', *options, output_format + ':' + str(staged)], stdin=stream)
+    return temporary_output(source, desired, write)
+
+
+def prepare_images(action, paths):
+    size = None
+    if action == 'resize':
+        size = dialog('--entry', '--text=Maximum width × height (aspect ratio is preserved)', '--entry-text=1920x1080').lower()
+        if not re.fullmatch(r'[1-9][0-9]{0,4}x[1-9][0-9]{0,4}', size):
+            raise ValueError('Enter dimensions such as 1920x1080')
+    return batch(paths, lambda source: image_operation(action, source, size))
+
+
+def rename_directory(staged, desired):
+    # Publica toda la carpeta de una vez sin sustituir una carpeta que apareció durante la operación.
+    for index in range(10000):
+        target = desired if index == 0 else desired.with_name(f'{desired.name} ({index})')
+        try:
+            core.rename_no_replace(staged, target)
+            return target
+        except FileExistsError:
+            continue
+    raise ValueError('Too many existing output folders')
+
+
+def pdf_operation(action, source, value=None):
+    if source.suffix.lower() != '.pdf':
+        raise ValueError('Select PDF documents')
+    if action == 'split':
+        with tempfile.TemporaryDirectory(dir=source.parent, prefix='.spectrum-pdf-') as directory:
+            staged = Path(directory) / 'pages';staged.mkdir()
+            run(['qpdf', source, '--split-pages', str(staged / 'page.pdf')])
+            if not list(staged.glob('*.pdf')):
+                raise ValueError('No PDF pages were created')
+            return rename_directory(staged, source.with_name(source.stem + '-pages'))
+    def write(staged):
+        if action == 'extract':
+            run(['qpdf', '--empty', '--pages', source, value, '--', staged])
+        elif action == 'rotate':
+            run(['qpdf', source, '--rotate=+' + value + ':1-z', '--', staged])
+        elif action == 'optimize':
+            run(['qpdf', '--object-streams=generate', '--stream-data=compress', '--recompress-flate', '--compression-level=9', source, staged])
+        else:
+            raise ValueError('Unknown PDF action')
+    return temporary_output(source, source.with_name(source.stem + '-' + action + '.pdf'), write)
+
+
+def pdf_tools(action, paths):
+    value = None
+    if action == 'extract':
+        value = dialog('--entry', '--text=Pages to extract, for example 1,3-5', '--entry-text=1')
+        if not re.fullmatch(r'[1-9][0-9]*(?:-[1-9][0-9]*)?(?:,[1-9][0-9]*(?:-[1-9][0-9]*)?)*', value):
+            raise ValueError('Use page numbers or ranges such as 1,3-5')
+    if action == 'rotate':
+        value = choose('Rotate all pages clockwise', ['90', '180', '270'])
+        if value not in ('90', '180', '270'):
+            raise ValueError('Choose 90, 180 or 270 degrees')
+    return batch(paths, lambda source: pdf_operation(action, source, value))
+
+
+def audio_info(source):
+    return json.loads(run(['ffprobe', '-v', 'error', '-show_format', '-show_streams', '-of', 'json', source], timeout=30))
+
+
+def audio_summary(information, source):
+    stream = next((row for row in information.get('streams', []) if row.get('codec_type') == 'audio'), {})
+    details = information.get('format', {})
+    tags = {key.lower(): value for row in (details.get('tags', {}), stream.get('tags', {})) for key, value in row.items()}
+    rows = [('File', str(source)), ('Codec', stream.get('codec_long_name', stream.get('codec_name', 'Unknown'))),
+            ('Duration (seconds)', details.get('duration', stream.get('duration', 'Unknown'))),
+            ('Sample rate (Hz)', stream.get('sample_rate', 'Unknown')), ('Channels', stream.get('channels', 'Unknown')),
+            ('Bit rate (bits/s)', details.get('bit_rate', stream.get('bit_rate', 'Unknown')))]
+    rows += [(key.title(), tags[key]) for key in ('title', 'artist', 'album', 'date', 'genre', 'track') if tags.get(key)]
+    return '\n'.join(f'{key}: {value}' for key, value in rows) + '\n'
+
+
+def seconds(value):
+    if not re.fullmatch(r'\d+(?::[0-5]?\d){0,2}(?:\.\d+)?', value):
+        raise ValueError('Enter seconds or a timestamp such as 01:30')
+    result = 0.0
+    for part in value.split(':'):
+        result = result * 60 + float(part)
+    if not math.isfinite(result):
+        raise ValueError('Enter a finite timestamp')
+    return result
+
+
+def audio_operation(action, source, values=None):
+    muxers = {'mp3': 'mp3', 'flac': 'flac', 'wav': 'wav', 'wave': 'wav', 'ogg': 'ogg',
+              'oga': 'ogg', 'opus': 'opus', 'm4a': 'ipod', 'aac': 'adts', 'aif': 'aiff',
+              'aiff': 'aiff', 'wma': 'asf', 'wv': 'wv', 'mka': 'matroska'}
+    if action == 'tags' and source.suffix.lower().lstrip('.') not in muxers:
+        raise ValueError('Convert this format to FLAC or M4A before editing its tags')
+    suffix = source.suffix if action == 'tags' else '.flac'
+    rate = None
+    if action == 'normalize':
+        stream = next((row for row in audio_info(source).get('streams', []) if row.get('codec_type') == 'audio'), {})
+        rate = str(stream.get('sample_rate', '48000'))
+        if not rate.isdigit() or int(rate) < 1:
+            raise ValueError('Could not read the audio sample rate')
+    def write(staged):
+        command = ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y']
+        if action == 'trim':
+            start, end = values
+            command += ['-ss', str(start)]
+        command += ['-i', str(source)]
+        if action == 'tags':
+            command += ['-map', '0', '-c', 'copy', '-map_metadata', '0']
+            for key, value in values.items():
+                command += ['-metadata', key + '=' + value, '-metadata:s:a:0', key + '=' + value]
+        else:
+            command += ['-map', '0:a:0', '-vn', '-c:a', 'flac']
+            if action == 'trim':command += ['-t', str(end - start)]
+            if action == 'normalize':
+                command += ['-af', 'loudnorm=I=-16:TP=-1.5:LRA=11,aresample=' + rate + ',asetnsamples=n=4096:p=0']
+        command += ['-threads', '2', '-f', muxers[source.suffix.lower().lstrip('.')] if action == 'tags' else 'flac', str(staged)]
+        run(command, timeout=3600)
+    return temporary_output(source, source.with_name(source.stem + '-' + action + suffix), write)
+
+
+def audio_tools(action, paths):
+    if action == 'normalize':
+        return batch(paths, lambda source: audio_operation(action, source))
+    source = files(paths)[0]
+    information = audio_info(source)
+    if action == 'info':
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt') as stream:
+            stream.write(audio_summary(information, source));stream.flush()
+            dialog('--text-info', '--filename=' + stream.name, '--width=720', '--height=500')
+        return 0
+    if action == 'trim':
+        duration = information['format'].get('duration', '')
+        reply = dialog('--forms', '--text=Trim into a new lossless FLAC file. Duration: ' + duration + ' seconds', '--separator=|', '--add-entry=Start (seconds or MM:SS)', '--add-entry=End (seconds or MM:SS)')
+        values = reply.split('|')
+        if len(values) != 2:raise ValueError('Enter start and end timestamps')
+        values = [seconds(value) for value in values]
+        if values[1] <= values[0] or values[1] > float(duration) + .05:raise ValueError('End must be after start and within the recording')
+    elif action == 'tags':
+        stream = next((row for row in information.get('streams', []) if row.get('codec_type') == 'audio'), {})
+        current = {**information['format'].get('tags', {}), **stream.get('tags', {})}
+        summary = '\n'.join(key + ': ' + str(current.get(key, current.get(key.upper(), '')))[:150] for key in ('title', 'artist', 'album'))
+        reply = dialog('--forms', '--text=Edit a new copy. Blank keeps the current value; - clears it.\n\n' + summary, '--separator=\x1f', '--add-entry=Title', '--add-entry=Artist', '--add-entry=Album')
+        parts = reply.split('\x1f')
+        if len(parts) != 3:raise ValueError('Enter title, artist and album fields')
+        values = {key: '' if value == '-' else value for key, value in zip(('title', 'artist', 'album'), parts) if value}
+        if not values:raise Cancelled()
+    else:
+        raise ValueError('Unknown audio action')
+    audio_operation(action, source, values)
+    core.notify('Created the edited audio copy.')
+    return 0
+
+
+def file_identity(path):
+    value = path.stat()
+    return [value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns]
+
+
+def move_file(source, target, identity):
+    if source.is_symlink() or file_identity(source) != identity:
+        raise ValueError('A source changed since the preview: ' + str(source))
+    try:
+        os.link(source, target, follow_symlinks=False)
+    except OSError as error:
+        if error.errno not in (errno.EXDEV, errno.EPERM, errno.EOPNOTSUPP):raise
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.spectrum-move-', delete=False) as stream:staged = Path(stream.name)
+            shutil.copy2(source, staged)
+            def checksum(path):
+                with path.open('rb') as stream:return hashlib.file_digest(stream, 'sha256').digest()
+            if checksum(source) != checksum(staged) or file_identity(source) != identity:
+                raise ValueError('The source changed during copying')
+            core.rename_no_replace(staged, target)
+        finally:
+            if staged is not None:staged.unlink(missing_ok=True)
+    if file_identity(source) != identity:
+        raise ValueError('The source changed before finalizing the move; both copies were retained')
+    source.unlink()
+    return file_identity(target)
+
+
+def organization_plan(paths, destination, mode, project=''):
+    result, reserved = [], set()
+    if mode == 'Project folder' and (not project or project in ('.','..') or '/' in project or '\\' in project):
+        raise ValueError('Enter a single project folder name')
+    for source in files(paths):
+        if mode == 'File type':
+            folder = source.suffix.lower().lstrip('.') or 'no-extension'
+        elif mode == 'Year and month':
+            folder = datetime.datetime.fromtimestamp(source.stat().st_mtime).strftime('%Y/%m')
+        elif mode == 'Project folder':folder = project
+        else:raise ValueError('Choose an organization rule')
+        target = destination / folder / source.name
+        if target.absolute() == source:continue
+        index = 1
+        while target.exists() or target.is_symlink() or str(target) in reserved:
+            target = target.with_name(f'{source.stem} ({index}){source.suffix}');index += 1
+        reserved.add(str(target));result.append({'source':str(source),'target':str(target),'identity':file_identity(source)})
+    return result
+
+
+def write_journal(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
+        temporary=Path(stream.name)
+        try:
+            json.dump(rows,stream,indent=2);stream.flush();os.fsync(stream.fileno());temporary.replace(path)
+        finally:temporary.unlink(missing_ok=True)
+
+
+def move_preview(rows, undo=False):
+    if not rows:raise ValueError('No files need to move')
+    args=['--list','--checklist','--text=Review the moves before applying them','--column=Move','--column=ID','--hide-column=2','--print-column=2','--column=From','--column=To','--separator=|','--width=1000','--height=500','--ok-label=Undo' if undo else '--ok-label=Move']
+    for index,row in enumerate(rows):args.extend(['TRUE',str(index),row['source'],row['target']])
+    reply=dialog(*args)
+    if not reply:raise Cancelled()
+    selected={int(value) for value in reply.split('|')}
+    if any(index<0 or index>=len(rows) for index in selected):raise ValueError('Invalid move preview selection')
+    return [row for index,row in enumerate(rows) if index in selected]
+
+
+def organize(paths):
+    paths=files(paths)
+    mode=choose('Organize the selected files', ['File type','Year and month','Project folder'])
+    destination=Path(dialog('--file-selection','--directory','--title=Destination folder','--filename='+str(paths[0].parent)+'/')).resolve(strict=True)
+    project=dialog('--entry','--text=Project folder name') if mode=='Project folder' else ''
+    rows=move_preview(organization_plan(paths,destination,mode,project))
+    journal=STATE/'organization'/(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')+'-'+uuid.uuid4().hex+'.json')
+    write_journal(journal,rows)
+    errors=[]
+    for row in rows:
+        try:
+            target=Path(row['target']);target.parent.mkdir(parents=True,exist_ok=True)
+            row['moved_identity']=move_file(Path(row['source']),target,row['identity']);row['done']=True
+            write_journal(journal,rows)
+        except (OSError,ValueError) as error:errors.append(str(error))
+    core.notify(f'Moved {sum(row.get("done",False) for row in rows)} file(s). Use Organize files → Undo last organization to restore.'+ ('\n'+'\n'.join(errors[:6]) if errors else ''),bool(errors))
+    return 1 if errors else 0
+
+
+def undo_organization():
+    journals=sorted((STATE/'organization').glob('*.json'),reverse=True)
+    for journal in journals:
+        rows=json.loads(journal.read_text())
+        remaining=[row for row in rows if row.get('done') and not row.get('undone')]
+        if remaining:break
+    else:raise ValueError('There is no file organization to undo')
+    preview=[{'source':row['target'],'target':row['source'],'row':row} for row in remaining]
+    chosen=move_preview(preview,True);errors=[]
+    for item in chosen:
+        row=item['row']
+        try:
+            source,target=Path(row['target']),Path(row['source'])
+            target.parent.mkdir(parents=True,exist_ok=True)
+            move_file(source,target,row['moved_identity']);row['undone']=True;write_journal(journal,rows)
+        except (OSError,ValueError) as error:errors.append(str(error))
+    core.notify('Organization undo completed.'+ ('\n'+'\n'.join(errors[:6]) if errors else ''),bool(errors))
+    return 1 if errors else 0
+
+
+def share(paths):
+    paths=files(paths)
+    response=json.loads(run([BACKEND/'spectrumdrop-adapter','prepare-selection'],input=json.dumps({'paths':[str(path) for path in paths]})+'\n'))
+    if not response.get('ok'):raise ValueError(response.get('error','Could not prepare the selection'))
+    result = run(['qs','--path','/usr/share/spectrumos/spectrum-shell','ipc','call','spectrum-shell','openSpectrumDropFiles'])
+    if result.strip():
+        raise ValueError('The files are ready. Open SpectrumDrop with Super+Shift+D to choose a recipient.')
+
+
+def main(args):
+    if not args:raise ValueError('Choose a file action')
+    action,*values=args
+    if action.startswith('copy-'):copy_paths(action[5:],values)
+    elif action=='project':open_project(values[0])
+    elif action.startswith('git-') and action!='git-view':git_action(action[4:],values)
+    elif action=='git-view':git_view(values[0],values[1:])
+    elif action.startswith('image-'):return prepare_images(action[6:],values)
+    elif action.startswith('pdf-'):return pdf_tools(action[4:],values)
+    elif action.startswith('audio-'):return audio_tools(action[6:],values)
+    elif action=='organize':return organize(values)
+    elif action=='organize-undo':return undo_organization()
+    elif action=='share':share(values)
+    else:raise ValueError('Unknown Thunar action')
+    return 0
+
+
+if __name__=='__main__':
+    try:sys.exit(main(sys.argv[1:]))
+    except Cancelled:sys.exit(0)
+    except (OSError,ValueError,subprocess.SubprocessError,IndexError) as error:
+        core.notify(str(error),True);sys.exit(1)

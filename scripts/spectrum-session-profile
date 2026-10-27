@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+from pathlib import Path
+import tempfile
+
+AUTOSTART = ('baloo_file.desktop', 'localsearch-3.desktop', 'org.gnome.Evolution-alarm-notify.desktop',
+             'org.kde.kdeconnect.daemon.desktop', 'spectrum-kdeconnect-indicator.desktop', 'blueman.desktop', 'print-applet.desktop')
+LIMITS = '[Service]\nMemoryHigh=512M\nMemoryMax=1G\nMemorySwapMax=256M\n'
+VISUALS = 'hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false } } })\n'
+DEFAULTS = {'bar_profile': 'standard', 'igor_enabled': False, 'widget_bounce_enabled': False}
+
+
+def profile():
+    config = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')
+    for path in (config / 'spectrumos/session-profile', Path('/etc/spectrumos/session-profile')):
+        try:
+            value = path.read_text().strip()
+        except FileNotFoundError:
+            continue
+        if value not in ('lean', 'full'):
+            raise ValueError('Unknown SpectrumOS session profile.')
+        return value
+    return 'full'
+
+
+def atomic_write(path, text):
+    if path.is_symlink():
+        raise ValueError('Refusing to replace a symbolic link: ' + str(path))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix='.' + path.name + '-')
+    try:
+        with os.fdopen(descriptor, 'w') as stream:
+            stream.write(text)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def seed(home, selected):
+    if not home.is_dir() or home.stat().st_uid != os.geteuid():
+        raise ValueError('Run session setup as the owner of the target home.')
+    config = home / '.config'
+    settings_path = config / 'spectrumos/shell.json'
+    settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
+    if not isinstance(settings, dict):
+        raise ValueError('Shell settings must contain a JSON object.')
+    files = {config / 'spectrumos/hyprland-controls.state': 'blur=off\nanimations=off\n',
+             config / 'systemd/user/spectrum-shell.service.d/50-spectrum-lean.conf': LIMITS,
+             config / 'spectrumos/hyprland-lean.lua': VISUALS}
+    for name in AUTOSTART:
+        files[config / 'autostart' / name] = '[Desktop Entry]\nType=Application\nName=SpectrumOS Lean startup preference\nHidden=true\nX-SpectrumOS-Lean=true\n'
+    if selected == 'lean':
+        for key, value in DEFAULTS.items():
+            settings.setdefault(key, value)
+        atomic_write(settings_path, json.dumps(settings, indent=2) + '\n')
+        for path, text in files.items():
+            if not path.exists():
+                atomic_write(path, text)
+    else:
+        for path, text in files.items():
+            if not path.is_symlink() and path.is_file() and path.read_text() == text:
+                path.unlink()
+    atomic_write(config / 'spectrumos/session-profile', selected + '\n')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Read or seed SpectrumOS session startup preferences.')
+    sub = parser.add_subparsers(dest='action')
+    sub.add_parser('get')
+    setup = sub.add_parser('seed')
+    setup.add_argument('--home', type=Path, required=True)
+    setup.add_argument('--profile', choices=('lean', 'full'), required=True)
+    args = parser.parse_args()
+    if args.action == 'seed':
+        seed(args.home, args.profile)
+    else:
+        print(profile())
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError) as error:
+        raise SystemExit(str(error))

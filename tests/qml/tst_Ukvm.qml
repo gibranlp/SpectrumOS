@@ -1,4 +1,5 @@
 import QtQuick
+import Spectrum.I18n 1.0
 import QtTest
 import Qt.labs.folderlistmodel
 import "../../configs/spectrum-ukvm" as Ukvm
@@ -6,6 +7,7 @@ import "../../configs/spectrum-ukvm/UkvmModel.js" as Model
 
 TestCase {
     id: test
+    readonly property var languageController: Translator
     name: "SpectrumUkvm"
     visible: true
     width: 1050; height: 900

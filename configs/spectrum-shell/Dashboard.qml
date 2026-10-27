@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -20,7 +22,13 @@ PanelWindow {
     property bool questlineLoaded: false
     signal refreshDueDates()
     signal dueItemRequested(string taskId, string stepId)
-    onExpandedChanged: if (expanded) { dueCalendar.today = new Date(); refreshDueDates(); }
+    onExpandedChanged: if (expanded) {
+        currentTime = Qt.formatDateTime(new Date(), "HH:mm");
+        currentDate = Qt.formatDateTime(new Date(), "ddd, d MMMM");
+        calendarContent.ensureLoaded();
+        calendarContent.item.today = new Date();
+        refreshDueDates();
+    }
     signal actionRequested(string action)
 
     screen: targetScreen
@@ -45,7 +53,7 @@ PanelWindow {
         interval: 30000
         repeat: true
         running: dashboard.expanded
-        onTriggered: { dueCalendar.today = new Date(); dashboard.refreshDueDates(); }
+        onTriggered: { if (calendarContent.item) calendarContent.item.today = new Date(); dashboard.refreshDueDates(); }
     }
 
     MouseArea {
@@ -112,7 +120,7 @@ PanelWindow {
                         font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize + 1 }
                         KeyboardAction {
                             anchors.fill: parent
-                            onActivated: dueCalendar.showToday()
+                            onActivated: calendarContent.item.showToday()
                         }
                     }
                 }
@@ -132,7 +140,7 @@ PanelWindow {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: dashboard.weather.location || "Weather"
+                            text: dashboard.weather.location || qsTranslate("Spectrum", "Weather")
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
                             color: dashboard.theme.colors.muted
@@ -168,7 +176,7 @@ PanelWindow {
                         clip: true
                         Text {
                             id: mediaLabel
-                            text: dashboard.media.available ? dashboard.media.artist + " - " + dashboard.media.title : "No media playing"
+                            text: dashboard.media.available ? dashboard.media.artist + " - " + dashboard.media.title : qsTranslate("Spectrum", "No media playing")
                             color: dashboard.theme.colors.muted
                             font { family: dashboard.theme.fontFamily; pixelSize: dashboard.theme.fontSize }
                         }
@@ -221,14 +229,17 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: dashboard.theme.colors.surface_alt }
 
-            QuestlineCalendar {
-                id: dueCalendar
-                objectName: "dashboard-calendar"
+            CachedContent {
+                id: calendarContent
+                requested: dashboard.expanded
                 Layout.fillWidth: true
-                theme: dashboard.theme
-                questline: dashboard.questline
-                loaded: dashboard.questlineLoaded
-                onItemRequested: (taskId, stepId) => dashboard.dueItemRequested(taskId, stepId)
+                sourceComponent: QuestlineCalendar {
+                    objectName: "dashboard-calendar"
+                    theme: dashboard.theme
+                    questline: dashboard.questline
+                    loaded: dashboard.questlineLoaded
+                    onItemRequested: (taskId, stepId) => dashboard.dueItemRequested(taskId, stepId)
+                }
             }
 
         }

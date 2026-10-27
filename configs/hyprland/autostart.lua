@@ -1,3 +1,17 @@
+local function lean_session()
+    local home = os.getenv("HOME") or ""
+    local config = os.getenv("XDG_CONFIG_HOME") or (home .. "/.config")
+    for _, path in ipairs({ config .. "/spectrumos/session-profile", "/etc/spectrumos/session-profile" }) do
+        local file = io.open(path, "r")
+        if file then
+            local value = file:read("*a"):match("^%s*(.-)%s*$")
+            file:close()
+            return value == "lean"
+        end
+    end
+    return false
+end
+
 -- UWSM conserva cada proceso importante fuera del árbol directo del compositor.
 hl.on("hyprland.start", function()
     hl.exec_cmd("uwsm app -s s -- /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
@@ -7,10 +21,10 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("systemctl --user start spectrum-resource-monitor.service")
     hl.exec_cmd("/usr/lib/spectrumos/mouse-adapter --apply")
     hl.exec_cmd("systemctl --user start spectrum-shell.service")
-    hl.exec_cmd("systemctl --user start spectrum-questline-notifications.service")
-    hl.exec_cmd("systemctl --user start spectrum-questline-sync.service")
     hl.exec_cmd("uwsm app -s s -- hypridle -c /usr/share/spectrumos/hyprland/hypridle.conf")
-    hl.exec_cmd("uwsm app -s s -- blueman-applet")
+    if not lean_session() then
+        hl.exec_cmd("uwsm app -s s -- blueman-applet")
+    end
     hl.exec_cmd("systemctl --user start spectrum-workspace-layout.service")
 end)
 

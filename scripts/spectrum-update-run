@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Conserva la confirmación en terminal y deja que el hook de pacman cree el respaldo.
 set -uo pipefail
-# No usa set -e para ejecutar el diagnóstico incluso cuando falla la actualización.
+# No usa set -e para conservar y reportar el estado de cada etapa.
 
 mode=${1:-all}
 
@@ -96,20 +96,14 @@ if [ "$mode" = all ] && [ "$update_status" -eq 0 ] && [ "$migration_status" -eq 
     fi
 fi
 
-printf '\n== Post-update check (spectrum doctor) ==\n'
-spectrum doctor
-doctor_status=$?
-
 if [ "$update_status" -ne 0 ]; then
     printf '\nThe update did not complete successfully (exit %s).\n' "$update_status"
 elif [ "$migration_status" -ne 0 ]; then
     printf '\nThe package update completed, but ordered migrations failed (exit %s).\n' "$migration_status"
 elif [ "$flatpak_status" -ne 0 ]; then
     printf '\nSystem packages updated, but Flatpak updates failed (exit %s).\n' "$flatpak_status"
-elif [ "$doctor_status" -ne 0 ]; then
-    printf '\nThe update completed, but spectrum doctor reports problems above.\n'
 else
-    printf '\nUpdate complete and healthy.\n'
+    printf '\nUpdate complete.\n'
 fi
 
 if [ "$update_status" -ne 0 ]; then
@@ -121,4 +115,4 @@ fi
 if [ "$flatpak_status" -ne 0 ]; then
     exit "$flatpak_status"
 fi
-exit "$doctor_status"
+exit 0

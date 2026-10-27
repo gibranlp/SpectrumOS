@@ -23,11 +23,11 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: {
                 try { monitor.status = JSON.parse(text); }
-                catch (error) { monitor.status = Object.assign({}, monitor.status, {error: "Could not check Stable updates."}); }
+                catch (error) { monitor.status = Object.assign({}, monitor.status, {error: qsTranslate("Spectrum", "Could not check Stable updates.")}); }
             }
         }
         onExited: exitCode => {
-            if (exitCode !== 0) monitor.status = Object.assign({}, monitor.status, {error: "Could not check Stable updates."});
+            if (exitCode !== 0) monitor.status = Object.assign({}, monitor.status, {error: qsTranslate("Spectrum", "Could not check Stable updates.")});
         }
     }
     Timer { interval: 60000; running: true; onTriggered: monitor.refresh() }

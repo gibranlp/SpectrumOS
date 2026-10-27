@@ -57,6 +57,13 @@ hl.config({
     },
 })
 
+-- El panel conserva su posición cuando se abre o cierra la ventana de red.
+hl.layer_rule({
+    name = "spectrum-live-shell-motion",
+    match = { namespace = "^spectrum-live-(bar|network)$" },
+    no_anim = true,
+})
+
 local mainMod = "SUPER"
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("uwsm app -- foot"))
 hl.bind(mainMod .. " + Q", hl.dsp.window.close())

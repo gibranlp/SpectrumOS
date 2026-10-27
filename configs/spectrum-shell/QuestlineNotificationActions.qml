@@ -23,8 +23,8 @@ Item {
         stdout:StdioCollector {onStreamFinished:bridge.response=text}
         onExited:(code,status)=> {
             let result;
-            try {result=JSON.parse(bridge.response);}catch(error){result={error:"Could not record your drink. Please try again."};}
-            if (code!==0 && !result.error) result.error="Could not record your drink. Please try again.";
+            try {result=JSON.parse(bridge.response);}catch(error){result={error:qsTranslate("Spectrum", "Could not record your drink. Please try again.")};}
+            if (code!==0 && !result.error) result.error=qsTranslate("Spectrum", "Could not record your drink. Please try again.");
             const request=bridge.job;bridge.job=null;bridge.finished(request,result);Qt.callLater(bridge.pump);
         }
     }

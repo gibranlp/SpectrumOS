@@ -64,3 +64,4 @@ id_ed25519
 .gnupg/
 !integrations/spectrumdrop/runtime/share/certs/*.pem
 !integrations/spectrumdrop/runtime/bin/apple-ca/*.pem
+.comem/.tmp-*

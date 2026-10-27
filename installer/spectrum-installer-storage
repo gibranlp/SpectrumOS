@@ -1,0 +1,363 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import struct
+import subprocess
+import sys
+import uuid
+
+
+GIB = 1024 ** 3
+MIB = 1024 ** 2
+ESP_BYTES = 2 * GIB
+MIN_ROOT_BYTES = 32 * GIB
+ESP_TYPE = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+ROOT_TYPE = "0fc63daf-8483-4772-8e79-3d69d8477de4"
+
+
+class StorageError(RuntimeError):
+    pass
+
+
+def command(arguments: list[str], *, timeout: int = 30) -> str:
+    result = subprocess.run(arguments, text=True, capture_output=True,
+                            env={**os.environ, "LC_ALL": "C"}, timeout=timeout)
+    if result.returncode:
+        raise StorageError(result.stderr.strip() or f"{arguments[0]} failed")
+    return result.stdout
+
+
+def command_json(arguments: list[str]) -> dict:
+    output = command(arguments)
+    tool = arguments[0]
+    if not output.strip():
+        raise StorageError(f"{tool} returned empty output instead of disk-layout JSON")
+    try:
+        result = json.loads(output)
+    except json.JSONDecodeError as error:
+        raise StorageError(f"{tool} returned invalid disk-layout JSON: {error}") from error
+    if not isinstance(result, dict):
+        raise StorageError(f"{tool} returned an unexpected disk-layout JSON structure")
+    return result
+
+
+def digest(value: dict) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def partition_path(disk: str, number: int) -> str:
+    return f"{disk}{'p' if disk[-1].isdigit() else ''}{number}"
+
+
+def aligned_extents(table: dict) -> list[dict]:
+    sector = int(table["sectorsize"])
+    if sector not in (512, 4096):
+        raise StorageError("Alongside installation supports 512-byte and 4096-byte sectors")
+    alignment = MIB // sector
+    first, last = int(table["firstlba"]), int(table["lastlba"])
+    partitions = sorted(table.get("partitions", []), key=lambda item: int(item["start"]))
+    gaps = []
+    cursor = first
+    for item in partitions:
+        start, size = int(item["start"]), int(item["size"])
+        if start < cursor or size <= 0 or start + size - 1 > last:
+            raise StorageError("Invalid or overlapping GPT partitions")
+        gaps.append((cursor, start))
+        cursor = start + size
+    gaps.append((cursor, last + 1))
+    result = []
+    for start, end in gaps:
+        start = ((start + alignment - 1) // alignment) * alignment
+        end = (end // alignment) * alignment
+        if end > start:
+            result.append({"start": start, "end": end - 1, "bytes": (end - start) * sector})
+    return result
+
+
+def firmware_state() -> dict:
+    directory = Path("/sys/firmware/efi/efivars")
+    if not directory.is_dir():
+        return {"mode": "bios", "secure_boot": None, "variables_writable": False}
+    values = list(directory.glob("SecureBoot-*"))
+    secure = None
+    if len(values) == 1:
+        raw = values[0].read_bytes()
+        if len(raw) == 5 and raw[4] in (0, 1):
+            secure = bool(raw[4])
+    writable = os.access(directory, os.W_OK) and not bool(os.statvfs(directory).f_flag & os.ST_RDONLY)
+    return {"mode": "uefi", "secure_boot": secure, "variables_writable": writable}
+
+
+def flatten(nodes: list[dict]) -> list[dict]:
+    return [item for node in nodes for item in [node, *flatten(node.get("children", []))]]
+
+
+def partition_slots(disk: str, sector_size: int) -> int:
+    with open(disk, "rb") as handle:
+        handle.seek(sector_size)
+        header = handle.read(92)
+    if len(header) != 92 or header[:8] != b"EFI PART":
+        raise StorageError("The primary GPT header is unavailable")
+    count = struct.unpack_from("<I", header, 80)[0]
+    if count < 1:
+        raise StorageError("The GPT partition table has no entries")
+    return min(count, 128)
+
+
+def inspect(disk: str) -> dict:
+    disk = os.path.realpath(disk)
+    if not re.fullmatch(r"/dev/[A-Za-z0-9_-]+", disk) or re.match(r"/dev/(fd|zram|loop)\d", disk):
+        raise StorageError("Select a persistent whole-disk device")
+    if not stat.S_ISBLK(os.stat(disk).st_mode):
+        raise StorageError("The selected device is not a block device")
+    tree = command_json([
+        "lsblk", "--json", "--tree", "--bytes", "--paths", "--output",
+        "PATH,TYPE,SIZE,RO,SERIAL,WWN,FSTYPE,UUID,LABEL,MOUNTPOINTS", disk,
+    ])["blockdevices"]
+    if len(tree) != 1 or tree[0]["type"] != "disk" or tree[0]["ro"]:
+        raise StorageError("Select a writable whole disk")
+    nodes = flatten(tree)
+    busy = [node["path"] for node in nodes if any(node.get("mountpoints") or [])]
+    swaps = {os.path.realpath(line.split()[0]) for line in Path("/proc/swaps").read_text().splitlines()[1:]}
+    for node in nodes:
+        if os.path.realpath(node["path"]) in swaps or node.get("fstype") == "LVM2_member":
+            busy.append(node["path"])
+        holders = Path("/sys/class/block") / Path(node["path"]).name / "holders"
+        if holders.is_dir() and any(holders.iterdir()):
+            busy.append(node["path"])
+    if busy:
+        raise StorageError("Disk is mounted, used as swap, or has active/unsupported storage: " + ", ".join(sorted(set(busy))))
+    table = command_json(["sfdisk", "--json", disk])["partitiontable"]
+    if table.get("label") != "gpt" or table.get("unit") != "sectors":
+        raise StorageError("Install alongside requires an existing GPT partition table")
+    uuid.UUID(table["id"])
+    verification = command(["sgdisk", "--verify", disk])
+    if "No problems found." not in verification:
+        raise StorageError("GPT verification did not pass; repair it outside the installer first")
+    slots = partition_slots(disk, int(table["sectorsize"]))
+    by_path = {node["path"]: node for node in nodes}
+    partitions = []
+    numbers = set()
+    for part in table.get("partitions", []):
+        node = by_path.get(part["node"])
+        if node is None or node["type"] != "part":
+            raise StorageError("Disk discovery changed; rescan the destination")
+        suffix = part["node"].removeprefix(disk).removeprefix("p")
+        if not suffix.isdigit() or not 1 <= int(suffix) <= slots or int(suffix) in numbers:
+            raise StorageError("Unsupported GPT partition numbering")
+        numbers.add(int(suffix))
+        partitions.append({
+            "number": int(suffix), "path": part["node"], "start": int(part["start"]),
+            "size": int(part["size"]), "type": part["type"].lower(),
+            "partuuid": str(uuid.UUID(part["uuid"])), "name": part.get("name", ""),
+            "attributes": part.get("attrs", ""), "fstype": node.get("fstype"),
+            "uuid": node.get("uuid"), "label": node.get("label"),
+        })
+    firmware = firmware_state()
+    blockers = []
+    if firmware["mode"] != "uefi":
+        blockers.append("Boot the installer in UEFI mode to install alongside")
+    if firmware["secure_boot"] is not False:
+        blockers.append("Secure Boot must be disabled for the current Spectrum loader; verify Windows recovery-key preparation before changing firmware")
+    if not firmware["variables_writable"]:
+        blockers.append("UEFI firmware variables must be writable to register Spectrum's boot entry")
+    available = [number for number in range(1, slots + 1) if number not in numbers]
+    if len(available) < 2:
+        blockers.append("Two unused GPT partition slots are required")
+    result = {
+        "schema": 1, "disk": disk, "disk_guid": str(uuid.UUID(table["id"])),
+        "bytes": int(tree[0]["size"]), "serial": tree[0].get("serial"), "wwn": tree[0].get("wwn"),
+        "sector_size": int(table["sectorsize"]), "first_lba": int(table["firstlba"]),
+        "partition_slots": slots,
+        "last_lba": int(table["lastlba"]), "partitions": partitions,
+        "free_extents": aligned_extents(table), "firmware": firmware, "blockers": blockers,
+    }
+    result["fingerprint"] = digest(result)
+    return result
+
+
+def make_plan(layout: dict, start: int, size_gib: int, default_boot: bool = True) -> dict:
+    if layout["blockers"]:
+        raise StorageError("; ".join(layout["blockers"]))
+    extent = next((item for item in layout["free_extents"] if item["start"] == start), None)
+    amount = size_gib * GIB
+    if not extent or amount < ESP_BYTES + MIN_ROOT_BYTES or amount > extent["bytes"]:
+        raise StorageError("Choose an unallocated extent with at least 34 GiB (2 GiB EFI + 32 GiB root)")
+    used = {part["number"] for part in layout["partitions"]}
+    numbers = [number for number in range(1, layout.get("partition_slots", 128) + 1) if number not in used]
+    if len(numbers) < 2:
+        raise StorageError("Two unused GPT partition slots are required")
+    sector = layout["sector_size"]
+    new = []
+    cursor = start
+    for role, length, kind, number in zip(
+        ("efi", "root"), (ESP_BYTES, amount - ESP_BYTES), (ESP_TYPE, ROOT_TYPE), numbers[:2],
+    ):
+        end = cursor + length // sector - 1
+        partuuid = str(uuid.uuid5(uuid.UUID(layout["disk_guid"]), f"spectrumos:{role}:{cursor}:{end}"))
+        new.append({"role": role, "number": number, "start": cursor, "end": end,
+                    "type": kind, "partuuid": partuuid, "path": partition_path(layout["disk"], number)})
+        cursor = end + 1
+    plan = {"schema": 1, "mode": "alongside", "disk": layout["disk"],
+            "fingerprint": layout["fingerprint"], "extent_start": start, "size_gib": size_gib,
+            "default_boot": default_boot, "create": new, "preserve": layout["partitions"]}
+    plan["confirmation"] = digest(plan)
+    return plan
+
+
+def partition_commands(plan: dict) -> list[list[str]]:
+    options = []
+    for part in plan["create"]:
+        number = part["number"]
+        options += [f"--new={number}:{part['start']}:{part['end']}",
+                    f"--typecode={number}:{part['type']}",
+                    f"--partition-guid={number}:{part['partuuid']}",
+                    f"--change-name={number}:SPECTRUM_{part['role'].upper()}"]
+    return [["sgdisk", *options, plan["disk"]], ["partprobe", plan["disk"]]]
+
+
+def wait_for_partitions(plan: dict) -> None:
+    devices = [f"/dev/disk/by-partuuid/{part['partuuid']}" for part in plan["create"]]
+    # Espera solo los dispositivos nuevos; otros eventos de udev no deben bloquear la instalación.
+    try:
+        command(["udevadm", "wait", "--initialized=yes", "--timeout=60", *devices], timeout=65)
+    except (StorageError, subprocess.TimeoutExpired) as error:
+        raise StorageError(
+            "The new partitions did not become ready within 60 seconds. "
+            "They may already exist; review the recovery records and current disk layout "
+            "before retrying. No filesystems were formatted. " + str(error)
+        ) from error
+    for part, device in zip(plan["create"], devices):
+        if not Path(device).is_block_device() or os.path.realpath(device) != os.path.realpath(part["path"]):
+            raise StorageError("New partition device identity does not match the plan; refusing to format")
+
+
+def assert_created(plan: dict, after: dict) -> None:
+    if after["disk"] != plan["disk"]:
+        raise StorageError("The disk identity changed")
+    preserved = {part["number"]: part for part in plan["preserve"]}
+    expected = set(preserved) | {part["number"] for part in plan["create"]}
+    if {part["number"] for part in after["partitions"]} != expected:
+        raise StorageError("Unexpected partitions after allocation; refusing to format")
+    for part in after["partitions"]:
+        if part["number"] in preserved:
+            if part != preserved[part["number"]]:
+                raise StorageError("An existing partition changed; refusing to format")
+        else:
+            created = next(item for item in plan["create"] if item["number"] == part["number"])
+            if any(part[key] != created[key] for key in ("path", "start", "type", "partuuid")) or part["size"] != created["end"] - created["start"] + 1:
+                raise StorageError("New partition geometry does not match the plan; refusing to format")
+
+
+def apply_partitions(plan: dict, backup: Path) -> None:
+    if os.geteuid() != 0:
+        raise StorageError("Partition creation requires root")
+    # Bloquea durante la escritura; udev necesita el cierre para procesar los cambios.
+    with open(plan["disk"], "r+b") as device:
+        fcntl.flock(device, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        current = inspect(plan["disk"])
+        fresh = make_plan(current, plan["extent_start"], plan["size_gib"], plan["default_boot"])
+        if fresh != plan:
+            raise StorageError("The reviewed disk layout changed; review a new plan")
+        if backup.is_symlink() or not backup.is_dir() or backup.stat().st_uid != 0 or backup.stat().st_mode & 0o077:
+            raise StorageError("Recovery records require a private root-owned directory")
+        backup_device = command(["findmnt", "--noheadings", "--output", "SOURCE", "--target", str(backup)]).strip()
+        if backup_device.startswith("/dev/"):
+            ancestors = command(["lsblk", "--inverse", "--noheadings", "--paths", "--output", "PATH", backup_device.split("[", 1)[0]]).split()
+            if plan["disk"] in ancestors:
+                raise StorageError("Recovery records must be outside the installation disk")
+        (backup / "plan.json").write_text(json.dumps(plan, indent=2) + "\n")
+        (backup / "partition-table.sfdisk").write_text(command(["sfdisk", "--dump", plan["disk"]]))
+        command(["sgdisk", f"--backup={backup / 'partition-table.gpt'}", plan["disk"]])
+        (backup / "firmware-before.txt").write_text(command(["efibootmgr", "--verbose"]))
+        for arguments in partition_commands(plan):
+            command(arguments)
+    wait_for_partitions(plan)
+    after = inspect(plan["disk"])
+    if after["disk_guid"] != current["disk_guid"] or after["bytes"] != current["bytes"]:
+        raise StorageError("Disk identity changed; refusing to format")
+    assert_created(plan, after)
+
+
+def boot_entries(content: str) -> tuple[list[str], set[str]]:
+    order_match = re.search(r"^BootOrder: ([0-9A-Fa-f,]+)$", content, re.M)
+    order = order_match[1].upper().split(",") if order_match else []
+    entries = {value.upper() for value in re.findall(r"^Boot([0-9A-Fa-f]{4})\*?\s", content, re.M)}
+    return order, entries
+
+
+def register_boot(disk: str, number: int, partuuid: str, default_boot: bool) -> None:
+    if os.geteuid() != 0 or not 1 <= number <= 128:
+        raise StorageError("A valid EFI partition and root privileges are required")
+    expected = str(uuid.UUID(partuuid))
+    actual = command(["blkid", "-s", "PARTUUID", "-o", "value", partition_path(disk, number)]).strip().lower()
+    if actual != expected:
+        raise StorageError("The EFI partition identity changed")
+    content = command(["efibootmgr", "--verbose"])
+    order, before = boot_entries(content)
+    matches = [line[4:8].upper() for line in content.splitlines()
+               if re.match(r"^Boot[0-9A-Fa-f]{4}\*?\s", line) and expected in line.lower()
+               and "\\efi\\spectrumos\\limine.efi" in line.lower().replace("/", "\\")]
+    if len(matches) == 1:
+        entry = matches[0]
+    else:
+        command(["efibootmgr", "--create-only", "--disk", disk, "--part", str(number),
+                 "--label", "SpectrumOS", "--loader", "\\EFI\\SpectrumOS\\limine.efi"])
+        _, after = boot_entries(command(["efibootmgr"]))
+        created = after - before
+        if len(created) != 1:
+            raise StorageError("Could not identify the new firmware entry; existing entries were preserved")
+        entry = created.pop()
+    desired = [entry, *[item for item in order if item != entry]] if default_boot else [*order, *([] if entry in order else [entry])]
+    if desired != order:
+        command(["efibootmgr", "--bootorder", ",".join(desired)])
+    final_order, final_entries = boot_entries(command(["efibootmgr"]))
+    if final_order != desired or not before.issubset(final_entries):
+        raise StorageError("Firmware did not retain the requested boot entries/order; inspect the saved recovery records")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Plan SpectrumOS alongside installation without resizing existing filesystems")
+    parser.add_argument("action", choices=("inspect", "plan", "partition", "register-boot"))
+    parser.add_argument("--disk", required=True)
+    parser.add_argument("--extent-start", type=int)
+    parser.add_argument("--size-gib", type=int)
+    parser.add_argument("--keep-boot-default", action="store_true")
+    parser.add_argument("--confirm-plan")
+    parser.add_argument("--backup", type=Path)
+    parser.add_argument("--boot-number", type=int)
+    parser.add_argument("--boot-partuuid")
+    options = parser.parse_args()
+    try:
+        if options.action == "register-boot":
+            if options.boot_number is None or not options.boot_partuuid:
+                raise StorageError("EFI partition number and PARTUUID are required")
+            register_boot(options.disk, options.boot_number, options.boot_partuuid, not options.keep_boot_default)
+            return 0
+        layout = inspect(options.disk)
+        result = layout
+        if options.action != "inspect":
+            if options.extent_start is None or options.size_gib is None:
+                raise StorageError("Select the start and size of unallocated space")
+            result = make_plan(layout, options.extent_start, options.size_gib, not options.keep_boot_default)
+        if options.action == "partition":
+            if options.confirm_plan != result["confirmation"] or options.backup is None:
+                raise StorageError("Exact reviewed-plan confirmation and recovery directory are required")
+            apply_partitions(result, options.backup)
+        print(json.dumps(result))
+    except (StorageError, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

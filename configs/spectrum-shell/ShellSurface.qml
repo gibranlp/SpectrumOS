@@ -13,7 +13,7 @@ Rectangle {
     property int leftFrameThickness: geometry.frameThickness
     property int rightFrameThickness: geometry.frameThickness
     readonly property int joinRadius: geometry.curveRadius
-    readonly property int attachmentOverlap: 4
+    readonly property int attachmentOverlap: geometry.frameThickness
     ShellGeometry { id: geometry }
     property alias keyboardController: keyboardNavigation
     KeyboardNavigation { id: keyboardNavigation }

@@ -20,23 +20,23 @@ function availability(peer) {
 }
 function serviceLabel(status) {
     const service = status.service || {};
-    if (!service.available) return "Service unavailable";
-    if (service.load_state === "not-found") return "Service not installed";
+    if (!service.available) return qsTranslate("Spectrum", "Service unavailable");
+    if (service.load_state === "not-found") return qsTranslate("Spectrum", "Service not installed");
     if (service.active_state === "active")
-        return status.runtime && status.runtime.state === "running" ? "Running" : "Service active · runtime unavailable";
-    if (service.unit_file_state === "disabled") return "Service disabled";
-    return "Service " + (service.active_state || "unknown");
+        return status.runtime && status.runtime.state === "running" ? qsTranslate("Spectrum", "Running") : qsTranslate("Spectrum", "Service active · runtime unavailable");
+    if (service.unit_file_state === "disabled") return qsTranslate("Spectrum", "Service disabled");
+    return qsTranslate("Spectrum", "Service ") + (service.active_state || qsTranslate("Spectrum", "unknown"));
 }
 function backendProblems(doctor) {
     if (!doctor || !doctor.portal) return [];
     const issues = [];
-    if (!doctor.portal.available) issues.push(doctor.portal.error || "Session portal unavailable.");
+    if (!doctor.portal.available) issues.push(doctor.portal.error || qsTranslate("Spectrum", "Session portal unavailable."));
     ["input_capture", "remote_desktop"].forEach(key => {
         const value = doctor[key] || {};
         if (value.keyboard_advertised !== true || value.pointer_advertised !== true)
-            issues.push((key === "input_capture" ? "InputCapture" : "RemoteDesktop") + ": " + (value.error || "keyboard/pointer unavailable"));
+            issues.push((key === "input_capture" ? "InputCapture" : "RemoteDesktop") + ": " + (value.error || qsTranslate("Spectrum", "keyboard/pointer unavailable")));
     });
-    if (!doctor.connect_to_eis_available) issues.push("ConnectToEIS unavailable. Check your Wayland desktop's portal backend.");
+    if (!doctor.connect_to_eis_available) issues.push(qsTranslate("Spectrum", "ConnectToEIS unavailable. Check your Wayland desktop's portal backend."));
     return issues;
 }
 function offerValid(offer) {
@@ -48,7 +48,7 @@ function approval(offer, accept) {
     return {accept:accept, remote_node_id:offer.remote_node_id, verification_code:offer.verification_code};
 }
 
-function permissionLabel(value) { return value === true ? "allowed" : value === false ? "denied" : "unknown"; }
+function permissionLabel(value) { return value === true ? qsTranslate("Spectrum", "allowed") : value === false ? qsTranslate("Spectrum", "denied") : qsTranslate("Spectrum", "unknown"); }
 
 function pairedControlOffer(data) {
     const peer = (data || {}).peer;
@@ -70,14 +70,14 @@ function permissionResult(status, data, peerId) {
 }
 
 function clipboardLabel(value) {
-    if (!value) return "Update UKVM for text sharing";
-    if (value.state === "restart_required") return "Restart UKVM to enable text sharing";
-    if (!value.enabled) return "Off";
-    if (value.supported === false || value.state === "unavailable") return "Backend unavailable";
-    if (value.state === "stopped") return "Enabled · start UKVM";
-    if (value.state === "starting") return "Starting…";
+    if (!value) return qsTranslate("Spectrum", "Update UKVM for text sharing");
+    if (value.state === "restart_required") return qsTranslate("Spectrum", "Restart UKVM to enable text sharing");
+    if (!value.enabled) return qsTranslate("Spectrum", "Off");
+    if (value.supported === false || value.state === "unavailable") return qsTranslate("Spectrum", "Backend unavailable");
+    if (value.state === "stopped") return qsTranslate("Spectrum", "Enabled · start UKVM");
+    if (value.state === "starting") return qsTranslate("Spectrum", "Starting…");
     const count = value.connected_peers || 0;
-    return count ? "Sharing text · " + count + " computer" + (count === 1 ? "" : "s") : "Enabled · waiting for another computer";
+    return count ? qsTranslate("Spectrum", "Sharing text · %n computer", "", count) : qsTranslate("Spectrum", "Enabled · waiting for another computer");
 }
 
 function authorizationLabel(status, kind, doctor) {
@@ -85,9 +85,9 @@ function authorizationLabel(status, kind, doctor) {
     const sampled = ((status || {}).desktop_authorization || {})[key];
     const probed = ((doctor || {}).desktop_authorization || {})[key];
     const value = probed && probed.persistence_api_supported === false ? probed : sampled || probed || {};
-    const labels = {persistent: "Persistent", active: "Active", needs_approval: "Needs approval",
-        unsupported: "Persistence unavailable", unavailable: "Authorization needs attention"};
-    return labels[value.state] || "Authorization status unavailable";
+    const labels = {persistent: qsTranslate("Spectrum", "Persistent"), active: qsTranslate("Spectrum", "Active"), needs_approval: qsTranslate("Spectrum", "Needs approval"),
+        unsupported: qsTranslate("Spectrum", "Persistence unavailable"), unavailable: qsTranslate("Spectrum", "Authorization needs attention")};
+    return labels[value.state] || qsTranslate("Spectrum", "Authorization status unavailable");
 }
 
 function backendState(doctor) {
@@ -100,13 +100,13 @@ function backendState(doctor) {
 }
 function healthLabel(status, doctor) {
     const service = status.service || {};
-    if (!service.available || service.active_state === "failed") return "Service needs attention";
+    if (!service.available || service.active_state === "failed") return qsTranslate("Spectrum", "Service needs attention");
     const backend = backendState(doctor);
-    if (backend === "backend_missing") return "Required Wayland backend missing";
-    if (backend === "incompatible_backend") return "Incompatible Wayland backend";
-    if (backend === "unknown") return "Checking Wayland backend…";
-    if ((status.runtime || {}).state === "running") return "Running · backend ready";
-    return "Backend ready · portal consent may be needed when starting";
+    if (backend === "backend_missing") return qsTranslate("Spectrum", "Required Wayland backend missing");
+    if (backend === "incompatible_backend") return qsTranslate("Spectrum", "Incompatible Wayland backend");
+    if (backend === "unknown") return qsTranslate("Spectrum", "Checking Wayland backend…");
+    if ((status.runtime || {}).state === "running") return qsTranslate("Spectrum", "Running · backend ready");
+    return qsTranslate("Spectrum", "Backend ready · portal consent may be needed when starting");
 }
 
 function discoveryMachines(machines, localId) {

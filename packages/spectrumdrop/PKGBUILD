@@ -1,7 +1,7 @@
 pkgname=spectrumdrop
 pkgver=1.0.0
-pkgrel=4
-pkgdesc='SpectrumOS native nearby file transfer with a maintained AWDL backend'
+pkgrel=6
+pkgdesc='SpectrumOS encrypted network sharing and native AirDrop file transfers'
 arch=(x86_64)
 url='https://spectrum.gibranlp.dev'
 license=(MIT GPL-3.0-or-later GPL-2.0-only ISC)
@@ -11,21 +11,23 @@ conflicts=(omdrop omdrop-owl brcmfmac-awdl-dkms)
 replaces=(omdrop omdrop-owl)
 install=spectrumdrop.install
 options=(!debug)
-_source_revision=a66ae26d50893c89
+_source_revision=a1d68347eb8e7fe9
 _source_root="spectrumos-source-$pkgver"
 source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
-sha256sums=('7e12a04cbbb35818aa19bb314b18e1c8268fee2b3dffe9734eed54a905c76162')
+sha256sums=('223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20')
 
 build() {
     "$srcdir/$_source_root/integrations/spectrumdrop/build" "$srcdir/$_source_root" "$srcdir/build"
 }
 
 check() {
+    ctest --test-dir "$srcdir/build" --output-on-failure
     cd "$srcdir/$_source_root"
     bash -n integrations/spectrumdrop/runtime/bin/spectrumdrop integrations/spectrumdrop/runtime/radio/spectrumdrop-radio
     python -m compileall -q integrations/spectrumdrop/runtime
     integrations/spectrumdrop/runtime/bin/spectrumdrop --version
     PYTHONPATH=integrations/spectrumdrop/tests python -m unittest test_receiver_limits test_receiver_protocol test_receiver_port test_contacts_policy test_identity_vectors test_exclusive
+    PYTHONPATH=integrations/spectrumdrop/tests python -m unittest test_lan_transfer test_lan_discovery
     python -m unittest tests.test_spectrumdrop tests.test_spectrumdrop_native.NativeSpectrumDropTests
 }
 
@@ -41,6 +43,7 @@ package() {
     install -Dm644 "$project/packaging/org.spectrumos.spectrumdrop.policy" "$pkgdir/usr/share/polkit-1/actions/org.spectrumos.spectrumdrop.policy"
     install -Dm644 "$project/packaging/99-spectrumdrop-unmanaged.conf" "$pkgdir/usr/lib/NetworkManager/conf.d/99-spectrumdrop-unmanaged.conf"
     install -Dm644 "$project/packaging/netmojo.spectrumdrop-links.desktop" "$pkgdir/usr/share/applications/netmojo.spectrumdrop-links.desktop"
+    install -Dm644 "$project/runtime/share/spectrumdrop-lan.service" "$pkgdir/usr/lib/systemd/user/spectrumdrop-lan.service"
     install -d "$pkgdir/usr/share/licenses/$pkgname"
     install -m644 "$project"/licenses/* "$pkgdir/usr/share/licenses/$pkgname/"
     install -Dm644 "$project/PROVENANCE.md" "$pkgdir/usr/share/doc/$pkgname/PROVENANCE.md"

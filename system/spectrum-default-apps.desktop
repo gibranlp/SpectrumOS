@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Default Applications
+Comment=Choose the applications used to open links and file types
+Exec=/usr/lib/spectrumos/spectrum-shell-open default-apps
+Icon=preferences-desktop-default-applications
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=Default;Applications;Browser;Video;MIME;Associations;

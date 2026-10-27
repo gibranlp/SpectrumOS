@@ -27,7 +27,7 @@ ColumnLayout {
         onActiveFocusChanged: if (activeFocus) editor.reveal(settingsButton)
         objectName: "questline-savings-settings-" + editor.account.id
         Layout.fillWidth: true
-        label: editor.expanded ? "Close settings" : "Savings settings"
+        label: editor.expanded ? qsTranslate("Spectrum", "Close settings") : qsTranslate("Spectrum", "Savings settings")
         fontFamily: editor.theme.fontFamily; fontSize: editor.theme.fontSize - 2
         backgroundColor: editor.theme.colors.background; foregroundColor: editor.theme.colors.foreground
         onClicked: editor.expanded = !editor.expanded
@@ -37,11 +37,12 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 6
         Text {
-            text: "Savings availability"
+            text: qsTranslate("Spectrum", "Savings availability")
             color: editor.theme.colors.foreground
             font { family: editor.theme.fontFamily; pixelSize: editor.theme.fontSize - 2 }
         }
         FocusChoice {
+            translateModel: true
             id: statusChoice
             onActiveFocusChanged: if (activeFocus) editor.reveal(statusChoice)
             objectName: "questline-savings-status-" + editor.account.id
@@ -52,7 +53,7 @@ ColumnLayout {
             onActivated: editor.status = model[currentIndex]
         }
         Text {
-            text: "Interest rate (%)"
+            text: qsTranslate("Spectrum", "Interest rate (%)")
             color: editor.theme.colors.foreground
             font { family: editor.theme.fontFamily; pixelSize: editor.theme.fontSize - 2 }
         }
@@ -69,6 +70,7 @@ ColumnLayout {
             onTextEdited: editor.rate = text
         }
         FocusChoice {
+            translateModel: true
             id: periodChoice
             onActiveFocusChanged: if (activeFocus) editor.reveal(periodChoice)
             objectName: "questline-savings-period-" + editor.account.id
@@ -80,7 +82,7 @@ ColumnLayout {
         }
         Text {
             Layout.fillWidth: true
-            text: "Estimates only. No automatic interest entries."
+            text: qsTranslate("Spectrum", "Estimates only. No automatic interest entries.")
             wrapMode: Text.Wrap
             color: editor.theme.colors.muted
             font { family: editor.theme.fontFamily; pixelSize: editor.theme.fontSize - 3 }
@@ -90,7 +92,7 @@ ColumnLayout {
             onActiveFocusChanged: if (activeFocus) editor.reveal(saveButton)
             objectName: "questline-savings-save-" + editor.account.id
             Layout.fillWidth: true
-            label: "Save savings settings"
+            label: qsTranslate("Spectrum", "Save savings settings")
             enabled: editor.valid && !editor.busy
             fontFamily: editor.theme.fontFamily; fontSize: editor.theme.fontSize - 2
             backgroundColor: editor.theme.colors.accent; foregroundColor: editor.theme.colors.background

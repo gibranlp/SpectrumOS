@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import os,subprocess,tempfile
+root = Path(__file__).resolve().parents[1]
+import argparse
+parser = argparse.ArgumentParser()
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('--build', type=Path)
+group.add_argument('--installed', action='store_true')
+options = parser.parse_args()
+qml_path = Path('/usr/lib/qt6/qml') if options.installed else options.build.resolve() / 'qml'
+catalog_path = Path('/usr/share/spectrumos/translations') if options.installed else options.build.resolve() / 'translations'
+with tempfile.TemporaryDirectory(prefix='spectrum-translation-proof-') as directory:
+ folder=Path(directory);runtime=folder/'runtime';runtime.mkdir(mode=0o700)
+ locale=folder/'locale.conf';locale.write_text('LANG=en_US.UTF-8\n')
+ qml=folder/'shell.qml';qml.write_text('''import QtQuick
+import Quickshell
+import Spectrum.I18n 1.0
+ShellRoot {
+ property var controller: Translator
+ property string label: qsTranslate("Spectrum", "Save")
+ property int count: 2
+ property string files: qsTranslate("Spectrum", "%n file", "", count)
+ property TextInput draft: TextInput { text: "unsaved user text" }
+ Timer {
+  interval: 50;running:true;repeat:true;property int step:0
+  onTriggered: {
+   try {
+    if(step===0) {if(!Translator.selectLanguage("es_MX"))throw Error(Translator.error);}
+    if(step===1) {if(label!=="Guardar"||files!=="2 archivos")throw Error(label+" / "+files);Translator.selectLanguage("pt_BR");}
+    if(step===2) {if(label!=="Salvar"||files!=="2 arquivos")throw Error(label+" / "+files);count=0;}
+    if(step===3) {if(files!=="0 arquivo")throw Error(files);if(Translator.selectLanguage("unknown"))throw Error("Accepted unknown locale");Translator.selectLanguage("en_US");}
+    if(step===4) {
+     if(label!=="Save"||files!=="0 files"||draft.text!=="unsaved user text")throw Error(label+" / "+files);
+     console.log("SPECTRUM_TRANSLATION_PROOF_PASSED");Qt.quit();
+    }
+    step++;
+   } catch(error) {console.error("SPECTRUM_TRANSLATION_PROOF_FAILED",error);Qt.quit();}
+  }
+ }
+}''')
+ env={**os.environ,'QT_QPA_PLATFORM':'offscreen','QT_QUICK_BACKEND':'software','XDG_RUNTIME_DIR':str(runtime),
+      'QML_IMPORT_PATH':str(qml_path),'SPECTRUM_TRANSLATIONS_DIR':str(catalog_path),
+      'SPECTRUM_LANGUAGE_FILE':str(folder/'language.json'),'SPECTRUM_SYSTEM_LOCALE_FILE':str(locale)}
+ 
+ try:
+  result=subprocess.run(['qs','--path',str(qml)],env=env,capture_output=True,text=True,timeout=15)
+ except subprocess.TimeoutExpired as error:
+  print(error.stdout,error.stderr);raise
+ output=result.stdout+result.stderr;print(output)
+ assert 'SPECTRUM_TRANSLATION_PROOF_PASSED' in output and 'SPECTRUM_TRANSLATION_PROOF_FAILED' not in output,output

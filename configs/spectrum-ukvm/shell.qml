@@ -5,10 +5,12 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import Spectrum.I18n 1.0
 import "../spectrum-shell" as Shell
 
 ShellRoot {
     id: root
+    readonly property var languageController: Translator
     property bool expanded: false
     property var openScreen: Quickshell.screens[0]
     readonly property string cacheHome: Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache"

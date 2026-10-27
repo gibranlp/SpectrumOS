@@ -77,25 +77,23 @@ screenshot_path() {
     printf '%s/Screenshots/Spectrum-%(%Y%m%d-%H%M%S)T.png\n' "$pictures" -1
 }
 
-take_screenshot() {
-    local mode=$1 destination geometry output
+take_screenshot() (
+    local mode=$1 annotate=${2:-true} destination geometry output temporary
     destination=$(screenshot_path)
+    destination=${destination%.png}-$(date +%N).png
+    temporary=$(mktemp --suffix=.png)
+    trap 'rm -f -- "$temporary"' EXIT
     case $mode in
-        Full) grim "$destination" ;;
+        Full) grim "$temporary" ;;
         Monitor)
             output=$(slurp -o -r -f '%l' </dev/null || true)
             [[ -n $output ]] || return 0
-            grim -o "$output" "$destination"
+            grim -o "$output" "$temporary"
             ;;
         Area)
             geometry=$(slurp || true)
             [[ -n $geometry ]] || return 0
-            grim -g "$geometry" -t ppm - | satty \
-                --filename - \
-                --output-filename "$destination" \
-                --actions-on-enter save-to-file \
-                --early-exit
-            [[ -f $destination ]] || return 0
+            grim -g "$geometry" "$temporary"
             ;;
         Window)
             geometry=$(python - <<'PY' | slurp -r || true
@@ -112,21 +110,26 @@ for client in clients:
 PY
             )
             [[ -n $geometry ]] || return 0
-            grim -g "$geometry" -t ppm - | satty \
-                --filename - \
-                --output-filename "$destination" \
-                --actions-on-enter save-to-file \
-                --early-exit
-            [[ -f $destination ]] || return 0
+            grim -g "$geometry" "$temporary"
             ;;
         Delayed)
             sleep 5
-            grim "$destination"
+            grim "$temporary"
             ;;
+        *) return 2 ;;
     esac
-    wl-copy < "$destination"
-    notice "Screenshot captured" "$destination · copied to clipboard"
-}
+    [[ -s $temporary ]] || return 1
+    if [[ $annotate == true ]]; then
+        satty --filename "$temporary" --output-filename "$destination" \
+            --actions-on-enter save-to-file --actions-on-escape exit \
+            --early-exit save --disable-notifications
+        [[ -s $destination ]] || return 0
+    else
+        cp -- "$temporary" "$destination"
+    fi
+    wl-copy --type image/png < "$destination"
+    notice "Screenshot saved" "$destination · copied to clipboard"
+)
 
 capture_menu() {
     /usr/lib/spectrumos/spectrum-shell-open screenshot
@@ -318,10 +321,15 @@ if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
         --audio) audio_menu ;;
         --capture) capture_menu ;;
         --screenshot-area) take_screenshot Area ;;
+        --screenshot-quick-area) take_screenshot Area false ;;
         --screenshot-window) take_screenshot Window ;;
+        --screenshot-quick-window) take_screenshot Window false ;;
         --screenshot-monitor) take_screenshot Monitor ;;
+        --screenshot-quick-monitor) take_screenshot Monitor false ;;
         --screenshot-full) take_screenshot Full ;;
+        --screenshot-quick-full) take_screenshot Full false ;;
         --screenshot-delay) take_screenshot Delayed ;;
+        --screenshot-quick-delay) take_screenshot Delayed false ;;
         --recording) exec /usr/lib/spectrumos/recorder-menu ;;
         --utilities) utilities_menu ;;
         --calculator) exec /usr/lib/spectrumos/calculator-menu ;;

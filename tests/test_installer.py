@@ -432,7 +432,7 @@ pacman() { printf '%s\\n' "$TEST_OWNER"; }
         self.assertNotIn("configs/waybar/layouts/*.jsonc", installer)
         self.assertIn("systemctl --user start spectrum-shell.service", autostart)
         self.assertNotIn("spectrum-dock", installer)
-        self.assertIn("waybar-menu --restart", menu)
+        self.assertIn("ipc call spectrum-shell refreshTheme", menu)
         self.assertIn('scripts/waybar-menu" /usr/lib/spectrumos/waybar-menu', installer)
         self.assertIn('scripts/waybar-widgets" /usr/lib/spectrumos/waybar-widgets', installer)
         self.assertIn('scripts/waybar-cava" /usr/lib/spectrumos/waybar-cava', installer)
@@ -569,17 +569,20 @@ pacman() { printf '%s\\n' "$TEST_OWNER"; }
     def test_lean_install_omits_optional_packages_and_services(self):
         result = self.run_installer("--phase", "packages,system", "--lean")
         self.assertEqual(result.returncode, 0, result.stderr)
-        for package in ("docker", "docker-compose", "transmission-cli", "cups-browsed", "avahi", "tuned"):
+        for package in ("docker", "docker-compose", "transmission-cli", "cups-browsed", "tuned"):
             self.assertNotIn(f" {package} ", result.stdout)
-        for service in ("docker.service", "cups.socket", "cups-browsed.service", "avahi-daemon.service", "tuned.service"):
+        for service in ("docker.service", "cups.socket", "cups-browsed.service", "tuned.service"):
             self.assertNotIn(service, result.stdout)
         for package in ("hyprland", "quickshell", "pipewire", "networkmanager", "zram-generator", "evolution", "kdeconnect"):
             self.assertIn(f" {package} ", result.stdout)
+        self.assertIn(" avahi ", result.stdout)
+        self.assertIn("systemctl mask --now avahi-daemon.service avahi-daemon.socket", result.stdout)
+        self.assertNotIn("systemctl enable --now avahi-daemon.service", result.stdout)
 
     def test_iso_lean_choice_reaches_backend_and_package_boundary(self):
         frontend = (ROOT / "installer/spectrum-installer").read_text(encoding="utf-8")
         backend = (ROOT / "installer/spectrum-installer-backend").read_text(encoding="utf-8")
-        self.assertIn('Gtk.CheckButton(label="Install lean SpectrumOS")', frontend)
+        self.assertIn("tr_widget(Gtk.CheckButton, label=msg('Install lean SpectrumOS'))", frontend)
         self.assertIn('command.append("--lean")', frontend)
         self.assertIn('profile_args+=(--lean)', backend)
         self.assertIn('desktop-lean-exclude.txt', backend)

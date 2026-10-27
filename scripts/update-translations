@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+import argparse
+import ast
+import json
+import re
+from pathlib import Path
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+
+import polib
+
+root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description='Extract Spectrum source messages and refresh PO catalogs')
+parser.add_argument('--check', action='store_true', help='Fail if catalogs do not cover current source messages')
+parser.add_argument('--complete', nargs='*', help='Require complete translations for these locale IDs (all if omitted)')
+options = parser.parse_args()
+entries = {}
+registry = json.loads((root / 'translations/languages.json').read_text())
+if options.complete:
+    unknown = set(options.complete) - {row['id'] for row in registry if row['id'] != 'en_US'}
+    if unknown:
+        raise SystemExit('Unregistered translation locale: ' + ', '.join(sorted(unknown)))
+
+
+def record(source, path, line=1, context='Spectrum', plural=''):
+    key = (context, source)
+    entry = entries.setdefault(key, polib.POEntry(msgctxt=context, msgid=source))
+    if plural:
+        entry.msgid_plural = plural
+    occurrence = (str(path), str(line))
+    if occurrence not in entry.occurrences:
+        entry.occurrences.append(occurrence)
+    return entry
+
+
+dynamic = json.loads((root / 'translations/messages.json').read_text())
+plurals = {value['source']: value['plural'] for value in dynamic if isinstance(value, dict) and value.get('plural')}
+for value in dynamic:
+    record(value if isinstance(value, str) else value['source'], 'translations/messages.json',
+           context='Spectrum' if isinstance(value, str) else value.get('context', 'Spectrum'),
+           plural='' if isinstance(value, str) else value.get('plural', ''))
+with tempfile.TemporaryDirectory(prefix='spectrum-extract-translations-') as temporary:
+    ts = Path(temporary) / 'source.ts'
+    subprocess.run(['/usr/lib/qt6/bin/lupdate', str(root / 'configs/spectrum-shell'),
+                    str(root / 'configs/spectrum-ukvm'), str(root / 'installer/live-shell.qml'), '-no-obsolete', '-locations', 'absolute',
+                    '-ts', str(ts)], check=True, stdout=subprocess.DEVNULL)
+    for context in ET.parse(ts).getroot().findall('context'):
+        for message in context.findall('message'):
+            source = message.findtext('source') or ''
+            plural = plurals.get(source, '') if message.get('numerus') == 'yes' else ''
+            if message.get('numerus') == 'yes' and not plural:
+                raise SystemExit('Add the English plural to translations/messages.json: ' + source)
+            entry = record(source, 'configs', context=context.findtext('name'), plural=plural)
+            entry.occurrences.clear()
+            for location in message.findall('location'):
+                path = (ts.parent / location.get('filename')).resolve()
+                entry.occurrences.append((str(path.relative_to(root)), location.get('line', '1')))
+for path in [*sorted((root / 'scripts').iterdir()), root / 'installer/spectrum-installer']:
+    if not path.is_file():
+        continue
+    try:
+        source = path.read_text()
+        if 'python' not in source.splitlines()[0] and path.suffix != '.py':
+            continue
+        tree = ast.parse(source)
+    except (UnicodeError, SyntaxError, IndexError):
+        continue
+    for node in ast.walk(tree):
+        if path.name == 'spectrum-installer':
+            values = []
+            if isinstance(node, ast.Assign):
+                names = [target.id if isinstance(target, ast.Name) else target.attr if isinstance(target, ast.Attribute) else '' for target in node.targets]
+                if any(name in ('INSTALL_STAGES', 'INSTALL_TIPS', 'keyboard_names', 'gpus', 'step_titles') for name in names):
+                    values = [value for value in ast.walk(node.value) if isinstance(value, ast.Constant) and isinstance(value.value, str)]
+                elif 'error' in names and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and node.value.value:
+                    values = [node.value]
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr == 'field' and len(node.args) > 1:
+                    values = [node.args[1]]
+                elif node.func.attr == 'wizard_page':
+                    values = node.args[:2]
+                elif node.func.attr == 'translated_dropdown' and node.args:
+                    values = [value for value in ast.walk(node.args[0]) if isinstance(value, ast.Constant) and isinstance(value.value, str)]
+            for value in values:
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    record(value.value, path.relative_to(root), value.lineno)
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in ('translate', '_', 'msg', 'plural') or not node.args:
+            continue
+        if isinstance(node.args[0], ast.IfExp):
+            for branch in (node.args[0].body, node.args[0].orelse):
+                if isinstance(branch, ast.Constant) and isinstance(branch.value, str):
+                    record(branch.value, path.relative_to(root), branch.lineno)
+        if not isinstance(node.args[0], ast.Constant) or not isinstance(node.args[0].value, str):
+            continue
+        plural = node.args[1].value if node.func.id == 'plural' and len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else ''
+        record(node.args[0].value, path.relative_to(root), node.lineno, plural=plural)
+template = polib.POFile()
+template.metadata = {'Project-Id-Version': 'SpectrumOS', 'Content-Type': 'text/plain; charset=UTF-8'}
+for key in sorted(entries):
+    template.append(entries[key])
+if not options.check:
+    template.save(str(root / 'translations/spectrum.pot'))
+missing = []
+for language in registry:
+    if language['id'] == 'en_US':
+        continue
+    path = root / 'translations' / (language['id'] + '.po')
+    catalog = polib.pofile(str(path)) if path.exists() else polib.POFile()
+    catalog.metadata.setdefault('Language', language['id'])
+    catalog.metadata.setdefault('Content-Type', 'text/plain; charset=UTF-8')
+    catalog.metadata.setdefault('Plural-Forms', language.get('plural_forms', ''))
+    for key, source in sorted(entries.items()):
+        entry = catalog.find(source.msgid, msgctxt=source.msgctxt)
+        if entry is None:
+            missing.append(language['id'] + ': ' + source.msgid)
+            entry = polib.POEntry(msgctxt=source.msgctxt, msgid=source.msgid,
+                                 msgid_plural=source.msgid_plural)
+            catalog.append(entry)
+        if entry.msgid_plural != source.msgid_plural:
+            missing.append(language['id'] + ': plural changed: ' + source.msgid)
+            entry.msgid_plural = source.msgid_plural
+            if 'fuzzy' not in entry.flags:
+                entry.flags.append('fuzzy')
+        entry.occurrences = source.occurrences
+        entry.obsolete = False
+        if options.complete is not None and (not options.complete or language['id'] in options.complete):
+            count = int(re.search(r'nplurals\s*=\s*(\d+)', language['plural_forms'])[1])
+            if not entry.translated() or (entry.msgid_plural and not all(entry.msgstr_plural.get(index) for index in range(count))):
+                missing.append(language['id'] + ': untranslated: ' + source.msgid)
+    if not options.check:
+        catalog.save(str(path))
+if (options.check or options.complete is not None) and missing:
+    raise SystemExit('Run scripts/update-translations:\n' + '\n'.join(missing))
+print(len(entries), 'source messages;', len(missing), 'new catalog entries')

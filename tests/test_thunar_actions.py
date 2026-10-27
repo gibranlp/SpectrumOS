@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 import tempfile
 import unittest
+import json
+import wave
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
@@ -29,7 +31,7 @@ class ThunarActionsTests(unittest.TestCase):
             actions.sync()
             self.assertEqual(first, config.read_bytes())
             nodes = ET.parse(config).getroot().findall('action')
-            self.assertEqual(len(nodes), 10)
+            self.assertEqual(len(nodes), len(actions.definitions()) + 1)
             self.assertEqual(nodes[0].findtext('command'), 'mine')
 
     def test_sync_preserves_additional_spectrum_actions(self):
@@ -140,6 +142,84 @@ class ThunarActionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='folder space ') as directory, patch.object(actions.subprocess, 'Popen') as popen:
             self.assertEqual(actions.main(['terminal', directory]), 0)
             self.assertEqual(popen.call_args.args[0], ['kitty', '--directory', directory])
+
+    def test_audio_menu_groups_formats_and_passes_all_selected_files(self):
+        definitions = actions.definitions()
+        audio = [node for node in definitions if node.findtext('submenu') == 'Convert audio']
+        self.assertEqual(len(audio), 6)
+        for node, fmt in zip(audio, actions.AUDIO_FORMATS):
+            self.assertEqual(node.findtext('command'), f'/usr/lib/spectrumos/thunar-actions convert-audio {fmt} %F')
+            self.assertIsNotNone(node.find('audio-files'))
+            self.assertIn('*.FLAC', node.findtext('patterns'))
+
+    def make_audio(self, path):
+        with wave.open(str(path), 'wb') as output:
+            output.setnchannels(2)
+            output.setsampwidth(2)
+            output.setframerate(44100)
+            output.writeframes(b'\x00\x00\x01\x00' * 4410)
+
+    def test_real_audio_conversions_preserve_sources_existing_outputs_and_metadata(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(actions, 'notify'):
+            source = Path(directory) / "track 'with $() spaces.WAV"
+            self.make_audio(source)
+            tagged = Path(directory) / 'tagged.flac'
+            subprocess.run(['ffmpeg', '-v', 'error', '-i', str(source), '-metadata', 'title=Test track',
+                            '-metadata', 'artist=Spectrum', str(tagged)], check=True)
+            original = tagged.read_bytes()
+            for fmt in actions.AUDIO_FORMATS:
+                with self.subTest(fmt=fmt):
+                    output = tagged.with_suffix('.' + fmt)
+                    previous = output.read_bytes() if output.exists() else None
+                    self.assertEqual(actions.convert_audio(fmt, [tagged]), 0)
+                    if previous is not None:
+                        self.assertEqual(output.read_bytes(), previous)
+                        output = output.with_name(output.stem + ' (1)' + output.suffix)
+                    details = json.loads(subprocess.check_output([
+                        'ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(output)]))
+                    self.assertEqual(len(details['streams']), 1)
+                    self.assertEqual(details['streams'][0]['codec_type'], 'audio')
+                    tags = {key.lower(): value for key, value in details['format'].get('tags', {}).items()}
+                    tags.update({key.lower(): value for key, value in details['streams'][0].get('tags', {}).items()})
+                    if fmt != 'wav':
+                        self.assertEqual(tags.get('title'), 'Test track')
+                        self.assertEqual(tags.get('artist'), 'Spectrum')
+            self.assertEqual(tagged.read_bytes(), original)
+            self.assertFalse(list(Path(directory).glob('.spectrum-audio-*')))
+
+    def test_audio_batch_continues_after_failure_without_partial_files(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(actions, 'notify'):
+            bad = Path(directory) / 'broken.wav'
+            bad.write_bytes(b'not audio')
+            good = Path(directory) / 'working.wav'
+            self.make_audio(good)
+            self.assertEqual(actions.convert_audio('mp3', [bad, good]), 1)
+            self.assertFalse(bad.with_suffix('.mp3').exists())
+            self.assertTrue(good.with_suffix('.mp3').is_file())
+            saved = good.with_suffix('.mp3').read_bytes()
+            self.assertEqual(actions.convert_audio('mp3', [good]), 0)
+            self.assertEqual(good.with_suffix('.mp3').read_bytes(), saved)
+            self.assertTrue(good.with_name('working (1).mp3').exists())
+            self.assertFalse(list(Path(directory).glob('.spectrum-audio-*')))
+
+    def test_audio_timeout_cleans_up_and_formats_are_validated(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(actions, 'notify'):
+            good = Path(directory) / 'working.wav'
+            self.make_audio(good)
+            with patch.object(actions.subprocess, 'run', side_effect=subprocess.TimeoutExpired('ffmpeg', 3600)):
+                self.assertEqual(actions.convert_audio('mp3', [good]), 1)
+            self.assertFalse(list(Path(directory).glob('.spectrum-audio-*')))
+            for fmt, sources in [('exe', [good]), ('mp3', [])]:
+                with self.assertRaises(ValueError):
+                    actions.convert_audio(fmt, sources)
+
+    def test_packaged_text_defaults_and_terminal_launcher(self):
+        defaults = (ROOT / 'configs/xdg/mimeapps.list').read_text()
+        for mime in ('text/plain', 'text/x-python', 'application/json', 'application/yaml', 'application/toml', 'application/xml'):
+            self.assertIn(mime + '=nvim.desktop', defaults)
+        self.assertNotIn('inode/directory=nvim.desktop', defaults)
+        self.assertEqual((ROOT / 'configs/xdg/xdg-terminals.list').read_text().splitlines()[0], 'kitty.desktop')
+        self.assertIn('xdg-terminal-exec', (ROOT / 'bootstrap/packages/desktop.txt').read_text().splitlines())
 
     def test_package_installer_and_session_include_actions(self):
         self.assertIn('thunar-actions', (ROOT / 'install.sh').read_text())

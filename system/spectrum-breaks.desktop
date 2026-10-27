@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Break Reminders
+Comment=Gentle eye and movement reminders that respect your activity
+Exec=/usr/lib/spectrumos/spectrum-shell-open breaks
+Icon=preferences-desktop-accessibility
+Terminal=false
+Categories=Utility;
+Keywords=Break;Eyes;Ergonomics;Movement;

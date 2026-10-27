@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
+import Spectrum.I18n 1.0
 
 ColumnLayout {
     id: content
@@ -16,7 +17,24 @@ ColumnLayout {
     property bool serversEdited: false
     property date now: new Date()
     readonly property bool busy: action.running
+    readonly property string interfaceLanguage: Translator.selectedLanguage
+    readonly property var interfaceChoices: ["system", ...Translator.languages.map(row => row.id)]
     spacing: 9
+
+    function interfaceName(value): string {
+        if (value === "system")
+            return qsTranslate("Spectrum", "Follow system");
+        const language = Translator.languages.find(row => row.id === value);
+        return language ? language.name : value;
+    }
+    function setInterfaceLanguage(value): void {
+        error = "";
+        message = "";
+        if (!Translator.selectLanguage(value))
+            error = qsTranslate("Spectrum", Translator.error);
+        else
+            picker = "";
+    }
 
     function refresh(): void {
         if (!status.running)
@@ -56,7 +74,7 @@ ColumnLayout {
                     if (!content.serversEdited)
                         servers.text = content.settings.servers || "";
                 } catch (error) {
-                    content.error = "Could not read time settings";
+                    content.error = qsTranslate("Spectrum", "Could not read time settings");
                 }
             }
         }
@@ -69,8 +87,9 @@ ColumnLayout {
         stderr: StdioCollector { onStreamFinished: content.error = text.trim() }
         onExited: (code) => {
             if (code !== 0 && !content.error)
-                content.error = "Time settings could not be updated";
+                content.error = qsTranslate("Spectrum", "Time settings could not be updated");
             if (code === 0) {
+                Translator.reload();
                 content.selectedZone = "";
                 content.selectedLanguage = "";
                 content.selectedRegion = "";
@@ -120,52 +139,71 @@ ColumnLayout {
         }
     }
 
-    Label { text: Qt.formatDateTime(content.now, "ddd d MMM yyyy  HH:mm:ss"); font.bold: true }
+    Label { text: content.now.toLocaleString(Qt.locale(Translator.region), "ddd d MMM yyyy  HH:mm:ss"); font.bold: true }
     Label {
         text: content.settings.available ? (content.settings.timezone || "") + "\n" +
-            (content.settings.ntp ? (content.settings.synchronized ? "Automatic time · synchronized" : "Automatic time · waiting for synchronization") : "Manual time") :
-            (content.settings.error || "Reading time settings…")
+            (content.settings.ntp ? (content.settings.synchronized ? qsTranslate("Spectrum", "Automatic time · synchronized") : qsTranslate("Spectrum", "Automatic time · waiting for synchronization")) : qsTranslate("Spectrum", "Manual time")) :
+            (content.settings.error || qsTranslate("Spectrum", "Reading time settings…"))
         color: content.theme.colors.accent
     }
     RowLayout {
         Layout.fillWidth: true
         Button {
             Layout.fillWidth: true
-            label: content.settings.ntp ? "Turn automatic time off" : "Turn automatic time on"
-            enabled: content.settings.available && content.settings.can_ntp && !content.busy
+            label: content.settings.ntp ? qsTranslate("Spectrum", "Turn automatic time off") : qsTranslate("Spectrum", "Turn automatic time on")
+            enabled: content.settings.available && !!content.settings.can_ntp && !content.busy
             onClicked: content.apply(["ntp", content.settings.ntp ? "off" : "on"])
         }
-        Button { label: "Refresh"; enabled: !content.busy; onClicked: content.refresh() }
+        Button { label: qsTranslate("Spectrum", "Refresh"); enabled: !content.busy; onClicked: content.refresh() }
     }
 
-    Label { text: "TIME ZONE"; font.bold: true }
+    Label { text: qsTranslate("Spectrum", "TIME ZONE"); font.bold: true }
     RowLayout {
         Layout.fillWidth: true
-        Button { Layout.fillWidth: true; label: content.selectedZone || content.settings.timezone || "Choose time zone"; onClicked: content.choose("timezone") }
-        Button { label: "Apply"; enabled: !!content.selectedZone && !content.busy; onClicked: content.apply(["timezone", content.selectedZone]) }
+        Button { Layout.fillWidth: true; label: content.selectedZone || content.settings.timezone || qsTranslate("Spectrum", "Choose time zone"); onClicked: content.choose("timezone") }
+        Button { label: qsTranslate("Spectrum", "Apply"); enabled: !!content.selectedZone && !content.busy; onClicked: content.apply(["timezone", content.selectedZone]) }
     }
-    Label { text: "LANGUAGE & REGION"; font.bold: true }
-    Label { text: "Language"; color: content.theme.colors.muted }
-    Button { Layout.fillWidth: true; label: content.selectedLanguage || content.settings.language || "Choose language"; onClicked: content.choose("language") }
-    Label { text: "Regional formats · dates, numbers and currency"; color: content.theme.colors.muted }
-    Button { Layout.fillWidth: true; label: content.selectedRegion || content.settings.region || "Choose region"; onClicked: content.choose("region") }
+    Label { text: qsTranslate("Spectrum", "LANGUAGE & REGION"); font.bold: true }
+    Label { text: qsTranslate("Spectrum", "Spectrum interface language"); font.bold: true }
+    Button {
+        objectName: "interface-language"
+        Layout.fillWidth: true
+        label: content.interfaceName(content.interfaceLanguage)
+        enabled: !content.busy
+        onClicked: content.choose("interface")
+    }
+    Label {
+        text: qsTranslate("Spectrum", "Applies immediately to translated Spectrum controls. Untranslated text uses English.")
+        color: content.theme.colors.muted
+        font.pixelSize: content.theme.fontSize - 2
+    }
+    Label { text: qsTranslate("Spectrum", "System language"); color: content.theme.colors.muted }
+    Button { Layout.fillWidth: true; label: content.selectedLanguage || content.settings.language || qsTranslate("Spectrum", "Choose language"); onClicked: content.choose("language") }
+    Label { text: qsTranslate("Spectrum", "Regional formats · dates, numbers and currency"); color: content.theme.colors.muted }
+    Button { Layout.fillWidth: true; label: content.selectedRegion || content.settings.region || qsTranslate("Spectrum", "Choose region"); onClicked: content.choose("region") }
 
     ColumnLayout {
         Layout.fillWidth: true
         visible: content.picker.length > 0
-        Input { id: search; placeholder: content.picker === "timezone" ? "Search city or time zone…" : "Search locale, e.g. en_US or es_MX…" }
+        Input { id: search; objectName: "time-region-search"; placeholder: content.picker === "interface" ? qsTranslate("Spectrum", "Search interface language…") : content.picker === "timezone" ? qsTranslate("Spectrum", "Search city or time zone…") : qsTranslate("Spectrum", "Search locale, e.g. en_US or es_MX…") }
         ListView {
             id: choices
+            objectName: "time-region-choices"
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(160, contentHeight)
             clip: true
             spacing: 4
-            model: (content.picker === "timezone" ? content.settings.timezones || [] : content.settings.locales || []).filter(name => name.toLowerCase().includes(search.text.toLowerCase()))
+            model: (content.picker === "interface" ? content.interfaceChoices : content.picker === "timezone" ? content.settings.timezones || [] : content.settings.locales || []).filter(name => (content.picker === "interface" ? content.interfaceName(name) + " " + name : name).toLowerCase().includes(search.text.toLowerCase()))
             delegate: Button {
                 required property string modelData
                 width: choices.width
-                label: modelData.replace(/_/g, " ")
+                label: content.picker === "interface" ? content.interfaceName(modelData) : modelData.replace(/_/g, " ")
+                enabled: !content.busy && (content.picker === "interface" || content.settings.available)
                 onClicked: {
+                    if (content.picker === "interface") {
+                        content.setInterfaceLanguage(modelData);
+                        return;
+                    }
                     if (content.picker === "timezone") content.selectedZone = modelData;
                     else if (content.picker === "language") content.selectedLanguage = modelData;
                     else content.selectedRegion = modelData;
@@ -174,40 +212,40 @@ ColumnLayout {
             }
             onModelChanged: positionViewAtBeginning()
         }
-        Label { visible: choices.count === 0; text: "No matching results"; color: content.theme.colors.muted }
+        Label { visible: choices.count === 0; text: qsTranslate("Spectrum", "No matching results"); color: content.theme.colors.muted }
     }
     Button {
         Layout.fillWidth: true
-        label: "Apply language and region"
+        label: qsTranslate("Spectrum", "Apply language and region")
         enabled: !content.busy && (!!content.selectedLanguage || !!content.selectedRegion)
         onClicked: content.apply(["locale", content.selectedLanguage || content.settings.language, content.selectedRegion || content.settings.region])
     }
-    Label { text: "Regional changes apply to all applications after signing out."; color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
+    Label { text: qsTranslate("Spectrum", "System language and regional formats apply to applications after signing out. Spectrum follows the system language when Follow system is selected."); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
 
-    Label { text: "NTP SERVERS"; font.bold: true }
+    Label { text: qsTranslate("Spectrum", "NTP SERVERS"); font.bold: true }
     Label {
-        text: content.settings.server ? "Connected to " + content.settings.server + (content.settings.server_address ? " · " + content.settings.server_address : "") : "No active server"
+        text: content.settings.server ? qsTranslate("Spectrum", "Connected to %1").arg(content.settings.server) + (content.settings.server_address ? " · " + content.settings.server_address : "") : qsTranslate("Spectrum", "No active server")
         color: content.theme.colors.muted
     }
-    Input { id: servers; visible: !!content.settings.server_controls; placeholder: "Default servers (or enter hostnames / IPs)"; onEdited: content.serversEdited = true }
+    Input { id: servers; objectName: "time-region-servers"; visible: !!content.settings.server_controls; placeholder: qsTranslate("Spectrum", "Default servers (or enter hostnames / IPs)"); onEdited: content.serversEdited = true }
     RowLayout {
         Layout.fillWidth: true
         visible: !!content.settings.server_controls
-        Button { Layout.fillWidth: true; label: "Save servers"; onClicked: content.apply(["servers", servers.text]) }
-        Button { label: "Use defaults"; onClicked: content.apply(["servers", ""]) }
+        Button { Layout.fillWidth: true; label: qsTranslate("Spectrum", "Save servers"); onClicked: content.apply(["servers", servers.text]) }
+        Button { label: qsTranslate("Spectrum", "Use defaults"); onClicked: content.apply(["servers", ""]) }
     }
     Label {
-        text: content.settings.server_controls ? "Separate servers with spaces. Saving reconnects automatic time when it is running." : "Custom server settings require systemd-timesyncd."
+        text: content.settings.server_controls ? qsTranslate("Spectrum", "Separate servers with spaces. Saving reconnects automatic time when it is running.") : qsTranslate("Spectrum", "Custom server settings require systemd-timesyncd.")
         color: content.theme.colors.muted
         font.pixelSize: content.theme.fontSize - 2
     }
-    Label { visible: !!content.settings.fallback_servers; text: "Fallback: " + (content.settings.fallback_servers || ""); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
+    Label { visible: !!content.settings.fallback_servers; text: qsTranslate("Spectrum", "Fallback: %1").arg(content.settings.fallback_servers || ""); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
 
-    Label { visible: !content.settings.ntp && content.settings.available; text: "MANUAL DATE & TIME"; font.bold: true }
+    Label { visible: !content.settings.ntp && content.settings.available; text: qsTranslate("Spectrum", "MANUAL DATE & TIME"); font.bold: true }
     Input { id: manual; visible: !content.settings.ntp && content.settings.available; placeholder: "YYYY-MM-DD HH:MM:SS" }
-    Button { visible: !content.settings.ntp && content.settings.available; Layout.fillWidth: true; label: "Set date and time"; onClicked: content.apply(["time", manual.text]) }
-    Label { text: "Hardware clock: " + (content.settings.local_rtc ? "local time" : "UTC"); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
-    Label { visible: content.busy; text: "Applying settings…"; color: content.theme.colors.accent }
-    Label { visible: !!content.message && !content.error; text: content.message; color: content.theme.colors.accent; font.pixelSize: content.theme.fontSize - 1 }
-    Label { visible: !!content.error; text: content.error; color: content.theme.colors.error || "#ff8c9a"; font.pixelSize: content.theme.fontSize - 1 }
+    Button { visible: !content.settings.ntp && content.settings.available; Layout.fillWidth: true; label: qsTranslate("Spectrum", "Set date and time"); onClicked: content.apply(["time", manual.text]) }
+    Label { text: qsTranslate("Spectrum", "Hardware clock: %1").arg(content.settings.local_rtc ? qsTranslate("Spectrum", "local time") : "UTC"); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
+    Label { visible: content.busy; text: qsTranslate("Spectrum", "Applying settings…"); color: content.theme.colors.accent }
+    Label { objectName: "time-region-message"; visible: !!content.message && !content.error; text: qsTranslate("Spectrum", content.message); color: content.theme.colors.accent; font.pixelSize: content.theme.fontSize - 1 }
+    Label { visible: !!content.error; text: qsTranslate("Spectrum", content.error); color: content.theme.colors.error || "#ff8c9a"; font.pixelSize: content.theme.fontSize - 1 }
 }

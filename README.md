@@ -24,7 +24,7 @@ Window controls stay consistent across **Dwindle, Master, Scrolling, and Monocle
 | --- | --- |
 | Mission control | Control Center, Dashboard, system readings, battery and power profiles, calendar, weather, time and region |
 | Connections and sound | Wi-Fi and Ethernet, Bluetooth, output/input selection, volume, microphone controls, playback and artwork |
-| Screens and appearance | Monitor arrangement, resolution, refresh rate, scale, supported brightness controls, wallpapers, fonts, keyboard and mouse settings |
+| Screens and appearance | Monitor arrangement, resolution, refresh rate, scale, supported brightness controls, wallpapers, fonts, keyboard and mouse settings, default applications |
 | Capture the evidence | Screenshots, screen recording, audio recording, and visible recording indicators |
 | Small but persistent side quests | File search, calculator, passwords, emoji, color picking and saved colors |
 | Stay on task | Focus timer, Questline, notification history, Do Not Disturb, keep-awake control |
@@ -162,7 +162,7 @@ Game compatibility depends on drivers, Proton, and anti-cheat support. Calling e
 
 Get the **x86_64 ISO and its SHA-256 checksum** from [the download page](https://spectrum.gibranlp.dev/), or explore the [visual guide](https://gibranlp.dev/en/spectrum/). Boot the live environment to inspect the installer before committing to a disk.
 
-The installer offers Full/Lean selection, hardware profiles, **Btrfs**, and **Limine**. Installation erases the selected disk; back it up first. Manual partitioning and same-disk dual boot are not offered by this installer. A VM is useful for exploration; physical hardware acceptance is a separate test.
+The installer offers Full/Lean selection, hardware profiles, **Btrfs**, and **Limine**. The currently downloadable ISO supports whole-disk erasure. Updated installer sources add **Install alongside** for UEFI/GPT disks with at least 34 GiB of unallocated space, preserving existing partitions and using a dedicated Spectrum EFI partition. Guided shrinking and manual partition selection are still planned. Back up important files before installation; a future explicitly authorized ISO release is required to deliver the new installer on installation media. See the [dual-boot implementation status](docs/dual-boot-installer-plan.md). A VM is useful for exploration; physical hardware acceptance is a separate test.
 
 **Stable update notifications:** SpectrumOS checks for newer installed packages from the signed SpectrumOS Stable repository about one minute after the shell starts, then every 30 minutes. When fresh loot is ready, a notification offers **Open Updates**. Click it to open the Updates widget, review the safety checks, and choose the update action. The widget also shows the Stable package status; **Check again** refreshes it. The same set of available versions is announced once, including across shell restarts. Offline or failed checks do not invent updates, and checks use a separate package database without changing the system database or installing anything. Notifications cover SpectrumOS Stable packages; the actual update still upgrades Arch and SpectrumOS together. Your party deserves compatible equipment.
 
@@ -270,6 +270,7 @@ This is the canonical **SpectrumOS** source repository. The former SpectrumOS2 d
 | `assets/` | Branding, original wallpapers and boot artwork |
 | `system/`, `migrations/` | Services, release policy and upgrade migrations |
 | `tests/` | Backend and QML checks |
+| `translations/` | Language registry, source template and shared shell/helper translation catalogs |
 | `repo/` | Public signing keys, repository configuration and hosting templates |
 | `docs/` | Architecture, integration and release documentation |
 
@@ -292,8 +293,68 @@ The root installer is a development tool for an existing Arch system; the ISO in
 
 Package recipes pin immutable source archives and checksums. Those release archives live at [spectrum.gibranlp.dev/sources](https://spectrum.gibranlp.dev/sources/), not in Git. Follow [packaging](docs/packaging.md) to prepare sources and clean builds. **Do not build or resume an ISO unless explicitly requested**; publishing source does not require rebuilding packages or the ISO.
 
+## Project memory
+
+This checkout uses [COMEM](docs/project-memory.md) for structured, evidence-backed
+development memory. Read [AGENTS.md](AGENTS.md), then run
+`python3 .comem/comem.py recall --budget 16000` and recall the task's paths before
+editing. Save milestones and a handoff with the tool. The older
+`docs/PROJECT_MEMORY.md` remains a historical archive. COMEM runs only on demand
+and adds no desktop service; its developer metadata is excluded from releases.
+
+## Help translate SpectrumOS
+
+SpectrumShell supports **English**, **Latin American Spanish (`es_MX`)**, and **Brazilian Portuguese (`pt_BR`)**. Select **Time & Region → Spectrum interface language** to switch translated bars, widgets, menus and tooltips immediately. **Follow system** uses the system language; changing the separate system language also affects applications after signing out. Personal notes, filenames, app names and third-party content keep their original text. Detailed command logs may remain in English. The ISO installer uses the same language registry and configures the selected system language and regional formats. Detailed installation and recovery logs retain their technical output.
+
+Translations live in [`translations/`](translations/). Edit the `.po` files with a PO editor or text editor; the same catalog produces Qt translations for the shell and gettext translations for Python helpers. English is the fallback. You do not need to edit C++ or build an ISO to contribute a language.
+
+On an Arch development system, install the build/check tools:
+
+```sh
+sudo pacman -S --needed base-devel cmake qt6-tools qt6-declarative quickshell python-polib
+```
+
+To add a language, append an entry to [`translations/languages.json`](translations/languages.json), preserving the existing entries. For example, French:
+
+```json
+{
+  "id": "fr_FR",
+  "name": "Français",
+  "language": "fr",
+  "locale": "fr_FR.UTF-8",
+  "plural_forms": "nplurals=2; plural=(n > 1);"
+}
+```
+
+Use the native language name for `name`, an appropriate Qt locale ID for `id`, the base language code for `language`, and the language's gettext plural rule for `plural_forms`. Then extract the source messages:
+
+```sh
+scripts/update-translations
+```
+
+This refreshes `translations/spectrum.pot` and creates or updates each registered language's PO file, including `translations/fr_FR.po` in this example. Translate `msgstr` and every `msgstr[n]` plural form. Keep `msgid`, context, `%1`/`%2`/`%n`, named placeholders such as `{name}`, markup, shortcuts and meaningful whitespace intact. Remove a `fuzzy` flag only after reviewing the translation. Missing or fuzzy entries use English, so contributors can work incrementally.
+
+Check your work and compile private build output:
+
+```sh
+scripts/update-translations --check --complete fr_FR
+scripts/build-localization --output artifacts/localization
+python -m unittest tests.test_localization
+scripts/check-localization --build artifacts/localization
+scripts/check-shell-translations --build artifacts/localization
+scripts/check-time-region-ui --build artifacts/localization
+```
+
+`--complete fr_FR` requires every current source message in French; omit `--complete` for a work-in-progress catalog. The compiler checks placeholders and plural rules. The UI checks use temporary settings and do not change your desktop language. They exercise the existing Spanish/Portuguese behavior; also review the new language on a development installation for wording, plural forms and longer labels at different font sizes and bar orientations. Installing an updated package and restarting the shell makes registry changes available in the selector.
+
+When adding English UI text, wrap complete messages with `qsTranslate("Spectrum", "Save")` in QML or `translate("Save")` in Python, then run extraction again. Keep translated labels separate from command IDs and saved values. Runtime-only messages and enum labels belong in [`translations/messages.json`](translations/messages.json); plural entries declare both English source forms there. Use a distinct context for ambiguous terms, as the weather context does for “Clear”. See the [translation guide](translations/README.md) for examples and limitations.
+
+Submit a pull request with the registry entry, PO changes and any necessary layout fixes. Include the checks you ran. Keep generated `.ts`, `.qm`, `.mo`, packages and ISOs out of the pull request. The Planning Council welcomes translators; no boss fight required.
+
 ## Credits, licenses, and fellow adventurers
 
 Thanks to [Arch Linux](https://archlinux.org/), [Hyprland](https://hypr.land/), [Quickshell](https://quickshell.org/), [Caelestia Shell](https://github.com/caelestia-dots/shell), [Gowall](https://github.com/Achno/gowall), and the many upstream projects behind this desktop. Stash, Questline, and UKVM have their own linked repositories and licenses; vendored components retain their notices. Consult package and component license files for the code and artwork you use.
 
 Found a bug? Open an issue with what happened, what you expected, steps to reproduce, relevant hardware, and sanitized logs or screenshots. Feature ideas, desktop screenshots, and reproducible boss encounters are welcome.
+
+Thunar configuration and file actions: [Neovim defaults and audio/image conversion](docs/thunar.md).

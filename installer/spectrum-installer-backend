@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export LC_ALL=C
 
 project_root=${SPECTRUM_PROJECT_ROOT:-/usr/local/share/spectrumos/source}
 target=/mnt/spectrumos
@@ -8,6 +9,8 @@ disk=
 username=
 hostname=spectrum
 timezone=UTC
+system_locale=en_US.UTF-8
+regional_locale=
 password_file=
 confirm_erase=
 cpu_profile=
@@ -16,6 +19,30 @@ form_factor=desktop
 keyboard_profile=us
 browsers=
 lean=false
+install_mode=erase
+extent_start=
+size_gib=
+confirm_plan=
+keep_boot_default=false
+storage_helper=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/spectrum-installer-storage
+storage_plan=
+recovery_records=
+target_mounted=false
+
+cleanup() {
+    local result=$?
+    if [[ $target_mounted == true ]] && mountpoint -q "$target"; then
+        if [[ -d $target/etc/pacman.d/gnupg ]]; then
+            gpgconf --homedir "$target/etc/pacman.d/gnupg" --kill gpg-agent 2>/dev/null || true
+        fi
+        umount --recursive "$target" || printf 'Warning: installation mounts remain under %s\n' "$target" >&2
+    fi
+    if (( result != 0 )) && [[ -n $recovery_records ]]; then
+        printf 'Installation stopped. Recovery records: %s. No erase fallback was attempted.\n' "$recovery_records" >&2
+    fi
+    return "$result"
+}
+trap cleanup EXIT
 
 die() {
     printf 'Error: %s\n' "$*" >&2
@@ -26,23 +53,32 @@ usage() {
     cat <<'EOF'
 Usage: spectrum-installer-backend [--list-disks [--json] | install options]
 
-Installation is a dry-run unless both --apply and --confirm-erase DEVICE are used.
+Installation is a dry-run unless --apply and the selected mode's confirmation are used.
 
 Options:
   --list-disks                 List eligible whole disks
   --json                       Emit disk data as JSON
   --apply                      Perform the installation
-  --disk DEVICE                Whole disk to erase and install to
+  --disk DEVICE                Destination whole disk
+  --inspect-disk DEVICE        Read GPT partitions and unallocated extents as JSON
+  --storage-plan              Preview an alongside plan as JSON (no installation)
+  --install-mode erase|alongside
+  --extent-start SECTOR        Aligned free extent from --inspect-disk
+  --size-gib GIB               Total alongside allocation (minimum 34 GiB)
+  --confirm-plan SHA256        Exact alongside plan confirmation
+  --keep-boot-default          Keep existing firmware entries before Spectrum
   --username NAME              Initial administrator account
   --hostname NAME              Installed system hostname
   --timezone ZONE              IANA timezone, for example America/Cancun
+  --locale LOCALE              en_US.UTF-8, es_MX.UTF-8 or pt_BR.UTF-8
+  --region LOCALE              UTF-8 locale for dates, numbers and currency
   --password-file PATH         Root-readable file containing the user password
   --cpu amd|intel              CPU microcode profile
   --gpu amd|intel|nvidia|nvidia-intel|nvidia-amd|vm
                                Graphics profile
   --form-factor desktop|laptop Hardware form factor
   --lean                       Skip optional background services and integrations
-  --keyboard us|us-intl|latam|es|us,latam|us-intl,latam|us-intl,es
+  --keyboard us|us-intl|latam|es|br|us,latam|us-intl,latam|us-intl,es
                                Keyboard layout
   --browsers LIST              Comma-separated optional browsers to install:
                                chrome, brave, zen (default: none)
@@ -64,7 +100,25 @@ list_disks() {
     fi
 }
 
+validate_locales() {
+    python -c '
+import json, pathlib, sys
+try:
+    rows = json.loads(pathlib.Path("/usr/share/spectrumos/translations/languages.json").read_text())
+except FileNotFoundError:
+    rows = [{"locale": value} for value in ("en_US.UTF-8", "es_MX.UTF-8", "pt_BR.UTF-8")]
+except (OSError, ValueError):
+    sys.exit(1)
+sys.exit(0 if isinstance(rows, list) and any(isinstance(row, dict) and row.get("locale") == sys.argv[1] for row in rows) else 1)
+' "$system_locale" || die "Installation language is invalid"
+    regional_locale=${regional_locale:-$system_locale}
+    [[ $regional_locale =~ ^[a-z]{2}_[A-Z]{2}\.UTF-8$ ]] || die "Regional locale is invalid"
+    grep -Eq "^${regional_locale//./\\.}[[:space:]]+UTF-8$" /usr/share/i18n/SUPPORTED || die "Regional locale is unavailable"
+}
+
 validate() {
+    [[ ! -L $target ]] || die "The installation mountpoint must not be a symbolic link"
+    [[ $install_mode == erase || $install_mode == alongside ]] || die "Unknown installation mode"
     [[ $disk == /dev/* ]] || die "A whole-disk device under /dev is required"
     [[ ! $disk =~ ^/dev/(fd|zram)[0-9]+$ ]] || die "Refusing a floppy or RAM-backed installation device: $disk"
     [[ -b $disk ]] || die "Disk does not exist: $disk"
@@ -72,17 +126,18 @@ validate() {
     [[ $(lsblk -dn -o RO "$disk") == 0 ]] || die "Disk is read-only: $disk"
     (( $(blockdev --getsize64 "$disk") >= 20 * 1024 * 1024 * 1024 )) || die "Disk must be at least 20 GiB"
     if lsblk -nrpo MOUNTPOINT "$disk" | grep -qv '^$'; then
-        die "Refusing to erase a disk with mounted filesystems"
+        die "Refusing to install on a disk with mounted filesystems"
     fi
     [[ $username =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Username is invalid"
     [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]] || die "Hostname is invalid"
     [[ -e /usr/share/zoneinfo/$timezone && $timezone != *..* ]] || die "Timezone is invalid"
+    validate_locales
     [[ -r $password_file ]] || die "Password file is not readable"
     [[ -n $(head -n 1 "$password_file") ]] || die "Password cannot be empty"
     [[ $cpu_profile == amd || $cpu_profile == intel ]] || die "CPU profile is invalid"
     [[ $gpu_profile == amd || $gpu_profile == intel || $gpu_profile == nvidia || $gpu_profile == nvidia-intel || $gpu_profile == nvidia-amd || $gpu_profile == vm ]] || die "GPU profile is invalid"
     [[ $form_factor == desktop || $form_factor == laptop ]] || die "Form factor is invalid"
-    [[ $keyboard_profile == us || $keyboard_profile == us-intl || $keyboard_profile == latam || $keyboard_profile == es || $keyboard_profile == us,latam || $keyboard_profile == us-intl,latam || $keyboard_profile == us-intl,es ]] || die "Keyboard profile is invalid"
+    [[ $keyboard_profile == us || $keyboard_profile == us-intl || $keyboard_profile == latam || $keyboard_profile == es || $keyboard_profile == br || $keyboard_profile == us,latam || $keyboard_profile == us-intl,latam || $keyboard_profile == us-intl,es ]] || die "Keyboard profile is invalid"
     if [[ -n $browsers ]]; then
         local browser
         IFS=',' read -r -a requested_browsers <<< "$browsers"
@@ -94,7 +149,20 @@ validate() {
     [[ -x $project_root/install.sh ]] || die "SpectrumOS source tree is unavailable: $project_root"
     if [[ $mode == apply ]]; then
         ((EUID == 0)) || die "Installation must run as root"
-        [[ $confirm_erase == "$disk" ]] || die "Erase confirmation does not exactly match the selected disk"
+        if [[ $install_mode == erase ]]; then
+            [[ $confirm_erase == "$disk" ]] || die "Erase confirmation does not exactly match the selected disk"
+        else
+            [[ $confirm_plan =~ ^[0-9a-f]{64}$ && -z $confirm_erase ]] || die "An exact alongside plan confirmation is required"
+        fi
+    fi
+    if [[ $install_mode == alongside ]]; then
+        local -a storage_args=(plan --disk "$disk" --extent-start "$extent_start" --size-gib "$size_gib")
+        [[ $keep_boot_default == false ]] || storage_args+=(--keep-boot-default)
+        storage_plan=$(python "$storage_helper" "${storage_args[@]}") || die "Alongside storage validation failed"
+        disk=$(python -c 'import json,sys; print(json.load(sys.stdin)["disk"])' <<< "$storage_plan")
+        if [[ $mode == apply ]]; then
+            [[ $(python -c 'import json,sys; print(json.load(sys.stdin)["confirmation"])' <<< "$storage_plan") == "$confirm_plan" ]] || die "The reviewed plan changed; review the disk again"
+        fi
     fi
 }
 
@@ -200,6 +268,19 @@ install_spectrum_repository() {
     fi
 }
 
+configure_locales() {
+    if [[ $mode == apply ]]; then
+        printf '%s UTF-8\n' en_US.UTF-8 "$system_locale" "$regional_locale" | awk '!seen[$0]++' > "$target/etc/locale.gen"
+        printf 'LANG=%s\nLC_MESSAGES=%s\n' "$system_locale" "$system_locale" > "$target/etc/locale.conf"
+        local category
+        for category in LC_TIME LC_NUMERIC LC_MONETARY LC_MEASUREMENT LC_PAPER LC_ADDRESS LC_TELEPHONE LC_NAME LC_IDENTIFICATION; do
+            printf '%s=%s\n' "$category" "$regional_locale" >> "$target/etc/locale.conf"
+        done
+    else
+        printf '+ configure language %q with regional formats %q\n' "$system_locale" "$regional_locale"
+    fi
+}
+
 configure_keyboard() {
     local layouts variants options keymap config_dir
     case $keyboard_profile in
@@ -207,6 +288,7 @@ configure_keyboard() {
         us-intl) layouts=us; variants=intl; options=; keymap=us-acentos ;;
         latam) layouts=latam; variants=; options=; keymap=la-latin1 ;;
         es) layouts=es; variants=; options=; keymap=es ;;
+        br) layouts=br; variants=; options=; keymap=br-abnt2 ;;
         us,latam) layouts=us,latam; variants=,; options=grp:alt_shift_toggle; keymap=us ;;
         us-intl,latam) layouts=us,latam; variants=intl,; options=grp:alt_shift_toggle; keymap=us-acentos ;;
         us-intl,es) layouts=us,es; variants=intl,; options=grp:alt_shift_toggle; keymap=us-acentos ;;
@@ -281,7 +363,18 @@ install_system() {
     local -a packages
     local -a profile_args=(--cpu "$cpu_profile" --gpu "$gpu_profile" --form-factor "$form_factor")
     [[ $lean == false ]] || profile_args+=(--lean)
-    mapfile -t packages < <(collect_packages)
+    local package_list
+    package_list=$(collect_packages) || die "Package selection failed"
+    [[ -n $package_list ]] || die "Package selection is empty"
+    mapfile -t packages <<< "$package_list"
+
+    if [[ $mode == apply ]]; then
+        [[ -s /var/lib/spectrumos/repository/edge/x86_64/spectrumos.db.tar.zst && \
+           -s /var/lib/spectrumos/repository/edge/x86_64/spectrumos.db.tar.zst.sig && \
+           -s $project_root/repo/keys/spectrumos-production.asc && \
+           -s $project_root/repo/keys/spectrumos-production.fingerprint ]] || \
+            die "The signed installation repository or signing key is unavailable"
+    fi
 
     if [[ $lean == true && $mode == apply ]]; then
         bash "$project_root/scripts/check-lean-package" \
@@ -294,8 +387,18 @@ install_system() {
     else
         firmware=bios
     fi
-    boot_partition=$(partition_path 1)
-    root_partition=$(partition_path 2)
+    local boot_number=1 boot_partuuid=
+    if [[ $install_mode == alongside ]]; then
+        local root_number
+        boot_number=$(python -c 'import json,sys; print(json.load(sys.stdin)["create"][0]["number"])' <<< "$storage_plan")
+        root_number=$(python -c 'import json,sys; print(json.load(sys.stdin)["create"][1]["number"])' <<< "$storage_plan")
+        boot_partuuid=$(python -c 'import json,sys; print(json.load(sys.stdin)["create"][0]["partuuid"])' <<< "$storage_plan")
+        boot_partition=$(partition_path "$boot_number")
+        root_partition=$(partition_path "$root_number")
+    else
+        boot_partition=$(partition_path 1)
+        root_partition=$(partition_path 2)
+    fi
 
     progress 2
     printf 'Checking package mirrors before touching the destination disk.\n'
@@ -318,23 +421,51 @@ install_system() {
     progress 5
     printf 'Installing SpectrumOS to %s (%s firmware).\n' "$disk" "$firmware"
     if mountpoint -q "$target"; then
-        run umount --recursive "$target"
+        die "The installation mountpoint is already in use; recover or unmount it before installing"
     fi
-    run wipefs --all --force "$disk"
-    run sgdisk --zap-all "$disk"
-    if [[ $firmware == uefi ]]; then
-        run sgdisk --new=1:0:+1GiB --typecode=1:ef00 --change-name=1:SPECTRUM_EFI "$disk"
+    if [[ $install_mode == alongside ]]; then
+        local -a allocation_args=(partition --disk "$disk" --extent-start "$extent_start" --size-gib "$size_gib" --confirm-plan "$confirm_plan")
+        [[ $keep_boot_default == false ]] || allocation_args+=(--keep-boot-default)
+        if [[ $mode == apply ]]; then
+            install -d -m 0700 /var/log/spectrum-installer
+            recovery_records=$(mktemp -d /var/log/spectrum-installer/alongside-XXXXXXXX)
+            exec > >(tee --output-error=warn -a "$recovery_records/install.log") 2>&1
+            cat > "$recovery_records/README.txt" <<'EOF'
+These records describe the partition table and firmware before installation.
+Export this directory to another drive before leaving the live session.
+After a successful installation a copy is saved in /var/lib/spectrumos/installer-recovery.
+Partition-table backups do not contain filesystem data. Do not restore the old
+table automatically: the new Spectrum partitions would become inaccessible.
+If installation stops, review the log and plan.json before taking further action.
+EOF
+            printf 'Recovery records: %s (export these before leaving the live session).\n' "$recovery_records"
+            python "$storage_helper" "${allocation_args[@]}" --backup "$recovery_records" > "$recovery_records/applied-plan.json"
+        else
+            printf '+ create only the two partitions in the reviewed alongside plan\n%s\n' "$storage_plan"
+        fi
     else
-        run sgdisk --new=1:0:+2MiB --typecode=1:ef02 --change-name=1:SPECTRUM_BIOS "$disk"
+        run wipefs --all --force "$disk"
+        run sgdisk --zap-all "$disk"
+        if [[ $firmware == uefi ]]; then
+            run sgdisk --new=1:0:+1GiB --typecode=1:ef00 --change-name=1:SPECTRUM_EFI "$disk"
+        else
+            run sgdisk --new=1:0:+2MiB --typecode=1:ef02 --change-name=1:SPECTRUM_BIOS "$disk"
+        fi
+        run sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:SPECTRUM_ROOT "$disk"
+        run partprobe "$disk"
+        run udevadm wait --initialized=yes --timeout=60 "$boot_partition" "$root_partition"
     fi
-    run sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:SPECTRUM_ROOT "$disk"
-    run partprobe "$disk"
-    run udevadm settle
     progress 10
+    if [[ $install_mode == alongside && $mode == apply ]]; then
+        boot_partition=/dev/disk/by-partuuid/$boot_partuuid
+        root_partition=/dev/disk/by-partuuid/$(python -c 'import json,sys; print(json.load(sys.stdin)["create"][1]["partuuid"])' <<< "$storage_plan")
+        [[ -b $boot_partition && -b $root_partition ]] || die "The newly allocated partition identities are unavailable; refusing to format"
+    fi
     [[ $firmware == bios ]] || run mkfs.fat -F 32 -n SPECTRM_EFI "$boot_partition"
     run mkfs.btrfs --force --label SPECTRUM_ROOT "$root_partition"
     run mkdir -p "$target"
     run mount "$root_partition" "$target"
+    [[ $mode != apply ]] || target_mounted=true
     run btrfs subvolume create "$target/@"
     run btrfs subvolume create "$target/@home"
     run btrfs subvolume create "$target/@snapshots"
@@ -360,6 +491,14 @@ install_system() {
     # package.
     if [[ $mode == apply ]]; then
         root_uuid=$(blkid -s UUID -o value "$root_partition")
+        if [[ $install_mode == alongside ]]; then
+            local boot_uuid
+            boot_uuid=$(blkid -s UUID -o value "$boot_partition")
+            install -d -m 0755 "$target/etc/spectrumos"
+            printf 'schema=1\nroot_uuid=%s\nboot_uuid=%s\nboot_partuuid=%s\n' \
+                "$root_uuid" "$boot_uuid" "$boot_partuuid" > "$target/etc/spectrumos/boot-ownership"
+            printf '%s\n' "$root_uuid" > "$target/boot/.spectrumos-boot-owner"
+        fi
         boot_source='boot():/boot'
         [[ $firmware == uefi ]] && boot_source='boot():'
         cat > "$target/boot/limine.conf" <<EOF
@@ -379,8 +518,11 @@ interface_branding: SpectrumOS
     cmdline: root=UUID=$root_uuid rootfstype=btrfs rootflags=subvol=@ rw
 EOF
         if [[ $firmware == uefi ]]; then
-            python "$project_root/scripts/limine-windows-entry" \
-                --config "$target/boot/limine.conf" --exclude-disk "$disk"
+            local -a discovery_args=(--config "$target/boot/limine.conf" --exclude-disk "$disk")
+            if [[ $install_mode == alongside ]]; then
+                discovery_args=(--config "$target/boot/limine.conf" --exclude-partuuid "$boot_partuuid" --include-linux)
+            fi
+            python "$project_root/scripts/limine-windows-entry" "${discovery_args[@]}"
         fi
     else
         printf '+ write Limine configuration for %s firmware\n' "$firmware"
@@ -411,9 +553,8 @@ EOF
 
     run arch-chroot "$target" ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime
     run arch-chroot "$target" hwclock --systohc
+    configure_locales
     if [[ $mode == apply ]]; then
-        printf 'en_US.UTF-8 UTF-8\n' > "$target/etc/locale.gen"
-        printf 'LANG=en_US.UTF-8\n' > "$target/etc/locale.conf"
         printf '%s\n' "$hostname" > "$target/etc/hostname"
         printf '127.0.0.1 localhost\n::1 localhost\n127.0.1.1 %s.localdomain %s\n' \
             "$hostname" "$hostname" > "$target/etc/hosts"
@@ -430,18 +571,33 @@ EOF
     run arch-chroot "$target" /opt/SpectrumOS2/install.sh --apply \
         --phase system,user,theme --target-user "$username" --set-default-shell --no-reload "${profile_args[@]}"
     configure_keyboard
+    if [[ $mode == apply ]]; then
+        printf '{"schema":1,"language":"system"}\n' > "$target/home/$username/.config/spectrumos/language.json"
+        run arch-chroot "$target" chown "$username:$username" "/home/$username/.config/spectrumos/language.json"
+    fi
     run arch-chroot "$target" systemctl enable NetworkManager.service sddm.service
     if [[ $gpu_profile == nvidia-intel || $gpu_profile == nvidia-amd ]]; then
         run arch-chroot "$target" systemctl enable switcheroo-control.service
     fi
     progress 90
     install_aur_desktop_apps
+    if [[ $install_mode == alongside ]]; then
+        run arch-chroot "$target" mkinitcpio -P
+    fi
     progress 93
 
     if [[ $mode == apply ]]; then
         if [[ $firmware == uefi ]]; then
-            install -d -m 0755 "$target/boot/EFI/BOOT"
-            cp "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/BOOT/BOOTX64.EFI"
+            if [[ $install_mode == alongside ]]; then
+                install -d -m 0755 "$target/boot/EFI/SpectrumOS"
+                install -m 0644 "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/SpectrumOS/limine.efi"
+                local -a firmware_args=(register-boot --disk "$disk" --boot-number "$boot_number" --boot-partuuid "$boot_partuuid")
+                [[ $keep_boot_default == false ]] || firmware_args+=(--keep-boot-default)
+                python "$storage_helper" "${firmware_args[@]}"
+            else
+                install -d -m 0755 "$target/boot/EFI/BOOT"
+                cp "$target/usr/share/limine/BOOTX64.EFI" "$target/boot/EFI/BOOT/BOOTX64.EFI"
+            fi
         else
             arch-chroot "$target" limine bios-install "$disk"
         fi
@@ -457,6 +613,10 @@ EOF
     # let it exit on its own. Confirmed live: left running, it holds the
     # mount open and `umount --recursive` below fails with "target is busy".
     if [[ $mode == apply ]]; then
+        if [[ -n $recovery_records ]]; then
+            install -d -m 0700 "$target/var/lib/spectrumos/installer-recovery"
+            cp -a "$recovery_records/." "$target/var/lib/spectrumos/installer-recovery/"
+        fi
         gpgconf --homedir "$target/etc/pacman.d/gnupg" --kill gpg-agent 2>/dev/null || true
     fi
     run umount --recursive "$target"
@@ -477,13 +637,26 @@ if [[ $1 == --list-disks ]]; then
     fi
     exit 0
 fi
+if [[ $1 == --inspect-disk ]]; then
+    [[ $# == 2 ]] || die "Usage: --inspect-disk DEVICE"
+    exec python "$storage_helper" inspect --disk "$2"
+fi
+storage_preview=false
 while (($#)); do
     case $1 in
         --apply) mode=apply ;;
         --disk) shift; disk=${1:-} ;;
+        --install-mode) shift; install_mode=${1:-} ;;
+        --extent-start) shift; extent_start=${1:-} ;;
+        --size-gib) shift; size_gib=${1:-} ;;
+        --confirm-plan) shift; confirm_plan=${1:-} ;;
+        --keep-boot-default) keep_boot_default=true ;;
+        --storage-plan) storage_preview=true ;;
         --username) shift; username=${1:-} ;;
         --hostname) shift; hostname=${1:-} ;;
         --timezone) shift; timezone=${1:-} ;;
+        --locale) shift; system_locale=${1:-} ;;
+        --region) shift; regional_locale=${1:-} ;;
         --password-file) shift; password_file=${1:-} ;;
         --cpu) shift; cpu_profile=${1:-} ;;
         --gpu) shift; gpu_profile=${1:-} ;;
@@ -498,5 +671,11 @@ while (($#)); do
     shift
 done
 
+if [[ $storage_preview == true ]]; then
+    [[ $mode == plan ]] || die "Storage preview cannot install"
+    storage_options=(plan --disk "$disk" --extent-start "$extent_start" --size-gib "$size_gib")
+    [[ $keep_boot_default == false ]] || storage_options+=(--keep-boot-default)
+    exec python "$storage_helper" "${storage_options[@]}"
+fi
 validate
 install_system

@@ -50,8 +50,8 @@ QtObject {
         const rate = account.interest_rate_bps || 0;
         const base = Math.max(0,account.balance_minor || 0);
         const estimate = Math.floor(base * rate / 10000);
-        if (!Number.isSafeInteger(estimate) || !Number.isSafeInteger(base * rate)) return "Estimate unavailable";
-        return "Estimated interest: " + account.currency_code + " " + (estimate / 100).toLocaleString(Qt.locale(),'f',2)
+        if (!Number.isSafeInteger(estimate) || !Number.isSafeInteger(base * rate)) return qsTranslate("Spectrum", "Estimate unavailable");
+        return qsTranslate("Spectrum", "Estimated interest: ") + account.currency_code + " " + (estimate / 100).toLocaleString(Qt.locale(),'f',2)
             + (account.interest_period === "Monthly" ? " / month" : " / year");
     }
 

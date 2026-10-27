@@ -97,7 +97,7 @@ ColumnLayout {
         const value = conversionValue.text.trim();
         const source = fromUnit.trim();
         const target = toUnit.trim();
-        if (!value || !source || !target) { error = "Enter a value and both units"; return; }
+        if (!value || !source || !target) { error = qsTranslate("Spectrum", "Enter a value and both units"); return; }
         input.text = "(" + value + ") " + source + " -> " + target;
         evaluate(conversionGroups[conversionCategory].name === "Temperature" && target !== "K" ? target : "");
     }
@@ -127,17 +127,17 @@ ColumnLayout {
                     calculator.steps = response.steps;
                     calculator.history = [{expression: calculator.submittedInput, result: response.result, unit: calculator.resultUnit, steps: response.steps}].concat(calculator.history).slice(0, 12);
                     input.text = "";
-                } catch (error) { calculator.error = "Calculator returned an invalid response"; }
+                } catch (error) { calculator.error = qsTranslate("Spectrum", "Calculator returned an invalid response"); }
             }
         }
         onExited: (code, status) => {
-            if (code !== 0 && !calculator.error) calculator.error = "Could not calculate the result";
+            if (code !== 0 && !calculator.error) calculator.error = qsTranslate("Spectrum", "Could not calculate the result");
             if (calculator.visible) calculator.activate();
         }
     }
     ShellButton {
         Layout.fillWidth: true
-        label: calculator.advanced ? "← Normal calculator" : "Conversions & scientific →"
+        label: calculator.advanced ? qsTranslate("Spectrum", "← Normal calculator") : qsTranslate("Spectrum", "Conversions & scientific →")
         enabled: !calculator.busy
         fontFamily: calculator.theme.fontFamily
         fontSize: calculator.theme.fontSize
@@ -154,7 +154,7 @@ ColumnLayout {
         Text {
             anchors { fill: parent; margins: 12 }
             visible: !input.text
-            text: calculator.result ? "Continue with +, −, ×, ÷ or Ans" : "Enter a calculation"
+            text: calculator.result ? qsTranslate("Spectrum", "Continue with +, −, ×, ÷ or Ans") : qsTranslate("Spectrum", "Enter a calculation")
             verticalAlignment: Text.AlignVCenter
             color: calculator.theme.colors.muted
             font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize }
@@ -170,7 +170,7 @@ ColumnLayout {
             color: calculator.theme.colors.foreground
             selectionColor: calculator.theme.colors.accent
             font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize }
-            Accessible.name: "Calculation"
+            Accessible.name: qsTranslate("Spectrum", "Calculation")
             Keys.onReturnPressed: calculator.evaluate()
             Keys.onEnterPressed: calculator.evaluate()
             Keys.onEscapePressed: calculator.closeRequested()
@@ -188,12 +188,12 @@ ColumnLayout {
         wrapMode: Text.WrapAnywhere
         color: calculator.theme.colors.accent
         font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize + 14; bold: true }
-        Accessible.name: "Result " + text
+        Accessible.name: qsTranslate("Spectrum", "Result ") + text
     }
     Text {
         Layout.fillWidth: true
         visible: calculator.error.length > 0
-        text: calculator.error
+        text: qsTranslate("Spectrum", calculator.error)
         wrapMode: Text.Wrap
         color: calculator.theme.colors.error || calculator.theme.colors.foreground
         font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
@@ -210,7 +210,7 @@ ColumnLayout {
                 required property string modelData
                 Layout.fillWidth: true
                 Layout.preferredHeight: 38
-                label: modelData
+                label: qsTranslate("Spectrum", modelData)
                 enabled: !calculator.busy && (!["Ans", "Copy"].includes(modelData) || calculator.result.length > 0)
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
@@ -228,7 +228,7 @@ ColumnLayout {
             ShellButton {
                 required property string modelData
                 Layout.fillWidth: true
-                label: modelData
+                label: qsTranslate("Spectrum", modelData)
                 enabled: !calculator.busy
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
@@ -245,14 +245,15 @@ ColumnLayout {
         FocusChoice {
             Layout.fillWidth: true
             theme: calculator.theme
+            translateModel: true
             model: calculator.conversionGroups.map(group => group.name)
             currentIndex: calculator.conversionCategory
             enabled: !calculator.busy
-            Accessible.name: "Conversion category"
+            Accessible.name: qsTranslate("Spectrum", "Conversion category")
             onActivated: calculator.setCategory(currentIndex)
         }
         Text {
-            text: "Value"
+            text: qsTranslate("Spectrum", "Value")
             color: calculator.theme.colors.muted
             font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
         }
@@ -272,7 +273,7 @@ ColumnLayout {
                 color: calculator.theme.colors.foreground
                 selectionColor: calculator.theme.colors.accent
                 font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize }
-                Accessible.name: "Value to convert"
+                Accessible.name: qsTranslate("Spectrum", "Value to convert")
                 Keys.onReturnPressed: calculator.convert()
                 Keys.onEnterPressed: calculator.convert()
                 Keys.onEscapePressed: calculator.closeRequested()
@@ -283,7 +284,7 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "From"
+                    text: qsTranslate("Spectrum", "From")
                     color: calculator.theme.colors.muted
                     font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
                 }
@@ -310,7 +311,7 @@ ColumnLayout {
                         enabled: !calculator.busy
                         color: calculator.theme.colors.foreground
                         font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize }
-                        Accessible.name: "Source unit"
+                        Accessible.name: qsTranslate("Spectrum", "Source unit")
                         onTextEdited: calculator.fromUnit = text
                     }
                 }
@@ -318,7 +319,7 @@ ColumnLayout {
             ShellButton {
                 label: "⇄"
                 enabled: !calculator.busy
-                Accessible.name: "Swap units"
+                Accessible.name: qsTranslate("Spectrum", "Swap units")
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
                 backgroundColor: calculator.theme.colors.surface_alt
@@ -328,7 +329,7 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "To"
+                    text: qsTranslate("Spectrum", "To")
                     color: calculator.theme.colors.muted
                     font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
                 }
@@ -355,7 +356,7 @@ ColumnLayout {
                         enabled: !calculator.busy
                         color: calculator.theme.colors.foreground
                         font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize }
-                        Accessible.name: "Target unit"
+                        Accessible.name: qsTranslate("Spectrum", "Target unit")
                         onTextEdited: calculator.toUnit = text
                     }
                 }
@@ -364,7 +365,7 @@ ColumnLayout {
         Text {
             Layout.fillWidth: true
             visible: calculator.conversionGroups[calculator.conversionCategory].name === "Currency"
-            text: "Currency rates depend on available exchange-rate data."
+            text: qsTranslate("Spectrum", "Currency rates depend on available exchange-rate data.")
             wrapMode: Text.Wrap
             color: calculator.theme.colors.muted
             font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
@@ -373,7 +374,7 @@ ColumnLayout {
             Layout.fillWidth: true
             ShellButton {
                 Layout.fillWidth: true
-                label: "Convert"
+                label: qsTranslate("Spectrum", "Convert")
                 enabled: !calculator.busy
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
@@ -382,7 +383,7 @@ ColumnLayout {
                 onClicked: calculator.convert()
             }
             ShellButton {
-                label: "Copy"
+                label: qsTranslate("Spectrum", "Copy")
                 enabled: !calculator.busy && calculator.result.length > 0
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
@@ -398,7 +399,7 @@ ColumnLayout {
         spacing: 6
         ShellButton {
             Layout.fillWidth: true
-            label: calculator.degrees ? "Angles: Degrees" : "Angles: Radians"
+            label: calculator.degrees ? qsTranslate("Spectrum", "Angles: Degrees") : qsTranslate("Spectrum", "Angles: Radians")
             enabled: !calculator.busy
             fontFamily: calculator.theme.fontFamily
             fontSize: calculator.theme.fontSize
@@ -417,7 +418,7 @@ ColumnLayout {
                     required property string modelData
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
-                    label: modelData
+                    label: qsTranslate("Spectrum", modelData)
                     enabled: !calculator.busy
                     fontFamily: calculator.theme.fontFamily
                     fontSize: calculator.theme.fontSize
@@ -434,7 +435,7 @@ ColumnLayout {
                 ShellButton {
                     required property string modelData
                     Layout.fillWidth: true
-                    label: modelData
+                    label: qsTranslate("Spectrum", modelData)
                     enabled: !calculator.busy
                     fontFamily: calculator.theme.fontFamily
                     fontSize: calculator.theme.fontSize
@@ -458,7 +459,7 @@ ColumnLayout {
                 fontSize: calculator.theme.fontSize - 1
                 backgroundColor: calculator.theme.colors.surface_alt
                 foregroundColor: calculator.theme.colors.muted
-                Accessible.name: "Reuse result " + modelData.result + (modelData.unit ? " " + modelData.unit : "")
+                Accessible.name: qsTranslate("Spectrum", "Reuse result ") + modelData.result + (modelData.unit ? " " + modelData.unit : "")
                 onClicked: calculator.recall(modelData)
             }
         }

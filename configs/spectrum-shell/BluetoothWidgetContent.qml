@@ -22,7 +22,7 @@ ColumnLayout {
 
     Text {
         Layout.fillWidth: true
-        text: !content.adapter ? "No Bluetooth adapter detected." : content.adapter.state === BluetoothAdapterState.Blocked ? "Bluetooth is blocked. Check your hardware switch or airplane mode." : content.changingPower ? "Changing Bluetooth power…" : content.powered ? "Bluetooth is on · " + content.adapter.name : "Bluetooth is off. Turn it on to connect or find devices."
+        text: !content.adapter ? qsTranslate("Spectrum", "No Bluetooth adapter detected.") : content.adapter.state === BluetoothAdapterState.Blocked ? qsTranslate("Spectrum", "Bluetooth is blocked. Check your hardware switch or airplane mode.") : content.changingPower ? qsTranslate("Spectrum", "Changing Bluetooth power…") : content.powered ? qsTranslate("Spectrum", "Bluetooth is on · ") + content.adapter.name : qsTranslate("Spectrum", "Bluetooth is off. Turn it on to connect or find devices.")
         wrapMode: Text.WordWrap
         color: content.theme.colors.muted
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -33,7 +33,7 @@ ColumnLayout {
         ShellButton {
             objectName: "bluetoothPower"
             Layout.fillWidth: true
-            label: content.powered ? "Turn off" : "Turn on"
+            label: content.powered ? qsTranslate("Spectrum", "Turn off") : qsTranslate("Spectrum", "Turn on")
             enabled: content.adapter !== null && !content.changingPower && content.adapter.state !== BluetoothAdapterState.Blocked
             fontFamily: content.theme.fontFamily
             fontSize: content.theme.fontSize - 1
@@ -47,7 +47,7 @@ ColumnLayout {
         ShellButton {
             objectName: "bluetoothScan"
             Layout.fillWidth: true
-            label: content.adapter && content.adapter.discovering ? "Stop scan" : "Find devices"
+            label: content.adapter && content.adapter.discovering ? qsTranslate("Spectrum", "Stop scan") : qsTranslate("Spectrum", "Find devices")
             enabled: content.powered && !content.changingPower
             fontFamily: content.theme.fontFamily
             fontSize: content.theme.fontSize - 1
@@ -59,7 +59,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: content.powered
-        text: content.adapter && content.adapter.discovering ? "Searching for nearby devices… Put your device in pairing mode." : "Choose Find devices to search for a new device."
+        text: content.adapter && content.adapter.discovering ? qsTranslate("Spectrum", "Searching for nearby devices… Put your device in pairing mode.") : qsTranslate("Spectrum", "Choose Find devices to search for a new device.")
         wrapMode: Text.WordWrap
         color: content.theme.colors.muted
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -82,7 +82,7 @@ ColumnLayout {
             }
             Text {
                 Layout.fillWidth: true
-                text: deviceRow.modelData.pairing ? "Pairing…" : (deviceRow.modelData.state === BluetoothDeviceState.Connecting ? "Connecting…" : deviceRow.modelData.state === BluetoothDeviceState.Disconnecting ? "Disconnecting…" : deviceRow.modelData.connected ? "Connected" : deviceRow.modelData.paired ? "Paired" : "Available") + (deviceRow.modelData.trusted ? " · Trusted" : "") + (deviceRow.modelData.batteryAvailable ? " · " + Math.round(deviceRow.modelData.battery * 100) + "% battery" : "")
+                text: deviceRow.modelData.pairing ? qsTranslate("Spectrum", "Pairing…") : (deviceRow.modelData.state === BluetoothDeviceState.Connecting ? qsTranslate("Spectrum", "Connecting…") : deviceRow.modelData.state === BluetoothDeviceState.Disconnecting ? qsTranslate("Spectrum", "Disconnecting…") : deviceRow.modelData.connected ? qsTranslate("Spectrum", "Connected") : deviceRow.modelData.paired ? qsTranslate("Spectrum", "Paired") : qsTranslate("Spectrum", "Available")) + (deviceRow.modelData.trusted ? qsTranslate("Spectrum", " · Trusted") : "") + (deviceRow.modelData.batteryAvailable ? " · " + Math.round(deviceRow.modelData.battery * 100) + qsTranslate("Spectrum", "% battery") : "")
                 color: content.theme.colors.muted
                 font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 2 }
             }
@@ -92,7 +92,7 @@ ColumnLayout {
                 ShellButton {
                     objectName: "bluetoothConnect"
                     Layout.fillWidth: true
-                    label: deviceRow.modelData.pairing ? "Cancel pairing" : deviceRow.modelData.connected ? "Disconnect" : deviceRow.modelData.paired ? "Connect" : "Pair"
+                    label: deviceRow.modelData.pairing ? qsTranslate("Spectrum", "Cancel pairing") : deviceRow.modelData.connected ? qsTranslate("Spectrum", "Disconnect") : deviceRow.modelData.paired ? qsTranslate("Spectrum", "Connect") : qsTranslate("Spectrum", "Pair")
                     enabled: content.powered && (!deviceRow.busy || deviceRow.modelData.pairing)
                     fontFamily: content.theme.fontFamily
                     fontSize: content.theme.fontSize - 2
@@ -108,7 +108,7 @@ ColumnLayout {
                 ShellButton {
                     objectName: "bluetoothTrust"
                     visible: deviceRow.modelData.paired
-                    label: deviceRow.modelData.trusted ? "Untrust" : "Trust"
+                    label: deviceRow.modelData.trusted ? qsTranslate("Spectrum", "Untrust") : qsTranslate("Spectrum", "Trust")
                     enabled: content.powered && !deviceRow.busy
                     fontFamily: content.theme.fontFamily
                     fontSize: content.theme.fontSize - 2
@@ -119,7 +119,7 @@ ColumnLayout {
                 ShellButton {
                     objectName: "bluetoothForget"
                     visible: deviceRow.modelData.paired
-                    label: "Forget"
+                    label: qsTranslate("Spectrum", "Forget")
                     enabled: content.powered && !deviceRow.busy
                     fontFamily: content.theme.fontFamily
                     fontSize: content.theme.fontSize - 2
@@ -135,7 +135,7 @@ ColumnLayout {
         visible: content.forgetTarget !== null
         Text {
             Layout.fillWidth: true
-            text: content.forgetTarget ? "Forget " + (content.forgetTarget.name || content.forgetTarget.address) + "? You will need to pair it again." : ""
+            text: content.forgetTarget ? qsTranslate("Spectrum", "Forget ") + (content.forgetTarget.name || content.forgetTarget.address) + qsTranslate("Spectrum", "? You will need to pair it again.") : ""
             wrapMode: Text.WordWrap
             color: content.theme.colors.foreground
             font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
@@ -143,7 +143,7 @@ ColumnLayout {
         RowLayout {
             ShellButton {
                 objectName: "bluetoothConfirmForget"
-                label: "Forget device"
+                label: qsTranslate("Spectrum", "Forget device")
                 enabled: content.powered && content.forgetTarget !== null
                 fontFamily: content.theme.fontFamily
                 fontSize: content.theme.fontSize - 1
@@ -156,7 +156,7 @@ ColumnLayout {
                 }
             }
             ShellButton {
-                label: "Cancel"
+                label: qsTranslate("Spectrum", "Cancel")
                 fontFamily: content.theme.fontFamily
                 fontSize: content.theme.fontSize - 1
                 backgroundColor: content.theme.colors.surface_alt
@@ -168,7 +168,7 @@ ColumnLayout {
     ShellButton {
         objectName: "bluetoothSettings"
         Layout.fillWidth: true
-        label: "Pairing & device settings"
+        label: qsTranslate("Spectrum", "Pairing & device settings")
         fontFamily: content.theme.fontFamily
         fontSize: content.theme.fontSize - 1
         backgroundColor: content.theme.colors.surface_alt
@@ -180,7 +180,7 @@ ColumnLayout {
     }
     Text {
         Layout.fillWidth: true
-        text: "Use device settings for PIN codes, pairing confirmations, or connection troubleshooting."
+        text: qsTranslate("Spectrum", "Use device settings for PIN codes, pairing confirmations, or connection troubleshooting.")
         wrapMode: Text.WordWrap
         color: content.theme.colors.muted
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 2 }

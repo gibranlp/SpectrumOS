@@ -56,8 +56,8 @@ Rectangle {
             panel.attachBottom = data.edge === "bottom";
             panel.attachLeft = data.edge === "left";
             panel.attachRight = data.edge === "right";
-            panel.x = 80 + (panel.attachLeft ? 3 : panel.attachRight ? -3 : 0);
-            panel.y = 60 + (panel.attachTop ? 3 : panel.attachBottom ? -3 : 0);
+            panel.x = 80 + (panel.attachLeft ? 5 : panel.attachRight ? -5 : 0);
+            panel.y = 60 + (panel.attachTop ? 5 : panel.attachBottom ? -5 : 0);
             waitForRendering(panel);
             const image = grabImage(scene);
             const samples = panel.attachTop ? [[180, 60], [68, 60], [292, 60]]

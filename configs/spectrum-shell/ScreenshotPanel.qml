@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -13,6 +14,7 @@ PanelWindow {
     property int leftInset: 0
     readonly property bool leftBar: theme.barPosition === "left"
     property bool expanded: false
+    property bool annotate: true
     property string pendingMode: ""
     signal captureRequested(string mode)
 
@@ -25,7 +27,7 @@ PanelWindow {
     ShellFocus { id: panelFocus; window: panel; enabled: expanded }
 
     function select(mode): void {
-        pendingMode = mode;
+        pendingMode = (annotate ? "" : "quick-") + mode;
         expanded = false;
         captureDelay.restart();
     }
@@ -56,8 +58,8 @@ PanelWindow {
             bounceEnabled: panel.theme.widgetBounceEnabled !== false
             expanded: panel.expanded
             edge: panel.leftBar ? "left" : "top"
-            viewportWidth: panel.screen.width
-            viewportHeight: panel.screen.height
+            viewportWidth: panel.screen ? panel.screen.width : 0
+            viewportHeight: panel.screen ? panel.screen.height : 0
         }
         attachTop: true
         attachLeft: true
@@ -83,17 +85,26 @@ PanelWindow {
             spacing: 9
 
             Text {
-                text: "SCREENSHOT"
+                text: qsTranslate("Spectrum", "SCREENSHOT")
                 color: panel.theme.colors.accent
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + 2; bold: true }
             }
+            ShellButton {
+                Layout.fillWidth: true
+                label: panel.annotate ? qsTranslate("Spectrum", "Annotations · On") : qsTranslate("Spectrum", "Annotations · Off")
+                fontFamily: panel.theme.fontFamily
+                fontSize: panel.theme.fontSize
+                backgroundColor: panel.annotate ? panel.theme.colors.accent : panel.theme.colors.surface_alt
+                foregroundColor: panel.annotate ? panel.theme.colors.background : panel.theme.colors.foreground
+                onClicked: panel.annotate = !panel.annotate
+            }
             Repeater {
                 model: [
-                    { label: "Capture area", mode: "area" },
-                    { label: "Capture window", mode: "window" },
-                    { label: "Capture monitor", mode: "monitor" },
-                    { label: "Capture full screen", mode: "full" },
-                    { label: "Capture after 5 seconds", mode: "delay" }
+                    { label: qsTranslate("Spectrum", "Capture area"), mode: "area" },
+                    { label: qsTranslate("Spectrum", "Capture window"), mode: "window" },
+                    { label: qsTranslate("Spectrum", "Capture monitor"), mode: "monitor" },
+                    { label: qsTranslate("Spectrum", "Capture full screen"), mode: "full" },
+                    { label: qsTranslate("Spectrum", "Capture after 5 seconds"), mode: "delay" }
                 ]
                 ShellButton {
                     required property var modelData

@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+import configparser
+from concurrent.futures import ThreadPoolExecutor
+import datetime
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+import uuid
+
+import gi
+gi.require_version('Gio', '2.0')
+from gi.repository import Gio
+try:
+    gi.require_version('GioUnix', '2.0')
+    from gi.repository import GioUnix
+    DesktopAppInfo = GioUnix.DesktopAppInfo
+except (ImportError, ValueError):
+    DesktopAppInfo = Gio.DesktopAppInfo
+
+GROUPS = [
+    ('browser', 'Web browser', ['x-scheme-handler/http', 'x-scheme-handler/https', 'text/html', 'application/xhtml+xml']),
+    ('email', 'Email', ['x-scheme-handler/mailto']),
+    ('files', 'File manager', ['inode/directory']),
+    ('video', 'Videos', ['video/mp4', 'video/x-matroska', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/mpeg', 'video/ogg']),
+    ('audio', 'Music', ['audio/mpeg', 'audio/flac', 'audio/ogg', 'audio/x-wav', 'audio/mp4', 'audio/aac']),
+    ('images', 'Images', ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff']),
+    ('text', 'Text files', ['text/plain']),
+    ('pdf', 'PDF documents', ['application/pdf']),
+    ('documents', 'Documents', ['application/vnd.oasis.opendocument.text', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']),
+    ('spreadsheets', 'Spreadsheets', ['application/vnd.oasis.opendocument.spreadsheet', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']),
+    ('presentations', 'Presentations', ['application/vnd.oasis.opendocument.presentation', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']),
+    ('archives', 'Archives', ['application/zip', 'application/x-7z-compressed', 'application/vnd.rar', 'application/x-tar', 'application/gzip']),
+]
+MIME = re.compile(r'[A-Za-z0-9!#$&^_.+\-]+/[A-Za-z0-9!#$&^_.+\-]+')
+DESKTOP = re.compile(r'[\w.+@\-]+\.desktop')
+
+
+def parser_for(data):
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    parser.optionxform = str
+    if data:
+        parser.read_string(data.decode('utf-8'))
+    return parser
+
+
+def update_section(data, section, changes):
+    # Conserva comentarios y claves ajenas, incluso cuando hay entradas repetidas.
+    ending = '\r\n' if b'\r\n' in data else '\n'
+    lines = data.decode('utf-8').splitlines(keepends=True)
+    output, seen = [], set()
+    current, found = '', False
+    def append_missing():
+        for key, value in changes.items():
+            if key not in seen and value is not None:
+                if output and not output[-1].endswith('\n'):
+                    output[-1] += ending
+                output.append(key + '=' + value + ending)
+                seen.add(key)
+    for line in lines:
+        header = re.fullmatch(r'\s*\[([^\]]+)\]\s*', line.strip())
+        if header:
+            if current == section:
+                append_missing()
+            current = header[1]
+            found = found or current == section
+        key = line.split('=', 1)[0].strip() if '=' in line and not line.lstrip().startswith(('#', ';')) else None
+        if current == section and key in changes:
+            value = changes[key]
+            if value is not None:
+                output.append(key + '=' + value + ending)
+            seen.add(key)
+        else:
+            output.append(line)
+    if current == section:
+        append_missing()
+    if not found and any(v is not None for v in changes.values()):
+        if output and not output[-1].endswith('\n'):
+            output[-1] += ending
+        output.append(ending + '[' + section + ']' + ending)
+        append_missing()
+    return ''.join(output).encode('utf-8')
+
+
+def associations(data, types, desktop, desktop_specific=False):
+    parser = parser_for(data)
+    changed = update_section(data, 'Default Applications', {mime: desktop + ';' for mime in types})
+    if desktop_specific:
+        return changed
+    added, removed = {}, {}
+    for mime in types:
+        old = parser.get('Added Associations', mime, fallback='').split(';')
+        added[mime] = ';'.join([desktop] + list(dict.fromkeys(v for v in old if v and v != desktop))) + ';'
+        old = parser.get('Removed Associations', mime, fallback='').split(';')
+        values = [v for v in old if v and v != desktop]
+        if parser.has_option('Removed Associations', mime):
+            removed[mime] = ';'.join(values) + ';' if values else None
+    changed = update_section(changed, 'Added Associations', added)
+    return update_section(changed, 'Removed Associations', removed)
+
+
+def atomic(path, data, mode=0o600):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix='.' + path.name + '-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as output:
+            os.fchmod(output.fileno(), mode)
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def query(mime):
+    result = subprocess.run(['xdg-mime', 'query', 'default', mime], capture_output=True, text=True, timeout=8)
+    if result.returncode:
+        raise ValueError('Could not read the system default for ' + mime + '.')
+    return result.stdout.strip()
+
+
+def selection(request):
+    if request.get('group'):
+        for key, label, types in GROUPS:
+            if request['group'] == key:
+                return {'group': key, 'label': label, 'types': types}
+        raise ValueError('Choose a known default application category.')
+    mime = request.get('mime', '')
+    known = set(Gio.content_types_get_registered()) | {t for _, _, types in GROUPS for t in types}
+    if not isinstance(mime, str) or len(mime) > 255 or not MIME.fullmatch(mime) or mime not in known:
+        raise ValueError('Choose a registered file type.')
+    return {'mime': mime, 'label': Gio.content_type_get_description(mime) or mime, 'types': [mime]}
+
+
+def candidates(types, defaults):
+    supported = [{app.get_id() for app in Gio.AppInfo.get_all_for_type(mime) if app.get_id()} for mime in types]
+    for app in Gio.AppInfo.get_all():
+        desktop = app.get_id()
+        if not desktop:
+            continue
+        declared = app.get_supported_types() or []
+        for index, mime in enumerate(types):
+            if any(mime == value or Gio.content_type_is_a(mime, value) for value in declared):
+                supported[index].add(desktop)
+    eligible = set.intersection(*supported) if supported else set()
+    result = []
+    for desktop in eligible:
+        if not DESKTOP.fullmatch(desktop) or desktop.startswith('-'):
+            continue
+        app = DesktopAppInfo.new(desktop)
+        if not app or app.get_is_hidden() or not app.get_filename() or not Path(app.get_filename()).is_file():
+            continue
+        if not app.should_show() and desktop not in defaults:
+            continue
+        icon = app.get_icon()
+        icon_name = icon.get_names()[0] if isinstance(icon, Gio.ThemedIcon) and icon.get_names() else ''
+        if isinstance(icon, Gio.FileIcon):
+            icon_name = icon.get_file().get_uri()
+        result.append({'id': desktop, 'name': app.get_display_name() or desktop, 'icon': icon_name})
+    return sorted(result, key=lambda app: (app['name'].casefold(), app['id']))
+
+
+def catalogue():
+    patterns = {}
+    roots = [Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')]
+    roots += [Path(v) for v in (os.environ.get('XDG_DATA_DIRS') or '/usr/local/share:/usr/share').split(':') if v]
+    for root in roots:
+        try:
+            for line in (root / 'mime/globs2').read_text().splitlines():
+                parts = line.split(':')
+                if len(parts) >= 3 and parts[2].startswith('*.') and not any(c in parts[2] for c in '?[]'):
+                    values = patterns.setdefault(parts[1], set())
+                    values.add(parts[2][1:])
+        except (OSError, UnicodeError):
+            pass
+    known = set(Gio.content_types_get_registered()) | {t for _, _, types in GROUPS for t in types}
+    return [{'id': mime, 'name': Gio.content_type_get_description(mime) or mime,
+             'extensions': sorted(patterns.get(mime, []))[:8]} for mime in sorted(known) if MIME.fullmatch(mime)]
+
+
+def status(request):
+    selected = selection(request)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        defaults = list(pool.map(query, selected['types']))
+    rows = []
+    for mime, desktop in zip(selected['types'], defaults):
+        app = DesktopAppInfo.new(desktop) if desktop else None
+        rows.append({'mime': mime, 'desktop': desktop, 'name': app.get_display_name() if app else desktop or 'Not set'})
+    response = {'ok': True, 'selection': selected, 'defaults': rows, 'apps': candidates(selected['types'], defaults)}
+    if request.get('catalogue'):
+        response.update(groups=[{'id': key, 'name': label} for key, label, _ in GROUPS], file_types=catalogue())
+    return response
+
+
+def set_default(request):
+    if os.geteuid() == 0:
+        raise ValueError('Default applications must be changed as your normal desktop user.')
+    selected = selection(request)
+    desktop = request.get('desktop', '')
+    if not isinstance(desktop, str) or not DESKTOP.fullmatch(desktop) or desktop.startswith('-'):
+        raise ValueError('Choose an installed application.')
+    current = status(request)
+    if desktop not in {app['id'] for app in current['apps']}:
+        raise ValueError('This application does not declare support for all selected types. Choose an individual file type instead.')
+    config = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')
+    state = Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local/state') / 'spectrumos/default-apps'
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state / 'settings.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        files = {config / 'mimeapps.list': (selected['types'], False)}
+        for name in os.environ.get('XDG_CURRENT_DESKTOP', '').lower().split(':'):
+            if not re.fullmatch(r'[a-z0-9_\-]+', name):
+                continue
+            path = config / (name + '-mimeapps.list')
+            if path.is_file():
+                parser = parser_for(path.read_bytes())
+                types = [mime for mime in selected['types'] if parser.has_option('Default Applications', mime)]
+                if types:
+                    files[path] = (types, True)
+        edits = {}
+        for path, (types, specific) in files.items():
+            path = path.resolve()
+            exists = path.exists()
+            if exists and (not path.is_file() or path.stat().st_uid != os.geteuid()):
+                raise ValueError('Your association settings are not an editable user-owned file: ' + str(path))
+            original = path.read_bytes() if exists else b''
+            replacement = associations(original, types, desktop, specific)
+            edits[path] = (original if exists else None, replacement, stat.S_IMODE(path.stat().st_mode) if exists else 0o600)
+        backup = state / 'backups' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex)
+        backup.mkdir(parents=True, mode=0o700)
+        metadata = []
+        for index, (path, (old, _, _)) in enumerate(edits.items()):
+            metadata.append({'path': str(path), 'existed': old is not None, 'backup': str(index)})
+            if old is not None:
+                atomic(backup / str(index), old)
+        atomic(backup / 'files.json', json.dumps(metadata, indent=2).encode())
+        written = []
+        try:
+            for path, (old, new, mode) in edits.items():
+                if (path.read_bytes() if path.exists() else None) != old:
+                    raise ValueError('Association settings changed while applying. Refresh and try again.')
+                atomic(path, new, mode)
+                written.append(path)
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                actual = list(pool.map(query, selected['types']))
+            if any(value != desktop for value in actual):
+                raise ValueError('The desktop reported a different default after applying the change.')
+        except BaseException as error:
+            conflicts = []
+            for path in reversed(written):
+                old, new, mode = edits[path]
+                if not path.exists() or path.read_bytes() != new:
+                    conflicts.append(str(path))
+                elif old is None:
+                    path.unlink()
+                else:
+                    atomic(path, old, mode)
+            if conflicts:
+                raise ValueError('Settings changed concurrently. The original backup is at ' + str(backup)) from error
+            raise ValueError(str(error) + ' The previous associations were restored.') from error
+    response = status(request)
+    response.update(message='Default updated for ' + str(len(selected['types'])) + (' file type.' if len(selected['types']) == 1 else ' file types.'), backup=str(backup))
+    return response
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else 'status'
+    request = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {'group': 'video', 'catalogue': True}
+    if not isinstance(request, dict):
+        raise ValueError('Expected default application options.')
+    if action not in ('status', 'set'):
+        raise ValueError('Unknown default application action.')
+    print(json.dumps(set_default(request) if action == 'set' else status(request)))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, configparser.Error, subprocess.SubprocessError) as error:
+        print(json.dumps({'ok': False, 'error': str(error)}))
+        raise SystemExit(1)

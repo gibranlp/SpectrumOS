@@ -10,16 +10,19 @@ import Quickshell.Services.UPower
 import Quickshell.Services.Notifications
 import "NotificationStyle.js" as NotificationStyle
 import Quickshell.Wayland
+import Spectrum.I18n 1.0
 
 ShellRoot {
     id: shell
+    readonly property var languageController: Translator
 
     readonly property string cacheHome: Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")
     readonly property string palettePath: Quickshell.env("SPECTRUM_SHELL_PALETTE") || (cacheHome + "/spectrumos/theme/current/palette.json")
     readonly property string fontPath: cacheHome + "/spectrumos/theme/current/kitty.conf"
+    readonly property bool leanMode: Quickshell.env("SPECTRUM_LEAN_MODE") === "1"
     readonly property string backendDir: Quickshell.env("SPECTRUM_SHELL_BACKEND_DIR") || "/usr/lib/spectrumos"
     property var colors: ({ background: "#15131a", surface: "#232029", surface_alt: "#2e2c34", foreground: "#eff3fa", muted: "#a6afbe", accent: "#b293e6" })
-    property var brightness: ({ devices: [], error: "Checking display brightness…" })
+    property var brightness: ({ devices: [], error: qsTranslate("Spectrum", "Checking display brightness…") })
     readonly property bool brightnessBusy: brightnessActionProcess.running
     property bool brightnessRefreshPending: false
     property int brightnessRevision: 0
@@ -155,6 +158,13 @@ ShellRoot {
         onTriggered: shell.igorMeetingPreview = false
     }
     MeetingState { id: meetingState }
+    BreakReminderState {
+        id: breakReminders
+        backendDir: shell.backendDir
+        inhibited: shell.gamingActive || meetingState.active || shell.recording.active || shell.audioRecording.active || shell.doNotDisturb || screensaver.active || shell.idle.active
+        focusActive: ["starting", "work", "paused"].includes(shell.focusState.phase)
+    }
+
     IgorRoutine {
         id: igorRoutine
         visitsEnabled: shell.igorEnabled && !shell.gamingActive && !screensaver.active
@@ -177,7 +187,7 @@ ShellRoot {
     property bool gamingRequested: false
     readonly property bool gamingActive: gamingRequested || gamingStatus.automatic === true
     property var gamingStatus: ({ active: false, error: "" })
-    readonly property bool animationsEnabled: !gamingActive
+    readonly property bool animationsEnabled: !gamingActive && !leanMode
     property string barProfile: "standard"
     property var barProfiles: ({})
     readonly property bool barVisible: !shell.gamingActive && barProfile !== "minimal" && barProfile !== "gaming"
@@ -305,23 +315,17 @@ ShellRoot {
         return false;
     }
 
-    function refreshControls(): void {
-        if (!overviewProcess.running)
-            overviewProcess.running = true;
-        if (!networkProcess.running)
-            networkProcess.running = true;
-        if (!audioProcess.running)
-            audioProcess.running = true;
-        if (!themeProcess.running)
-            themeProcess.running = true;
-        if (!displayProcess.running)
-            displayProcess.running = true;
-        if (!workspaceAssignmentsProcess.running)
-            workspaceAssignmentsProcess.running = true;
-        if (!workspaceIconsProcess.running)
-            workspaceIconsProcess.running = true;
-        if (!keyboardLayoutProcess.running)
-            keyboardLayoutProcess.running = true;
+    function refreshControls(page): void {
+        const groups = {
+            audio: [audioProcess], wifi: [networkProcess], displays: [displayProcess],
+            typography: [overviewProcess, keyboardLayoutProcess], battery: [overviewProcess],
+            wallpapers: [themeProcess], dashboard: [], bluetooth: [], mouse: [], time: [],
+            appimages: [], extras: [], weather: []
+        };
+        const processes = groups[page] || [overviewProcess, networkProcess, audioProcess, themeProcess,
+            displayProcess, workspaceAssignmentsProcess, workspaceIconsProcess, keyboardLayoutProcess];
+        for (const process of processes)
+            if (!process.running) process.running = true;
     }
 
     // El historial de foco se filtra por monitor y espacio antes de elegir el título de cada barra.
@@ -522,12 +526,12 @@ ShellRoot {
         stdout: StdioCollector { onStreamFinished: {
             if (!shell.brightnessBusy && brightnessProcess.revision === shell.brightnessRevision) {
                 try { shell.brightness = JSON.parse(text); }
-                catch (error) { shell.brightness = Object.assign({}, shell.brightness, {error: "Could not read display brightness."}); }
+                catch (error) { shell.brightness = Object.assign({}, shell.brightness, {error: qsTranslate("Spectrum", "Could not read display brightness.")}); }
             }
         } }
         onExited: exitCode => {
             if (exitCode !== 0)
-                shell.brightness = Object.assign({}, shell.brightness, {error: "Could not read display brightness."});
+                shell.brightness = Object.assign({}, shell.brightness, {error: qsTranslate("Spectrum", "Could not read display brightness.")});
             if (shell.brightnessRefreshPending) brightnessRefresh.restart();
         }
     }
@@ -704,9 +708,10 @@ ShellRoot {
         stdout: StdioCollector { onStreamFinished: {
             try {
                 const windows = JSON.parse(text);
-                shell.titleWindows = Array.isArray(windows) ? windows : [];
+                if (Array.isArray(windows))
+                    shell.titleWindows = windows;
             }
-            catch (error) { shell.titleWindows = []; }
+            catch (error) { console.warn("SpectrumShell window snapshot:", error); }
         } }
         onExited: {
             if (shell.activeWindowRefreshPending) {
@@ -1171,11 +1176,15 @@ ShellRoot {
         function toggleCalculator(): void { shell.openOnFocused("toggleCalculator"); }
         function togglePassword(): void { shell.openOnFocused("togglePassword"); }
         function toggleSpectrumDrop(): void { shell.openOnFocused("toggleSpectrumDrop"); }
+        function openSpectrumDropFiles(): void { shell.openOnFocused("openSpectrumDropFiles"); }
         function toggleBarExtras(): void { shell.openOnFocused("toggleBarExtras"); }
         function toggleHotKey(): void { shell.openOnFocused("toggleHotKey"); }
         function toggleShortcuts(): void { shell.openOnFocused("toggleShortcuts"); }
         function toggleUpdates(): void { shell.openOnFocused("toggleUpdates"); }
         function toggleFocusTimer(): void { shell.openOnFocused("toggleFocusTimer"); }
+        function toggleBreakReminders(): void { shell.openOnFocused("toggleBreakReminders"); }
+        function toggleLocalServices(): void { shell.openOnFocused("toggleLocalServices"); }
+        function toggleDefaultApps(): void { shell.openOnFocused("toggleDefaultApps"); }
         function focusTimerState(): string {
             return JSON.stringify({phase: shell.focusState.phase, remaining: shell.focusState.remaining,
                 monitors: bars.instances.map(bar => bar.focusTimerState())});
@@ -1261,6 +1270,7 @@ ShellRoot {
 
         PanelWindow {
             WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.namespace: "spectrum-bar"
             id: bar
             required property var modelData
             screen: modelData
@@ -1444,6 +1454,7 @@ ShellRoot {
             }
 
             function openUtility(page): void {
+                if (page === "questline") Quickshell.execDetached(["systemctl", "--user", "--no-block", "start", "spectrum-questline-notifications.service", "spectrum-questline-sync.service"]);
                 const opening = !utilityPanel.expanded || utilityPanel.page !== page;
                 if (opening) {
                     closeSidePanels();
@@ -1455,10 +1466,29 @@ ShellRoot {
                 }
             }
 
+            function openWidgetIcon(action): void {
+                const methods = {dashboard:"toggleDashboard", favorites:"toggleFavorites", "app-store":"toggleAppStore",
+                    spectrumdrop:"toggleSpectrumDrop", wallpapers:"toggleWallpapers", notifications:"toggleNotifications",
+                    screenshot:"toggleScreenshot", recorder:"toggleRecorder", "audio-recorder":"toggleAudioRecorder",
+                    control:"toggleControlCenter", session:"toggleSession", updates:"toggleUpdates", color:"toggleColorPicker",
+                    "color-history":"toggleColorHistory"};
+                if (methods[action]) bar[methods[action]]();
+                else if (action === "keep-awake") shell.toggleKeepAwake();
+                else if (action === "ukvm") Quickshell.execDetached(["/usr/bin/spectrum-ukvm"]);
+                else if (["questline", "focus", "breaks", "services", "default-apps", "search", "calculator", "password", "emoji", "hotkey", "shortcuts"].includes(action)) bar.openUtility(action);
+                else if (["appimages", "audio", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
+            }
+
             function toggleFileSearch(): void { openUtility("search"); }
             function toggleCalculator(): void { openUtility("calculator"); }
             function togglePassword(): void { openUtility("password"); }
             function toggleSpectrumDrop(): void { openUtility("spectrumdrop"); }
+            function openSpectrumDropFiles(): void {
+                closeSidePanels();
+                appLauncher.expanded = false;
+                wallpaperBrowser.expanded = false;
+                utilityPanel.open("spectrumdrop");
+            }
             function toggleBarExtras(): void { toggleBarWidget("extras"); }
             function toggleHotKey(): void { openUtility("hotkey"); }
             function toggleShortcuts(): void { openUtility("shortcuts"); }
@@ -1478,6 +1508,9 @@ ShellRoot {
             function dismissTrackIndicator(): void { levelIndicator.dismissTrack(); }
             function levelIndicatorState(): var { return levelIndicator.state(); }
             function toggleFocusTimer(): void { openUtility("focus"); }
+            function toggleBreakReminders(): void { openUtility("breaks"); }
+            function toggleLocalServices(): void { openUtility("services"); }
+            function toggleDefaultApps(): void { openUtility("default-apps"); }
             function focusTimerState(): var {
                 return {monitor: modelData.name, profile: barProfile, position: shell.barPosition,
                     top: {visible: bar.visible && topFocusCountdown.visible, width: topFocusCountdown.width, height: topFocusCountdown.height},
@@ -1497,12 +1530,14 @@ ShellRoot {
             function toggleEmoji(): void { openUtility("emoji"); }
             function toggleQuestline(): void { openUtility("questline"); }
             function openQuestlineNewScroll(): void {
+                Quickshell.execDetached(["systemctl", "--user", "--no-block", "start", "spectrum-questline-notifications.service", "spectrum-questline-sync.service"]);
                 closeSidePanels();
                 appLauncher.expanded = false;
                 wallpaperBrowser.expanded = false;
                 utilityPanel.openQuestlineNewScroll();
             }
             function openQuestlineNewTask(): void {
+                Quickshell.execDetached(["systemctl", "--user", "--no-block", "start", "spectrum-questline-notifications.service", "spectrum-questline-sync.service"]);
                 closeSidePanels();
                 appLauncher.expanded = false;
                 wallpaperBrowser.expanded = false;
@@ -1521,7 +1556,7 @@ ShellRoot {
                 closeSidePanels();
                 appLauncher.expanded = false;
                 wallpaperBrowser.expanded = false;
-                shell.refreshControls();
+                shell.refreshControls("dashboard");
                 dashboard.expanded = true;
             }
 
@@ -1572,7 +1607,10 @@ ShellRoot {
 
             function toggleFavorites(): void {
                 const opening = !favoritesPanel.expanded;
-                if (opening) { closeSidePanels(); appLauncher.expanded = false; wallpaperBrowser.expanded = false; }
+                if (opening) {
+                    closeSidePanels(); appLauncher.expanded = false; wallpaperBrowser.expanded = false;
+                    Quickshell.execDetached(["systemctl", "--user", "--no-block", "start", "spectrum-questline-sync.service"]);
+                }
                 favoritesPanel.expanded = opening;
             }
 
@@ -1599,7 +1637,7 @@ ShellRoot {
                 }
                 closeSidePanels();
                 appLauncher.expanded = false;
-                shell.refreshControls();
+                shell.refreshControls("wallpapers");
                 wallpaperBrowser.open();
             }
 
@@ -1633,6 +1671,7 @@ ShellRoot {
                 activeWindowTitle: bar.activeWindowTitle
                 activeWindowIdentity: bar.activeWindowIdentity
                 active: bar.barVisible && shell.barPosition === "left"
+                onWidgetRequested: action => bar.openWidgetIcon(action)
                 onLauncherRequested: bar.toggleLauncher()
                 onDashboardRequested: bar.toggleDashboard()
                 onTimeRegionRequested: bar.toggleBarWidget("time")
@@ -1768,6 +1807,7 @@ ShellRoot {
                 theme: shell
                 backendDir: shell.backendDir
                 focusState: shell.focusState
+                breakState: breakReminders
                 leftInset: bar.barLeftInset
                 topInset: bar.panelTopInset
                 onFocusAction: action => shell.runAction([shell.backend("spectrum-focus"), action])
@@ -1997,7 +2037,7 @@ ShellRoot {
                                 color: active ? shell.colors.accent : occupied ? shell.colors.surface_alt : "transparent"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: shell.workspaceGlyph(parent.modelData, parent.active ? "active" : parent.occupied ? "occupied" : "empty")
+                                    text: shell.workspaceGlyph(parent.modelData, parent.active ? qsTranslate("Spectrum", "active") : parent.occupied ? qsTranslate("Spectrum", "occupied") : qsTranslate("Spectrum", "empty"))
                                     color: parent.active ? shell.colors.background : parent.occupied ? shell.colors.foreground : shell.colors.muted
                                     font { family: shell.fontFamily; pixelSize: shell.fontSize; bold: parent.active }
                                 }
@@ -2010,10 +2050,11 @@ ShellRoot {
                     }
 
                     ScrollingTitle {
+                        animationsEnabled: shell.animationsEnabled && bar.visible
                         id: windowTitle
                         visible: (bar.barProfile === "standard" || bar.barProfile === "detailed") && bar.activeWindowTitle.length > 0
                         Layout.preferredWidth: Math.min(shell.barStyle === "islands" ? windowTitle.measuredTextWidth : 420, 420, bar.modelData.width * 0.25,
-                            islandStats.visible ? Math.max(0, islandStats.availableWidth - islandStats.naturalWidth) : 420)
+                            islandStats.visible ? Math.min(180, Math.max(0, islandStats.availableWidth - 240)) : 420)
                         Layout.minimumWidth: 0
                         Layout.maximumWidth: islandStats.visible ? Layout.preferredWidth : 420
                         title: bar.activeWindowTitle
@@ -2027,11 +2068,13 @@ ShellRoot {
 
                     DetailedBarStats {
                         id: islandStats
-                        visible: shell.barStyle === "islands" && bar.barProfile === "detailed"
+                        visible: bar.barProfile === "detailed"
                         availableWidth: Math.max(1, topRow.width - launcherButton.implicitWidth
                             - topIgorButton.implicitWidth - workspaceButtons.width
                             - minimalStatusGroup.implicitWidth - trayGroup.width - 8 * topRow.spacing)
-                        Layout.preferredWidth: Math.min(naturalWidth, availableWidth)
+                        Layout.preferredWidth: Math.min(naturalWidth, Math.max(1, availableWidth - (windowTitle.visible ? windowTitle.Layout.preferredWidth : 0)))
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                         Layout.minimumWidth: Layout.preferredWidth
                         Layout.maximumWidth: Layout.preferredWidth
                         text: detailedStats.text
@@ -2052,126 +2095,141 @@ ShellRoot {
                             onOpenRequested: bar.openFocusTimer()
                         }
 
-                    Text {
-                        text: shell.performance.available ? (shell.performance.mode === "performance" ? "󰓅" : shell.performance.mode === "power-saver" ? "󰌪" : "") : ""
-                        visible: bar.barProfile !== "standard" && shell.performance.available && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        color: shell.performance.mode === "performance" ? shell.colors.accent : shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("battery") }
-                    }
-
-                    Text {
-                        text: shell.idle.active ? "󰅶" : "󰾪"
-                        visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                        color: shell.idle.active ? shell.colors.accent : shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: shell.toggleKeepAwake() }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        text: "󰥔"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onActivated: bar.toggleBarWidget("time") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                        text: (shell.weather.icon || "󰖕") + ((bar.barProfile === "standard" || bar.barProfile === "detailed") && shell.weather.temperature !== "—" ? " " + shell.weather.temperature : "")
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("weather") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                        text: shell.network.connection_type === "ethernet" ? "󰈀" : shell.network.connection_type === "wifi" ? "󰖩" : "󰖪"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("wifi") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                        text: "󰂯"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("bluetooth") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        text: "󰍹"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("displays") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        text: "󰍽"
-                        color: barWidget.expanded && barWidget.page === "mouse" ? shell.colors.accent : shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("mouse") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        text: "Aa"
-                        color: barWidget.expanded && barWidget.page === "typography" ? shell.colors.accent : shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize; bold: true }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("typography") }
-                    }
-
-                    VolumeIndicator {
-                        visible: bar.barProfile !== "minimal"
-                        percent: shell.volumePercent
-                        muted: shell.volumeMuted
-                        available: shell.volumeAvailable
-                        theme: shell
-                        onClicked: bar.toggleBarWidget("audio")
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                        text: "󰁹 " + Math.round(UPower.displayDevice.percentage * 100) + "%"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize - 1 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("battery") }
-                    }
-
-                    Text {
-                        visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
-                        text: "󰂚"
-                        color: shell.colors.foreground
-                        font { family: shell.fontFamily; pixelSize: shell.fontSize + 2 }
-                        KeyboardAction { anchors.fill: parent; onActivated: bar.toggleNotifications() }
-                    }
-
-                        Text {
-                            visible: bar.barProfile === "standard"
-                            text: "󰇘"
-                            color: shell.colors.foreground
-                            font { family: shell.fontFamily; pixelSize: shell.fontSize + 3 }
-                            Accessible.name: "More bar controls"
-                            KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("extras") }
+                        WidgetIcons {
+                            visible: bar.barProfile === "detailed"
+                            theme: shell
+                            Layout.preferredWidth: Math.min(naturalWidth, Math.max(140, topRow.width
+                                - launcherButton.implicitWidth - topIgorButton.implicitWidth - workspaceButtons.width
+                                - trayGroup.width - topFocusCountdown.width - 340 - 8 * topRow.spacing))
+                            Layout.minimumWidth: Layout.preferredWidth
+                            Layout.maximumWidth: Layout.preferredWidth
+                            onChosen: action => bar.openWidgetIcon(action)
                         }
-                        Text {
-                            visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
-                            text: "󰒡"
-                            color: shell.colors.foreground
-                            font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
-                            Accessible.name: "SpectrumDrop"
-                            KeyboardAction { anchors.fill: parent; onActivated: bar.toggleSpectrumDrop() }
-                        }
-                        Text {
-                            visible: bar.barProfile === "minimal" && !minimalStatusHover.hovered
-                            text: "󰕮"
-                            color: shell.colors.foreground
-                            font { family: shell.fontFamily; pixelSize: shell.fontSize + 2 }
+                        RowLayout {
+                            visible: bar.barProfile !== "detailed"
+                            spacing: 8
+                            Text {
+                                text: shell.performance.available ? (shell.performance.mode === "performance" ? "󰓅" : shell.performance.mode === "power-saver" ? "󰌪" : "") : ""
+                                visible: bar.barProfile !== "standard" && shell.performance.available && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                color: shell.performance.mode === "performance" ? shell.colors.accent : shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("battery") }
+                            }
+
+                            Text {
+                                text: shell.idle.active ? "󰅶" : "󰾪"
+                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                color: shell.idle.active ? shell.colors.accent : shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: shell.toggleKeepAwake() }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                text: "󰥔"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onActivated: bar.toggleBarWidget("time") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                text: (shell.weather.icon || "󰖕") + ((bar.barProfile === "standard" || bar.barProfile === "detailed") && shell.weather.temperature !== "—" ? " " + shell.weather.temperature : "")
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("weather") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                text: shell.network.connection_type === "ethernet" ? "󰈀" : shell.network.connection_type === "wifi" ? "󰖩" : "󰖪"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("wifi") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                text: "󰂯"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("bluetooth") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                text: "󰍹"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("displays") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                text: "󰍽"
+                                color: barWidget.expanded && barWidget.page === "mouse" ? shell.colors.accent : shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("mouse") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                text: qsTranslate("Spectrum", "Aa")
+                                color: barWidget.expanded && barWidget.page === "typography" ? shell.colors.accent : shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize; bold: true }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("typography") }
+                            }
+
+                            VolumeIndicator {
+                                visible: bar.barProfile !== "minimal"
+                                percent: shell.volumePercent
+                                muted: shell.volumeMuted
+                                available: shell.volumeAvailable
+                                theme: shell
+                                onClicked: bar.toggleBarWidget("audio")
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                text: "󰁹 " + Math.round(UPower.displayDevice.percentage * 100) + "%"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize - 1 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("battery") }
+                            }
+
+                            Text {
+                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                text: "󰂚"
+                                color: shell.colors.foreground
+                                font { family: shell.fontFamily; pixelSize: shell.fontSize + 2 }
+                                KeyboardAction { anchors.fill: parent; onActivated: bar.toggleNotifications() }
+                            }
+
+                                Text {
+                                    visible: ["standard", "multimedia"].includes(bar.barProfile)
+                                    text: "󰇘"
+                                    color: shell.colors.foreground
+                                    font { family: shell.fontFamily; pixelSize: shell.fontSize + 3 }
+                                    Accessible.name: qsTranslate("Spectrum", "More bar controls")
+                                    KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("extras") }
+                                }
+                                Text {
+                                    visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
+                                    text: "󰒡"
+                                    color: shell.colors.foreground
+                                    font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
+                                    Accessible.name: "SpectrumDrop"
+                                    KeyboardAction { anchors.fill: parent; onActivated: bar.toggleSpectrumDrop() }
+                                }
+                                Text {
+                                    visible: bar.barProfile === "minimal" && !minimalStatusHover.hovered
+                                    text: "󰕮"
+                                    color: shell.colors.foreground
+                                    font { family: shell.fontFamily; pixelSize: shell.fontSize + 2 }
+                                }
                         }
                     }
+
 
                     Row {
                         id: trayGroup
@@ -2208,7 +2266,7 @@ ShellRoot {
                             fontSize: shell.fontSize
                             screenRecording: shell.recording.active
                             audioRecording: shell.audioRecording.active
-                            animationsEnabled: shell.animationsEnabled
+                            animationsEnabled: shell.animationsEnabled && bar.visible
                             onScreenRequested: bar.toggleRecorder()
                             onAudioRequested: bar.toggleAudioRecorder()
                         }
@@ -2234,11 +2292,12 @@ ShellRoot {
                 Text {
                     id: detailedStats
                     anchors.centerIn: parent
-                    width: Math.min(shell.barStyle === "islands" ? statsMetrics.width : 600, parent.width - 40, 600)
+                    width: Math.max(0, Math.min(600, 2 * Math.min(parent.width / 2 - (windowTitle.visible ? windowTitle.x + windowTitle.width : workspaceButtons.x + workspaceButtons.width) - 20,
+                        minimalStatusGroup.x - parent.width / 2 - 20)))
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
-                    visible: bar.barProfile === "detailed" && shell.barStyle !== "islands"
-                    text: "CPU " + shell.overview.load + "   RAM " + shell.overview.memory + (shell.overview.gpu ? "   GPU " + shell.overview.gpu : "") + (shell.overview.temperature ? "   " + shell.overview.temperature : "")
+                    visible: false
+                    text: qsTranslate("Spectrum", "CPU ") + shell.overview.load + qsTranslate("Spectrum", "   RAM ") + shell.overview.memory + (shell.overview.gpu ? qsTranslate("Spectrum", "   GPU ") + shell.overview.gpu : "") + (shell.overview.temperature ? "   " + shell.overview.temperature : "")
                     color: shell.colors.foreground
                     font { family: shell.fontFamily; pixelSize: shell.fontSize - 1; bold: true }
                 }
@@ -2282,10 +2341,11 @@ ShellRoot {
                         KeyboardAction { anchors.fill: parent; onActivated: bar.toggleDashboard() }
                     }
                     ScrollingTitle {
+                        animationsEnabled: shell.animationsEnabled && bar.visible
                         id: mediaTitle
-                        width: Math.min(shell.barStyle === "islands" ? mediaTitle.measuredTextWidth : 420, 420, mediaControls.availableWidth - 150)
+                        width: Math.max(0, Math.min(shell.barStyle === "islands" ? mediaTitle.measuredTextWidth : 420, 420, mediaControls.availableWidth - 150))
                         height: 28
-                        title: shell.media.available ? [shell.media.artist, shell.media.title].filter(Boolean).join(" - ") : "No media"
+                        title: shell.media.available ? [shell.media.artist, shell.media.title].filter(Boolean).join(" - ") : qsTranslate("Spectrum", "No media")
                         autoScroll: true
                         centered: false
                         bold: true
@@ -2331,6 +2391,9 @@ ShellRoot {
                     else if (action === "favorites") bar.toggleFavorites();
                     else if (action === "app-store") bar.toggleAppStore();
                     else if (action === "control") bar.toggleControlCenter();
+                    else if (action === "breaks") bar.toggleBreakReminders();
+                    else if (action === "services") bar.toggleLocalServices();
+                    else if (action === "default-apps") bar.toggleDefaultApps();
                     else if (action === "session") bar.toggleSession();
                     else bar.toggleBarWidget(action);
                 }

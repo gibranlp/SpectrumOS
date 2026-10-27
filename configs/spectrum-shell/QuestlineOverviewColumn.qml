@@ -23,7 +23,7 @@ Rectangle {
         }
         Text {
             visible: column.items.length === 0
-            text: "Nothing here yet"
+            text: qsTranslate("Spectrum", "Nothing here yet")
             color: column.theme.colors.muted
             font { family: column.theme.fontFamily; pixelSize: column.theme.fontSize }
         }
@@ -52,7 +52,7 @@ Rectangle {
                     }
                     Text {
                         width: parent.width
-                        text: column.kind === "Treasury" ? parent.parent.modelData.currency_code + " " + (parent.parent.modelData.amount_minor / 100).toFixed(2) + "  ·  " + parent.parent.modelData.status : (parent.parent.modelData.campaign || "Unfiled") + (parent.parent.modelData.due_date ? "  ·  " + parent.parent.modelData.due_date : "")
+                        text: column.kind === "Treasury" ? parent.parent.modelData.currency_code + " " + (parent.parent.modelData.amount_minor / 100).toFixed(2) + "  ·  " + parent.parent.modelData.status : (parent.parent.modelData.campaign || qsTranslate("Spectrum", "Unfiled")) + (parent.parent.modelData.due_date ? "  ·  " + parent.parent.modelData.due_date : "")
                         elide: Text.ElideRight
                         color: column.theme.colors.muted
                         font { family: column.theme.fontFamily; pixelSize: column.theme.fontSize }

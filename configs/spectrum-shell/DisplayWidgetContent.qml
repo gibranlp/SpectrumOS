@@ -7,7 +7,7 @@ ColumnLayout {
     spacing: 9
 
     Text {
-        text: "CONNECTED DISPLAYS"
+        text: qsTranslate("Spectrum", "CONNECTED DISPLAYS")
         color: content.theme.colors.accent
         font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize; bold: true }
     }
@@ -26,7 +26,7 @@ ColumnLayout {
                 anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
                 spacing: 6
                 Text {
-                    text: displayRow.modelData.name + (displayRow.modelData.primary ? "  ·  Primary" : "")
+                    text: displayRow.modelData.name + (displayRow.modelData.primary ? qsTranslate("Spectrum", "  ·  Primary") : "")
                     color: content.theme.colors.foreground
                     font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize; bold: true }
                 }
@@ -61,7 +61,7 @@ ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
                     ShellButton {
-                        label: "Make primary"
+                        label: qsTranslate("Spectrum", "Make primary")
                         enabled: !displayRow.modelData.primary
                         fontFamily: content.theme.fontFamily
                         fontSize: content.theme.fontSize - 2
@@ -70,7 +70,7 @@ ColumnLayout {
                         onClicked: content.theme.runAction([content.theme.backend("control-adapter"), "display", "primary", displayRow.modelData.name])
                     }
                     ShellButton {
-                        label: "Rotate"
+                        label: qsTranslate("Spectrum", "Rotate")
                         fontFamily: content.theme.fontFamily
                         fontSize: content.theme.fontSize - 2
                         backgroundColor: content.theme.colors.surface
@@ -79,7 +79,7 @@ ColumnLayout {
                     }
                 }
                 Text {
-                    text: "Workspaces on this display"
+                    text: qsTranslate("Spectrum", "Workspaces on this display")
                     color: content.theme.colors.muted
                     font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize - 1 }
                 }
@@ -110,7 +110,7 @@ ColumnLayout {
             model: ["left", "right", "up", "down"]
             ShellButton {
                 required property string modelData
-                label: "Arrange " + modelData
+                label: qsTranslate("Spectrum", "Arrange ") + modelData
                 fontFamily: content.theme.fontFamily
                 fontSize: content.theme.fontSize - 1
                 backgroundColor: content.theme.colors.surface_alt

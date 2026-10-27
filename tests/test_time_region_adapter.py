@@ -14,6 +14,19 @@ LOADER.exec_module(ADAPTER)
 
 
 class TimeRegionAdapterTests(unittest.TestCase):
+    def test_status_keeps_interface_language_separate_from_regional_formats(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'locale.conf'
+            config.write_text('LANG=en_US.UTF-8\nLC_MESSAGES=es_MX.UTF-8\nLC_TIME=pt_BR.UTF-8\n')
+            with patch.object(ADAPTER, 'LOCALE_CONF', config), patch.object(ADAPTER, 'run', return_value=''), \
+                    patch.object(ADAPTER, 'active', return_value=False), \
+                    patch.object(ADAPTER, 'timesyncd_available', return_value=False), \
+                    patch.object(ADAPTER, 'supported_locales', return_value=[]), \
+                    patch.object(ADAPTER, 'NTP_CONF', Path(directory) / 'missing'):
+                result = ADAPTER.state()
+            self.assertEqual(result['language'], 'es_MX.UTF-8')
+            self.assertEqual(result['region'], 'pt_BR.UTF-8')
+
     def test_server_validation_accepts_dns_and_ip_but_rejects_config_injection(self):
         self.assertEqual(ADAPTER.validate_servers('time.example.org 192.0.2.1 2001:db8::1'),
                          ['time.example.org', '192.0.2.1', '2001:db8::1'])

@@ -50,8 +50,8 @@ def state() -> dict:
     timedate = properties(run('timedatectl', 'show'))
     sync = properties(run('timedatectl', 'show-timesync', '--all', check=False)) if active('systemd-timesyncd.service') else {}
     configured = properties(LOCALE_CONF.read_text()) if LOCALE_CONF.exists() else {}
-    language = configured.get('LANG', 'C.UTF-8').strip('"\'')
-    region = configured.get('LC_TIME', language).strip('"\'')
+    language = configured.get('LC_MESSAGES', configured.get('LANG', 'C.UTF-8')).strip('"\'')
+    region = configured.get('LC_TIME', configured.get('LANG', 'C.UTF-8')).strip('"\'')
     servers = ''
     if NTP_CONF.exists():
         servers = properties(NTP_CONF.read_text()).get('NTP', '')

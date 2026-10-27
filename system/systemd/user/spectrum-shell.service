@@ -2,7 +2,6 @@
 Description=SpectrumShell desktop session
 PartOf=graphical-session.target
 After=graphical-session.target
-Wants=spectrum-questline-notifications.service spectrum-questline-sync.service
 StartLimitIntervalSec=30
 StartLimitBurst=3
 
@@ -13,3 +12,7 @@ ExecStart=/usr/lib/spectrumos/spectrum-shell-session
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=5
+OOMPolicy=kill
+MemoryHigh=1536M
+MemoryMax=2G
+MemorySwapMax=512M

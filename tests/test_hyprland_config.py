@@ -11,13 +11,14 @@ class HyprlandConfigTests(unittest.TestCase):
     def test_shortcut_widget_is_alphabetical_and_has_unique_chords(self):
         source = (ROOT / "configs/spectrum-shell/UtilityPanel.qml").read_text()
         catalog = source.split("readonly property var shortcuts: [", 1)[1].split("\n    ]", 1)[0]
-        rows = re.findall(r'combo: "([^"]+)", action: "([^"]+)"', catalog)
+        rows = re.findall(r'combo: "([^"]+)", action: qsTranslate\("Spectrum", "([^"]+)"\)', catalog)
+        self.assertGreater(len(rows), 40)
         labels = [label for _, label in rows]
         self.assertEqual(labels, sorted(labels, key=str.casefold))
         chords = [chord.casefold() for chord, _ in rows]
         self.assertEqual(len(chords), len(set(chords)))
 
-    def test_every_shell_widget_is_listed_and_matches_a_real_binding(self):
+    def test_shell_shortcuts_match_real_bindings_and_keep_menu_only_pages(self):
         wrapper = (ROOT / "scripts/spectrum-shell-open").read_text()
         routes = {}
         for alternatives, method in re.findall(r'^    ([a-z|\-]+)\) method=(\w+)', wrapper, re.M):
@@ -28,7 +29,8 @@ class HyprlandConfigTests(unittest.TestCase):
         represented = {routes[route] for route in re.findall(r'backendDir \+ "/spectrum-shell-open", "([^"]+)"', catalog)}
         if '"/panel", "--capture"' in catalog:
             represented.add(routes["screenshot"])
-        self.assertEqual(set(routes.values()) - represented, set())
+        menu_only = {routes[name] for name in ("appearance",)}
+        self.assertEqual(set(routes.values()) - represented, menu_only)
         bindings = (CONFIG_DIR / "keybindings.lua").read_text()
         actual = {}
         for modifier, chord, command in re.findall(r'hl\.bind\((mainMod \.\. )?"([^"]+)", hl\.dsp\.exec_cmd\("([^"]+)"\)', bindings):
@@ -205,6 +207,30 @@ class HyprlandConfigTests(unittest.TestCase):
         self.assertIn('name = "spectrum-file-dialog-border"', rules)
         self.assertIn('match = { title = fileDialogTitles }, border_size = 0, no_blur = true', rules)
 
+    def test_structural_shell_layers_do_not_receive_compositor_motion(self):
+        rules = (CONFIG_DIR / "window-rules.lua").read_text()
+        rule = rules.split('name = "spectrum-shell-structural-motion"', 1)[1].split('})', 1)[0]
+        pattern = re.search(r'namespace = "([^"]+)"', rule)[1]
+        for name in ("bar", "frame", "frame-reservation", "focus-countdown", "level-indicator",
+                     "desktop-branding", "igor", "dashboard-hover"):
+            self.assertRegex("spectrum-" + name, pattern)
+        self.assertNotRegex("quickshell", pattern)
+        self.assertIn("no_anim = true", rule)
+        frame = (ROOT / "configs/spectrum-shell/ShellFrame.qml").read_text()
+        self.assertEqual(frame.count('namespace: "spectrum-frame-reservation"'), 4)
+        self.assertIn('namespace: "spectrum-frame"', frame)
+        for filename in ("shell.qml", "VerticalBar.qml"):
+            self.assertIn('namespace: "spectrum-bar"', (ROOT / "configs/spectrum-shell" / filename).read_text())
+
+    def test_live_shell_layers_keep_their_attachment_geometry(self):
+        shell = (ROOT / "installer/live-shell.qml").read_text()
+        config = (ROOT / "installer/live-hyprland.lua").read_text()
+        self.assertIn('namespace: "spectrum-live-bar"', shell)
+        self.assertIn('namespace: "spectrum-live-network"', shell)
+        rule = config.split('name = "spectrum-live-shell-motion"', 1)[1].split('})', 1)[0]
+        self.assertIn("no_anim = true", rule)
+        self.assertIn('namespace = "^spectrum-live-(bar|network)$"', rule)
+
     def test_portal_file_chooser_does_not_receive_the_global_blur(self):
         # xdg-desktop-portal-gtk draws the file chooser for apps without their own GTK (Electron
         # apps included) as its own long-lived background service, not the requesting app itself.
@@ -232,7 +258,7 @@ class HyprlandConfigTests(unittest.TestCase):
             '"Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --capture")',
             '"SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --screenshot-area")',
             'mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open recorder")',
-            'mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open control")',
+            'mainMod .. " + P", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open control")',
             'mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open questline")',
         )
         for binding in expected:

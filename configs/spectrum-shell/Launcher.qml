@@ -133,13 +133,13 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "Applications"
+                    text: qsTranslate("Spectrum", "Applications")
                     color: launcher.theme.colors.foreground
                     font { family: launcher.theme.fontFamily; pixelSize: launcher.theme.fontSize + 5; bold: true }
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: "Esc to close"
+                    text: qsTranslate("Spectrum", "Esc to close")
                     color: launcher.theme.colors.muted
                     font { family: launcher.theme.fontFamily; pixelSize: launcher.theme.fontSize - 2 }
                 }
@@ -156,7 +156,7 @@ PanelWindow {
                     anchors.leftMargin: 14
                     verticalAlignment: Text.AlignVCenter
                     visible: search.text.length === 0
-                    text: "Search applications"
+                    text: qsTranslate("Spectrum", "Search applications")
                     color: launcher.theme.colors.muted
                     font { family: launcher.theme.fontFamily; pixelSize: launcher.theme.fontSize }
                 }
@@ -179,7 +179,7 @@ PanelWindow {
             }
 
             Text {
-                text: results.count + (results.count === 1 ? " application" : " applications")
+                text: results.count + (results.count === 1 ? qsTranslate("Spectrum", " application") : qsTranslate("Spectrum", " applications"))
                 color: launcher.theme.colors.muted
                 font { family: launcher.theme.fontFamily; pixelSize: launcher.theme.fontSize - 2 }
             }
@@ -225,7 +225,7 @@ PanelWindow {
                             }
                             Text {
                                 Layout.fillWidth: true
-                                text: [modelData.source || "", modelData.genericName || modelData.comment || "Application"].filter(value => value).join(" · ")
+                                text: [modelData.source || "", modelData.genericName || modelData.comment || qsTranslate("Spectrum", "Application")].filter(value => value).join(" · ")
                                 elide: Text.ElideRight
                                 color: launcher.theme.colors.muted
                                 font { family: launcher.theme.fontFamily; pixelSize: launcher.theme.fontSize - 2 }

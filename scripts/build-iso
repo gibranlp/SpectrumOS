@@ -80,6 +80,7 @@ tar -C "$project_root" \
     --exclude='./spectrumos-personal' \
     --exclude='./secrets' \
     --exclude='./.git' \
+    --exclude='./.comem' \
     --exclude='./artifacts' \
     --exclude='./iso' \
     --exclude='./repo/sources' \
@@ -113,6 +114,18 @@ PY
 ln -s "$source_path" "$staging/airootfs/root/SpectrumOS2"
 install -m 0755 "$project_root/scripts/snapshot" "$staging/airootfs/usr/local/bin/spectrum-snapshot"
 install -m 0755 "$project_root/scripts/spectrum" "$staging/airootfs/usr/local/bin/spectrum"
+desktop_entry=$(bsdtar -tf "$repository/spectrumos.db.tar.zst" | awk '/^spectrum-desktop-[^/]+\/desc$/ {print; exit}')
+desktop_filename=$(bsdtar -xOf "$repository/spectrumos.db.tar.zst" "$desktop_entry" | awk '/^%FILENAME%$/ {getline; print; exit}')
+[[ -n $desktop_filename && $desktop_filename != */* ]] || { printf 'Invalid indexed Desktop artifact.\n' >&2; exit 1; }
+bsdtar -xf "$repository/$desktop_filename" -C "$staging/airootfs" \
+    usr/lib/qt6/qml/Spectrum/I18n usr/share/spectrumos/translations usr/lib/spectrumos/spectrum_i18n.py
+"$project_root/scripts/build-localization" --catalogs-only --output "$temporary_root/localization"
+cp -a -- "$temporary_root/localization/translations/." "$staging/airootfs/usr/share/spectrumos/translations/"
+[[ -s $staging/airootfs/usr/lib/qt6/qml/Spectrum/I18n/libspectrumi18n.so && \
+   -s $staging/airootfs/usr/share/spectrumos/translations/spectrum_es_MX.qm && \
+   -s $staging/airootfs/usr/share/spectrumos/translations/es_MX/LC_MESSAGES/spectrum.mo ]] || {
+    printf 'The signed Desktop package must include the language runtime and catalogs.\n' >&2; exit 1;
+}
 install -m 0755 "$project_root/installer/spectrum-installer" \
     "$staging/airootfs/usr/local/bin/spectrum-installer"
 install -m 0755 "$project_root/installer/spectrum-recovery" \
@@ -121,6 +134,8 @@ install -m 0755 "$project_root/installer/spectrum-rescue-shell" \
     "$staging/airootfs/usr/local/bin/spectrum-rescue-shell"
 install -m 0755 "$project_root/installer/spectrum-installer-backend" \
     "$staging/airootfs/usr/local/lib/spectrumos/spectrum-installer-backend"
+install -m 0755 "$project_root/installer/spectrum-installer-storage" \
+    "$staging/airootfs/usr/local/lib/spectrumos/spectrum-installer-storage"
 install -m 0755 "$project_root/installer/spectrum-live-session" \
     "$staging/airootfs/usr/local/bin/spectrum-live-session"
 install -m 0755 "$project_root/installer/spectrum-live-network" \

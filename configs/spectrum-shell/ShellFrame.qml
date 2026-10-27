@@ -4,6 +4,7 @@ import Quickshell.Wayland
 
 PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "spectrum-frame"
     id: frame
     required property var targetScreen
     required property var theme
@@ -37,6 +38,7 @@ PanelWindow {
 
     PanelWindow {
         WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "spectrum-frame-reservation"
         visible: frame.visible
         screen: frame.targetScreen
         anchors { top: true; left: true; right: true }
@@ -49,6 +51,7 @@ PanelWindow {
 
     PanelWindow {
         WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "spectrum-frame-reservation"
         visible: frame.visible
         screen: frame.targetScreen
         anchors { top: true; bottom: true; left: true }
@@ -61,6 +64,7 @@ PanelWindow {
 
     PanelWindow {
         WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "spectrum-frame-reservation"
         visible: frame.visible
         screen: frame.targetScreen
         anchors { top: true; bottom: true; right: true }
@@ -73,6 +77,7 @@ PanelWindow {
 
     PanelWindow {
         WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "spectrum-frame-reservation"
         visible: frame.visible
         screen: frame.targetScreen
         anchors { bottom: true; left: true; right: true }

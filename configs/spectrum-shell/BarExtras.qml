@@ -10,17 +10,20 @@ ColumnLayout {
     signal chosen(string action)
     spacing: 14
     readonly property var actions: [
-        {icon:"󰏗", label:"App Store", action:"app-store"},
-        {icon:"★", label:"Favorites", action:"favorites"},
+        {icon:"󰏗", label:qsTranslate("Spectrum", "App Store"), action:"app-store"},
+        {icon:"★", label:qsTranslate("Spectrum", "Favorites"), action:"favorites"},
         {icon:"󰒡", label:"SpectrumDrop", action:"spectrumdrop"},
         {icon:"󰏖", label:"AppImages", action:"appimages"},
-        {icon:"󰥔", label:"Time & region", action:"time"},
-        {icon:"󰓅", label:"Power & battery", action:"battery"},
-        {icon:"󰍹", label:"Displays", action:"displays"},
-        {icon:"󰍽", label:"Mouse", action:"mouse"},
-        {icon:"Aa", label:"Typography", action:"typography"},
-        {icon:"󰒓", label:"Control Center", action:"control"},
-        {icon:"󰐥", label:"Session", action:"session"}
+        {icon:"󰥔", label:qsTranslate("Spectrum", "Time & region"), action:"time"},
+        {icon:"󰒲", label:qsTranslate("Spectrum", "Break reminders"), action:"breaks"},
+        {icon:"󰒋", label:qsTranslate("Spectrum", "Local services"), action:"services"},
+        {icon:"󰈔", label:qsTranslate("Spectrum", "Default applications"), action:"default-apps"},
+        {icon:"󰓅", label:qsTranslate("Spectrum", "Power & battery"), action:"battery"},
+        {icon:"󰍹", label:qsTranslate("Spectrum", "Displays"), action:"displays"},
+        {icon:"󰍽", label:qsTranslate("Spectrum", "Mouse"), action:"mouse"},
+        {icon:"Aa", label:qsTranslate("Spectrum", "Typography"), action:"typography"},
+        {icon:"󰒓", label:qsTranslate("Spectrum", "Control Center"), action:"control"},
+        {icon:"󰐥", label:qsTranslate("Spectrum", "Session"), action:"session"}
     ]
     GridLayout {
         Layout.fillWidth: true
@@ -44,7 +47,7 @@ ColumnLayout {
     }
     Text {
         visible: trayIcons.count > 0
-        text: "Applications"
+        text: qsTranslate("Spectrum", "Applications")
         color: extras.theme.colors.muted
         font.family: extras.theme.fontFamily
         font.pixelSize: extras.theme.fontSize

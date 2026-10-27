@@ -120,6 +120,8 @@ def create(label: str | None) -> str:
     if os.geteuid() != 0:
         raise SnapshotError("Snapshot creation requires root privileges")
     mount = root_mount()
+    if Path("/etc/spectrumos/boot-ownership").exists():
+        validate_boot_ownership(Path("/"), Path("/boot"), mount["source"], device_for("/boot").strip())
     identifier = snapshot_id(label)
     with mounted_top_level(mount["source"]) as top:
         source = top / mount["subvolume"]
@@ -422,6 +424,27 @@ def clear_directory(directory: Path) -> None:
             child.unlink()
 
 
+def validate_boot_ownership(root: Path, boot: Path, root_device: str, boot_device: str) -> None:
+    efi = boot / "EFI"
+    if efi.is_dir() and any(child.name.casefold() not in {"boot", "linux", "spectrumos"} for child in efi.iterdir()):
+        raise SnapshotError("Refusing whole-boot recovery on an EFI partition containing another system")
+    ownership = root / "etc/spectrumos/boot-ownership"
+    marker = boot / ".spectrumos-boot-owner"
+    if not ownership.exists():
+        if marker.exists():
+            raise SnapshotError("Spectrum boot ownership metadata is missing from this root")
+        return
+    values = dict(line.split("=", 1) for line in ownership.read_text().splitlines() if "=" in line)
+    root_uuid = run(["blkid", "-s", "UUID", "-o", "value", root_device]).strip()
+    boot_uuid = run(["blkid", "-s", "UUID", "-o", "value", boot_device]).strip()
+    partuuid = run(["blkid", "-s", "PARTUUID", "-o", "value", boot_device]).strip()
+    if (values.get("schema") != "1" or not root_uuid or not boot_uuid or not partuuid
+            or values.get("root_uuid") != root_uuid or values.get("boot_uuid") != boot_uuid
+            or values.get("boot_partuuid") != partuuid
+            or not marker.is_file() or marker.read_text().strip() != root_uuid):
+        raise SnapshotError("Root and EFI partition ownership do not match; refusing recovery")
+
+
 def restore(identifier: str, root_device: str, boot_device: str, target: str, confirmation: str) -> str:
     if os.geteuid() != 0:
         raise SnapshotError("restore requires root privileges")
@@ -449,6 +472,12 @@ def restore(identifier: str, root_device: str, boot_device: str, target: str, co
             raise SnapshotError(f"Active root subvolume is missing: {target}")
         failed.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         with mounted_device(boot_device, "restore-boot-") as boot:
+            validate_boot_ownership(active, boot, root_device, boot_device)
+            validate_boot_ownership(selected, boot, root_device, boot_device)
+            if (active / "etc/spectrumos/boot-ownership").exists():
+                archived_owner = run(["tar", "-xOf", str(top / SNAPSHOT_ROOT / identifier / "boot.tar"), "./.spectrumos-boot-owner"]).strip()
+                if archived_owner != (boot / ".spectrumos-boot-owner").read_text().strip():
+                    raise SnapshotError("The archived EFI files belong to another root; refusing recovery")
             run(["tar", "--numeric-owner", "-cpf", str(boot_backup), "-C", str(boot), "."], capture=False)
             os.rename(active, failed)
             replacement_created = False
@@ -500,6 +529,11 @@ def parser() -> argparse.ArgumentParser:
     restore_parser.add_argument("--boot-device", required=True)
     restore_parser.add_argument("--target", default="@")
     restore_parser.add_argument("--confirm", required=True)
+    ownership_parser = commands.add_parser("verify-boot", help="Check mounted root and boot ownership before recovery")
+    ownership_parser.add_argument("--root-path", type=Path, required=True)
+    ownership_parser.add_argument("--boot-path", type=Path, required=True)
+    ownership_parser.add_argument("--root-device", required=True)
+    ownership_parser.add_argument("--boot-device", required=True)
     commands.add_parser("status", help="Report snapshot support for this root")
     retention_parser = commands.add_parser("retention", help="Plan restore-point retention without deleting anything")
     retention_parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
@@ -518,11 +552,15 @@ def main() -> int:
     arguments = parser().parse_args()
     try:
         if arguments.command in {
-            "create", "list", "check", "plan", "restore", "retention", "prune", "enforce-cap",
+            "create", "list", "check", "plan", "restore", "retention", "prune", "enforce-cap", "verify-boot",
         } and os.geteuid() != 0:
             raise SnapshotError(f"{arguments.command} requires root privileges")
         if arguments.command == "create":
             print(create(arguments.label))
+        elif arguments.command == "verify-boot":
+            validate_boot_ownership(arguments.root_path, arguments.boot_path,
+                                    require_block_device(arguments.root_device), require_block_device(arguments.boot_device))
+            print("Root and boot ownership verified")
         elif arguments.command == "status":
             mount = root_mount()
             print(f"supported: btrfs root {mount['subvolume']} on {mount['source']}")

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=SpectrumDrop encrypted network file sharing
+PartOf=graphical-session.target
+After=graphical-session.target network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/python3 /usr/lib/spectrumos/spectrumdrop/bin/lan.py daemon
+RuntimeDirectory=spectrumdrop-lan
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=12
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ReadWritePaths=%h %t/spectrumdrop-lan
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+LimitCORE=0
+

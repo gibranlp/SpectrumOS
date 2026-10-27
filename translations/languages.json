@@ -1,0 +1,23 @@
+[
+  {
+    "id": "en_US",
+    "name": "English",
+    "language": "en",
+    "locale": "en_US.UTF-8",
+    "plural_forms": "nplurals=2; plural=(n != 1);"
+  },
+  {
+    "id": "es_MX",
+    "name": "Español (Latinoamérica)",
+    "language": "es",
+    "locale": "es_MX.UTF-8",
+    "plural_forms": "nplurals=2; plural=(n != 1);"
+  },
+  {
+    "id": "pt_BR",
+    "name": "Português (Brasil)",
+    "language": "pt",
+    "locale": "pt_BR.UTF-8",
+    "plural_forms": "nplurals=2; plural=(n > 1);"
+  }
+]

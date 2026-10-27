@@ -91,6 +91,7 @@ gst-plugins-bad
 gst-plugins-ugly
 gnome-epub-thumbnailer
 poppler
+qpdf
 poppler-glib
 libgsf
 libgepub
@@ -127,6 +128,7 @@ ukvm
 xdg-user-dirs
 python-pillow
 xdg-utils
+xdg-terminal-exec
 
 imagemagick
 

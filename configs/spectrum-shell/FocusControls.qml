@@ -18,8 +18,8 @@ ColumnLayout {
     property string soundscape: focusState.soundscape || "Silent"
     property int duration: focusState.duration || 25
     readonly property bool active: ["starting", "work", "paused"].includes(focusState.phase)
-    readonly property var campaigns: [{ id: "", name: "Unfiled / no campaign" }].concat(questline.campaigns || [])
-    readonly property var tasks: [{ id: "", title: "No specific task" }].concat((questline.tasks || []).filter(task => (task.project_id || "") === projectId))
+    readonly property var campaigns: [{ id: "", name: qsTranslate("Spectrum", "Unfiled / no campaign") }].concat(questline.campaigns || [])
+    readonly property var tasks: [{ id: "", title: qsTranslate("Spectrum", "No specific task") }].concat((questline.tasks || []).filter(task => (task.project_id || "") === projectId))
     readonly property var soundscapes: ["Silent", "LoFi Radio", "Forest Sounds", "Rain Sounds", "Ocean Waves", "White Noise", "Music For Programming", "Local Folder"]
     spacing: 9
 
@@ -65,7 +65,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: focus.active && text.length > 0
-        text: focus.focusState.phase === "paused" ? "Paused" : focus.focusState.task || focus.focusState.campaign || ""
+        text: focus.focusState.phase === "paused" ? qsTranslate("Spectrum", "Paused") : focus.focusState.task || focus.focusState.campaign || ""
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         color: focus.theme.colors.muted
@@ -75,7 +75,7 @@ ColumnLayout {
         Layout.fillWidth: true
         visible: !focus.active
         spacing: 6
-        Text { text: "Campaign"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        Text { text: qsTranslate("Spectrum", "Campaign"); color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
         FocusChoice {
             Layout.fillWidth: true
             theme: focus.theme
@@ -84,7 +84,7 @@ ColumnLayout {
             currentIndex: Math.max(0, focus.campaigns.findIndex(item => item.id === focus.projectId))
             onActivated: { focus.projectId = focus.campaigns[currentIndex].id; focus.taskId = ""; }
         }
-        Text { text: "Task"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        Text { text: qsTranslate("Spectrum", "Task"); color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
         FocusChoice {
             Layout.fillWidth: true
             theme: focus.theme
@@ -95,7 +95,7 @@ ColumnLayout {
         }
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Minutes"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+            Text { text: qsTranslate("Spectrum", "Minutes"); color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
             Controls.SpinBox {
                 Layout.fillWidth: true
                 from: 5; to: 180; stepSize: 5; editable: true
@@ -110,11 +110,12 @@ ColumnLayout {
                 palette { base: focus.theme.colors.surface_alt; text: focus.theme.colors.foreground; button: focus.theme.colors.surface_alt; buttonText: focus.theme.colors.foreground }
             }
         }
-        Text { text: "Soundscape"; color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
+        Text { text: qsTranslate("Spectrum", "Soundscape"); color: focus.theme.colors.muted; font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 } }
         FocusChoice {
             Layout.fillWidth: true
             theme: focus.theme
             enabled: !focus.active
+            translateModel: true
             model: focus.soundscapes
             currentIndex: Math.max(0, focus.soundscapes.indexOf(focus.soundscape))
             onActivated: focus.soundscape = focus.soundscapes[currentIndex]
@@ -124,7 +125,7 @@ ColumnLayout {
         Layout.fillWidth: true
         ShellButton {
             Layout.fillWidth: true
-            label: focus.focusState.phase === "work" ? "Pause" : focus.focusState.phase === "paused" ? "Resume" : focus.focusState.phase === "starting" ? "Starting…" : "Start focus"
+            label: focus.focusState.phase === "work" ? qsTranslate("Spectrum", "Pause") : focus.focusState.phase === "paused" ? qsTranslate("Spectrum", "Resume") : focus.focusState.phase === "starting" ? qsTranslate("Spectrum", "Starting…") : qsTranslate("Spectrum", "Start focus")
             enabled: focus.questline.available && focus.focusState.phase !== "starting"
             fontFamily: focus.theme.fontFamily
             fontSize: focus.theme.fontSize
@@ -138,7 +139,7 @@ ColumnLayout {
             }
         }
         ShellButton {
-            label: "Reset"
+            label: qsTranslate("Spectrum", "Reset")
             fontFamily: focus.theme.fontFamily
             fontSize: focus.theme.fontSize
             backgroundColor: focus.theme.colors.surface_alt
@@ -157,7 +158,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !focus.questline.available || !!focus.focusState.message
-        text: focus.focusState.message || (!focus.questline.available ? "Complete Questline setup to start." : "")
+        text: qsTranslate("Spectrum", focus.focusState.message) || (!focus.questline.available ? qsTranslate("Spectrum", "Complete Questline setup to start.") : "")
         wrapMode: Text.Wrap
         color: focus.focusState.phase === "error" ? focus.theme.colors.error || "#ff8c9a" : focus.theme.colors.accent
         font { family: focus.theme.fontFamily; pixelSize: focus.theme.fontSize - 1 }

@@ -87,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     render = subparsers.add_parser("render", help="Render and atomically activate a Spectrum palette")
     render.add_argument("--palette", type=Path)
     render.add_argument("--output", type=Path, default=default_output_root())
+    render.add_argument("--appearance-state", type=Path, help="Wallpaper appearance settings retained for rollback")
     render.add_argument("--strict", action="store_true", help="Fail instead of using the packaged fallback")
     render.add_argument("--wallpaper", type=Path, help="Wallpaper associated with this generation")
     render.add_argument("--retention", type=int, default=DEFAULT_RETENTION)
@@ -175,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             generation = generate(
                 palette, arguments.output, wallpaper,
                 font_size=global_font_size(), font_family=global_font_family(),
+                appearance=json.loads(((arguments.output / "current").resolve() / "generation.json").read_text()).get("appearance"),
             )
             print(f"Activated theme: {palette.name}")
             print(f"Generation: {generation}")
@@ -209,9 +211,17 @@ def main(argv: list[str] | None = None) -> int:
             print("Using packaged fallback palette.", file=sys.stderr)
             palette = load_palette(default_palette_path())
 
+        appearance = None
+        if arguments.appearance_state:
+            appearance = json.loads(arguments.appearance_state.read_text())
+            if not isinstance(appearance, dict) or appearance.get("mode") not in NATIVE_MODES or appearance.get("variant") not in {"auto", "dark", "light"}:
+                raise ValueError("Invalid wallpaper appearance settings")
+            if not isinstance(appearance.get("scheme"), str) or not isinstance(appearance.get("rendered_wallpaper"), str):
+                raise ValueError("Invalid rendered wallpaper metadata")
         generation = generate(
             palette, arguments.output, arguments.wallpaper, arguments.retention,
             font_size=global_font_size(), font_family=global_font_family(),
+            appearance=appearance,
         )
         print(f"Activated theme: {palette.name}")
         print(f"Generation: {generation}")

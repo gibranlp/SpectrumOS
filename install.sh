@@ -226,7 +226,10 @@ phase_preflight() {
     resolve_target
     local -a packages=()
     local -a aur_packages=()
-    mapfile -t packages < <(collect_packages)
+    local package_list
+    package_list=$(collect_packages) || die "Package selection failed"
+    [[ -n $package_list ]] || die "Package selection is empty"
+    mapfile -t packages <<< "$package_list"
     mapfile -t aur_packages < <(collect_aur_packages)
     check_multilib "${packages[@]}"
     if ((${#aur_packages[@]} > 0)) && [[ $APPLY == true ]]; then
@@ -241,7 +244,10 @@ phase_packages() {
     log "Installing package profiles with a full synchronized upgrade"
     local -a packages=()
     local -a aur_packages=()
-    mapfile -t packages < <(collect_packages)
+    local package_list
+    package_list=$(collect_packages) || die "Package selection failed"
+    [[ -n $package_list ]] || die "Package selection is empty"
+    mapfile -t packages <<< "$package_list"
     mapfile -t aur_packages < <(collect_aur_packages)
     check_multilib "${packages[@]}"
     if ((${#packages[@]} > 0)); then
@@ -274,6 +280,29 @@ install_hotkey_keyboard() {
     fi
     run sudo install -m 0755 "$hotkey_keyboard" "$hotkey_destination"
     rm -f -- "$hotkey_keyboard"
+}
+
+install_localization() {
+    local localization_module=/usr/lib/qt6/qml/Spectrum/I18n/libspectrumi18n.so
+    if [[ -r $localization_module && -r /usr/share/spectrumos/translations/languages.json ]] && \
+        [[ $(pacman -Qqo -- "$localization_module" 2>/dev/null) == spectrum-desktop ]]; then
+        log "Using the package-owned Spectrum language runtime"
+        return
+    fi
+    if [[ $APPLY != true ]]; then
+        log "Would build and install the Spectrum language runtime"
+        return
+    fi
+    local localization_build
+    localization_build=$(mktemp -d)
+    if ! "$PROJECT_ROOT/scripts/build-localization" --output "$localization_build"; then
+        rm -rf -- "$localization_build"
+        die "Could not build the language runtime; install cmake, qt6-tools and python-polib"
+    fi
+    run sudo install -d -m 0755 /usr/lib/qt6/qml /usr/share/spectrumos/translations
+    run sudo cp -r "$localization_build/qml/." /usr/lib/qt6/qml/
+    run sudo cp -r "$localization_build/translations/." /usr/share/spectrumos/translations/
+    rm -rf -- "$localization_build"
 }
 
 phase_system() {
@@ -342,6 +371,7 @@ phase_system() {
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/org.spectrumos.time-region.policy" \
         /usr/share/polkit-1/actions/org.spectrumos.time-region.policy
     run sudo install -m 0644 "$PROJECT_ROOT/configs/xdg/mimeapps.list" /etc/xdg/mimeapps.list
+    run sudo install -m 0644 "$PROJECT_ROOT/configs/xdg/xdg-terminals.list" /etc/xdg/xdg-terminals.list
     run sudo install -m 0644 "$PROJECT_ROOT/system/flatpak-flathub.flatpakrepo" \
         /etc/flatpak/remotes.d/flathub.flatpakrepo
     run sudo install -m 0644 "$PROJECT_ROOT/configs/networkmanager/20-spectrumos.conf" \
@@ -436,13 +466,23 @@ phase_system() {
     if [[ $LEAN == false ]]; then
         run sudo systemctl enable --now cups.socket
         run sudo systemctl enable --now cups-browsed.service
+        run sudo systemctl unmask avahi-daemon.service avahi-daemon.socket
         run sudo systemctl enable --now avahi-daemon.service
         if [[ $FORM_FACTOR_PROFILE != laptop ]]; then
             run sudo systemctl unmask tuned.service
             run sudo systemctl enable tuned.service
         fi
+    else
+        run sudo systemctl mask --now avahi-daemon.service avahi-daemon.socket
+    fi
+    if [[ $APPLY == true ]]; then
+        printf '%s\n' "$([[ $LEAN == true ]] && printf lean || printf full)" | sudo tee /etc/spectrumos/session-profile >/dev/null
+        run sudo chmod 0644 /etc/spectrumos/session-profile
+    else
+        printf '+ set SpectrumOS session profile to %s\n' "$([[ $LEAN == true ]] && printf lean || printf full)"
     fi
     run sudo systemctl enable sddm.service
+    run sudo install -m 0755 "$PROJECT_ROOT/scripts/spectrum-session-profile" /usr/lib/spectrumos/spectrum-session-profile
     run sudo install -m 0755 "$PROJECT_ROOT/scripts/volume" /usr/lib/spectrumos/volume
     run sudo install -m 0755 "$PROJECT_ROOT/scripts/brightness" /usr/lib/spectrumos/brightness
     run sudo install -m 0755 "$PROJECT_ROOT/scripts/theme-menu" /usr/lib/spectrumos/theme-menu
@@ -499,13 +539,15 @@ phase_system() {
     run sudo install -m 0755 "$PROJECT_ROOT/scripts/spectrum-shell-picker" /usr/lib/spectrumos/spectrum-shell-picker
     run sudo install -Dm0644 "$PROJECT_ROOT/system/modules-load.d/spectrumos-ddc.conf" /usr/lib/modules-load.d/spectrumos-ddc.conf
     install_hotkey_keyboard
+    install_localization
+    run sudo install -m 0644 "$PROJECT_ROOT/scripts/spectrum_i18n.py" /usr/lib/spectrumos/spectrum_i18n.py
     local desktop_script
     for desktop_script in \
         application-menu calculator-menu keyboard-layout spectrum-browser-defaults \
         font-family-menu performance-mode resource-monitor session-menu spectrum-update-run window-pin-toggle spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session \
         waybar-workspace-icons \
         spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder \
-        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus; do
+        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter; do
         run sudo install -m 0755 "$PROJECT_ROOT/scripts/$desktop_script" "/usr/lib/spectrumos/$desktop_script"
     done
     run sudo install -m 0644 "$PROJECT_ROOT/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
@@ -517,6 +559,9 @@ phase_system() {
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-favorites.desktop" /usr/share/applications/spectrum-favorites.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-appimages.desktop" /usr/share/applications/spectrum-appimages.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-app-store.desktop" /usr/share/applications/spectrum-app-store.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-breaks.desktop" /usr/share/applications/spectrum-breaks.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-services.desktop" /usr/share/applications/spectrum-services.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-default-apps.desktop" /usr/share/applications/spectrum-default-apps.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/configs/app-store/paru.conf" /usr/share/spectrumos/app-store/paru.conf
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/org.spectrumos.app-store.policy" /usr/share/polkit-1/actions/org.spectrumos.app-store.policy
     run sudo install -Dm 0644 "$PROJECT_ROOT/integrations/stash/stash.desktop" /usr/share/applications/stash.desktop
@@ -570,6 +615,8 @@ phase_user() {
     run_as_target /usr/lib/spectrumos/spectrum-user-avatar \
         /usr/share/spectrumos/spectrum-shell/igor/face.svg "$TARGET_HOME/$TARGET_USER.png"
     run_as_target mkdir -p -- "$projects_dir" "$hypr_dir" "$spectrum_dir" "$kitty_dir" "$alacritty_dir" "$environment_dir" "$wallpaper_dir" "$vlc_dir" "$transmission_download_dir"
+    run_as_target /usr/lib/spectrumos/spectrum-session-profile seed --home "$TARGET_HOME" \
+        --profile "$([[ $LEAN == true ]] && printf lean || printf full)"
     if [[ $LEAN == false ]]; then
         run_as_target mkdir -p -- "$transmission_dir"
     if [[ ! -e $transmission_dir/settings.json ]]; then

@@ -11,3 +11,8 @@ button { background: #__SURFACE__; color: #__FOREGROUND__; border-radius: 9px; }
 entry, dropdown { background: #__SURFACE__; color: #__FOREGROUND__; border-radius: 9px; }
 progressbar trough { min-height: 12px; border-radius: 8px; background: #__SURFACE__; }
 progressbar progress { min-height: 12px; border-radius: 8px; background: #__ACCENT__; }
+.install-progress-card { background: #__SURFACE__; padding: 20px; border-radius: 16px; }
+.install-status { font-weight: 650; }
+.install-tip-card { background: alpha(#__ACCENT__, 0.07); padding: 18px 20px; border-radius: 16px; }
+.install-tip-context { color: #__MUTED__; font-size: 0.8em; letter-spacing: 1px; }
+.install-tip-title { color: #__ACCENT_ALT__; font-weight: 700; }

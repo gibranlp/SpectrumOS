@@ -75,7 +75,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "NOTIFICATIONS"
+                    text: qsTranslate("Spectrum", "NOTIFICATIONS")
                     color: center.theme.colors.foreground
                     font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize + 5; bold: true }
                 }
@@ -92,7 +92,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 ShellButton {
-                    label: center.doNotDisturb ? "Do not disturb: on" : "Do not disturb: off"
+                    label: center.doNotDisturb ? qsTranslate("Spectrum", "Do not disturb: on") : qsTranslate("Spectrum", "Do not disturb: off")
                     fontFamily: center.theme.fontFamily
                     fontSize: center.theme.fontSize - 1
                     backgroundColor: center.doNotDisturb ? center.theme.colors.accent : center.theme.colors.surface_alt
@@ -101,7 +101,7 @@ PanelWindow {
                 }
                 Item { Layout.fillWidth: true }
                 ShellButton {
-                    label: "Clear all"
+                    label: qsTranslate("Spectrum", "Clear all")
                     fontFamily: center.theme.fontFamily
                     fontSize: center.theme.fontSize - 1
                     backgroundColor: center.theme.colors.surface_alt
@@ -135,7 +135,7 @@ PanelWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             Text {
-                                text: modelData.appName || "Application"
+                                text: modelData.appName || qsTranslate("Spectrum", "Application")
                                 color: noticeEntry.palette.accent
                                 font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize - 2; bold: true }
                             }
@@ -171,7 +171,7 @@ PanelWindow {
                         ShellButton {
                             objectName:"notification-center-drink"
                             visible:noticeEntry.palette.kind==="hydration" && !!modelData.dismiss
-                            label:"Drink"
+                            label:qsTranslate("Spectrum", "Drink")
                             fontFamily:center.theme.fontFamily
                             fontSize:center.theme.fontSize
                             backgroundColor:noticeEntry.palette.accent
@@ -181,7 +181,7 @@ PanelWindow {
                         ShellButton {
                             objectName: "notification-center-open-updates"
                             visible: NotificationStyle.isStableUpdate(modelData)
-                            label: "Open Updates"
+                            label: qsTranslate("Spectrum", "Open Updates")
                             fontFamily: center.theme.fontFamily
                             fontSize: center.theme.fontSize
                             backgroundColor: noticeEntry.palette.accent
@@ -195,7 +195,7 @@ PanelWindow {
                                 model: modelData.actions || []
                                 ShellButton {
                                     required property var modelData
-                                    label: modelData.text
+                                    label: ["spectrum-open-updates", "questline-drink"].includes(modelData.identifier) ? qsTranslate("Spectrum", modelData.text) : modelData.text
                                     fontFamily: center.theme.fontFamily
                                     fontSize: center.theme.fontSize - 2
                                     backgroundColor: noticeEntry.palette.accent
@@ -209,7 +209,7 @@ PanelWindow {
             }
             Text {
                 visible: center.visibleItems.length === 0
-                text: "All caught up"
+                text: qsTranslate("Spectrum", "All caught up")
                 color: center.theme.colors.muted
                 font { family: center.theme.fontFamily; pixelSize: center.theme.fontSize }
             }

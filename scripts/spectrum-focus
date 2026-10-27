@@ -10,6 +10,10 @@ import tempfile
 import time
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from spectrum_i18n import translate
+
+
 ROOT = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "spectrumos/focus"
 STATE = ROOT / "state.json"
 CONTROL = ROOT / "control.json"
@@ -49,7 +53,7 @@ def backend_binary():
 
 
 def notify(message):
-    subprocess.run(["notify-send", "--app-name=SpectrumOS", "Questline Focus", message], check=False)
+    subprocess.run(["notify-send", "--app-name=SpectrumOS", translate("Questline Focus"), translate(message)], check=False)
 
 
 def start(request):

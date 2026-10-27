@@ -15,7 +15,7 @@ spec.loader.exec_module(migration)
 class NativePackagingTests(unittest.TestCase):
     def test_desktop_uses_maintained_source_without_external_drop_packages(self):
         recipe = (ROOT / 'packages/spectrum-desktop/PKGBUILD').read_text()
-        self.assertIn('spectrumdrop acl', recipe)
+        self.assertRegex(recipe, r"['\"]?spectrumdrop(?:>=[^'\" ]+)?['\"]? acl")
         self.assertNotIn("'omdrop:", recipe)
         self.assertNotIn("'omdrop-owl:", recipe)
         adapter = (ROOT / 'scripts/spectrumdrop-adapter').read_text()

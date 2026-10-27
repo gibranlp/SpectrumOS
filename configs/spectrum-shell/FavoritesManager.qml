@@ -75,7 +75,7 @@ Item {
     }
     function refresh(): void { persist(); run("status"); run("browsers"); iconsWanted=true; }
     function categoryName(id): string {
-        const found=categories.find(c=>c.id===id); return found ? found.name : "Uncategorized";
+        const found=categories.find(c=>c.id===id); return found ? found.name : qsTranslate("Spectrum", "Uncategorized");
     }
     readonly property var ranked: favorites.slice().sort((a,b) => b.clickCount-a.clickCount || a.title.toLocaleLowerCase().localeCompare(b.title.toLocaleLowerCase()) || a.id.localeCompare(b.id))
     readonly property var visibleFavorites: {
@@ -129,7 +129,7 @@ Item {
                         && manager.job.payload.view.editor===manager.view.editor
                         && manager.job.payload.view.draft.id===manager.view.draft.id) manager.back();
                 }
-            } catch(error) { manager.error="Could not read the Favorites response. Your saved data has been preserved."; }
+            } catch(error) { manager.error=qsTranslate("Spectrum", "Could not read the Favorites response. Your saved data has been preserved."); }
             Qt.callLater(()=>manager.pump());
         }
     }

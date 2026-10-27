@@ -9,6 +9,7 @@ import string
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 
 COLOR_HISTORY_LIMIT = 60
@@ -36,6 +37,123 @@ def search(query: str) -> int:
                     return 0
     print(json.dumps(matches, ensure_ascii=False))
     return 0
+
+
+
+def search_preferences():
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "spectrumos/search.json"
+
+
+def search_saved():
+    try:
+        value = json.loads(search_preferences().read_text())
+        if isinstance(value, dict) and isinstance(value.get("root"), str):
+            return value
+    except (OSError, ValueError):
+        pass
+    return {"root": str(Path.home()), "recent": []}
+
+
+def search_directory(value):
+    if not isinstance(value, str) or not value.strip() or len(value) > 4096 or "\0" in value:
+        raise ValueError("Enter a folder path.")
+    path = Path(value.strip()).expanduser()
+    if not path.is_absolute():
+        raise ValueError("Use an absolute folder path, such as /media/Music, or ~/Music.")
+    if not path.is_dir():
+        raise ValueError("Folder is unavailable. Check its path and whether the drive is mounted.")
+    if not os.access(path, os.R_OK | os.X_OK):
+        raise ValueError("You do not have permission to search this folder.")
+    return path.resolve()
+
+
+def search_locations(saved):
+    values = []
+    seen = set()
+    def add(path, label):
+        path = str(path)
+        if path not in seen:
+            seen.add(path)
+            values.append({"path": path, "name": label})
+    add(Path.home(), "Home")
+    for name in ("Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos"):
+        path = Path.home() / name
+        if path.is_dir():
+            add(path, name)
+    try:
+        for line in Path("/proc/self/mountinfo").read_text().splitlines():
+            parts = line.split()
+            if len(parts) < 6:
+                continue
+            path = re.sub(r"\\([0-7]{3})", lambda match: chr(int(match[1], 8)), parts[4])
+            if any(path.startswith(prefix) for prefix in ("/media/", "/mnt/", "/run/media/")):
+                add(path, Path(path).name + " · " + path)
+    except OSError:
+        pass
+    recent = saved.get("recent") if isinstance(saved.get("recent"), list) else []
+    for path in [saved.get("root"), *recent[:8]]:
+        if isinstance(path, str) and path.startswith("/"):
+            add(path, path)
+    return values
+
+
+def search_state(selected=None):
+    saved = search_saved()
+    if selected is not None:
+        root = search_directory(selected)
+        recent = saved.get("recent") if isinstance(saved.get("recent"), list) else []
+        recent = list(dict.fromkeys([str(root)] + [v for v in recent if isinstance(v, str)]))[:8]
+        saved = {"root": str(root), "recent": recent}
+        path = search_preferences()
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd, temporary = tempfile.mkstemp(prefix=".search-", dir=path.parent)
+        try:
+            with os.fdopen(fd, "w") as output:
+                json.dump(saved, output, ensure_ascii=False)
+            os.replace(temporary, path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+    result = {"root": saved["root"], "locations": search_locations(saved)}
+    try:
+        search_directory(saved["root"])
+        result["ok"] = True
+    except (OSError, ValueError, RuntimeError) as error:
+        result.update(ok=False, error=str(error))
+    return result
+
+
+def scoped_search(request):
+    if not isinstance(request, dict):
+        raise ValueError("Expected search options.")
+    query = request.get("query", "")
+    result = {"request_id": request.get("request_id"), "matches": [], "limited": False, "timed_out": False, "skipped": 0}
+    try:
+        if not isinstance(query, str) or len(query) > 4096:
+            raise ValueError("Enter a shorter search query.")
+        root = search_directory(request.get("root", ""))
+        result["root"] = str(root)
+        needle = query.casefold().strip()
+        if len(needle) < 2:
+            return {**result, "ok": True}
+        deadline = time.monotonic() + 8
+        def unreadable(error):
+            result["skipped"] += 1
+        # No sigue carpetas enlazadas: evita ciclos y recorridos fuera de la ubicación elegida.
+        for directory, folders, files in os.walk(root, onerror=unreadable, followlinks=False):
+            folders[:] = sorted(name for name in folders if not name.startswith("."))
+            files.sort()
+            for name in files:
+                if time.monotonic() >= deadline:
+                    return {**result, "ok": True, "timed_out": True}
+                if not name.startswith(".") and needle in name.casefold():
+                    result["matches"].append(str(Path(directory) / name))
+                    if len(result["matches"]) >= 60:
+                        return {**result, "ok": True, "limited": True}
+            if time.monotonic() >= deadline:
+                return {**result, "ok": True, "timed_out": True}
+        return {**result, "ok": True}
+    except (OSError, ValueError, RuntimeError) as error:
+        return {**result, "ok": False, "error": str(error)}
 
 
 def emoji_search(query: str) -> int:
@@ -210,6 +328,20 @@ def add_color(value: str) -> int:
 
 
 def main() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] in ("search-state", "search-root", "search-json"):
+        try:
+            if sys.argv[1] == "search-state" and len(sys.argv) == 2:
+                result = search_state()
+            elif sys.argv[1] == "search-root" and len(sys.argv) == 3:
+                result = search_state(sys.argv[2])
+            elif sys.argv[1] == "search-json" and len(sys.argv) == 3:
+                result = scoped_search(json.loads(sys.argv[2]))
+            else:
+                raise ValueError("Invalid search options.")
+        except (OSError, ValueError, RuntimeError) as error:
+            result = {"ok": False, "error": str(error)}
+        print(json.dumps(result, ensure_ascii=False))
+        return 0 if result["ok"] else 1
     if len(sys.argv) == 2 and sys.argv[1] == "questline-campaign":
         return questline_campaign()
     if len(sys.argv) == 3 and sys.argv[1] == "questline-campaign":
