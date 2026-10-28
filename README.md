@@ -18,28 +18,51 @@ Inspired by [Caelestia Shell](https://github.com/caelestia-dots/shell), Spectrum
 
 Window controls stay consistent across **Dwindle, Master, Scrolling, and Monocle**. Multi-monitor controls, keyboard navigation, and integrated utilities handle the practical work behind the pretty screenshots. The menu labyrinth has lost another customer.
 
-### A widget for almost anything
+### Widgets that do the everyday work
 
-| Your current encounter | Tools already in the party |
+Open a tool from the bar, the **More** menu, the application launcher, or its keyboard shortcut. Widgets share the desktop theme and work with both top and left bars.
+
+| What you want to do | What SpectrumOS puts within reach |
 | --- | --- |
-| Mission control | Control Center, Dashboard, system readings, battery and power profiles, calendar, weather, time and region |
-| Connections and sound | Wi-Fi and Ethernet, Bluetooth, output/input selection, volume, microphone controls, playback and artwork |
-| Screens and appearance | Monitor arrangement, resolution, refresh rate, scale, supported brightness controls, wallpapers, fonts, keyboard and mouse settings, default applications |
-| Capture the evidence | Screenshots, screen recording, audio recording, and visible recording indicators |
-| Small but persistent side quests | File search, calculator, passwords, emoji, color picking and saved colors |
-| Stay on task | Focus timer, Questline, notification history, Do Not Disturb, keep-awake control |
-| Expand the inventory | AppImage Manager, Updates, shortcuts, HotKey automation, session controls |
-| Share the desk | UKVM controls and SpectrumDrop transfers on supported hardware |
+| Plan the day | Dashboard calendar, Questline due tasks and steps, weather, time and region |
+| Keep work organized | Campaigns, tasks, Markdown Scrolls, Chronicles, Treasury, focus sessions, and saved drafts |
+| Control sound and connections | Wi-Fi and Ethernet, Bluetooth, output/input selection, volume, microphone controls, playback, and album artwork |
+| Capture and find things | Annotated screenshots, screen and audio recording, file search across home folders and mounted drives |
+| Keep a comfortable pace | Focus timer, optional eye and movement reminders, Do Not Disturb, notification history, and Keep Awake |
+| Manage the desktop | Displays, brightness, wallpapers, typography, mouse settings, default applications, power and battery controls |
+| Find apps and favorite places | App Store, AppImage Manager, Updates, categorized Favorites, and the application launcher |
+| Run a development session | Local services, container controls, logs, calculator, HotKey sequences, and the shortcut catalog |
+| Connect your computers | UKVM keyboard/mouse sharing and SpectrumDrop file transfers |
 
-Some features depend on the hardware and desktop APIs available. A widget cannot summon a missing monitor, although the Planning Council has filed a request.
+### Capture the moment, find the file
 
-## Your wallpaper, your world
+Press **Print** to open the screenshot widget. Capture an area, window, monitor, or the whole desktop, with a delay when needed. Add arrows, text, shapes, highlights, cropping, or blur in the annotation editor; turn annotations off for a direct capture. Screen and audio recording have their own widgets and visible recording indicators.
 
-Change the wallpaper and the shell, widgets, terminals, notifications, supported GTK/Qt apps, and folder colors follow. The native theme engine builds a shared semantic palette instead of asking every application to improvise.
+**Super + S** opens file search. Choose Home, a standard folder, a mounted drive, or a custom path, then search by filename. The widget remembers your search location, so an external project drive can stay one shortcut away. A calculator, password generator, emoji picker, and color picker with saved-color history handle the smaller interruptions.
 
-Wallpaper filters use [Gowall by Achno](https://github.com/Achno/gowall). Recolor a scene with palettes such as Catppuccin, Nord, Gruvbox, or Dracula, then let SpectrumOS derive its desktop colors from the filtered image. Combine filters, **four palette backends**, and light/dark variants for **literally hundreds of combinations per wallpaper**. Choose `None` to return to the original colors.
+### Music and volume, together
 
-The Great Backlog remains undefeated. Its wardrobe, however, is exceptional.
+The audio widget brings playback controls, player selection, album artwork, audio devices, volume, and microphone controls into one place. When a song changes, its compact display shows the track and artist, plus a progress bar with elapsed and remaining time when the player provides timing.
+
+Change the volume while music is playing and the volume section slides out beneath the song. Both stay visible if a track changes at the same moment. When nothing is playing, the familiar compact volume display appears on its own.
+
+### Focus, breaks, and notifications
+
+Start a focus session from **Super + Shift + F**, then use notification history and Do Not Disturb to manage interruptions. Optional **Break reminders** offer configurable eye and movement intervals, a snooze, and a way to mark a break taken. Reminders pause during activities such as games, calls, and recording.
+
+The Dashboard calendar connects planning to action: choose a Questline due task or step to open that exact item in the widget. Your backlog has a calendar appointment now.
+
+### Your development desk, within reach
+
+**Local services** watches selected user services and local Docker or Podman containers. Check status, start, stop, restart, or read recent logs from the widget. **Default applications** lets you choose handlers for common categories or individual file types and explicitly apply the association.
+
+Use **HotKey** to create repeatable key sequences with a toggle shortcut and interval. **Favorites** keeps categorized web links, search, and frequently visited sites close by. The **App Store** searches package repositories, AUR, and Flatpak, while **Updates** and **AppImage Manager** cover the software already in your inventory.
+
+For another Spectrum PC, **SpectrumDrop** supports encrypted transfers over Ethernet or Wi-Fi, with device discovery, incoming acceptance, progress, and cancellation. Its separate Apple AirDrop mode depends on compatible Wi-Fi/Bluetooth hardware. **UKVM** handles keyboard and mouse sharing between trusted computers. See [SpectrumDrop](docs/spectrumdrop.md), [App Store](docs/app-store.md), and the [shell guide](docs/spectrum-shell.md) for details.
+
+## A desktop that follows your wallpaper
+
+Wallpaper colors carry through the shell, widgets, terminals, notifications, and supported applications. Choose light or dark variants and optional [Gowall](https://github.com/Achno/gowall) filters from the appearance controls. The [theme-engine guide](docs/theme-engine.md) covers palette generation and application integration.
 
 ## Three homegrown apps. One adventuring party.
 
@@ -67,10 +90,13 @@ Projects become **Campaigns**, tasks become **Quests**, and notes become **Scrol
 
 Run `questline` for the terminal adventure, or press **Super + Shift + Q** for its native shell widget:
 
-- Overview, Tasks, Scrolls, Treasury, Tree, Focus, Hero, and Sidequests views.
-- Horizontal campaign buttons share the same selection across Tasks, Scrolls and Treasury.
-- Create and edit work from the desktop, with **autosave and restored navigation** when you close and reopen the widget.
-- Press **Super + Shift + N** for a quick Scroll in your selected project. No project selected? Choose one and start writing.
+- **Overview, Tasks, Scrolls, Treasury, Chronicles, Tree, Focus, Hero, Sidequests, and Sync** in one workspace.
+- Campaign buttons above the navigation stay available across tabs and editors. Switch campaigns without losing an unfinished draft.
+- **Markdown reading and plain-text editing:** Scrolls render headings, emphasis, lists, links, quotes, code blocks, and tables in the reading view. Edit shows the original Markdown source; links open in the default application.
+- **Autosave and restored navigation:** valid edits save after a short typing pause. Incomplete or failed edits remain local drafts, with a status and a way to resume. The widget remembers your selected campaign, item, editor, cursor, and scroll position.
+- Open a due task or step directly from the Dashboard calendar, or use **Super + T** to start a new task.
+- Press **Super + Shift + N** for a quick Scroll in your selected project. When a project choice is needed, choose one and start writing.
+- Review sync status, create backups, and preview supported restore operations from **Sync**. See the [sync guide](docs/questline-sync.md).
 
 Questline 2.0.2 adds desktop alerts for actual XP gains, level-ups and unlocked achievements. A background service keeps Swarm and water reminders alive when the terminal is closed, following your existing Questline preferences. See [Questline notifications](docs/questline-notifications.md).
 
@@ -145,9 +171,19 @@ Game compatibility depends on drivers, Proton, and anti-cheat support. Calling e
 | `Super + E` | Files |
 | `Super + P` | Control Center |
 | `Super + K` | All shortcuts, sorted by action |
+| `Super + Shift + H` | Dashboard and calendar |
 | `Super + Shift + Q` | Questline widget |
+| `Super + T` | New Questline task |
 | `Super + Shift + N` | Quick Scroll in the current project, or choose a project |
 | `Super + Shift + K` | UKVM widget |
+| `Super + Shift + F` | Focus timer |
+| `Super + Shift + B` | Break reminders |
+| `Super + Shift + C` | Local services and containers |
+| `Super + Shift + G` | Default applications |
+| `Super + S` | File search |
+| `Print` | Screenshot widget and annotations |
+| `Super + Shift + S` / `Super + Shift + A` | Screen / audio recording |
+| `Super + Shift + D` | SpectrumDrop |
 | `Super + Shift + U` | App Store |
 | `Super + Shift + E` | AppImage Manager |
 | `Super + J` | Change the current layout's arrangement |

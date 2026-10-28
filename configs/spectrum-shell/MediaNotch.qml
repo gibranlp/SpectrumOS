@@ -28,7 +28,7 @@ PanelWindow {
         height: notch.horizontal ? 34 : notch.height * 0.2
         x: notch.horizontal ? (notch.width + 52 - width) / 2 : 0
         y: notch.horizontal ? 0 : (notch.height - height) / 2
-        radius: Math.max(0, 34 - leftFrameThickness - joinRadius)
+        radius: Math.max(0, (34 - leftFrameThickness) / 2)
         color: notch.theme.colors.surface
 
         Canvas {

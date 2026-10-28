@@ -14,6 +14,7 @@ PanelWindow {
     required property var theme
     property string page: "audio"
     property string barPosition: "top"
+    property string barProfile: "standard"
     property int panelLeftInset: theme.panelLeftInset
     property int panelTopInset: theme.panelTopInset
     property bool expanded: false
@@ -133,6 +134,7 @@ PanelWindow {
                     visible: widget.page === "extras"
                     Layout.fillWidth: true
                     sourceComponent: BarExtras {
+                        detailed: widget.barProfile === "detailed"
                         theme: widget.theme
                         window: widget
                         trayItems: SystemTray.items

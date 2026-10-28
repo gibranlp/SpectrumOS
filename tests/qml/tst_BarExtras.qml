@@ -16,7 +16,20 @@ TestCase {
     }
     Shell.BarExtras { id: extras; width: parent.width; theme: theme; window: null }
     SignalSpy { id: chosen; target: extras; signalName: "chosen" }
-    function init() { chosen.clear(); }
+    function init() { extras.detailed = false; chosen.clear(); }
+    function test_detailed_menu_preserves_secondary_widgets() {
+        extras.detailed = true;
+        const actions = extras.actions.map(item => item.action);
+        for (const action of ["questline", "updates", "network", "bluetooth", "notifications", "screenshot", "recorder", "audio-recorder", "ukvm"])
+            verify(actions.includes(action), action + " must remain available in More");
+        for (const action of ["weather", "time", "keep-awake", "audio", "battery"])
+            verify(!actions.includes(action), action + " stays on the bar");
+        compare(new Set(actions).size, actions.length);
+        waitForRendering(extras);
+        const button = findChild(extras, "bar-extra-dashboard");
+        mouseClick(button, button.width / 2, button.height / 2);
+        compare(chosen.signalArguments[0][0], "dashboard");
+    }
     function test_actions_data() {
         return ["spectrumdrop", "appimages", "time", "battery", "displays", "mouse", "typography", "control", "session"].map(action => ({tag:action, action:action}));
     }

@@ -60,6 +60,71 @@ Scope {
             list.positionViewAtIndex(index,ListView.Contain);wait(40);
             return list.itemAtIndex(index);
         }
+        function test_campaign_selector_stays_visible_on_every_tab() {
+            try {
+            for (const tab of field("tabs").model) {
+                panel.switchQuestlineTab(tab);wait(30);
+                verify(field("campaign-bar").visible,tab);
+                mouseClick(campaignButton("campaign-b"));wait(30);assertCampaign("campaign-b");
+                mouseClick(campaignButton("campaign-a"));wait(30);assertCampaign("campaign-a");
+            }
+            panel.switchQuestlineTab("Overview");
+            mouseClick(campaignButton("campaign-b"));wait(30);
+            panel.expanded=false;panel.open("questline");wait(100);
+            assertCampaign("campaign-b");verify(field("campaign-bar").visible);
+            } catch(error) {console.warn("test_campaign_selector_stays_visible_on_every_tab",error.message,String(error.stack));throw error;}
+        }
+        function test_campaign_switch_from_scroll_editor_keeps_draft() {
+            try {
+            panel.switchQuestlineTab("Scrolls");panel.selectQuestlineProject("campaign-a");
+            panel.beginQuestlineEdit(panel.questlineSelected);
+            field("body").text="# Preserved draft\n\n[Example](https://example.com)";
+            panel.rememberQuestline();
+            const key=panel.questlineDraftKey;
+            const body=field("body").text;
+            verify(field("campaign-bar").visible);
+            mouseClick(campaignButton("campaign-b"));wait(50);
+            assertCampaign("campaign-b");verify(!panel.questlineEditing);
+            compare(workspace.drafts[key].view.body,body);
+            compare(workspace.drafts[key].view.campaignId,"campaign-a");
+            panel.restoreQuestline("Scrolls",workspace.drafts[key].view);wait(50);
+            assertCampaign("campaign-a");compare(field("body").text,body);
+            } catch(error) {console.warn("test_campaign_switch_from_scroll_editor_keeps_draft",error.message,String(error.stack));throw error;}
+        }
+        function test_scroll_markdown_renders_and_edit_preserves_source() {
+            const markdown = "# Heading\n\n**Bold** and *italic* with [Example](https://example.com).\n\n- First\n- Second\n\n> Quote\n\n```text\ncode <literal>\n```\n\n| Name | Value |\n| --- | --- |\n| Item | 42 |\n";
+            panel.questline=Object.assign({},panel.questline,{
+                scrolls:panel.questline.scrolls.map(item=>item.id==="scroll-a" ? Object.assign({},item,{markdown_content:markdown}) : item)
+            });
+            panel.switchQuestlineTab("Scrolls");
+            panel.selectQuestlineScrollProject("campaign-a");
+            wait(50);
+            const detail=field("detail-text");
+            compare(detail.textFormat,TextEdit.MarkdownText);
+            verify(detail.readOnly);
+            const rendered=detail.getText(0,detail.length);
+            verify(rendered.includes("Heading"));
+            verify(rendered.includes("Bold and italic"));
+            verify(rendered.includes("code <literal>"));
+            verify(rendered.includes("Item"));verify(rendered.includes("42"));
+            verify(!rendered.includes("# Heading"));
+            verify(!rendered.includes("**Bold**"));
+            verify(!rendered.includes("[Example]"));
+            let linkFound=false;
+            for(let i=0;i<detail.length;i++) {
+                const rect=detail.positionToRectangle(i);
+                if(detail.linkAt(rect.x+1,rect.y+rect.height/2)==="https://example.com") {linkFound=true;break;}
+            }
+            verify(linkFound);
+            panel.beginQuestlineEdit(panel.questlineSelected);wait(30);
+            compare(field("body").textFormat,TextEdit.PlainText);
+            compare(field("body").text,markdown);
+            compare(panel.questlineDraftPayload().payload.content,markdown);
+            panel.leaveQuestlineEditor();wait(30);
+            compare(field("detail-text").textFormat,TextEdit.MarkdownText);
+            panel.switchQuestlineTab("Tasks");wait(30);
+            compare(field("detail-text").textFormat,TextEdit.PlainText);
+        }
         function test_dashboard_calendar_click_opens_the_exact_step() {
             dashboard.expanded=true;
             wait(150);
@@ -169,7 +234,7 @@ Scope {
             try {
             panel.questline=Object.assign({},panel.questline,{campaigns:panel.questline.campaigns.concat(Array.from({length:35},(_,i)=>({id:"extra-"+i,name:"Project "+String(i).padStart(2,"0"),is_shared:false})))});
             panel.switchQuestlineTab("Tasks");panel.selectQuestlineTaskProject("extra-34");wait(100);
-            const list=field("campaign-buttons");verify(list.contentWidth>list.width);verify(list.contentX>0);verify(field("campaign-scroll").visible);
+            const list=field("campaign-buttons");verify(list.contentWidth>list.width);verify(list.contentX>0);verify(!field("campaign-scroll").visible);
             const button=campaignButton("extra-34");verify(button!==null);compare(button.backgroundColor,panel.theme.colors.accent);
             const previous=list.contentX;mouseWheel(list,list.width/2,list.height/2,0,120);wait(100);verify(list.contentX<previous);
             } catch(e) {console.warn("campaign_overflow",e.message,String(e.stack));throw e;}
@@ -177,11 +242,14 @@ Scope {
         function test_campaign_tab_order_places_sidequests_after_hero() {
             compare(field("tabs").model,["Overview","Tasks","Scrolls","Treasury","Chronicles","Tree","Focus","Hero","Sidequests","Sync"]);
         }
-        function test_campaign_scrollbar_stays_two_pixels_across_tabs() {
+        function test_campaign_scrolls_without_visible_scrollbar_across_tabs() {
             panel.questline=Object.assign({},panel.questline,{campaigns:panel.questline.campaigns.concat(Array.from({length:35},(_,i)=>({id:"extra-"+i,name:"Project "+String(i).padStart(2,"0"),is_shared:false})))});
             for (const tab of ["Tasks","Treasury","Scrolls","Chronicles"]) {
                 panel.switchQuestlineTab(tab);wait(30);
-                const scroll=field("campaign-scroll");verify(scroll.visible);compare(scroll.height,2);
+                const scroll=field("campaign-scroll");verify(!scroll.visible);
+                const campaigns=field("campaign-bar");
+                const tabs=field("tabs").itemAt(0).parent;
+                verify(campaigns.y+campaigns.height<=tabs.y);
                 const list=field("campaign-buttons");
                 list.contentX=0;mouseWheel(list,list.width/2,list.height/2,0,-120);wait(30);
                 verify(list.contentX>0);

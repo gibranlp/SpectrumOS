@@ -20,7 +20,7 @@ Translate {
     property bool ready: false
     readonly property bool active: expanded || animation.running || progress > 0
     property ShellGeometry geometry: ShellGeometry {}
-    readonly property int overhang: geometry.frameThickness + geometry.curveRadius
+    readonly property real overhang: Math.max(geometry.frameThickness + geometry.curveRadius, surface.joinRadius || 0)
 
     readonly property real travelDistance: edge === "left" ? surface.x + surface.width + overhang
         : edge === "right" ? viewportWidth - surface.x + overhang

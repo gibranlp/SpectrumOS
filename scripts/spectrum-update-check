@@ -40,6 +40,28 @@ def save_state(state):
     temporary.replace(STATE/'status.json')
 
 
+def installed_packages():
+    result = run('pacman', '-Q')
+    if result.returncode:
+        raise RuntimeError('Could not read installed package versions.')
+    packages = []
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and (fields[0].startswith('spectrum-') or fields[0] in ('spectrumdrop', 'ukvm', 'questline', 'stash')):
+            packages.append({'name': fields[0], 'installed': fields[1]})
+    return sorted(packages, key=lambda item: item['name'])
+
+
+def with_installed_packages(state):
+    try:
+        state['installed_packages'] = installed_packages()
+        state['inventory_error'] = ''
+    except (OSError, subprocess.TimeoutExpired, RuntimeError):
+        state['installed_packages'] = []
+        state['inventory_error'] = 'Could not read installed package versions.'
+    return state
+
+
 def stable_configured():
     result = run('pacman-conf', '--repo', 'spectrumos', 'Server')
     if result.returncode:
@@ -89,7 +111,7 @@ def notify(packages):
 
 
 def check():
-    state = read_state()
+    state = with_installed_packages(read_state())
     state['last_attempt'] = int(time.time())
     try:
         state['eligible'] = stable_configured()
@@ -110,7 +132,7 @@ def check():
 
 def main():
     if sys.argv[1:] == ['--status']:
-        print(json.dumps(read_state()))
+        print(json.dumps(with_installed_packages(read_state())))
         return 0
     if sys.argv[1:] != ['--check']:
         print('Usage: spectrum-update-check --check|--status', file=sys.stderr)
@@ -120,7 +142,7 @@ def main():
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            print(json.dumps(read_state()))
+            print(json.dumps(with_installed_packages(read_state())))
             return 0
         print(json.dumps(check()))
     return 0

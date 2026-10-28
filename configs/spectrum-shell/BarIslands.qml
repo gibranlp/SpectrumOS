@@ -8,7 +8,7 @@ Item {
     property var groups: []
     property color surfaceColor: "#232029"
     property int padding: 10
-    property real joinRadius: horizontal ? 18 : Math.max(0, (width - frameThickness) / 2)
+    property real joinRadius: Math.max(0, ((horizontal ? height : width) - frameThickness) / 2)
     property int frameThickness: 8
     readonly property real extent: horizontal ? width : height
     readonly property var segments: mergeGroups(groups, extent)
@@ -57,67 +57,57 @@ Item {
     }
 
     Repeater {
-        model: backdrop.horizontal ? null : islandModel
+        model: islandModel
         Canvas {
             id: island
             required property real segmentStart
             required property real segmentEnd
             objectName: "barIsland"
-            x: 0
-            y: segmentStart - backdrop.joinRadius
-            width: backdrop.width
-            height: segmentEnd - segmentStart + 2 * backdrop.joinRadius
+            x: backdrop.horizontal ? segmentStart - shoulder : 0
+            y: backdrop.horizontal ? 0 : segmentStart - shoulder
+            width: backdrop.horizontal ? span : backdrop.width
+            height: backdrop.horizontal ? backdrop.height : span
             readonly property real shoulder: backdrop.joinRadius
+            readonly property real span: segmentEnd - segmentStart + 2 * shoulder
+            readonly property real depth: backdrop.horizontal ? backdrop.height : backdrop.width
             readonly property real tipRadius: Math.min(shoulder, (segmentEnd - segmentStart) / 2)
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
             onShoulderChanged: requestPaint()
             onTipRadiusChanged: requestPaint()
+            onDepthChanged: requestPaint()
             Connections {
                 target: backdrop
                 function onSurfaceColorChanged() { island.requestPaint(); }
                 function onFrameThicknessChanged() { island.requestPaint(); }
+                function onHorizontalChanged() { island.requestPaint(); }
             }
             onPaint: {
                 const ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
+                ctx.save();
+                // Intercambia los ejes para conservar el mismo contorno en la barra superior.
+                if (backdrop.horizontal) ctx.transform(0, 1, 1, 0, 0, 0);
                 const frame = backdrop.frameThickness;
                 const start = shoulder;
-                const end = height - shoulder;
-                const bend = width - tipRadius;
+                const end = span - shoulder;
+                const bend = depth - tipRadius;
                 const k = 0.5522847498;
                 // Dos cuartos de círculo se unen con la misma tangente, sin un tramo recto entre ellos.
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(frame, 0);
                 ctx.bezierCurveTo(frame, start * k, bend - (bend - frame) * k, start, bend, start);
-                ctx.bezierCurveTo(bend + tipRadius * k, start, width, start + tipRadius * (1 - k), width, start + tipRadius);
-                ctx.lineTo(width, end - tipRadius);
-                ctx.bezierCurveTo(width, end - tipRadius * (1 - k), bend + tipRadius * k, end, bend, end);
-                ctx.bezierCurveTo(bend - (bend - frame) * k, end, frame, end + shoulder * (1 - k), frame, height);
-                ctx.lineTo(0, height);
+                ctx.bezierCurveTo(bend + tipRadius * k, start, depth, start + tipRadius * (1 - k), depth, start + tipRadius);
+                ctx.lineTo(depth, end - tipRadius);
+                ctx.bezierCurveTo(depth, end - tipRadius * (1 - k), bend + tipRadius * k, end, bend, end);
+                ctx.bezierCurveTo(bend - (bend - frame) * k, end, frame, end + shoulder * (1 - k), frame, span);
+                ctx.lineTo(0, span);
                 ctx.closePath();
                 ctx.fillStyle = backdrop.surfaceColor;
                 ctx.fill();
+                ctx.restore();
             }
-        }
-    }
-    Repeater {
-        model: backdrop.horizontal ? islandModel : null
-        ShellSurface {
-            required property real segmentStart
-            required property real segmentEnd
-            objectName: "barIsland"
-            x: backdrop.horizontal ? segmentStart : 0
-            y: backdrop.horizontal ? 0 : segmentStart
-            width: backdrop.horizontal ? segmentEnd - segmentStart : backdrop.width
-            height: backdrop.horizontal ? backdrop.height : segmentEnd - segmentStart
-            radius: backdrop.horizontal ? 12 : 16
-            attachTop: backdrop.horizontal
-            attachLeft: !backdrop.horizontal
-            topFrameThickness: backdrop.frameThickness
-            leftFrameThickness: backdrop.frameThickness
-            color: backdrop.surfaceColor
         }
     }
 }

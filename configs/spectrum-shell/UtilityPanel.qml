@@ -424,6 +424,11 @@ PanelWindow {
         questlineEditing = false;
         questlineDraftKey = "";
         syncQuestlineCampaign(id);
+        questlineWorkspace.selectedProjectId = id;
+        if (questlineTab === "Focus") {
+            questlineView.questlineFocusEditor.projectId = id;
+            questlineView.questlineFocusEditor.taskId = "";
+        }
         questlineSelected = null;
         questlineStepParent = null;
         questlineStepSelected = null;
@@ -1561,6 +1566,21 @@ PanelWindow {
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                     }
+                    QuestlineCampaignBar {
+                        objectName:"questline-campaign-bar"
+                        Layout.fillWidth:true
+                        Layout.minimumWidth:0
+                        readonly property bool choosingNewTaskCampaign: panel.questlineEditing && panel.questlineTab === "Tasks" && panel.questlineSelected === null && panel.questlineStepParent === null
+                        visible:panel.page==="questline" && panel.questline.available && !panel.questlineQuickScrollPicker
+                        enabled:!choosingNewTaskCampaign || !panel.questlineWorkspace.busy
+                        theme:panel.theme
+                        campaigns:choosingNewTaskCampaign ? (panel.questline.campaigns || []).filter(c=>!c.is_shared).slice().sort((a,b)=>a.name.localeCompare(b.name)) : panel.questlineProjects()
+                        selectedId:choosingNewTaskCampaign ? panel.questlineEditCampaignId : panel.questlineCampaignId
+                        onChosen:campaignId=> {
+                            if (choosingNewTaskCampaign) panel.selectQuestlineCampaign(campaignId);
+                            else panel.selectQuestlineProject(campaignId);
+                        }
+                    }
                     Flow {
                         Layout.fillWidth: true
                         visible: panel.page === "questline" && (panel.questline.available || panel.questline.installed)
@@ -1580,20 +1600,6 @@ PanelWindow {
                                     panel.switchQuestlineTab(modelData);
                                 }
                             }
-                        }
-                    }
-                    QuestlineCampaignBar {
-                        objectName:"questline-campaign-bar"
-                        Layout.fillWidth:true
-                        Layout.minimumWidth:0
-                        visible:panel.page==="questline" && panel.questline.available && ["Tasks","Scrolls","Treasury","Chronicles"].includes(panel.questlineTab) && (!panel.questlineEditing || (panel.questlineTab==="Tasks" && panel.questlineSelected===null && panel.questlineStepParent===null)) && !panel.questlineQuickScrollPicker
-                        enabled:!panel.questlineEditing || !panel.questlineWorkspace.busy
-                        theme:panel.theme
-                        campaigns:panel.questlineEditing ? (panel.questline.campaigns || []).filter(c=>!c.is_shared).slice().sort((a,b)=>a.name.localeCompare(b.name)) : panel.questlineProjects()
-                        selectedId:panel.questlineEditing ? panel.questlineEditCampaignId : panel.questlineCampaignId
-                        onChosen:campaignId=> {
-                            if (panel.questlineEditing) panel.selectQuestlineCampaign(campaignId);
-                            else panel.selectQuestlineProject(campaignId);
                         }
                     }
                     ColumnLayout {
@@ -1790,6 +1796,7 @@ PanelWindow {
                             TextInput {
                                 activeFocusOnTab: true
                                 id: viewQuestlineTitle
+                                    clip: true
                                     objectName: "questline-title"
                                     onTextChanged: panel.queueQuestlineState()
                                     onCursorPositionChanged: panel.queueQuestlineState()
@@ -1903,6 +1910,7 @@ PanelWindow {
                                 TextInput {
                                     activeFocusOnTab: true
                                     id: viewQuestlineDate
+                                    clip: true
                                     objectName: "questline-date"
                                     onTextChanged: panel.queueQuestlineState()
                                     onCursorPositionChanged: panel.queueQuestlineState()
@@ -2011,6 +2019,7 @@ PanelWindow {
                                 TextInput {
                                     activeFocusOnTab: true
                                     id: viewQuestlineAmount
+                                    clip: true
                                     objectName: "questline-amount"
                                     onTextChanged: panel.queueQuestlineState()
                                     onCursorPositionChanged: panel.queueQuestlineState()
@@ -2043,7 +2052,9 @@ PanelWindow {
                                     onTextChanged: panel.queueQuestlineState()
                                     onCursorPositionChanged: panel.queueQuestlineState()
                                     width: parent.width
+                                    height: Math.max(viewQuestlineEditorFlick.height, implicitHeight)
                                     wrapMode: TextEdit.Wrap
+                                    textFormat: TextEdit.PlainText
                                     color: panel.theme.colors.foreground
                                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                                 }
@@ -2569,7 +2580,8 @@ PanelWindow {
                                         selectByMouse: true
                                         persistentSelection: true
                                         wrapMode: TextEdit.Wrap
-                                        textFormat: TextEdit.PlainText
+                                        textFormat: panel.questlineTab === "Scrolls" ? TextEdit.MarkdownText : TextEdit.PlainText
+                                        onLinkActivated: link => Qt.openUrlExternally(link)
                                         text: !panel.questlineSelected ? "" : panel.questlineTab === "Scrolls" ? (panel.questlineSelected.markdown_content || "") : panel.questlineTab === "Treasury" ? panel.questlineEntryDetails(panel.questlineSelected) : (panel.questlineSelected.description || qsTranslate("Spectrum", "No description yet."))
                                         color: panel.theme.colors.foreground
                                         selectionColor: panel.theme.colors.accent

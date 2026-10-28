@@ -7,16 +7,20 @@ Item {
     readonly property var window: target.Window.window
     readonly property var focusedItem: window ? window.activeFocusItem : null
 
+    readonly property bool textFocused: focusedItem !== null && contains(focusedItem) && focusedItem.cursorPosition !== undefined
+
     Rectangle {
-        parent: navigation.target
-        z: 1000
-        visible: navigation.focusedItem !== null && navigation.contains(navigation.focusedItem) && navigation.focusedItem.cursorPosition !== undefined
-        x: visible ? navigation.focusedItem.mapToItem(navigation.target, 0, 0).x : 0
-        y: visible ? navigation.focusedItem.mapToItem(navigation.target, 0, 0).y : 0
-        width: visible ? navigation.focusedItem.width : 0
-        height: visible ? navigation.focusedItem.height : 0
-        color: visible ? navigation.focusedItem.color : "transparent"
-        opacity: 0.15
+        objectName: "keyboard-input-focus-outline"
+        parent: navigation.textFocused ? navigation.focusedItem : navigation
+        anchors.fill: parent
+        visible: navigation.textFocused
+        color: "transparent"
+        border.width: 1
+        border.color: {
+            for (let item = parent; item; item = item.parent)
+                if (item.theme && item.theme.colors) return item.theme.colors.accent;
+            return navigation.textFocused ? navigation.focusedItem.color : "transparent";
+        }
         radius: 4
     }
 

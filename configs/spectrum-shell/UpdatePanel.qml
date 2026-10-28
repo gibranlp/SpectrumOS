@@ -87,6 +87,7 @@ PanelWindow {
 
     ShellSurface {
         id: card
+        objectName: "update-card"
         transform: ShellMotion {
             id: motion
             surface: card
@@ -101,7 +102,7 @@ PanelWindow {
         leftAttachmentWidth: panel.theme.barStyle === "islands" && panel.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
         width: Math.min(570, panel.width - panel.leftInset - 24)
-        height: Math.min(720, panel.height - panel.topInset - 24)
+        height: Math.min(900, panel.height - panel.topInset - 24)
         x: Math.max(leftFrameThickness, panel.leftInset)
         y: panel.topInset + Math.max(0, (panel.height - panel.topInset - height) / 2)
         radius: 30
@@ -158,19 +159,34 @@ PanelWindow {
                 font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize; bold: true }
             }
             Controls.ScrollView {
+                id: updateScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
                 contentWidth: availableWidth
-                Controls.TextArea {
-                    id: safetyText
-                    readOnly: true
-                    text: [panel.planText, panel.planError].filter(value => value !== "").join("\n\n")
-                    wrapMode: TextEdit.Wrap
-                    color: panel.theme.colors.foreground
-                    font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
-                    background: Rectangle { color: panel.theme.colors.surface_alt; radius: 12 }
-                    padding: 12
+                ColumnLayout {
+                    width: updateScroll.availableWidth
+                    spacing: 13
+                    UpdatePackageList {
+                        objectName: "update-package-list"
+                        Layout.fillWidth: true
+                        theme: panel.theme
+                        installed: panel.theme.stableUpdates ? panel.theme.stableUpdates.installed_packages || [] : []
+                        updates: panel.theme.stableUpdates ? panel.theme.stableUpdates.packages || [] : []
+                        error: panel.theme.stableUpdates ? panel.theme.stableUpdates.inventory_error || "" : ""
+                    }
+                    Controls.TextArea {
+                        id: safetyText
+                        objectName: "update-safety-text"
+                        Layout.fillWidth: true
+                        readOnly: true
+                        text: [panel.planText, panel.planError].filter(value => value !== "").join("\n\n")
+                        wrapMode: TextEdit.Wrap
+                        color: panel.theme.colors.foreground
+                        font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize - 1 }
+                        background: Rectangle { color: panel.theme.colors.surface_alt; radius: 12 }
+                        padding: 12
+                    }
                 }
             }
             Text {

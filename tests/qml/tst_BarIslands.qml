@@ -43,7 +43,7 @@ Item {
                     compare(current[index], original[index], "A title resize must preserve every existing island and its painted corners");
                 compare(backdrop.segments[0].end, 30 + length);
                 compare(data.horizontal ? current[0].width : current[0].height,
-                    length + 20 + (data.horizontal ? 0 : 2 * backdrop.joinRadius));
+                    length + 20 + 2 * backdrop.joinRadius);
             }
         }
         function test_merging_groups_keeps_surviving_curves() {
@@ -54,8 +54,8 @@ Item {
             compare(merged.length, 2);
             compare(merged[0], original[0]);
             compare(merged[1], original[1]);
-            compare(merged[0].width, 460);
-            compare(merged[1].x, 720);
+            compare(merged[0].width, 460 + 2 * backdrop.joinRadius);
+            compare(merged[1].x, 720 - backdrop.joinRadius);
         }
         function test_visible_islands_repaint_after_palette_change_data() {
             return [{tag: "top", horizontal: true}, {tag: "left", horizontal: false}];
@@ -131,6 +131,28 @@ Item {
             verify(image.red(48, 212) > 200, "The curve must reach the body gradually");
             verify(image.red(25, 300) > 200);
             verify(image.red(20, 150) < 50, "The gap stays transparent");
+        }
+        function test_top_island_has_continuous_symmetric_ends() {
+            backdrop.surfaceColor = "#ffffff";
+            backdrop.groups = [{ start: 200, length: 200 }];
+            wait(60);
+            const image = grabImage(backdrop);
+            let previous = 8;
+            compare(backdrop.joinRadius, 13);
+            for (let x = 178; x <= 208; x += 2) {
+                let edge = 0;
+                for (let y = 0; y < 34; y++) {
+                    if (image.red(x, y) > 200) edge = y + 1;
+                    verify(Math.abs(image.red(x, y) - image.red(599 - x, y)) <= 2, "Island ends must mirror each other");
+                }
+                verify(edge >= previous, "The curve must deepen smoothly");
+                verify(edge - previous <= 10, "The curve must not have a squared step");
+                previous = edge;
+            }
+            verify(image.red(190, 32) < 50, "The outer end must remain rounded");
+            verify(image.red(194, 29) > 200, "The outer quarter-circle must not be pinched by an oversized radius");
+            verify(image.red(210, 32) > 200, "The curve must reach the body gradually");
+            verify(image.red(150, 20) < 50, "The gap stays transparent");
         }
         function test_revealed_content_merges_without_overlapping_islands() {
             backdrop.groups = [{ start: 20, length: 180 }, { start: 420, length: 100 }, { start: 200, length: 230 }];

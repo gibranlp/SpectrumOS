@@ -12,7 +12,7 @@ Rectangle {
     property int leftAttachmentWidth: 0
     property int leftFrameThickness: geometry.frameThickness
     property int rightFrameThickness: geometry.frameThickness
-    readonly property int joinRadius: geometry.curveRadius
+    readonly property real joinRadius: Math.min(radius, width / 2, height / 2)
     readonly property int attachmentOverlap: geometry.frameThickness
     ShellGeometry { id: geometry }
     property alias keyboardController: keyboardNavigation
@@ -57,10 +57,9 @@ Rectangle {
     }
     Rectangle {
         x: -surface.leftAttachmentWidth - surface.attachmentOverlap
-        y: surface.attachTop ? 0 : -surface.joinRadius
+        y: 0
         width: surface.attachmentOverlap
-        height: surface.height + (surface.attachTop ? 0 : surface.joinRadius)
-            + (surface.attachBottom ? 0 : surface.joinRadius)
+        height: surface.height
         color: surface.color
         visible: surface.attachLeft
     }
@@ -75,10 +74,9 @@ Rectangle {
     }
     Rectangle {
         x: surface.width
-        y: surface.attachTop ? 0 : -surface.joinRadius
+        y: 0
         width: surface.attachmentOverlap
-        height: surface.height + (surface.attachTop ? 0 : surface.joinRadius)
-            + (surface.attachBottom ? 0 : surface.joinRadius)
+        height: surface.height
         color: surface.color
         visible: surface.attachRight
     }
@@ -109,6 +107,8 @@ Rectangle {
     }
 
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachTop && !surface.attachLeft
         y: -surface.topAttachmentHeight
         x: -width + frameThickness
@@ -117,6 +117,8 @@ Rectangle {
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachTop && !surface.attachRight
         y: -surface.topAttachmentHeight
         x: surface.width - frameThickness
@@ -124,6 +126,8 @@ Rectangle {
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachBottom && !surface.attachLeft
         x: -width
         y: surface.height - height
@@ -133,6 +137,8 @@ Rectangle {
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachBottom && !surface.attachRight
         x: surface.width
         y: surface.height - height
@@ -141,21 +147,27 @@ Rectangle {
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachLeft && !surface.attachTop
-        x: -surface.leftAttachmentWidth - surface.leftFrameThickness + surface.leftEdgeInset
+        x: -surface.leftAttachmentWidth - frameThickness + surface.leftEdgeInset
         y: -height + frameThickness
-        frameThickness: surface.leftFrameThickness
+        frameThickness: Math.min(surface.leftFrameThickness, Math.max(0, surface.x - surface.leftAttachmentWidth + surface.leftEdgeInset))
         mirrorY: true
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachLeft && !surface.attachBottom
-        x: -surface.leftAttachmentWidth - surface.leftFrameThickness + surface.leftEdgeInset
+        x: -surface.leftAttachmentWidth - frameThickness + surface.leftEdgeInset
         y: surface.height - frameThickness
-        frameThickness: surface.leftFrameThickness
+        frameThickness: Math.min(surface.leftFrameThickness, Math.max(0, surface.x - surface.leftAttachmentWidth + surface.leftEdgeInset))
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachRight && !surface.attachTop
         x: surface.width - width
         y: -height + frameThickness
@@ -165,6 +177,8 @@ Rectangle {
         surfaceColor: surface.color
     }
     ShellCorner {
+        tapered: true
+        curveRadius: surface.joinRadius
         visible: surface.attachRight && !surface.attachBottom
         x: surface.width - width
         y: surface.height - frameThickness

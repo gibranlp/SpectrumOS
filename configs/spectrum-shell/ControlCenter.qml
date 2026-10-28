@@ -9,6 +9,7 @@ PanelWindow {
     id: center
     required property var theme
     property var themeState: ({ palette: {}, gowall: {} })
+    readonly property string themeVariant: theme.themeVariant || themeState.palette.variant || "dark"
     property string barPosition: "top"
     property string barProfile: theme.barProfile
     property int topInset: theme.panelTopInset
@@ -179,8 +180,8 @@ PanelWindow {
                                     label: qsTranslate("Spectrum", modelData.charAt(0).toUpperCase() + modelData.slice(1))
                                     fontFamily: center.theme.fontFamily
                                     fontSize: center.theme.fontSize
-                                    backgroundColor: center.themeState.palette.variant === modelData ? center.theme.colors.accent : center.theme.colors.surface_alt
-                                    foregroundColor: center.themeState.palette.variant === modelData ? center.theme.colors.background : center.theme.colors.foreground
+                                    backgroundColor: center.themeVariant === modelData ? center.theme.colors.accent : center.theme.colors.surface_alt
+                                    foregroundColor: center.themeVariant === modelData ? center.theme.colors.background : center.theme.colors.foreground
                                     onClicked: center.actionRequested([center.theme.backend("theme-adapter"), "variant", modelData])
                                 }
                             }

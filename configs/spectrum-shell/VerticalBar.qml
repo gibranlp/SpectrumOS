@@ -321,27 +321,12 @@ PanelWindow {
 
         ColumnLayout {
             id: statusGroup
-            Layout.fillHeight: bar.barProfile === "detailed"
-            Layout.minimumHeight: bar.barProfile === "detailed" ? 80 : implicitHeight
-            Layout.maximumHeight: bar.barProfile === "detailed" ? detailedWidgets.naturalHeight : Infinity
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 44
             Layout.maximumWidth: 44
             spacing: bar.theme.barStyle === "islands" ? 5 : 7
             HoverHandler { id: minimalStatusHover }
-            WidgetIcons {
-                id: detailedWidgets
-                visible: bar.barProfile === "detailed"
-                theme: bar.theme
-                vertical: true
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumHeight: 80
-                Layout.maximumHeight: naturalHeight
-                onChosen: action => bar.widgetRequested(action)
-            }
             ColumnLayout {
-                visible: bar.barProfile !== "detailed"
                 Layout.fillWidth: true
                 spacing: bar.theme.barStyle === "islands" ? 5 : 7
                 Text {
@@ -393,7 +378,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: bar.network.connection_type === "ethernet" ? "󰈀" : bar.network.connection_type === "wifi" ? "󰖩" : "󰖪"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
@@ -401,7 +386,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: "󰂯"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
@@ -409,7 +394,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: "󰍹"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
@@ -417,7 +402,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: "󰍽"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
@@ -425,7 +410,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: qsTranslate("Spectrum", "Aa")
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5); bold: true }
@@ -444,7 +429,7 @@ PanelWindow {
 
                 Item {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                    visible: !["standard", "detailed"].includes(bar.barProfile) && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     implicitWidth: 44
                     implicitHeight: batteryContent.height
                     Column {
@@ -472,7 +457,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                    visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                     text: "󰂚"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + (bar.theme.barStyle === "islands" ? 3 : 5) }
@@ -480,7 +465,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: ["standard", "multimedia"].includes(bar.barProfile)
+                    visible: ["standard", "detailed", "multimedia"].includes(bar.barProfile)
                     text: "󰇘"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 5 }
@@ -489,7 +474,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
+                    visible: !["standard", "detailed", "minimal"].includes(bar.barProfile)
                     text: "󰒡"
                     color: bar.theme.colors.foreground
                     font { family: bar.theme.fontFamily; pixelSize: bar.theme.fontSize + 3 }
@@ -497,7 +482,7 @@ PanelWindow {
                     KeyboardAction { anchors.fill: parent; onActivated: bar.spectrumDropRequested() }
                 }
                 Repeater {
-                    model: bar.barProfile === "standard" ? [] : SystemTray.items
+                    model: ["standard", "detailed"].includes(bar.barProfile) ? [] : SystemTray.items
                     Item {
                         required property var modelData
                         Layout.alignment: Qt.AlignHCenter

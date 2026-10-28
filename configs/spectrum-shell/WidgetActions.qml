@@ -1,0 +1,43 @@
+import QtQuick
+
+QtObject {
+    readonly property var widgets: [
+        {icon:"󰕮", label:qsTranslate("Spectrum", "Dashboard"), action:"dashboard"},
+        {icon:"★", label:qsTranslate("Spectrum", "Favorites"), action:"favorites"},
+        {icon:"󰏗", label:qsTranslate("Spectrum", "App Store"), action:"app-store"},
+        {icon:"󰏖", label:"AppImages", action:"appimages"},
+        {icon:"󰒡", label:"SpectrumDrop", action:"spectrumdrop"},
+        {icon:"󰄬", label:"Questline", action:"questline"},
+        {icon:"󰔟", label:qsTranslate("Spectrum", "Focus timer"), action:"focus"},
+        {icon:"󰒲", label:qsTranslate("Spectrum", "Break reminders"), action:"breaks", shortcut:"Super+Shift+B"},
+        {icon:"󰒋", label:qsTranslate("Spectrum", "Local services"), action:"services", shortcut:"Super+Shift+C"},
+        {icon:"󰈔", label:qsTranslate("Spectrum", "Default applications"), action:"default-apps", shortcut:"Super+Shift+G"},
+        {icon:"󰍉", label:qsTranslate("Spectrum", "File search"), action:"search"},
+        {icon:"󰃬", label:qsTranslate("Spectrum", "Calculator"), action:"calculator"},
+        {icon:"󰌾", label:qsTranslate("Spectrum", "Password generator"), action:"password"},
+        {icon:"󰞅", label:qsTranslate("Spectrum", "Emoji"), action:"emoji"},
+        {icon:"󰈋", label:qsTranslate("Spectrum", "Pick colors"), action:"color"},
+        {icon:"󰏘", label:qsTranslate("Spectrum", "Saved colors"), action:"color-history"},
+        {icon:"󰌌", label:"HotKey", action:"hotkey"},
+        {icon:"󰌐", label:qsTranslate("Spectrum", "Keyboard shortcuts"), action:"shortcuts"},
+        {icon:"󰚰", label:qsTranslate("Spectrum", "Updates"), action:"updates"},
+        {icon:"󰸉", label:qsTranslate("Spectrum", "Wallpapers"), action:"wallpapers"},
+        {icon:"󰕾", label:qsTranslate("Spectrum", "Audio"), action:"audio"},
+        {icon:"󰖩", label:qsTranslate("Spectrum", "Network"), action:"network"},
+        {icon:"󰂯", label:qsTranslate("Spectrum", "Bluetooth"), action:"bluetooth"},
+        {icon:"󰍹", label:qsTranslate("Spectrum", "Displays"), action:"displays"},
+        {icon:"󰍽", label:qsTranslate("Spectrum", "Mouse"), action:"mouse"},
+        {icon:"Aa", label:qsTranslate("Spectrum", "Typography"), action:"typography"},
+        {icon:"󰖕", label:qsTranslate("Spectrum", "Weather"), action:"weather"},
+        {icon:"󰥔", label:qsTranslate("Spectrum", "Time & region"), action:"time"},
+        {icon:"󰓅", label:qsTranslate("Spectrum", "Power & battery"), action:"battery"},
+        {icon:"󰂚", label:qsTranslate("Spectrum", "Notifications"), action:"notifications"},
+        {icon:"󰹑", label:qsTranslate("Spectrum", "Screenshot"), action:"screenshot"},
+        {icon:"󰑋", label:qsTranslate("Spectrum", "Screen recorder"), action:"recorder"},
+        {icon:"󰍬", label:qsTranslate("Spectrum", "Audio recorder"), action:"audio-recorder"},
+        {icon:"󰒓", label:qsTranslate("Spectrum", "Control Center"), action:"control"},
+        {icon:"󰐥", label:qsTranslate("Spectrum", "Session"), action:"session"},
+        {icon:"󰍺", label:"UniversalKVM", action:"ukvm"},
+        {icon:"󰅶", label:qsTranslate("Spectrum", "Keep Awake"), action:"keep-awake"}
+    ]
+}

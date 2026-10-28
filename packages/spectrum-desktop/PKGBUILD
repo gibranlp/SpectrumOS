@@ -1,6 +1,6 @@
 pkgname=spectrum-desktop
-pkgver=1.0.0
-pkgrel=27
+pkgver=1.1.0
+pkgrel=1
 pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
 arch=(x86_64)
 url="https://spectrum.gibranlp.dev"
@@ -36,15 +36,16 @@ conflicts=(eww eww-git wofi waybar dunst)
 replaces=(eww eww-git wofi waybar dunst)
 options=(!strip !debug)
 backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-terminals.list' 'etc/xdg/fastfetch/config.jsonc')
-_source_revision=8ddd53c56301770d
-_source_root="spectrumos-source-$pkgver"
+_source_revision=2fdeff3a7ac14a39
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
 _questline_version=2.0.3
 _stash_version=0.7.0
-source=("spectrumos-source-$pkgver-$_source_revision.tar.zst"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst"
         "questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst"
         'questline.LICENSE'
         "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
-sha256sums=('c5423788c9be82af0593224a034768d3d36ed3efeffbdd2a47c62f65fc7af314'
+sha256sums=('1c81a59793fa8e1921ba8091f5c60217091160f4fc0c8bcc8759a0f817db47fb'
             'a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495'
             '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
             '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')

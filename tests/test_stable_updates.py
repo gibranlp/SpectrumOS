@@ -25,14 +25,52 @@ class StableUpdatesTests(unittest.TestCase):
         self.module = load()
         self.module.STATE = Path(self.temp.name)/'state'
         self.module.DATABASE = Path(self.temp.name)/'cache/database'
+        self.read_installed = self.module.installed_packages
+        self.installed = [{'name': 'spectrum-desktop', 'installed': '1.0.0-13'}, {'name': 'spectrum-theme', 'installed': '1.0.0-5'}]
+        inventory = mock.patch.object(self.module, 'installed_packages', return_value=self.installed)
+        self.inventory = inventory.start()
+        self.addCleanup(inventory.stop)
         self.packages = [{'name': 'spectrum-desktop', 'installed': '1.0.0-13', 'available': '1.0.0-14'}]
 
     def checked(self, packages=None, notified=True):
-        with mock.patch.object(self.module, 'stable_configured', return_value=True), \
+        with mock.patch.object(self.module, 'installed_packages', return_value=self.installed), \
+             mock.patch.object(self.module, 'stable_configured', return_value=True), \
              mock.patch.object(self.module, 'available_updates', return_value=self.packages if packages is None else packages), \
              mock.patch.object(self.module, 'notify', return_value=notified) as notify:
             state = self.module.check()
         return state, notify
+
+    def test_installed_inventory_contains_current_spectrum_versions_without_repository_access(self):
+        installed = 'linux 6.18-1\nspectrum-theme 1.0.0-5\nspectrum-desktop 1.0.0-27\nukvm 0.1.0-1\nspectrumdrop 1.0.0-6\nstash 0.3.0-1\n'
+        with mock.patch.object(self.module, 'run', return_value=mock.Mock(returncode=0, stdout=installed)) as run:
+            result = self.read_installed()
+        self.assertEqual([p['name'] for p in result], ['spectrum-desktop', 'spectrum-theme', 'spectrumdrop', 'stash', 'ukvm'])
+        self.assertEqual(result[0]['installed'], '1.0.0-27')
+        run.assert_called_once_with('pacman', '-Q')
+
+    def test_inventory_failure_is_reported_without_showing_stale_installed_versions(self):
+        self.inventory.side_effect = RuntimeError('Local database unavailable')
+        state = self.module.with_installed_packages({'installed_packages': self.installed})
+        self.assertEqual(state['installed_packages'], [])
+        self.assertTrue(state['inventory_error'])
+
+    def test_status_reads_installed_versions_without_network_or_notification(self):
+        import contextlib
+        import io
+        output = io.StringIO()
+        with mock.patch('sys.argv', ['spectrum-update-check', '--status']), \
+             mock.patch.object(self.module, 'available_updates') as check, \
+             mock.patch.object(self.module, 'notify') as notify, contextlib.redirect_stdout(output):
+            self.assertEqual(self.module.main(), 0)
+        state = json.loads(output.getvalue())
+        self.assertEqual(state['installed_packages'], self.installed)
+        check.assert_not_called()
+        notify.assert_not_called()
+
+    def test_current_packages_remain_visible_when_no_updates_exist(self):
+        state, _ = self.checked([])
+        self.assertEqual(state['installed_packages'], self.installed)
+        self.assertEqual(state['packages'], [])
 
     def test_only_production_stable_configuration_is_eligible(self):
         for server, eligible in [('https://spectrum.gibranlp.dev/repo/stable/x86_64', True),
@@ -110,6 +148,7 @@ class StableUpdatesTests(unittest.TestCase):
         self.assertEqual(after['last_notified'], before['last_notified'])
         self.assertEqual(after['checked_at'], before['checked_at'])
         self.assertEqual(after['error'], 'Offline')
+        self.assertEqual(after['installed_packages'], self.installed)
         notify.assert_not_called()
 
     def test_notification_has_open_updates_hint_and_no_blocking_wait(self):

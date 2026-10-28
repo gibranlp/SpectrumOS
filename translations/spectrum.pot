@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: SpectrumOS\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "F"
 msgstr ""
@@ -14,7 +14,7 @@ msgctxt "Calendar"
 msgid "Fri"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "M"
 msgstr ""
@@ -24,7 +24,7 @@ msgctxt "Calendar"
 msgid "Mon"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "Sa"
 msgstr ""
@@ -34,7 +34,7 @@ msgctxt "Calendar"
 msgid "Sat"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "Su"
 msgstr ""
@@ -44,7 +44,7 @@ msgctxt "Calendar"
 msgid "Sun"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "Th"
 msgstr ""
@@ -54,7 +54,7 @@ msgctxt "Calendar"
 msgid "Thu"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "Tu"
 msgstr ""
@@ -64,7 +64,7 @@ msgctxt "Calendar"
 msgid "Tue"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1951
+#: configs/spectrum-shell/UtilityPanel.qml:1959
 msgctxt "Calendar"
 msgid "W"
 msgstr ""
@@ -134,12 +134,12 @@ msgctxt "Spectrum"
 msgid "    Signal  "
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2300
+#: configs/spectrum-shell/shell.qml:2301
 msgctxt "Spectrum"
 msgid "   GPU "
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2300
+#: configs/spectrum-shell/shell.qml:2301
 msgctxt "Spectrum"
 msgid "   RAM "
 msgstr ""
@@ -174,12 +174,12 @@ msgstr ""
 #: configs/spectrum-shell/QuestlineCharacterHeader.qml:52
 #: configs/spectrum-shell/QuestlineHero.qml:63
 #: configs/spectrum-shell/QuestlineHero.qml:65
-#: configs/spectrum-shell/UtilityPanel.qml:2470
+#: configs/spectrum-shell/UtilityPanel.qml:2481
 msgctxt "Spectrum"
 msgid " XP"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2514
+#: configs/spectrum-shell/UtilityPanel.qml:2525
 msgctxt "Spectrum"
 msgid " XP per completion"
 msgstr ""
@@ -194,7 +194,7 @@ msgctxt "Spectrum"
 msgid " XP · "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1714
+#: configs/spectrum-shell/UtilityPanel.qml:1720
 msgctxt "Spectrum"
 msgid " and its "
 msgstr ""
@@ -259,12 +259,12 @@ msgctxt "Spectrum"
 msgid " files selected in Thunar"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2229
+#: configs/spectrum-shell/UtilityPanel.qml:2240
 msgctxt "Spectrum"
 msgid " growth"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1714
+#: configs/spectrum-shell/UtilityPanel.qml:1720
 msgctxt "Spectrum"
 msgid " linked step"
 msgstr ""
@@ -306,7 +306,7 @@ msgctxt "Spectrum"
 msgid " pending · "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2535
+#: configs/spectrum-shell/UtilityPanel.qml:2546
 msgctxt "Spectrum"
 msgid " priority"
 msgstr ""
@@ -342,7 +342,7 @@ msgctxt "Spectrum"
 msgid " results · Choose a source before installing."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2394
+#: configs/spectrum-shell/UtilityPanel.qml:2405
 msgctxt "Spectrum"
 msgid " savings · "
 msgstr ""
@@ -384,8 +384,8 @@ msgid ""
 "approval remains separate."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2470
-#: configs/spectrum-shell/UtilityPanel.qml:2514
+#: configs/spectrum-shell/UtilityPanel.qml:2481
+#: configs/spectrum-shell/UtilityPanel.qml:2525
 msgctxt "Spectrum"
 msgid " today · "
 msgstr ""
@@ -410,7 +410,7 @@ msgctxt "Spectrum"
 msgid " · Installed"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2386
+#: configs/spectrum-shell/UtilityPanel.qml:2397
 msgctxt "Spectrum"
 msgid " · Legacy"
 msgstr ""
@@ -474,7 +474,7 @@ msgctxt "Spectrum"
 msgid "% · 100% is the default"
 msgstr ""
 
-#: scripts/spectrum-update-check:86
+#: scripts/spectrum-update-check:108
 msgctxt "Spectrum"
 msgid ""
 "%n SpectrumOS package update is ready.\n"
@@ -500,32 +500,32 @@ msgctxt "Spectrum"
 msgid "+ Favorite"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1663
+#: configs/spectrum-shell/UtilityPanel.qml:1669
 msgctxt "Spectrum"
 msgid "+ New chronicle"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1663
+#: configs/spectrum-shell/UtilityPanel.qml:1669
 msgctxt "Spectrum"
 msgid "+ New entry"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1663
+#: configs/spectrum-shell/UtilityPanel.qml:1669
 msgctxt "Spectrum"
 msgid "+ New scroll"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1663
+#: configs/spectrum-shell/UtilityPanel.qml:1669
 msgctxt "Spectrum"
 msgid "+ New sidequest"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2599
+#: configs/spectrum-shell/UtilityPanel.qml:2611
 msgctxt "Spectrum"
 msgid "+ New step"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1663
+#: configs/spectrum-shell/UtilityPanel.qml:1669
 msgctxt "Spectrum"
 msgid "+ New task"
 msgstr ""
@@ -639,7 +639,7 @@ msgctxt "Spectrum"
 msgid "AUR · community"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2177
+#: configs/spectrum-shell/shell.qml:2178
 #: configs/spectrum-shell/VerticalBar.qml:429
 msgctxt "Spectrum"
 msgid "Aa"
@@ -656,12 +656,12 @@ msgctxt "Spectrum"
 msgid "Account"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:517
+#: configs/spectrum-shell/UtilityPanel.qml:522
 msgctxt "Spectrum"
 msgid "Account: "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Acorn"
 msgstr ""
@@ -808,7 +808,7 @@ msgctxt "Spectrum"
 msgid "Alternate both"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2008
+#: configs/spectrum-shell/UtilityPanel.qml:2016
 msgctxt "Spectrum"
 msgid "Amount"
 msgstr ""
@@ -820,7 +820,7 @@ msgid ""
 "here."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Ancient Ent"
 msgstr ""
@@ -1074,14 +1074,19 @@ msgid "Autosaved"
 msgstr ""
 
 #: configs/spectrum-shell/BluetoothWidgetContent.qml:85
-#: configs/spectrum-shell/UtilityPanel.qml:2295
+#: configs/spectrum-shell/UtilityPanel.qml:2306
 msgctxt "Spectrum"
 msgid "Available"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2296
+#: configs/spectrum-shell/UtilityPanel.qml:2307
 msgctxt "Spectrum"
 msgid "Available savings"
+msgstr ""
+
+#: configs/spectrum-shell/UpdatePackageList.qml:77
+msgctxt "Spectrum"
+msgid "Available: %1"
 msgstr ""
 
 #: configs/spectrum-shell/ControlCenter.qml:278
@@ -1105,7 +1110,7 @@ msgid "BLUETOOTH"
 msgstr ""
 
 #: configs/spectrum-shell/FavoritesContent.qml:295
-#: configs/spectrum-shell/UtilityPanel.qml:2071
+#: configs/spectrum-shell/UtilityPanel.qml:2082
 #: configs/spectrum-ukvm/UkvmPage.qml:276 installer/spectrum-installer:150
 #: installer/spectrum-installer:526
 msgctxt "Spectrum"
@@ -1211,13 +1216,13 @@ msgstr ""
 
 #: configs/spectrum-shell/BarExtras.qml:18
 #: configs/spectrum-shell/UtilityPanel.qml:144
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:17
 msgctxt "Spectrum"
 msgid "Break reminders"
 msgstr ""
 
-#: configs/spectrum-shell/LevelIndicator.qml:126
+#: configs/spectrum-shell/LevelIndicator.qml:281
 msgctxt "Spectrum"
 msgid "Brightness"
 msgstr ""
@@ -1252,7 +1257,7 @@ msgctxt "Spectrum"
 msgid "CPU"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2300
+#: configs/spectrum-shell/shell.qml:2301
 msgctxt "Spectrum"
 msgid "CPU "
 msgstr ""
@@ -1283,7 +1288,7 @@ msgid "Calculation"
 msgstr ""
 
 #: configs/spectrum-shell/UtilityPanel.qml:145
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:21
 msgctxt "Spectrum"
 msgid "Calculator"
@@ -1299,8 +1304,8 @@ msgctxt "Spectrum"
 msgid "Campaign"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:517
-#: configs/spectrum-shell/UtilityPanel.qml:1767
+#: configs/spectrum-shell/UtilityPanel.qml:522
+#: configs/spectrum-shell/UtilityPanel.qml:1773
 msgctxt "Spectrum"
 msgid "Campaign: "
 msgstr ""
@@ -1316,7 +1321,7 @@ msgstr ""
 #: configs/spectrum-shell/QuestlineSync.qml:166
 #: configs/spectrum-shell/SpectrumDrop.qml:174
 #: configs/spectrum-shell/SpectrumDrop.qml:210
-#: configs/spectrum-shell/UtilityPanel.qml:1721
+#: configs/spectrum-shell/UtilityPanel.qml:1727
 #: configs/spectrum-ukvm/FilePicker.qml:101
 #: configs/spectrum-ukvm/UkvmPage.qml:266
 #: configs/spectrum-ukvm/UkvmPage.qml:483
@@ -1380,7 +1385,7 @@ msgctxt "Spectrum"
 msgid "Category name"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:517
+#: configs/spectrum-shell/UtilityPanel.qml:522
 msgctxt "Spectrum"
 msgid "Category: "
 msgstr ""
@@ -1405,7 +1410,7 @@ msgctxt "Spectrum"
 msgid "Charging"
 msgstr ""
 
-#: configs/spectrum-shell/UpdatePanel.qml:185
+#: configs/spectrum-shell/UpdatePanel.qml:199
 msgctxt "Spectrum"
 msgid "Check again"
 msgstr ""
@@ -1420,7 +1425,7 @@ msgctxt "Spectrum"
 msgid "Checking CLI compatibility…"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1451
+#: configs/spectrum-shell/UtilityPanel.qml:1456
 msgctxt "Spectrum"
 msgid "Checking Questline profile…"
 msgstr ""
@@ -1475,7 +1480,7 @@ msgctxt "Spectrum"
 msgid "Choose a name to get started."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2514
+#: configs/spectrum-shell/UtilityPanel.qml:2525
 msgctxt "Spectrum"
 msgid "Choose a row to see its details."
 msgstr ""
@@ -1500,7 +1505,7 @@ msgctxt "Spectrum"
 msgid "Choose an application in Discover to start."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1891
+#: configs/spectrum-shell/UtilityPanel.qml:1898
 msgctxt "Spectrum"
 msgid "Choose date"
 msgstr ""
@@ -1515,7 +1520,7 @@ msgctxt "Spectrum"
 msgid "Choose how Hyprland arranges windows."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1476
+#: configs/spectrum-shell/UtilityPanel.qml:1481
 msgctxt "Spectrum"
 msgid ""
 "Choose how to begin. Your character and progress will appear here after "
@@ -1648,12 +1653,12 @@ msgctxt "Spectrum"
 msgid "Clear the form for a new sequence"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2806
+#: configs/spectrum-shell/UtilityPanel.qml:2818
 msgctxt "Spectrum"
 msgid "Click a color to copy its hex. Press Escape to finish picking."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1352
+#: configs/spectrum-shell/UtilityPanel.qml:1357
 msgctxt "Spectrum"
 msgid "Click a shortcut to run it, or use ↑ / ↓ and Enter."
 msgstr ""
@@ -1698,7 +1703,7 @@ msgctxt "Spectrum"
 msgid "Color copied"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 msgctxt "Spectrum"
 msgid "Color picker"
 msgstr ""
@@ -1713,12 +1718,12 @@ msgctxt "Spectrum"
 msgid "Complete Questline setup to start."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1695
+#: configs/spectrum-shell/UtilityPanel.qml:1701
 msgctxt "Spectrum"
 msgid "Complete sidequest"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1695
+#: configs/spectrum-shell/UtilityPanel.qml:1701
 msgctxt "Spectrum"
 msgid "Complete task"
 msgstr ""
@@ -1808,7 +1813,7 @@ msgctxt "Spectrum"
 msgid "Continue"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1525
+#: configs/spectrum-shell/UtilityPanel.qml:1530
 msgctxt "Spectrum"
 msgid "Continue from another PC"
 msgstr ""
@@ -1847,7 +1852,7 @@ msgstr ""
 
 #: configs/spectrum-shell/Calculator.qml:386
 #: configs/spectrum-shell/SpectrumDrop.qml:144
-#: configs/spectrum-shell/UtilityPanel.qml:2950
+#: configs/spectrum-shell/UtilityPanel.qml:2962
 msgctxt "Spectrum"
 msgid "Copy"
 msgstr ""
@@ -1862,12 +1867,12 @@ msgctxt "Spectrum"
 msgid "Copy Transfer Code"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2542
+#: configs/spectrum-shell/UtilityPanel.qml:2553
 msgctxt "Spectrum"
 msgid "Copy details"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2542
+#: configs/spectrum-shell/UtilityPanel.qml:2553
 msgctxt "Spectrum"
 msgid "Copy scroll"
 msgstr ""
@@ -1887,8 +1892,8 @@ msgctxt "Spectrum"
 msgid "Could not calculate the result"
 msgstr ""
 
-#: configs/spectrum-shell/StableUpdateMonitor.qml:26
-#: configs/spectrum-shell/StableUpdateMonitor.qml:30
+#: configs/spectrum-shell/StableUpdateMonitor.qml:36
+#: configs/spectrum-shell/StableUpdateMonitor.qml:40
 msgctxt "Spectrum"
 msgid "Could not check Stable updates."
 msgstr ""
@@ -1929,7 +1934,7 @@ msgctxt "Spectrum"
 msgid "Could not prepare the installation log: {value0}"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:887
+#: configs/spectrum-shell/UtilityPanel.qml:892
 msgctxt "Spectrum"
 msgid "Could not read Questline status."
 msgstr ""
@@ -1939,7 +1944,7 @@ msgctxt "Spectrum"
 msgid "Could not read break reminder settings."
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:529 configs/spectrum-shell/shell.qml:534
+#: configs/spectrum-shell/shell.qml:530 configs/spectrum-shell/shell.qml:535
 msgctxt "Spectrum"
 msgid "Could not read display brightness."
 msgstr ""
@@ -1947,6 +1952,11 @@ msgstr ""
 #: configs/spectrum-shell/AppStoreManager.qml:108
 msgctxt "Spectrum"
 msgid "Could not read installation activity."
+msgstr ""
+
+#: configs/spectrum-shell/UpdatePackageList.qml:25
+msgctxt "Spectrum"
+msgid "Could not read installed package versions."
 msgstr ""
 
 #: configs/spectrum-shell/MouseWidgetContent.qml:28
@@ -2046,12 +2056,12 @@ msgctxt "Spectrum"
 msgid "Counting active desk time"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1493
+#: configs/spectrum-shell/UtilityPanel.qml:1498
 msgctxt "Spectrum"
 msgid "Create a character"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1612
+#: configs/spectrum-shell/UtilityPanel.qml:1618
 msgctxt "Spectrum"
 msgid ""
 "Create an active personal campaign in Questline first, then try the shortcut"
@@ -2063,7 +2073,7 @@ msgctxt "Spectrum"
 msgid "Create backup"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1507
+#: configs/spectrum-shell/UtilityPanel.qml:1512
 msgctxt "Spectrum"
 msgid "Create in Questline"
 msgstr ""
@@ -2073,7 +2083,7 @@ msgctxt "Spectrum"
 msgid "Create your account"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2347
+#: configs/spectrum-shell/UtilityPanel.qml:2358
 msgctxt "Spectrum"
 msgid "Create your accounts in Questline to start recording entries."
 msgstr ""
@@ -2108,7 +2118,7 @@ msgctxt "Spectrum"
 msgid "Currency rates depend on available exchange-rate data."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2340
+#: configs/spectrum-shell/UtilityPanel.qml:2351
 msgctxt "Spectrum"
 msgid "Current accounts"
 msgstr ""
@@ -2208,14 +2218,14 @@ msgctxt "Spectrum"
 msgid "Decline review"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:513
+#: configs/spectrum-shell/UtilityPanel.qml:518
 msgctxt "Spectrum"
 msgid "Default account"
 msgstr ""
 
 #: configs/spectrum-shell/BarExtras.qml:20
 #: configs/spectrum-shell/UtilityPanel.qml:150
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:19
 msgctxt "Spectrum"
 msgid "Default applications"
@@ -2227,7 +2237,7 @@ msgid "Default browser"
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineEntryEditor.qml:44
-#: configs/spectrum-shell/UtilityPanel.qml:514
+#: configs/spectrum-shell/UtilityPanel.qml:519
 msgctxt "Spectrum"
 msgid "Default category"
 msgstr ""
@@ -2238,13 +2248,13 @@ msgid "Default servers (or enter hostnames / IPs)"
 msgstr ""
 
 #: configs/spectrum-shell/FavoritesContent.qml:171
-#: configs/spectrum-shell/UtilityPanel.qml:1684
-#: configs/spectrum-shell/UtilityPanel.qml:2666
+#: configs/spectrum-shell/UtilityPanel.qml:1690
+#: configs/spectrum-shell/UtilityPanel.qml:2678
 msgctxt "Spectrum"
 msgid "Delete"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1730
+#: configs/spectrum-shell/UtilityPanel.qml:1736
 msgctxt "Spectrum"
 msgid "Delete permanently"
 msgstr ""
@@ -2290,7 +2300,7 @@ msgctxt "Spectrum"
 msgid "Device level · "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1116
+#: configs/spectrum-shell/UtilityPanel.qml:1121
 msgctxt "Spectrum"
 msgid "Device search returned an invalid response."
 msgstr ""
@@ -2464,14 +2474,14 @@ msgctxt "Spectrum"
 msgid "Drink"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2535
-#: configs/spectrum-shell/UtilityPanel.qml:2650
+#: configs/spectrum-shell/UtilityPanel.qml:2546
+#: configs/spectrum-shell/UtilityPanel.qml:2662
 msgctxt "Spectrum"
 msgid "Due "
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineEntryEditor.qml:94
-#: configs/spectrum-shell/UtilityPanel.qml:1877
+#: configs/spectrum-shell/UtilityPanel.qml:1884
 msgctxt "Spectrum"
 msgid "Due date"
 msgstr ""
@@ -2486,7 +2496,7 @@ msgctxt "Spectrum"
 msgid "ETHERNET  ·  "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2104
+#: configs/spectrum-shell/UtilityPanel.qml:2115
 msgctxt "Spectrum"
 msgid "EVERGROWTH"
 msgstr ""
@@ -2501,13 +2511,13 @@ msgstr ""
 #: configs/spectrum-shell/FavoritesContent.qml:170
 #: configs/spectrum-shell/FavoritesContent.qml:265
 #: configs/spectrum-shell/HotKeyEditor.qml:233
-#: configs/spectrum-shell/UtilityPanel.qml:1674
-#: configs/spectrum-shell/UtilityPanel.qml:2657
+#: configs/spectrum-shell/UtilityPanel.qml:1680
+#: configs/spectrum-shell/UtilityPanel.qml:2669
 msgctxt "Spectrum"
 msgid "Edit"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "Edit "
 msgstr ""
@@ -2517,7 +2527,7 @@ msgctxt "Spectrum"
 msgid "Edit connections"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "Edit step"
 msgstr ""
@@ -2532,7 +2542,7 @@ msgctxt "Spectrum"
 msgid "Email"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:23
 msgctxt "Spectrum"
 msgid "Emoji"
@@ -2605,7 +2615,7 @@ msgctxt "Spectrum"
 msgid "English (US, international accents)"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1539
+#: configs/spectrum-shell/UtilityPanel.qml:1544
 msgctxt "Spectrum"
 msgid "Enter Transfer Code"
 msgstr ""
@@ -2690,7 +2700,7 @@ msgctxt "Spectrum"
 msgid "Ethernet or Wi-Fi · no special radio required"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Evergrowth Elder"
 msgstr ""
@@ -2804,7 +2814,7 @@ msgid "File types"
 msgstr ""
 
 #: configs/spectrum-shell/UtilityPanel.qml:155
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 msgctxt "Spectrum"
 msgid "Files"
 msgstr ""
@@ -2865,7 +2875,7 @@ msgid "Focus shell bar"
 msgstr ""
 
 #: configs/spectrum-shell/UtilityPanel.qml:158
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:16
 msgctxt "Spectrum"
 msgid "Focus timer"
@@ -2951,12 +2961,12 @@ msgctxt "Spectrum"
 msgid "Form into"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1807
+#: configs/spectrum-shell/UtilityPanel.qml:1814
 msgctxt "Spectrum"
 msgid "Frequency"
 msgstr ""
 
-#: scripts/spectrum-update-check:85
+#: scripts/spectrum-update-check:107
 msgctxt "Spectrum"
 msgid "Fresh loot on Stable"
 msgstr ""
@@ -3011,7 +3021,7 @@ msgctxt "Spectrum"
 msgid "Gaps"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2941
+#: configs/spectrum-shell/UtilityPanel.qml:2953
 msgctxt "Spectrum"
 msgid "Generate"
 msgstr ""
@@ -3042,7 +3052,7 @@ msgctxt "Spectrum"
 msgid "Graphics"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Grove Guardian"
 msgstr ""
@@ -3052,7 +3062,7 @@ msgctxt "Spectrum"
 msgid "Hardware clock: %1"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2234
+#: configs/spectrum-shell/UtilityPanel.qml:2245
 msgctxt "Spectrum"
 msgid "Health  "
 msgstr ""
@@ -3098,7 +3108,7 @@ msgctxt "Spectrum"
 msgid "HotKey"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1157
+#: configs/spectrum-shell/UtilityPanel.qml:1162
 msgctxt "Spectrum"
 msgid "HotKey service returned an invalid response."
 msgstr ""
@@ -3278,6 +3288,11 @@ msgctxt "Spectrum"
 msgid "Installed"
 msgstr ""
 
+#: configs/spectrum-shell/UpdatePackageList.qml:61
+msgctxt "Spectrum"
+msgid "Installed: %1"
+msgstr ""
+
 #: translations/messages.json:1
 msgctxt "Spectrum"
 msgid "Installing"
@@ -3330,7 +3345,7 @@ msgctxt "Spectrum"
 msgid "Interval in milliseconds"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2296
+#: configs/spectrum-shell/UtilityPanel.qml:2307
 msgctxt "Spectrum"
 msgid "Invested"
 msgstr ""
@@ -3389,7 +3404,7 @@ msgid "Keyboard"
 msgstr ""
 
 #: configs/spectrum-shell/UtilityPanel.qml:164
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:27
 msgctxt "Spectrum"
 msgid "Keyboard shortcuts"
@@ -3425,7 +3440,7 @@ msgctxt "Spectrum"
 msgid "Last successful sync: "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2262
+#: configs/spectrum-shell/UtilityPanel.qml:2273
 msgctxt "Spectrum"
 msgid "Last watered  "
 msgstr ""
@@ -3465,7 +3480,7 @@ msgctxt "Spectrum"
 msgid "Length"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2864
+#: configs/spectrum-shell/UtilityPanel.qml:2876
 msgctxt "Spectrum"
 msgid "Length: "
 msgstr ""
@@ -3480,7 +3495,7 @@ msgctxt "Spectrum"
 msgid "Let the calculator remember"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2893
+#: configs/spectrum-shell/UtilityPanel.qml:2905
 msgctxt "Spectrum"
 msgid "Letters"
 msgstr ""
@@ -3540,7 +3555,7 @@ msgstr ""
 
 #: configs/spectrum-shell/BarExtras.qml:19
 #: configs/spectrum-shell/UtilityPanel.qml:165
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:18
 msgctxt "Spectrum"
 msgid "Local services"
@@ -3731,7 +3746,7 @@ msgctxt "Spectrum"
 msgid "Monthly"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2213
+#: configs/spectrum-shell/shell.qml:2214
 #: configs/spectrum-shell/VerticalBar.qml:487
 msgctxt "Spectrum"
 msgid "More bar controls"
@@ -3840,7 +3855,7 @@ msgctxt "Spectrum"
 msgid "Mute"
 msgstr ""
 
-#: configs/spectrum-shell/LevelIndicator.qml:132
+#: configs/spectrum-shell/LevelIndicator.qml:287
 msgctxt "Spectrum"
 msgid "Muted"
 msgstr ""
@@ -3926,7 +3941,7 @@ msgctxt "Spectrum"
 msgid "NetworkManager unavailable"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "New "
 msgstr ""
@@ -3936,7 +3951,7 @@ msgctxt "Spectrum"
 msgid "New Questline task"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "New step for "
 msgstr ""
@@ -3961,8 +3976,13 @@ msgctxt "Spectrum"
 msgid "No Bluetooth adapter detected."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1767
-#: configs/spectrum-shell/UtilityPanel.qml:1777
+#: configs/spectrum-shell/UpdatePackageList.qml:25
+msgctxt "Spectrum"
+msgid "No SpectrumOS packages found."
+msgstr ""
+
+#: configs/spectrum-shell/UtilityPanel.qml:1773
+#: configs/spectrum-shell/UtilityPanel.qml:1783
 msgctxt "Spectrum"
 msgid "No active campaign"
 msgstr ""
@@ -3994,7 +4014,7 @@ msgctxt "Spectrum"
 msgid "No background audio"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2438
+#: configs/spectrum-shell/UtilityPanel.qml:2449
 msgctxt "Spectrum"
 msgid "No chronicles in this campaign yet."
 msgstr ""
@@ -4004,12 +4024,12 @@ msgctxt "Spectrum"
 msgid "No compatible applications found"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2573
+#: configs/spectrum-shell/UtilityPanel.qml:2585
 msgctxt "Spectrum"
 msgid "No description yet."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1917
+#: configs/spectrum-shell/UtilityPanel.qml:1925
 msgctxt "Spectrum"
 msgid "No due date"
 msgstr ""
@@ -4074,7 +4094,7 @@ msgctxt "Spectrum"
 msgid "No matching services or containers."
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2348
+#: configs/spectrum-shell/shell.qml:2349
 #: configs/spectrum-shell/VerticalBar.qml:219
 msgctxt "Spectrum"
 msgid "No media"
@@ -4100,7 +4120,7 @@ msgctxt "Spectrum"
 msgid "No paired computers yet."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2822
+#: configs/spectrum-shell/UtilityPanel.qml:2834
 msgctxt "Spectrum"
 msgid "No saved colors yet. Pick one from the screen to start."
 msgstr ""
@@ -4111,7 +4131,7 @@ msgctxt "Spectrum"
 msgid "No specific task"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2609
+#: configs/spectrum-shell/UtilityPanel.qml:2621
 msgctxt "Spectrum"
 msgid "No steps yet. Add one to break this task down."
 msgstr ""
@@ -4182,7 +4202,7 @@ msgctxt "Spectrum"
 msgid "Nothing here yet"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2438
+#: configs/spectrum-shell/UtilityPanel.qml:2449
 msgctxt "Spectrum"
 msgid "Nothing here yet. Use the New button above to get started."
 msgstr ""
@@ -4202,7 +4222,7 @@ msgctxt "Spectrum"
 msgid "Notifications"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2894
+#: configs/spectrum-shell/UtilityPanel.qml:2906
 msgctxt "Spectrum"
 msgid "Numbers"
 msgstr ""
@@ -4212,7 +4232,7 @@ msgctxt "Spectrum"
 msgid "ON YOUR NEW DESKTOP"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2101
+#: configs/spectrum-shell/UtilityPanel.qml:2112
 msgctxt "Spectrum"
 msgid "OPEN TASKS"
 msgstr ""
@@ -4262,7 +4282,7 @@ msgctxt "Spectrum"
 msgid "On battery"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1531
+#: configs/spectrum-shell/UtilityPanel.qml:1536
 msgctxt "Spectrum"
 msgid ""
 "On the old PC, use Sync → Export Profile and wait for the backup. Here, "
@@ -4347,7 +4367,7 @@ msgctxt "Spectrum"
 msgid "Open folder"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1430
+#: configs/spectrum-shell/UtilityPanel.qml:1435
 msgctxt "Spectrum"
 msgid "Open full app"
 msgstr ""
@@ -4378,7 +4398,7 @@ msgctxt "Spectrum"
 msgid "Open terminal log"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1499
+#: configs/spectrum-shell/UtilityPanel.qml:1504
 msgctxt "Spectrum"
 msgid "Open the full app, choose New Adventurer, then pick a name and class."
 msgstr ""
@@ -4499,7 +4519,7 @@ msgid "Password for "
 msgstr ""
 
 #: configs/spectrum-shell/UtilityPanel.qml:182
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:22
 msgctxt "Spectrum"
 msgid "Password generator"
@@ -4564,7 +4584,7 @@ msgctxt "Spectrum"
 msgid "Performance"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1715
+#: configs/spectrum-shell/UtilityPanel.qml:1721
 msgctxt "Spectrum"
 msgid "Permanently delete "
 msgstr ""
@@ -4579,7 +4599,7 @@ msgctxt "Spectrum"
 msgid "Persistent"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2796
+#: configs/spectrum-shell/UtilityPanel.qml:2808
 #: configs/spectrum-shell/WidgetIcons.qml:24
 msgctxt "Spectrum"
 msgid "Pick colors"
@@ -4706,7 +4726,7 @@ msgctxt "Spectrum"
 msgid "Previous window"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1840
+#: configs/spectrum-shell/UtilityPanel.qml:1847
 msgctxt "Spectrum"
 msgid "Priority"
 msgstr ""
@@ -4738,12 +4758,12 @@ msgctxt "Spectrum"
 msgid "Questline Focus"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:853
+#: configs/spectrum-shell/UtilityPanel.qml:858
 msgctxt "Spectrum"
 msgid "Questline action failed."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1458
+#: configs/spectrum-shell/UtilityPanel.qml:1463
 msgctxt "Spectrum"
 msgid ""
 "Questline could not load your character. Open the full app to inspect your "
@@ -4760,12 +4780,12 @@ msgctxt "Spectrum"
 msgid "Questline focus session stopped unexpectedly"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1458
+#: configs/spectrum-shell/UtilityPanel.qml:1463
 msgctxt "Spectrum"
 msgid "Questline is not installed yet."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2197
+#: configs/spectrum-shell/UtilityPanel.qml:2208
 msgctxt "Spectrum"
 msgid "Questline's current tree renderer is unavailable."
 msgstr ""
@@ -4775,7 +4795,7 @@ msgctxt "Spectrum"
 msgid "Quick note in Questline"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1606
+#: configs/spectrum-shell/UtilityPanel.qml:1612
 msgctxt "Spectrum"
 msgid "Quick note — choose a project"
 msgstr ""
@@ -4854,12 +4874,12 @@ msgctxt "Spectrum"
 msgid "Ready"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2262
+#: configs/spectrum-shell/UtilityPanel.qml:2273
 msgctxt "Spectrum"
 msgid "Ready for its first watering"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2251
+#: configs/spectrum-shell/UtilityPanel.qml:2262
 msgctxt "Spectrum"
 msgid "Ready for today's watering"
 msgstr ""
@@ -4910,12 +4930,12 @@ msgctxt "Spectrum"
 msgid "Receiving…"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2157
+#: configs/spectrum-shell/UtilityPanel.qml:2168
 msgctxt "Spectrum"
 msgid "Recent scrolls"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2170
+#: configs/spectrum-shell/UtilityPanel.qml:2181
 msgctxt "Spectrum"
 msgid "Recent treasury"
 msgstr ""
@@ -4951,14 +4971,14 @@ msgid "Recovery hold — restore before enabling sync."
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineEntryEditor.qml:66
-#: configs/spectrum-shell/UtilityPanel.qml:1855
+#: configs/spectrum-shell/UtilityPanel.qml:1862
 msgctxt "Spectrum"
 msgid "Recurrence"
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineSync.qml:117
 #: configs/spectrum-shell/TimeRegionWidgetContent.qml:157
-#: configs/spectrum-shell/UtilityPanel.qml:1440
+#: configs/spectrum-shell/UtilityPanel.qml:1445
 #: configs/spectrum-shell/WeatherWidgetContent.qml:101
 #: configs/spectrum-ukvm/UkvmPage.qml:251
 msgctxt "Spectrum"
@@ -5173,17 +5193,17 @@ msgctxt "Spectrum"
 msgid "Resume"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1650
+#: configs/spectrum-shell/UtilityPanel.qml:1656
 msgctxt "Spectrum"
 msgid "Resume draft: "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2084
+#: configs/spectrum-shell/UtilityPanel.qml:2095
 msgctxt "Spectrum"
 msgid "Retry"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1551
+#: configs/spectrum-shell/UtilityPanel.qml:1556
 msgctxt "Spectrum"
 msgid "Return here and press Refresh when setup is complete."
 msgstr ""
@@ -5198,7 +5218,7 @@ msgctxt "Spectrum"
 msgid "Review"
 msgstr ""
 
-#: configs/spectrum-shell/UpdatePanel.qml:178
+#: configs/spectrum-shell/UpdatePanel.qml:192
 msgctxt "Spectrum"
 msgid ""
 "Review and confirm in the terminal before changes begin. System upgrades "
@@ -5251,7 +5271,7 @@ msgctxt "Spectrum"
 msgid "SAMPLE RATE"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2815
+#: configs/spectrum-shell/UtilityPanel.qml:2827
 msgctxt "Spectrum"
 msgid "SAVED COLORS · NEWEST FIRST"
 msgstr ""
@@ -5276,7 +5296,7 @@ msgctxt "Spectrum"
 msgid "SCROLL AMOUNT"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2102
+#: configs/spectrum-shell/UtilityPanel.qml:2113
 msgctxt "Spectrum"
 msgid "SCROLLS"
 msgstr ""
@@ -5332,7 +5352,7 @@ msgctxt "Spectrum"
 msgid "Save servers"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2295
+#: configs/spectrum-shell/UtilityPanel.qml:2306
 msgctxt "Spectrum"
 msgid "Saved"
 msgstr ""
@@ -5450,7 +5470,7 @@ msgctxt "Spectrum"
 msgid "Search city or time zone…"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1242
+#: configs/spectrum-shell/UtilityPanel.qml:1247
 msgctxt "Spectrum"
 msgid "Search emoji by name"
 msgstr ""
@@ -5522,7 +5542,7 @@ msgid ""
 " you confirm installation."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1612
+#: configs/spectrum-shell/UtilityPanel.qml:1618
 msgctxt "Spectrum"
 msgid "Select a project and start writing. Your note saves automatically."
 msgstr ""
@@ -5537,7 +5557,7 @@ msgctxt "Spectrum"
 msgid "Select an app to "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2501
+#: configs/spectrum-shell/UtilityPanel.qml:2512
 msgctxt "Spectrum"
 msgid "Select an item"
 msgstr ""
@@ -5671,7 +5691,7 @@ msgctxt "Spectrum"
 msgid "Set up"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1470
+#: configs/spectrum-shell/UtilityPanel.qml:1475
 msgctxt "Spectrum"
 msgid "Set up Questline"
 msgstr ""
@@ -5814,7 +5834,7 @@ msgctxt "Spectrum"
 msgid "SpectrumDrop"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1088
+#: configs/spectrum-shell/UtilityPanel.qml:1093
 msgctxt "Spectrum"
 msgid "SpectrumDrop returned an invalid response."
 msgstr ""
@@ -5832,6 +5852,11 @@ msgstr ""
 #: installer/spectrum-installer:912
 msgctxt "Spectrum"
 msgid "SpectrumOS menu first"
+msgstr ""
+
+#: configs/spectrum-shell/UpdatePackageList.qml:18
+msgctxt "Spectrum"
+msgid "SpectrumOS packages"
 msgstr ""
 
 #: configs/spectrum-shell/UpdatePanel.qml:148
@@ -5860,7 +5885,7 @@ msgctxt "Spectrum"
 msgid "Spreadsheets"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Sprout"
 msgstr ""
@@ -5885,7 +5910,7 @@ msgctxt "Spectrum"
 msgid "Stable notifications require the SpectrumOS Stable repository."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2229
+#: configs/spectrum-shell/UtilityPanel.qml:2240
 msgctxt "Spectrum"
 msgid "Stage "
 msgstr ""
@@ -5935,7 +5960,7 @@ msgctxt "Spectrum"
 msgid "Status"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2000
+#: configs/spectrum-shell/UtilityPanel.qml:2008
 msgctxt "Spectrum"
 msgid "Status: "
 msgstr ""
@@ -5950,7 +5975,7 @@ msgctxt "Spectrum"
 msgid "Step · "
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2593
+#: configs/spectrum-shell/UtilityPanel.qml:2605
 msgctxt "Spectrum"
 msgid "Steps  ·  "
 msgstr ""
@@ -6142,7 +6167,7 @@ msgctxt "Spectrum"
 msgid "Switch to workspace 6"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2895
+#: configs/spectrum-shell/UtilityPanel.qml:2907
 msgctxt "Spectrum"
 msgid "Symbols"
 msgstr ""
@@ -6205,7 +6230,7 @@ msgctxt "Spectrum"
 msgid "System updates"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2217
+#: configs/spectrum-shell/UtilityPanel.qml:2228
 msgctxt "Spectrum"
 msgid "THE EVERGROWTH"
 msgstr ""
@@ -6230,7 +6255,7 @@ msgctxt "Spectrum"
 msgid "TOP"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2103
+#: configs/spectrum-shell/UtilityPanel.qml:2114
 msgctxt "Spectrum"
 msgid "TREASURY ENTRIES"
 msgstr ""
@@ -6386,13 +6411,13 @@ msgctxt "Spectrum"
 msgid "To account"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:518
+#: configs/spectrum-shell/UtilityPanel.qml:523
 msgctxt "Spectrum"
 msgid "To account: "
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineCalendar.qml:82
-#: configs/spectrum-shell/UtilityPanel.qml:1879
+#: configs/spectrum-shell/UtilityPanel.qml:1886
 msgctxt "Spectrum"
 msgid "Today"
 msgstr ""
@@ -6422,7 +6447,7 @@ msgctxt "Spectrum"
 msgid "Toggle shortcut"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1885
+#: configs/spectrum-shell/UtilityPanel.qml:1892
 msgctxt "Spectrum"
 msgid "Tomorrow"
 msgstr ""
@@ -6449,7 +6474,7 @@ msgid ""
 "position."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2256
+#: configs/spectrum-shell/UtilityPanel.qml:2267
 msgctxt "Spectrum"
 msgid "Total waterings  "
 msgstr ""
@@ -6578,9 +6603,9 @@ msgid "Uncategorized"
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineOverviewColumn.qml:55
-#: configs/spectrum-shell/UtilityPanel.qml:2470
-#: configs/spectrum-shell/UtilityPanel.qml:2470
-#: configs/spectrum-shell/UtilityPanel.qml:2514
+#: configs/spectrum-shell/UtilityPanel.qml:2481
+#: configs/spectrum-shell/UtilityPanel.qml:2481
+#: configs/spectrum-shell/UtilityPanel.qml:2525
 msgctxt "Spectrum"
 msgid "Unfiled"
 msgstr ""
@@ -6600,12 +6625,12 @@ msgctxt "Spectrum"
 msgid "Unknown"
 msgstr ""
 
-#: configs/spectrum-shell/LevelIndicator.qml:164
+#: configs/spectrum-shell/LevelIndicator.qml:222
 msgctxt "Spectrum"
 msgid "Unknown artist"
 msgstr ""
 
-#: configs/spectrum-shell/LevelIndicator.qml:154
+#: configs/spectrum-shell/LevelIndicator.qml:212
 #: configs/spectrum-shell/MediaState.qml:29
 msgctxt "Spectrum"
 msgid "Unknown track"
@@ -6626,14 +6651,14 @@ msgctxt "Spectrum"
 msgid "Unpair"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Unplanted"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1650
-#: configs/spectrum-shell/UtilityPanel.qml:2463
-#: configs/spectrum-shell/UtilityPanel.qml:2501
+#: configs/spectrum-shell/UtilityPanel.qml:1656
+#: configs/spectrum-shell/UtilityPanel.qml:2474
+#: configs/spectrum-shell/UtilityPanel.qml:2512
 msgctxt "Spectrum"
 msgid "Untitled"
 msgstr ""
@@ -6653,12 +6678,12 @@ msgctxt "Spectrum"
 msgid "Up"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2144
+#: configs/spectrum-shell/UtilityPanel.qml:2155
 msgctxt "Spectrum"
 msgid "Upcoming tasks"
 msgstr ""
 
-#: configs/spectrum-shell/UpdatePanel.qml:194
+#: configs/spectrum-shell/UpdatePanel.qml:208
 msgctxt "Spectrum"
 msgid "Update Arch + SpectrumOS packages"
 msgstr ""
@@ -6671,7 +6696,7 @@ msgid ""
 "apps."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1560
+#: configs/spectrum-shell/UtilityPanel.qml:1565
 msgctxt "Spectrum"
 msgid "Update Questline to enable editing and tree care here."
 msgstr ""
@@ -6681,7 +6706,7 @@ msgctxt "Spectrum"
 msgid "Update UKVM for text sharing"
 msgstr ""
 
-#: configs/spectrum-shell/UpdatePanel.qml:194
+#: configs/spectrum-shell/UpdatePanel.qml:208
 msgctxt "Spectrum"
 msgid "Update everything"
 msgstr ""
@@ -6699,7 +6724,7 @@ msgctxt "Spectrum"
 msgid "Updated successfully."
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1217
+#: configs/spectrum-shell/UtilityPanel.qml:1222
 #: configs/spectrum-shell/WidgetIcons.qml:28
 msgctxt "Spectrum"
 msgid "Updates"
@@ -6797,7 +6822,7 @@ msgctxt "Spectrum"
 msgid "Virtual machine"
 msgstr ""
 
-#: configs/spectrum-shell/LevelIndicator.qml:126
+#: configs/spectrum-shell/LevelIndicator.qml:281
 msgctxt "Spectrum"
 msgid "Volume"
 msgstr ""
@@ -6837,7 +6862,7 @@ msgctxt "Spectrum"
 msgid "Wait before starting"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:790
+#: configs/spectrum-shell/UtilityPanel.qml:795
 msgctxt "Spectrum"
 msgid "Wait for the current operation to finish."
 msgstr ""
@@ -6863,13 +6888,13 @@ msgctxt "Spectrum"
 msgid "Wallpapers"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2271
+#: configs/spectrum-shell/UtilityPanel.qml:2282
 msgctxt "Spectrum"
 msgid "Water tree"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2251
-#: configs/spectrum-shell/UtilityPanel.qml:2271
+#: configs/spectrum-shell/UtilityPanel.qml:2262
+#: configs/spectrum-shell/UtilityPanel.qml:2282
 msgctxt "Spectrum"
 msgid "Watered today"
 msgstr ""
@@ -6983,7 +7008,7 @@ msgctxt "Spectrum"
 msgid "Workspaces on this display"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1820
+#: configs/spectrum-shell/UtilityPanel.qml:1827
 msgctxt "Spectrum"
 msgid "XP per completion"
 msgstr ""
@@ -7008,7 +7033,7 @@ msgctxt "Spectrum"
 msgid "Yes"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2223
+#: configs/spectrum-shell/UtilityPanel.qml:2234
 msgctxt "Spectrum"
 msgid "Young Entling"
 msgstr ""
@@ -7039,7 +7064,7 @@ msgctxt "Spectrum"
 msgid "Zen Browser"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2040
+#: configs/spectrum-shell/shell.qml:2041
 #: configs/spectrum-shell/VerticalBar.qml:152
 msgctxt "Spectrum"
 msgid "active"
@@ -7050,12 +7075,12 @@ msgctxt "Spectrum"
 msgid "allowed"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:2535
+#: configs/spectrum-shell/UtilityPanel.qml:2546
 msgctxt "Spectrum"
 msgid "anytime"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "chronicle"
 msgstr ""
@@ -7075,7 +7100,7 @@ msgctxt "Spectrum"
 msgid "denied"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2040
+#: configs/spectrum-shell/shell.qml:2041
 #: configs/spectrum-shell/VerticalBar.qml:152
 msgctxt "Spectrum"
 msgid "empty"
@@ -7106,7 +7131,7 @@ msgctxt "Spectrum"
 msgid "not initialized"
 msgstr ""
 
-#: configs/spectrum-shell/shell.qml:2040
+#: configs/spectrum-shell/shell.qml:2041
 #: configs/spectrum-shell/VerticalBar.qml:152
 msgctxt "Spectrum"
 msgid "occupied"
@@ -7122,12 +7147,12 @@ msgctxt "Spectrum"
 msgid "profile"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "scroll"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "sidequest"
 msgstr ""
@@ -7142,8 +7167,8 @@ msgctxt "Spectrum"
 msgid "stop playback"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1713
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1719
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "task"
 msgstr ""
@@ -7154,7 +7179,7 @@ msgctxt "Spectrum"
 msgid "this peer"
 msgstr ""
 
-#: configs/spectrum-shell/UtilityPanel.qml:1759
+#: configs/spectrum-shell/UtilityPanel.qml:1765
 msgctxt "Spectrum"
 msgid "treasury entry"
 msgstr ""

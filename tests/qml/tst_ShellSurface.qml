@@ -7,6 +7,7 @@ Rectangle {
     width: 400
     height: 300
     color: "black"
+    property bool showRightFrame: false
     Shell.ShellSurface {
         id: panel
         x: 80
@@ -16,11 +17,20 @@ Rectangle {
         radius: 24
         color: "white"
     }
+    Rectangle {
+        x: panel.x + panel.width - 8
+        width: 8
+        height: scene.height
+        color: "black"
+        visible: scene.showRightFrame
+    }
     TestCase {
         name: "ShellSurface"
         when: windowShown
         function init() {
+            scene.showRightFrame = false;
             panel.color = "white";
+            panel.rightFrameThickness = 8;
             panel.leftAttachmentWidth = 0;
             panel.topAttachmentHeight = 0;
         }
@@ -42,7 +52,8 @@ Rectangle {
                     compare(image.pixel(x, y), Qt.rgba(1, 1, 1, 1));
             }
             if (!panel.attachTop) {
-                compare(image.pixel(36, 48), Qt.rgba(1, 1, 1, 1));
+                compare(image.pixel(31, 48), Qt.rgba(1, 1, 1, 1));
+                compare(image.pixel(43, 48), Qt.rgba(0, 0, 0, 1));
                 compare(image.pixel(68, 48), Qt.rgba(0, 0, 0, 1));
             }
             compare(panel.width, 200);
@@ -62,8 +73,8 @@ Rectangle {
             const image = grabImage(scene);
             const samples = panel.attachTop ? [[180, 60], [68, 60], [292, 60]]
                 : panel.attachBottom ? [[180, 200], [68, 200], [292, 200]]
-                : panel.attachLeft ? [[80, 130], [80, 48], [80, 212]]
-                : [[280, 130], [280, 48], [280, 212]];
+                : panel.attachLeft ? [[80, 130], [80, 56], [80, 204]]
+                : [[280, 130], [273, 56], [273, 204]];
             for (const point of samples)
                 compare(image.pixel(point[0], point[1]), Qt.rgba(1, 1, 1, 1));
             compare(panel.width, 200);
@@ -104,6 +115,71 @@ Rectangle {
                     verify(Math.abs(image.red(point[0], point[1]) - panel.color.r * 255) < 20);
                     verify(Math.abs(image.green(point[0], point[1]) - panel.color.g * 255) < 20);
                     verify(Math.abs(image.blue(point[0], point[1]) - panel.color.b * 255) < 20);
+                }
+            }
+        }
+        function test_attachment_tips_have_no_flat_stem_data() {
+            return ["top", "bottom", "left", "right"].map(edge => ({tag: edge, edge: edge}));
+        }
+        function test_attachment_tips_have_no_flat_stem(data) {
+            panel.rightFrameThickness = 0;
+            panel.attachTop = data.edge === "top";
+            panel.attachBottom = data.edge === "bottom";
+            panel.attachLeft = data.edge === "left";
+            panel.attachRight = data.edge === "right";
+            panel.x = panel.attachLeft ? 0 : 80;
+            panel.y = panel.attachTop ? 0 : panel.attachBottom ? 160 : 60;
+            wait(60);
+            const image = grabImage(scene);
+            let opaquePixels = 0;
+            for (let i = 0; i < panel.joinRadius; i++) {
+                const x = panel.attachLeft ? i : panel.attachRight ? 280 - panel.joinRadius + i : 80 - panel.joinRadius;
+                const y = panel.attachTop ? i : panel.attachBottom ? 300 - panel.joinRadius + i : 200 + panel.joinRadius - 1;
+                if (image.red(x, y) > 40) opaquePixels++;
+            }
+            verify(opaquePixels <= 1, data.edge + " tip has " + opaquePixels + " opaque pixels");
+        }
+        function test_right_curves_meet_the_visible_frame_data() {
+            return [{tag:"top-right-widget",top:true},{tag:"notification",top:false}];
+        }
+        function test_right_curves_meet_the_visible_frame(data) {
+            panel.attachTop = data.top;
+            panel.attachRight = true;
+            panel.attachBottom = panel.attachLeft = false;
+            panel.x = 80;
+            panel.y = 60;
+            scene.showRightFrame = true;
+            wait(60);
+            const image = grabImage(scene);
+            compare(image.pixel(271, 216), Qt.rgba(1, 1, 1, 1), "The lower curve must reach the frame before being clipped");
+            if (!data.top)
+                compare(image.pixel(271, 43), Qt.rgba(1, 1, 1, 1), "The notification upper curve must reach the frame too");
+            compare(image.pixel(270, 225), Qt.rgba(0, 0, 0, 1), "The pointed end must not become a rectangular stem");
+        }
+        function test_attached_corners_share_the_body_circle_data() {
+            return ["top", "bottom", "left", "right"].map(edge => ({tag: edge, edge: edge}));
+        }
+        function test_attached_corners_share_the_body_circle(data) {
+            panel.attachTop = data.edge === "top";
+            panel.attachBottom = data.edge === "bottom";
+            panel.attachLeft = data.edge === "left";
+            panel.attachRight = data.edge === "right";
+            panel.x = 80;
+            panel.y = 60;
+            wait(60);
+            const corners = Array.from(panel.children).filter(item => item.tapered === true && item.visible);
+            compare(corners.length, 2);
+            for (const corner of corners) {
+                compare(corner.curveRadius, panel.radius);
+                compare(corner.width - corner.frameThickness, panel.radius);
+                compare(corner.height - corner.frameThickness, panel.radius);
+                const image = grabImage(scene);
+                for (const sample of [{fraction:0.2, opaque:true}, {fraction:0.5, opaque:false}]) {
+                    const offset = corner.frameThickness + Math.floor(panel.radius * sample.fraction);
+                    const x = corner.mirrorX ? corner.width - 1 - offset : offset;
+                    const y = corner.mirrorY ? corner.height - 1 - offset : offset;
+                    const point = corner.mapToItem(scene, x, y);
+                    compare(image.red(point.x, point.y) > 128, sample.opaque, "Attached corners must follow a circular arc");
                 }
             }
         }

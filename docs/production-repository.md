@@ -1,5 +1,17 @@
 # Production repository ceremony
 
+## October 27 Desktop 1.1.0 package update
+
+Stable snapshot `20261028T0035550000-84da1c1b057c6f3f` publishes Desktop **1.1.0-1** with the corrected island and widget curves, restored notification placement, compact Detailed bar controls and More menu, and startup restoration of Auto/Dark/Light selection. The other eight package artifacts are unchanged. Immutable source revision: `2fdeff3a7ac14a39`; archive SHA-256: `1c81a59793fa8e1921ba8091f5c60217091160f4fc0c8bcc8759a0f817db47fb`. The source archive retains the system release version 1.0.0; Desktop has its own package version.
+
+Desktop was rebuilt in an Arch Devtools clean chroot with `--nocheck`, production-signed, and published directly to Stable. No test suites ran for this deployment, as requested by the owner. Remote checksums and HTTPS package, database and signed manifest delivery were verified. Testing and the website remain unchanged; no ISO was built or published. The changes were already deployed locally. Evidence: `artifacts/package-release-20261027-desktop-1.1.0`. Existing installations update through Updates or `sudo pacman -Syu`.
+
+## October 27 widget update
+
+Stable snapshot `20261027T2250170000-c2ea4ab7a168b833` publishes Desktop **1.0.0-28** with pointed widget attachment curves, Questline campaign navigation and Markdown viewing, the combined song and volume display, and compact installed/update package versions. The other eight package artifacts are unchanged. Source revision: `f94dee510fe5a8c7`; archive SHA-256: `aa5989778c4c2e3c31f5df85fa13de4578399da4a88139ce912a405bb08c36e1`.
+
+Desktop was rebuilt in an Arch Devtools clean chroot with `--nocheck`, then production-signed and published directly to Stable. Test suites were skipped at the owner's request. Server artifact checksums and HTTPS package, database and signed manifest delivery were verified. Testing and the website are unchanged; no ISO was built or published. The previously deployed local widget files match the source and SpectrumShell remains active. Evidence: `artifacts/package-release-20261027-widgets`. Existing installations update through Updates or `sudo pacman -Syu`.
+
 ## October 25 package-only Stable update
 
 Stable snapshot `20261025T2311430000-106e5134679bc151` publishes Base **1.0.0-5**, Hyprland **1.0.0-12** and Desktop **1.0.0-26**. It includes the recovery safeguards, Default Apps widget, configurable file-search locations and updated widget shortcuts. Other package versions are unchanged. Matching source revision: `364d2aae1bf13dfa`; archive SHA-256: `ab31c3355927f50efc39301a484ccd4c137ddabaede9254a2551dcddf7195775`.

@@ -7,9 +7,14 @@ ColumnLayout {
     required property var theme
     required property var window
     property var trayItems: []
+    property bool detailed: false
+    WidgetActions { id: catalog }
     signal chosen(string action)
     spacing: 14
-    readonly property var actions: [
+    readonly property var actions: detailed
+        ? catalog.widgets.filter(item => !["weather", "time", "keep-awake", "audio", "battery"].includes(item.action))
+        : standardActions
+    readonly property var standardActions: [
         {icon:"󰏗", label:qsTranslate("Spectrum", "App Store"), action:"app-store"},
         {icon:"★", label:qsTranslate("Spectrum", "Favorites"), action:"favorites"},
         {icon:"󰒡", label:"SpectrumDrop", action:"spectrumdrop"},

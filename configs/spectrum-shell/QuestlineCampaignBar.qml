@@ -37,20 +37,7 @@ Item {
         }
         Controls.ScrollBar.horizontal:Controls.ScrollBar {
             objectName:"questline-campaign-scroll"
-            implicitHeight:2
-            padding:0
-            policy:list.contentWidth>list.width?Controls.ScrollBar.AlwaysOn:Controls.ScrollBar.AlwaysOff
-            contentItem:Rectangle {
-                implicitWidth:12
-                implicitHeight:2
-                radius:1
-                color:bar.theme.colors.accent
-            }
-            background:Rectangle {
-                implicitHeight:2
-                radius:1
-                color:bar.theme.colors.surface_alt
-            }
+            policy:Controls.ScrollBar.AlwaysOff
         }
         WheelHandler {
             onWheel:event=> {

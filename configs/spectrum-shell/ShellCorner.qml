@@ -6,6 +6,7 @@ Canvas {
     ShellGeometry { id: geometry }
     property int frameThickness: geometry.frameThickness
     property int curveRadius: geometry.curveRadius
+    property bool tapered: false
     property bool mirrorX: false
     property bool mirrorY: false
 
@@ -15,6 +16,7 @@ Canvas {
     onSurfaceColorChanged: requestPaint()
     onFrameThicknessChanged: requestPaint()
     onCurveRadiusChanged: requestPaint()
+    onTaperedChanged: requestPaint()
     onMirrorXChanged: requestPaint()
     onMirrorYChanged: requestPaint()
 
@@ -32,7 +34,12 @@ Canvas {
         painter.moveTo(0, 0);
         painter.lineTo(width, 0);
         painter.lineTo(width, frameThickness);
-        painter.arc(width, height, curveRadius, -Math.PI / 2, -Math.PI, true);
+        if (tapered) {
+            // Mantiene el radio circular; el tramo del marco queda detrás de su borde.
+            const tangent = 0.4477152502;
+            painter.bezierCurveTo(frameThickness + curveRadius * tangent, frameThickness,
+                frameThickness, frameThickness + curveRadius * tangent, frameThickness, height);
+        } else painter.arc(width, height, curveRadius, -Math.PI / 2, -Math.PI, true);
         painter.lineTo(0, height);
         painter.closePath();
         painter.fill();

@@ -2,6 +2,8 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 import importlib.util
 import os
+import json
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -264,6 +266,13 @@ class ThemeAdapterTests(unittest.TestCase):
         launch.assert_called_once_with(
             ["/usr/lib/spectrumos/theme-menu", "--refresh"]
         )
+
+    def test_all_variants_survive_a_new_backend_process(self):
+        for variant in ("auto", "dark", "light"):
+            with self.subTest(variant=variant):
+                subprocess.run([str(SCRIPT), "variant", variant], check=True, capture_output=True)
+                state = subprocess.run([str(SCRIPT), "--json"], check=True, capture_output=True, text=True)
+                self.assertEqual(json.loads(state.stdout)["palette"]["variant"], variant)
 
 
 if __name__ == "__main__":

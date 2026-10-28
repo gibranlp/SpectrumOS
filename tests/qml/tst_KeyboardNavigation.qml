@@ -15,7 +15,7 @@ Item {
             height: 100
             contentHeight: 500
             Column {
-                visible: !directionGrid.visible
+                visible: !directionGrid.visible && !editorViewport.visible
                 width: 280
                 Shell.ShellButton { id: first; label: "First"; onClicked: tests.activations++ }
                 Shell.ShellButton { label: "Disabled"; enabled: false; onClicked: tests.activations += 100 }
@@ -37,12 +37,46 @@ Item {
             }
         }
     }
+    Flickable {
+        id: editorViewport
+        parent: surface
+        x: 25; y: 120
+        width: 250; height: 80
+        contentHeight: editor.height
+        visible: false
+        clip: true
+        TextEdit {
+            id: editor
+            width: 240
+            height: 500
+            color: "white"
+            text: "Editor content"
+        }
+    }
     TestCase {
         id: tests
         name: "KeyboardNavigation"
         when: windowShown
         property int activations: 0
-        function init() { directionGrid.visible = false; activations = 0; scroll.contentY = 0; surface.forceActiveFocus(); }
+        function init() { editorViewport.visible = false; directionGrid.visible = false; activations = 0; scroll.contentY = 0; surface.forceActiveFocus(); }
+        function test_textFocusOutlineFollowsScrolledAndMovedEditor() {
+            editorViewport.visible = true;
+            editor.forceActiveFocus();
+            const outline = findChild(surface.keyboardController, "keyboard-input-focus-outline");
+            verify(outline !== null);
+            compare(outline.parent, editor);
+            compare(outline.color.a, 0);
+            verify(outline.visible);
+            editorViewport.contentY = 120;
+            editorViewport.y = 140;
+            wait(20);
+            compare(outline.mapToItem(surface, 0, 0).y, editor.mapToItem(surface, 0, 0).y);
+            compare(outline.parent.parent.parent, editorViewport);
+            verify(editorViewport.clip);
+            surface.forceActiveFocus();
+            verify(!outline.visible);
+            editorViewport.y = 120;
+        }
         function test_arrowsFollowRowsAndColumnsAndScroll() {
             directionGrid.visible = true;
             keyClick(Qt.Key_Down);

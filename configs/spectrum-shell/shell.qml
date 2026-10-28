@@ -60,6 +60,7 @@ ShellRoot {
 
     PwObjectTracker { objects: shell.audioNodes }
     readonly property var media: mediaState.state
+    readonly property var mediaPlayer: mediaState.player
     property bool trackIndicatorReady: false
     property bool trackIndicatorPrimed: false
     property string lastIndicatorTrack: ""
@@ -107,6 +108,7 @@ ShellRoot {
     function selectMediaPlayer(id): void { mediaState.selectPlayer(id); }
     function dismissMediaChoice(): void { mediaState.pendingAction = ""; }
     property var themeState: ({ wallpapers: [], palette: {}, gowall: {} })
+    readonly property string themeVariant: themePreferences.variant
     property var displays: ({ monitors: [] })
     property var workspaceAssignments: ({ workspace_monitors: {} })
     property var weather: ({ temperature: "—", icon: "", location: "" })
@@ -614,6 +616,25 @@ ShellRoot {
                     console.warn("SpectrumShell audio devices:", error);
                 }
             }
+        }
+    }
+
+    FileView {
+        id: themePreferences
+        property string variant: "dark"
+        path: shell.stateHome + "/spectrumos/theme/preferences"
+        preload: true
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            let saved = "dark";
+            for (const line of text().split("\n")) {
+                const fields = line.split("=");
+                if (fields[0] === "variant" && ["auto", "dark", "light"].includes(fields[1]))
+                    saved = fields[1];
+            }
+            variant = saved;
         }
     }
 
@@ -1160,6 +1181,7 @@ ShellRoot {
         function toggleFavorites(): void { shell.openOnFocused("toggleFavorites"); }
         function favoritesStatus(): string { return JSON.stringify({ready:sharedFavorites.ready,busy:sharedFavorites.busy,favorites:sharedFavorites.favorites.length,categories:sharedFavorites.categories.length,defaultBrowser:sharedFavorites.defaultBrowser,panels:bars.instances.map(bar=>({monitor:bar.modelData.name,expanded:bar.favoritesOpen}))}); }
         function toggleControlCenter(): void { shell.openOnFocused("toggleControlCenter"); }
+        function appearanceState(): string { return JSON.stringify({variant:shell.themeVariant}); }
         function openControlPage(page: string): void {
             const target = shell.focusedBar();
             if (target) target.openControlPage(page);
@@ -1167,6 +1189,11 @@ ShellRoot {
 
         function toggleWallpapers(): void { shell.openOnFocused("toggleWallpapers"); }
         function toggleNotifications(): void { shell.openOnFocused("toggleNotifications"); }
+        function notificationState(): string {
+            return JSON.stringify({queued:toastModel.count,tracked:notificationServer.trackedNotifications.values.length,
+                doNotDisturb:shell.doNotDisturb,gaming:shell.gamingActive,
+                monitors:bars.instances.map(bar=>bar.notificationState())});
+        }
         function toggleSession(): void { shell.openOnFocused("toggleSession"); }
         function toggleDashboard(): void { shell.openOnFocused("toggleDashboard"); }
         function toggleScreenshot(): void { shell.openOnFocused("toggleScreenshot"); }
@@ -1298,6 +1325,11 @@ ShellRoot {
             readonly property bool favoritesOpen: favoritesPanel.expanded
             readonly property bool appStoreOpen: appStorePanel.expanded
             readonly property bool controlCenterOpen: controlCenter.expanded
+            function notificationState(): var {
+                return {name:modelData.name,monitorAvailable:!!monitor,monitorFocused:monitor ? monitor.focused : null,
+                    popupVisible:notificationToast.visible,widgetOpen:barWidget.expanded,
+                    width:notificationToast.width,height:notificationToast.height,stackHeight:toastStack.height};
+            }
             ShellFrame {
                 id: shellFrame
                 barHeight: bar.implicitHeight
@@ -1883,7 +1915,7 @@ ShellRoot {
                 }
                 onCloseRequested: wallpaperBrowser.expanded = false
                 onApplyWallpaper: token => {
-                    shell.runAction([shell.backend("theme-adapter"), "apply", token, shell.themeState.palette.mode || "spectrum", shell.themeState.palette.variant || "dark"]);
+                    shell.runAction([shell.backend("theme-adapter"), "apply", token, shell.themeState.palette.mode || "spectrum", shell.themeVariant]);
                     wallpaperBrowser.expanded = false;
                 }
                 onRandomWallpaper: {
@@ -1922,7 +1954,7 @@ ShellRoot {
                 focusable: false
                 implicitWidth: Math.min(Math.max(260, shell.fontSize * 20) + 8, bar.modelData.width - 20)
                 mask: Region { item: toastStack }
-                visible: shell.toastNotifications.count > 0 && bar.monitor && bar.monitor.focused && !shell.doNotDisturb && !shell.gamingActive && !barWidget.expanded
+                visible: shell.toastNotifications.count > 0 && shell.focusedBar() === bar && !shell.doNotDisturb && !shell.gamingActive && !barWidget.expanded
                 color: "transparent"
                 Column {
                     id: toastStack
@@ -2095,18 +2127,7 @@ ShellRoot {
                             onOpenRequested: bar.openFocusTimer()
                         }
 
-                        WidgetIcons {
-                            visible: bar.barProfile === "detailed"
-                            theme: shell
-                            Layout.preferredWidth: Math.min(naturalWidth, Math.max(140, topRow.width
-                                - launcherButton.implicitWidth - topIgorButton.implicitWidth - workspaceButtons.width
-                                - trayGroup.width - topFocusCountdown.width - 340 - 8 * topRow.spacing))
-                            Layout.minimumWidth: Layout.preferredWidth
-                            Layout.maximumWidth: Layout.preferredWidth
-                            onChosen: action => bar.openWidgetIcon(action)
-                        }
                         RowLayout {
-                            visible: bar.barProfile !== "detailed"
                             spacing: 8
                             Text {
                                 text: shell.performance.available ? (shell.performance.mode === "performance" ? "󰓅" : shell.performance.mode === "power-saver" ? "󰌪" : "") : ""
@@ -2126,7 +2147,7 @@ ShellRoot {
 
                             Text {
                                 visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
-                                text: "󰥔"
+                                text: bar.barProfile === "detailed" ? shell.currentDateTime.slice(-5) : "󰥔"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
                                 KeyboardAction { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onActivated: bar.toggleBarWidget("time") }
@@ -2141,7 +2162,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: shell.network.connection_type === "ethernet" ? "󰈀" : shell.network.connection_type === "wifi" ? "󰖩" : "󰖪"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
@@ -2149,7 +2170,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: "󰂯"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
@@ -2157,7 +2178,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: "󰍹"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
@@ -2165,7 +2186,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: "󰍽"
                                 color: barWidget.expanded && barWidget.page === "mouse" ? shell.colors.accent : shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
@@ -2173,7 +2194,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "standard" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                visible: !["standard", "detailed"].includes(bar.barProfile) && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: qsTranslate("Spectrum", "Aa")
                                 color: barWidget.expanded && barWidget.page === "typography" ? shell.colors.accent : shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize; bold: true }
@@ -2190,7 +2211,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "standard" && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
+                                visible: !["standard", "detailed"].includes(bar.barProfile) && UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: "󰁹 " + Math.round(UPower.displayDevice.percentage * 100) + "%"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize - 1 }
@@ -2198,7 +2219,7 @@ ShellRoot {
                             }
 
                             Text {
-                                visible: bar.barProfile !== "minimal" || minimalStatusHover.hovered
+                                visible: bar.barProfile !== "detailed" && (bar.barProfile !== "minimal" || minimalStatusHover.hovered)
                                 text: "󰂚"
                                 color: shell.colors.foreground
                                 font { family: shell.fontFamily; pixelSize: shell.fontSize + 2 }
@@ -2206,7 +2227,7 @@ ShellRoot {
                             }
 
                                 Text {
-                                    visible: ["standard", "multimedia"].includes(bar.barProfile)
+                                    visible: ["standard", "detailed", "multimedia"].includes(bar.barProfile)
                                     text: "󰇘"
                                     color: shell.colors.foreground
                                     font { family: shell.fontFamily; pixelSize: shell.fontSize + 3 }
@@ -2214,7 +2235,7 @@ ShellRoot {
                                     KeyboardAction { anchors.fill: parent; onActivated: bar.toggleBarWidget("extras") }
                                 }
                                 Text {
-                                    visible: bar.barProfile !== "standard" && bar.barProfile !== "minimal"
+                                    visible: !["standard", "detailed", "minimal"].includes(bar.barProfile)
                                     text: "󰒡"
                                     color: shell.colors.foreground
                                     font { family: shell.fontFamily; pixelSize: shell.fontSize + 1 }
@@ -2235,7 +2256,7 @@ ShellRoot {
                         id: trayGroup
                         spacing: 8
                         Repeater {
-                            model: bar.barProfile === "standard" ? [] : SystemTray.items
+                            model: ["standard", "detailed"].includes(bar.barProfile) ? [] : SystemTray.items
                             Item {
                                 required property var modelData
                                 width: 22
@@ -2386,17 +2407,8 @@ ShellRoot {
                 targetScreen: bar.modelData
                 theme: shell
                 barPosition: shell.barPosition
-                onExtraRequested: action => {
-                    if (action === "spectrumdrop") bar.toggleSpectrumDrop();
-                    else if (action === "favorites") bar.toggleFavorites();
-                    else if (action === "app-store") bar.toggleAppStore();
-                    else if (action === "control") bar.toggleControlCenter();
-                    else if (action === "breaks") bar.toggleBreakReminders();
-                    else if (action === "services") bar.toggleLocalServices();
-                    else if (action === "default-apps") bar.toggleDefaultApps();
-                    else if (action === "session") bar.toggleSession();
-                    else bar.toggleBarWidget(action);
-                }
+                barProfile: bar.barProfile
+                onExtraRequested: action => bar.openWidgetIcon(action)
             }
         }
     }
