@@ -12,6 +12,28 @@ ADAPTER = ROOT / "scripts" / "weather-adapter"
 
 
 class WeatherAdapterTests(unittest.TestCase):
+    def test_inline_city_search_and_save(self):
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = self.load_adapter(directory)
+            city = {'id': 123, 'name': 'Test City', 'admin1': 'Region', 'country': 'Country', 'latitude': 12.5, 'longitude': -45.5}
+            with mock.patch.dict(adapter['search_locations'].__globals__, request_json=mock.Mock(return_value={'results': [city]})):
+                self.assertEqual(adapter['search_locations']('Test')['results'], [city])
+            adapter['add_location'](city)
+            state = adapter['load_state']()
+            saved = next(row for row in state['locations'] if row['token'] == state['active'])
+            self.assertEqual(saved['name'], 'Test City')
+            self.assertEqual(saved['latitude'], 12.5)
+            with self.assertRaises(ValueError):
+                adapter['add_location']({**city, 'latitude': float('nan')})
+
+    def test_inline_city_search_failure_is_actionable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = self.load_adapter(directory)
+            with mock.patch.dict(adapter['search_locations'].__globals__, request_json=mock.Mock(side_effect=OSError)):
+                result = adapter['search_locations']('Test')
+            self.assertFalse(result['ok'])
+            self.assertIn('connection', result['error'])
+
     def test_lockscreen_weather_uses_only_matching_recent_cache_and_escapes_markup(self):
         with tempfile.TemporaryDirectory() as directory:
             adapter = self.load_adapter(directory)

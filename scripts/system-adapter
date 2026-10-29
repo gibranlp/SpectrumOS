@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import platform
 import pwd
+import re
 import shutil
 import subprocess
 import sys
@@ -98,6 +99,60 @@ def gpu_state() -> str:
     return ""
 
 
+def fan_state(root: Path = Path("/sys/class/hwmon")) -> list[dict]:
+    fans = []
+    for device in sorted(root.glob("hwmon*")):
+        for sensor in sorted(device.glob("fan*_input")):
+            try:
+                rpm = int(sensor.read_text().strip())
+                if rpm < 0:
+                    continue
+            except (OSError, ValueError):
+                continue
+            try:
+                label = sensor.with_name(sensor.name.replace("_input", "_label")).read_text().strip()
+            except OSError:
+                label = sensor.stem.replace("_input", "")
+            try:
+                driver = (device / "name").read_text().strip()
+            except OSError:
+                driver = device.name
+            fans.append({"name": driver, "label": label, "rpm": rpm})
+    return fans
+
+
+def storage_state(root_usage, mountinfo: Path = Path("/proc/self/mountinfo")) -> list[dict]:
+    disks = [{"mount": "/", "used": root_usage.used, "total": root_usage.total}]
+    try:
+        lines = mountinfo.read_text().splitlines()
+    except OSError:
+        return disks
+    mounts = []
+    for line in lines:
+        fields = line.split()
+        try:
+            separator = fields.index("-")
+            mount = re.sub(r"\\([0-7]{3})", lambda match: chr(int(match[1], 8)), fields[4])
+            mounts.append((fields[2], mount, fields[separator + 2]))
+        except (ValueError, IndexError):
+            continue
+    seen = {device for device, mount, _ in mounts if mount == "/"}
+    for device, mount, source in mounts:
+        if device in seen or not source.startswith("/dev/") or source.startswith(("/dev/loop", "/dev/ram")):
+            continue
+        if mount == "/" or mount.startswith(("/boot", "/efi")):
+            continue
+        try:
+            usage = shutil.disk_usage(mount)
+        except OSError:
+            continue
+        if usage.total <= 0:
+            continue
+        seen.add(device)
+        disks.append({"mount": mount, "used": usage.used, "total": usage.total})
+    return disks
+
+
 def display_state() -> tuple[str, str, str]:
     try:
         result = subprocess.run(("hyprctl", "-j", "monitors"), check=False, capture_output=True, text=True, timeout=2)
@@ -147,6 +202,8 @@ def telemetry() -> dict:
     used = max(0, total - available)
     memory_percent = round(used / total * 100) if total else 0
     disk = shutil.disk_usage("/")
+    disks = storage_state(disk)
+    fans = fan_state()
     disk_percent = round(disk.used / disk.total * 100) if disk.total else 0
     load = os.getloadavg()[0]
     cores = os.cpu_count() or 1
@@ -157,6 +214,8 @@ def telemetry() -> dict:
         "load": f"{load_percent}%", "load_detail": f"{load:.2f} across {cores} threads",
         "memory": f"{memory_percent}%", "memory_detail": f"{used / 1048576:.1f} of {total / 1048576:.1f} GiB",
         "disk": f"{disk_percent}%", "disk_detail": f"{disk.free / 1073741824:.0f} GiB available",
+        "disks": disks, "disk_usage": "   ".join(f"󰋊 {item['used'] / 1e9:.0f}GB/{item['total'] / 1e9:.0f}GB" for item in disks),
+        "fans": fans, "fan": "󰈐 " + "/".join(str(item["rpm"]) for item in fans) + " RPM" if fans else "",
         "uptime": uptime, "uptime_long": uptime_long, "temperature": temperature(), "gpu": gpu_state(),
     }
 

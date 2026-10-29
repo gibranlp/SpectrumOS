@@ -186,7 +186,7 @@ class PerformanceModeTests(unittest.TestCase):
         self.assertEqual(status["class"], "unavailable")
 
     def test_game_start_remembers_the_prior_mode_only_on_first_arrival(self):
-        modes = iter(["balanced"])
+        modes = iter(["balanced", "performance"])
         set_calls = []
         notified = []
         with mock.patch.object(self.module, "backend", return_value="tuned"), \
@@ -194,7 +194,7 @@ class PerformanceModeTests(unittest.TestCase):
              mock.patch.object(self.module, "set_mode", side_effect=lambda m, b: set_calls.append(m) or True), \
              mock.patch.object(self.module, "notify", side_effect=notified.append):
             self.module.game_start()
-            self.module.game_start()  # a second, overlapping game
+            self.module.game_start("session")
         self.assertEqual(set_calls, ["performance"])  # only switched once
         self.assertEqual(notified, ["performance"])  # activation announced exactly once
         self.assertEqual(self.module.PRE_GAME_FILE.read_text(encoding="utf-8"), "balanced")
@@ -220,11 +220,13 @@ class PerformanceModeTests(unittest.TestCase):
              mock.patch.object(self.module, "current_mode", return_value="performance"), \
              mock.patch.object(self.module, "set_mode", side_effect=lambda m, b: set_calls.append(m) or True), \
              mock.patch.object(self.module, "notify", side_effect=notified.append):
+            self.module.STATE_DIR.mkdir(parents=True, exist_ok=True)
+            (self.module.STATE_DIR / "game-requests.json").write_text('["gamemode", "session"]')
             self.module._write_count(2)
             self.module.PRE_GAME_FILE.parent.mkdir(parents=True, exist_ok=True)
             self.module.PRE_GAME_FILE.write_text("balanced", encoding="utf-8")
 
-            self.module.game_end()
+            self.module.game_end("session")
             self.assertEqual(set_calls, [])  # one game still running
             self.assertEqual(notified, [])
             self.module.game_end()
@@ -258,6 +260,47 @@ class PerformanceModeTests(unittest.TestCase):
             self.module._write_count(1)
             self.module.game_end()
         self.assertEqual(set_calls, ["balanced"])
+
+    def test_duplicate_hook_is_idempotent(self):
+        with mock.patch.object(self.module, "backend", return_value="none"):
+            self.module.game_start()
+            self.module.game_start()
+            self.assertEqual(self.module._read_count(), 1)
+            self.module.game_end()
+            self.module.game_end()
+            self.assertEqual(self.module._read_count(), 0)
+
+    def test_stale_legacy_count_restores_saved_mode(self):
+        self.module._write_count(5)
+        self.module.PRE_GAME_FILE.write_text("power-saver")
+        with mock.patch.object(self.module, "backend", return_value="tuned"), \
+             mock.patch.object(self.module, "current_mode", return_value="performance"), \
+             mock.patch.object(self.module, "set_mode", return_value=True) as change, \
+             mock.patch.object(self.module, "notify"):
+            self.assertEqual(self.module.update_game_requests(set()), 0)
+            change.assert_called_once_with("power-saver", "tuned")
+            self.assertEqual(self.module._read_count(), 0)
+
+    def test_failed_power_change_retains_request_for_retry(self):
+        self.module._write_count(1)
+        self.module.PRE_GAME_FILE.write_text("balanced")
+        with mock.patch.object(self.module, "backend", return_value="tuned"), \
+             mock.patch.object(self.module, "current_mode", return_value="performance"), \
+             mock.patch.object(self.module, "set_mode", return_value=False):
+            self.assertEqual(self.module.game_end(), 1)
+            self.assertEqual(self.module._read_count(), 1)
+
+    def test_second_owner_preserves_manual_power_selection(self):
+        self.module.STATE_DIR.mkdir(parents=True, exist_ok=True)
+        (self.module.STATE_DIR / "game-requests.json").write_text('["gamemode"]')
+        self.module._write_count(1)
+        self.module.PRE_GAME_FILE.write_text("power-saver")
+        with mock.patch.object(self.module, "backend", return_value="tuned"), \
+             mock.patch.object(self.module, "current_mode", return_value="balanced"), \
+             mock.patch.object(self.module, "set_mode") as change:
+            self.assertEqual(self.module.game_start("session"), 0)
+            change.assert_not_called()
+            self.assertEqual(self.module.PRE_GAME_FILE.read_text(), "power-saver")
 
 
 if __name__ == "__main__":

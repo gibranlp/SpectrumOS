@@ -19,6 +19,7 @@ import threading
 import time
 
 from .common import BUFFER, CHUNK, ID_RE, MAX_JSON, TOKEN_RE, TransferError, access_code, atomic_json, manifest, proof
+from .trust import TrustStore, paired_proof
 
 
 class LimitedThreads:
@@ -101,6 +102,10 @@ class Node:
         self.code = ''
         self.window = ''
         self.sessions = {}
+        self.session_peers = {}
+        self.pair_requests = {}
+        self.challenges = {}
+        self.trust = TrustStore(Path(identity['certificate']).parent)
         self.jobs = {}
         self.attempts = {}
         self.server = None
@@ -130,6 +135,9 @@ class Node:
             self.code = access_code()
             self.window = secrets.token_hex(16)
             self.sessions.clear()
+            self.session_peers.clear()
+            self.pair_requests.clear()
+            self.challenges.clear()
             self.attempts.clear()
             port = self.server.server_port
         if self.discovery:
@@ -144,6 +152,10 @@ class Node:
                     'dir': self.config['directory'], 'code': self.code if receiving else '',
                     'port': self.server.server_port if self.server else self.requested_port,
                     'addresses': self.local_addresses(),
+                    'paired': self.trust.public(),
+                    'pair_requests': [{'id': key, 'name': row['name'], 'fingerprint': row['fingerprint']}
+                                      for key, row in self.pair_requests.items()
+                                      if row['phase'] == 'pending' and row['deadline'] > time.monotonic() and receiving],
                     'error': self.discovery.error if self.discovery else '',
                     'incoming': [job.public(summary=True) for job in self.jobs.values()][-12:]}
 
@@ -185,7 +197,107 @@ class Node:
 
     def session_valid(self, token):
         with self.lock:
-            return self.deadline > time.monotonic() and self.sessions.get(token) == self.window
+            peer = self.session_peers.get(token)
+            trusted = self.trust.read().get(peer['id']) if peer else None
+            return (self.deadline > time.monotonic() and self.sessions.get(token) == self.window
+                    and (peer is None or trusted == peer['record']))
+
+    def challenge(self, value):
+        with self.lock:
+            now = time.monotonic()
+            self.challenges = {key: row for key, row in self.challenges.items() if row[1] > now}
+            identifier = value.get('id')
+            if not isinstance(identifier, str) or not ID_RE.fullmatch(identifier):
+                raise TransferError('Invalid paired PC identity.')
+            if self.deadline <= now or identifier not in self.trust.read():
+                raise TransferError('This PC is not paired or receiving is off. Pair again using the receiver code.')
+            if len(self.challenges) >= 64:
+                raise TransferError('Too many authentication requests. Try again shortly.')
+            nonce = secrets.token_hex(32)
+            self.challenges[nonce] = (identifier, now + 30)
+            return {'nonce': nonce}
+
+    def authenticate_paired(self, value):
+        with self.lock:
+            nonce = value.get('nonce', '')
+            if not isinstance(nonce, str) or not TOKEN_RE.fullmatch(nonce):
+                raise TransferError('Invalid pairing challenge.')
+            challenge = self.challenges.pop(nonce, None)
+            if challenge is None or challenge[1] <= time.monotonic() or self.deadline <= time.monotonic():
+                raise TransferError('Pair authentication expired. Try sending again.')
+            identifier = challenge[0]
+            row = self.trust.read().get(identifier)
+            if not row or not hmac.compare_digest(str(value.get('proof', '')), paired_proof(
+                    row['secret'], self.identity['fingerprint'], row['fingerprint'], nonce, 'request')):
+                raise TransferError('Paired PC authentication failed. Pair again using the receiver code.')
+            if len(self.sessions) >= 64:
+                raise TransferError('Too many active transfer sessions. Restart receiving.')
+            token = secrets.token_hex(32)
+            self.sessions[token] = self.window
+            self.session_peers[token] = {'id': identifier, 'record': row}
+            return {'session': token, 'proof': paired_proof(row['secret'], self.identity['fingerprint'],
+                                                           row['fingerprint'], nonce, 'response')}
+
+    def request_pair(self, value, session, remote):
+        with self.lock:
+            if not self.session_valid(session) or session in self.session_peers:
+                raise TransferError('Enter the receiver code to pair this PC.')
+            identifier, fingerprint, secret = (value.get(key) for key in ('id', 'fingerprint', 'secret'))
+            if (not isinstance(identifier, str) or not ID_RE.fullmatch(identifier) or identifier == self.identity['id']
+                    or any(not isinstance(item, str) or not TOKEN_RE.fullmatch(item) for item in (fingerprint, secret))):
+                raise TransferError('Invalid pairing identity.')
+            if len(self.pair_requests) >= 8:
+                raise TransferError('Too many pairing requests. Restart receiving.')
+            name = str(value.get('name', 'Spectrum PC'))[:100]
+            key = secrets.token_hex(16)
+            self.pair_requests[key] = {'peer_id': identifier, 'fingerprint': fingerprint, 'secret': secret,
+                                       'name': name, 'addresses': [remote], 'port': 8857,
+                                       'session': session, 'phase': 'pending', 'deadline': time.monotonic() + 120}
+        self.notify('Pair Spectrum PC', f'{name} wants to pair. Open SpectrumDrop to accept or decline.')
+        return {'id': key}
+
+    def pair_status(self, identifier, session):
+        with self.lock:
+            row = self.pair_requests.get(identifier)
+            if not row or row['session'] != session or not self.session_valid(session):
+                raise TransferError('The pairing request expired. Try pairing again.')
+            if row['deadline'] <= time.monotonic() and row['phase'] == 'pending':
+                row['phase'] = 'expired'
+            return {'phase': row['phase'], 'peer': {'id': self.identity['id'], 'name': self.config['name'],
+                    'fingerprint': self.identity['fingerprint'], 'addresses': self.local_addresses(),
+                    'port': self.server.server_port}}
+
+    def decide_pair(self, identifier, accept):
+        with self.lock:
+            row = self.pair_requests.get(identifier)
+            if (not row or row['phase'] != 'pending' or row['deadline'] <= time.monotonic()
+                    or not self.session_valid(row['session'])):
+                raise TransferError('The pairing request expired. Try pairing again.')
+            if accept:
+                self.trust.update(row['peer_id'], {key: row[key] for key in ('name', 'fingerprint', 'secret', 'addresses', 'port')})
+            row['phase'] = 'accepted' if accept else 'declined'
+        return self.status()
+
+    def forget(self, identifier):
+        with self.lock:
+            self.trust.update(identifier)
+            for row in self.pair_requests.values():
+                if row['peer_id'] == identifier:
+                    row['phase'] = 'declined'
+            jobs = [job for job in self.jobs.values() if self.session_peers.get(job.session, {}).get('id') == identifier]
+        for job in jobs:
+            if job.phase in ('pending', 'receiving'):
+                self.fail(job, 'The paired PC was forgotten.', 'cancelled')
+        return self.status()
+
+    def cancel_pair(self, identifier, session):
+        with self.lock:
+            row = self.pair_requests.get(identifier)
+            if not row or row['session'] != session or not self.session_valid(session):
+                raise TransferError('The pairing request expired.')
+            if row['phase'] == 'pending':
+                row['phase'] = 'cancelled'
+            return {'phase': row['phase']}
 
     def offer(self, value, session):
         files = manifest(value.get('files'))
@@ -206,7 +318,8 @@ class Node:
             reserved = sum(sum(row['size'] for row in job.files) for job in self.jobs.values() if job.phase in ('pending', 'receiving'))
             if sum(row['size'] for row in files) + reserved > max(0, free - 64 * 1024 * 1024) * self.config['max_receive_percent'] / 100:
                 raise TransferError('There is not enough allowed free space on the receiver.')
-            job = Incoming(files, value.get('sender', 'Spectrum PC'), session)
+            paired = self.session_peers.get(session)
+            job = Incoming(files, paired['record']['name'] if paired else value.get('sender', 'Spectrum PC'), session)
             job.request_id = request_id
             self.jobs[job.id] = job
             while len(self.jobs) > 12:
@@ -303,6 +416,9 @@ class Node:
             self.deadline = 0
             self.code = ''
             self.sessions.clear()
+            self.session_peers.clear()
+            self.challenges.clear()
+            self.pair_requests.clear()
             jobs = list(self.jobs.values())
         for job in jobs:
             if job.phase in ('pending', 'receiving'):
@@ -392,6 +508,14 @@ class TransferHandler(BaseHTTPRequestHandler):
             value = self.body()
             if self.path == '/v1/auth':
                 result = node.authenticate(value, self.client_address[0])
+            elif self.path == '/v1/pair-challenge':
+                result = node.challenge(value)
+            elif self.path == '/v1/auth-paired':
+                result = node.authenticate_paired(value)
+            elif self.path == '/v1/pair':
+                result = node.request_pair(value, self.headers.get('Authorization', ''), self.client_address[0])
+            elif re.fullmatch(r'/v1/pair/[0-9a-f]{32}/cancel', self.path):
+                result = node.cancel_pair(self.path.split('/')[3], self.headers.get('Authorization', ''))
             elif self.path == '/v1/offer':
                 result = node.offer(value, self.headers.get('Authorization', ''))
             else:
@@ -411,6 +535,11 @@ class TransferHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            pairing = re.fullmatch(r'/v1/pair/([0-9a-f]{32})', self.path)
+            if pairing:
+                result = self.server.node.pair_status(pairing[1], self.headers.get('Authorization', ''))
+                self.reply(200, {'ok': True, **result})
+                return
             match = re.fullmatch(r'/v1/transfers/([0-9a-f]{32})', self.path)
             if not match:
                 raise TransferError('Unknown request.')

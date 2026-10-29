@@ -18,6 +18,10 @@ Item {
     TestCase {
         name: "IgorCoverage"
         when: windowShown
+        function init() {
+            findChild(cat, "igorOutfitClock").running = false;
+            findChild(cat, "igorSeasonalOutfit").currentDate = new Date(2026, 0, 1);
+        }
         function test_earJoints_data() {
             return [{tag:"outward", tilt:-4}, {tag:"rest", tilt:0}, {tag:"inward", tilt:2}];
         }

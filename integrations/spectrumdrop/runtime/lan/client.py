@@ -14,6 +14,7 @@ import threading
 import time
 
 from .common import CHUNK, ID_RE, MAX_JSON, TOKEN_RE, TransferError, collect_files, endpoint, file_identity, normalize_code, open_source, proof
+from .trust import TrustStore, paired_proof
 
 
 class NetworkError(TransferError):
@@ -21,19 +22,25 @@ class NetworkError(TransferError):
 
 
 class Client:
-    def __init__(self, peer, code, progress=None, cancel=None, timeout=15):
+    def __init__(self, peer, code='', progress=None, cancel=None, timeout=15, identity=None):
         self.peer = peer
-        self.code = normalize_code(code)
+        self.code = normalize_code(code) if code else ''
+        self.identity = identity
+        self.trust = TrustStore(Path(identity['certificate']).parent) if identity else None
+        self.paired = self.trust.read().get(peer.get('id')) if self.trust and not code else None
+        if not self.code and not self.paired:
+            raise TransferError('Pair this PC first or enter its receiver code.')
         self.progress = progress or (lambda value: None)
         self.cancelled = cancel or threading.Event()
         self.timeout = timeout
         self.connection = None
-        self.fingerprint = peer.get('fingerprint', '')
+        self.fingerprint = self.paired['fingerprint'] if self.paired else peer.get('fingerprint', '')
         self.addresses = [endpoint(value) for value in peer.get('addresses', [])][:8]
         self.port = peer.get('port', 8857)
         if not self.addresses or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
             raise TransferError('This device has no usable network address. Search again or enter its IP address.')
         self.ticket = None
+        self.pair_ticket = None
         self.session = ''
         self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         self.context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -94,6 +101,7 @@ class Client:
             if not result.get('ok'):
                 if response.status == 409 and isinstance(result.get('offset'), int):
                     return result
+                self.close()
                 raise TransferError(str(result.get('error', 'The receiver rejected the transfer.'))[:300])
             return result
         except (OSError, HTTPException) as error:
@@ -105,15 +113,53 @@ class Client:
 
     def authenticate(self):
         self.connect()
-        nonce = secrets.token_hex(32)
-        response = self.request('POST', '/v1/auth', {'nonce': nonce, 'proof': proof(self.code, self.fingerprint, nonce, 'request')})
-        expected = proof(self.code, self.fingerprint, nonce, 'response')
+        if self.paired:
+            nonce = self.request('POST', '/v1/pair-challenge', {'id': self.identity['id']}).get('nonce')
+            if not isinstance(nonce, str) or not TOKEN_RE.fullmatch(nonce):
+                raise TransferError('Invalid paired authentication challenge.')
+            signature = paired_proof(self.paired['secret'], self.fingerprint, self.identity['fingerprint'], nonce, 'request')
+            response = self.request('POST', '/v1/auth-paired', {'nonce': nonce, 'proof': signature})
+            expected = paired_proof(self.paired['secret'], self.fingerprint, self.identity['fingerprint'], nonce, 'response')
+        else:
+            nonce = secrets.token_hex(32)
+            response = self.request('POST', '/v1/auth', {'nonce': nonce, 'proof': proof(self.code, self.fingerprint, nonce, 'request')})
+            expected = proof(self.code, self.fingerprint, nonce, 'response')
         if not hmac.compare_digest(str(response.get('proof', '')), expected):
             self.close()
             raise TransferError('The receiver could not prove its identity. Check the code on the receiving PC.')
         self.session = response.get('session', '')
         if not isinstance(self.session, str) or not TOKEN_RE.fullmatch(self.session):
             raise TransferError('The receiver returned an invalid session.')
+
+    def pair(self, name='Spectrum PC'):
+        if not self.identity or not self.code:
+            raise TransferError('Enter the receiver code to pair this PC.')
+        self.authenticate()
+        secret = secrets.token_hex(32)
+        value = self.request('POST', '/v1/pair', {'id': self.identity['id'], 'name': name,
+                             'fingerprint': self.identity['fingerprint'], 'secret': secret}, token=self.session)
+        identifier = value.get('id')
+        if not isinstance(identifier, str) or not ID_RE.fullmatch(identifier):
+            raise TransferError('Invalid pairing request identity.')
+        self.pair_ticket = identifier
+        self.progress({'phase': 'waiting', 'message': 'Waiting for the other PC to approve pairing…'})
+        deadline = time.monotonic() + 125
+        while True:
+            response = self.request('GET', '/v1/pair/' + identifier, token=self.session)
+            if response.get('phase') == 'accepted':
+                peer = response.get('peer', {})
+                if (not isinstance(peer.get('id'), str) or not ID_RE.fullmatch(peer['id'])
+                        or peer.get('fingerprint') != self.fingerprint
+                        or (self.peer.get('id') and peer['id'] != self.peer['id'])):
+                    raise TransferError('The pairing identity changed. Pair again.')
+                self.trust.update(peer['id'], {'name': str(peer.get('name', 'Spectrum PC'))[:100],
+                    'fingerprint': self.fingerprint, 'secret': secret,
+                    'addresses': self.addresses, 'port': self.port})
+                return peer
+            if response.get('phase') != 'pending' or time.monotonic() > deadline:
+                raise TransferError('Pairing was declined or expired. Try pairing again.')
+            if self.cancelled.wait(0.5):
+                raise InterruptedError('Pairing cancelled.')
 
     def status(self):
         last = None
@@ -207,6 +253,17 @@ class Client:
         return result
 
     def abort(self):
+        if self.pair_ticket:
+            saved = self.cancelled
+            self.cancelled = threading.Event()
+            try:
+                self.close()
+                self.timeout = min(self.timeout, 3)
+                self.request('POST', '/v1/pair/' + self.pair_ticket + '/cancel', token=self.session)
+            except (TransferError, OSError):
+                pass
+            finally:
+                self.cancelled = saved
         if self.ticket:
             saved = self.cancelled
             self.cancelled = threading.Event()

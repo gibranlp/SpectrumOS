@@ -354,6 +354,7 @@ phase_system() {
         /etc/flatpak/remotes.d
     run sudo install -d -m 0755 /usr/share/spectrumos/branding
     run sudo install -m 0644 "$PROJECT_ROOT/assets/branding/spectrum-wordmark.svg" /usr/share/spectrumos/branding/spectrum-wordmark.svg
+    run sudo install -m 0644 "$PROJECT_ROOT/assets/branding/logo.svg" /usr/share/spectrumos/branding/logo.svg
     local source
     run sudo install -m 0644 "$PROJECT_ROOT"/configs/terminal/* /usr/share/spectrumos/terminal/
     run sudo install -Dm644 "$PROJECT_ROOT/configs/terminal/kitty-user.conf" /etc/skel/.config/kitty/kitty.conf
@@ -361,13 +362,15 @@ phase_system() {
     for source in "$PROJECT_ROOT"/configs/hyprland/*.lua "$PROJECT_ROOT"/configs/hyprland/hypridle.conf; do
         run sudo install -m 0644 "$source" "/usr/share/spectrumos/hyprland/$(basename "$source")"
     done
-    for source in "$PROJECT_ROOT"/configs/spectrum-shell/*.qml "$PROJECT_ROOT"/configs/spectrum-shell/*.js; do
+    for source in "$PROJECT_ROOT"/configs/spectrum-shell/*.qml "$PROJECT_ROOT"/configs/spectrum-shell/*.js "$PROJECT_ROOT"/configs/spectrum-shell/*.qsb "$PROJECT_ROOT"/configs/spectrum-shell/matrix-*; do
         run sudo install -m 0644 "$source" "/usr/share/spectrumos/spectrum-shell/$(basename "$source")"
     done
     run sudo install -d -m 0755 /usr/share/spectrumos/spectrum-shell/igor
     for source in "$PROJECT_ROOT"/configs/spectrum-shell/igor/*.svg; do
         run sudo install -m 0644 "$source" "/usr/share/spectrumos/spectrum-shell/igor/$(basename "$source")"
     done
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/50-spectrumos-gamemode.rules" \
+        /usr/share/polkit-1/rules.d/50-spectrumos-gamemode.rules
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/org.spectrumos.time-region.policy" \
         /usr/share/polkit-1/actions/org.spectrumos.time-region.policy
     run sudo install -m 0644 "$PROJECT_ROOT/configs/xdg/mimeapps.list" /etc/xdg/mimeapps.list

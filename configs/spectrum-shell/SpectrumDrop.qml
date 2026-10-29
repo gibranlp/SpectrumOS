@@ -12,6 +12,11 @@ Controls.ScrollView {
     readonly property var receiveState: networkMode ? backend.state.lan || {} : backend.state
     readonly property var incoming: networkMode ? receiveState.incoming || [] : []
     readonly property bool incomingBusy: incoming.some(item => ["pending", "receiving"].includes(item.phase))
+    readonly property var pairedPCs: networkMode ? receiveState.paired || [] : []
+    readonly property bool choosingRecipient: (backend.state.selection?.count || 0) > 0
+    readonly property string selectionKey: JSON.stringify(backend.state.selection || {})
+    function revealSelection(): void { contentItem.contentY = 0; }
+    onSelectionKeyChanged: if (choosingRecipient) Qt.callLater(revealSelection)
     contentHeight: contentBody.implicitHeight
     palette { window: theme.colors.surface; base: theme.colors.background; text: theme.colors.foreground; button: theme.colors.surface_alt; buttonText: theme.colors.foreground; highlight: theme.colors.accent; highlightedText: theme.colors.background }
     contentWidth: availableWidth
@@ -81,10 +86,12 @@ Controls.ScrollView {
                 anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
                 Label { objectName: "drop-selection-summary"; Layout.fillWidth: true; text: (drop.backend.state.selection?.count || 0) + qsTranslate("Spectrum", " files selected in Thunar"); font.bold: true }
                 Label { Layout.fillWidth: true; text: (drop.backend.state.selection?.names || []).join("\n"); maximumLineCount: 5; elide: Text.ElideRight; color: drop.theme.colors.muted }
+                Label { objectName: "drop-choose-recipient"; Layout.fillWidth: true; text: qsTranslate("Spectrum", "Choose a PC below to send these files."); font.bold: true }
                 Button { objectName: "drop-clear-selection"; label: qsTranslate("Spectrum", "Clear selection"); enabled: !drop.backend.busy && !drop.backend.state.transfer?.active; onClicked: drop.backend.command(["clear-selection", drop.backend.transport]) }
             }
         }
         RowLayout {
+            visible: !drop.choosingRecipient || !drop.networkMode
             Layout.fillWidth: true
             spacing: 16
             Label { text: "󰀂"; font.pixelSize: 44; color: drop.receiveState.receiving ? drop.theme.colors.accent : drop.theme.colors.muted }
@@ -101,6 +108,7 @@ Controls.ScrollView {
             }
         }
         RowLayout {
+            visible: !drop.choosingRecipient || !drop.networkMode
             Layout.fillWidth: true
             spacing: 8
             Repeater {
@@ -124,7 +132,7 @@ Controls.ScrollView {
         }
         Rectangle {
             Layout.fillWidth: true
-            visible: drop.networkMode && !!drop.receiveState.receiving
+            visible: drop.networkMode && !!drop.receiveState.receiving && !drop.choosingRecipient
             implicitHeight: codeBody.implicitHeight + 20
             radius: 10
             color: drop.theme.colors.surface_alt
@@ -152,7 +160,7 @@ Controls.ScrollView {
             }
         }
         Repeater {
-            model: drop.incoming
+            model: drop.choosingRecipient ? drop.incoming.filter(item => ["pending", "receiving"].includes(item.phase)) : drop.incoming
             Rectangle {
                 id: incomingCard
                 required property var modelData
@@ -173,7 +181,7 @@ Controls.ScrollView {
                     Controls.ProgressBar { Layout.fillWidth: true; visible: incomingCard.modelData.phase === "receiving"; from: 0; to: Math.max(1, incomingCard.modelData.total); value: incomingCard.modelData.bytes }
                     Button { visible: incomingCard.modelData.phase === "receiving"; label: qsTranslate("Spectrum", "Cancel"); onClicked: drop.backend.command(["cancel-incoming-lan", incomingCard.modelData.id]) }
                     Button { visible: incomingCard.modelData.phase === "complete"; label: qsTranslate("Spectrum", "Open folder"); onClicked: drop.openFolderRequested(incomingCard.modelData.folder) }
-                    Label { Layout.fillWidth: true; visible: incomingCard.modelData.phase !== "pending"; text: qsTranslate("Spectrum", incomingCard.modelData.error) || (incomingCard.modelData.phase === "complete" ? qsTranslate("Spectrum", "Received and verified · ") + incomingCard.modelData.folder : qsTranslate("Spectrum", "Receiving…")); color: drop.theme.colors.muted }
+                    Label { Layout.fillWidth: true; visible: incomingCard.modelData.phase !== "pending"; text: qsTranslate("Spectrum", incomingCard.modelData.error || "") || (incomingCard.modelData.phase === "complete" ? qsTranslate("Spectrum", "Received and verified · ") + incomingCard.modelData.folder : qsTranslate("Spectrum", "Receiving…")); color: drop.theme.colors.muted }
                 }
             }
         }
@@ -219,6 +227,38 @@ Controls.ScrollView {
         }
         Label {
             Layout.fillWidth: true
+            visible: drop.networkMode && !drop.choosingRecipient
+            text: qsTranslate("Spectrum", "Pair once with the receiver code to send without typing it next time. Receiving must be enabled, and each file request still needs approval.")
+            color: drop.theme.colors.muted
+        }
+        Repeater {
+            model: drop.networkMode ? drop.receiveState.pair_requests || [] : []
+            ColumnLayout {
+                id: pairing
+                required property var modelData
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; text: pairing.modelData.name + qsTranslate("Spectrum", " wants to pair with this PC"); font.bold: true }
+                Label { Layout.fillWidth: true; text: qsTranslate("Spectrum", "Only approve if you requested this pairing on the other PC. Both PCs will remember each other."); color: drop.theme.colors.muted }
+                RowLayout {
+                    Button { objectName: "drop-accept-pair-" + pairing.modelData.id; label: qsTranslate("Spectrum", "Accept pairing"); onClicked: drop.backend.command(["accept-pair-lan", pairing.modelData.id]) }
+                    Button { objectName: "drop-decline-pair-" + pairing.modelData.id; label: qsTranslate("Spectrum", "Decline"); onClicked: drop.backend.command(["decline-pair-lan", pairing.modelData.id]) }
+                }
+            }
+        }
+        Label { visible: drop.networkMode && drop.pairedPCs.length > 0; text: qsTranslate("Spectrum", "Paired PCs"); font.bold: true }
+        Repeater {
+            model: drop.pairedPCs
+            RowLayout {
+                id: saved
+                required property var modelData
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; text: saved.modelData.name; elide: Text.ElideRight; maximumLineCount: 1 }
+                Button { objectName: "drop-saved-send-" + saved.modelData.id; label: qsTranslate("Spectrum", "Send"); enabled: !drop.backend.busy && !drop.backend.state.transfer?.active; onClicked: drop.backend.command(["send-lan", "lan:" + saved.modelData.id], {code: ""}) }
+                Button { objectName: "drop-forget-" + saved.modelData.id; label: qsTranslate("Spectrum", "Forget"); enabled: !drop.backend.busy && !drop.backend.state.transfer?.active; onClicked: drop.backend.command(["forget-lan", saved.modelData.id]) }
+            }
+        }
+        Label {
+            Layout.fillWidth: true
             visible: drop.backend.peers.length === 0
             text: drop.backend.scanning ? qsTranslate("Spectrum", "Looking for devices…") : drop.networkMode ? qsTranslate("Spectrum", "Enable receiving on the other Spectrum PC, then Search. You can also connect by IP address below.") : drop.backend.state.visible ? qsTranslate("Spectrum", "Open AirDrop on your Apple device") : qsTranslate("Spectrum", "Start receiving to find devices")
             color: drop.theme.colors.muted
@@ -228,6 +268,9 @@ Controls.ScrollView {
             Rectangle {
                 id: device
                 required property var modelData
+                readonly property var trusted: drop.pairedPCs.find(item => item.id === device.modelData.id)
+                readonly property bool paired: !!trusted
+                readonly property bool identityChanged: !!trusted && trusted.fingerprint !== modelData.fingerprint
                 Layout.fillWidth: true
                 implicitHeight: deviceBody.implicitHeight + 20
                 radius: 10
@@ -243,14 +286,25 @@ Controls.ScrollView {
                             Layout.fillWidth: false
                             icon: "󰇠"; objectName: "drop-send-" + device.modelData.mac
                             label: qsTranslate("Spectrum", "Send"); hint: qsTranslate("Spectrum", "Choose files to send")
-                            enabled: !drop.backend.busy && (drop.networkMode || !!drop.backend.state.visible) && !drop.backend.state.transfer?.active && (!drop.networkMode || receiverCode.text.replace(/[ -]/g, "").length === 16)
+                            enabled: !drop.backend.busy && (drop.networkMode || !!drop.backend.state.visible) && !drop.backend.state.transfer?.active && !device.identityChanged && (!drop.networkMode || device.paired || receiverCode.text.replace(/[ -]/g, "").length === 16)
                             onClicked: {
-                                drop.backend.command([drop.networkMode ? "send-lan" : "send", device.modelData.mac], drop.networkMode ? {code: receiverCode.text} : {});
+                                drop.backend.command([drop.networkMode ? "send-lan" : "send", device.modelData.mac], drop.networkMode ? {code: device.paired ? "" : receiverCode.text} : {});
                                 receiverCode.clear();
                             }
                         }
                     }
-                    CodeField { id: receiverCode; objectName: "drop-code-" + device.modelData.mac; visible: drop.networkMode }
+                    Label { Layout.fillWidth: true; visible: drop.networkMode && device.paired; text: device.identityChanged ? qsTranslate("Spectrum", "Identity changed. Check the other PC, then forget and pair again.") : device.modelData.offline ? qsTranslate("Spectrum", "Paired · Last known address. Enable receiving on the other PC.") : qsTranslate("Spectrum", "Paired · No code needed"); color: drop.theme.colors.muted }
+                    RowLayout {
+                        visible: drop.networkMode && !device.paired
+                        Layout.fillWidth: true
+                        CodeField { id: receiverCode; objectName: "drop-code-" + device.modelData.mac }
+                        Button {
+                            objectName: "drop-pair-" + device.modelData.mac
+                            label: qsTranslate("Spectrum", "Pair PC")
+                            enabled: !drop.backend.busy && !drop.backend.state.transfer?.active && receiverCode.text.replace(/[ -]/g, "").length === 16
+                            onClicked: { drop.backend.command(["pair-lan", device.modelData.mac], {code: receiverCode.text}); receiverCode.clear(); }
+                        }
+                    }
                 }
             }
         }
@@ -277,8 +331,14 @@ Controls.ScrollView {
                 enabled: !drop.backend.busy && !drop.backend.state.transfer?.active && manualAddress.text.trim().length > 0 && manualCode.text.replace(/[ -]/g, "").length === 16
                 onClicked: { drop.backend.command(["send-lan", "manual"], {address: manualAddress.text.trim(), code: manualCode.text}); manualCode.clear(); }
             }
+            Button {
+                objectName: "drop-manual-pair"
+                label: qsTranslate("Spectrum", "Pair PC")
+                enabled: !drop.backend.busy && !drop.backend.state.transfer?.active && manualAddress.text.trim().length > 0 && manualCode.text.replace(/[ -]/g, "").length === 16
+                onClicked: { drop.backend.command(["pair-lan", "manual"], {address: manualAddress.text.trim(), code: manualCode.text}); manualCode.clear(); }
+            }
         }
-        Label { Layout.fillWidth: true; visible: drop.networkMode && !!drop.receiveState.error; text: qsTranslate("Spectrum", drop.receiveState.error) || ""; color: drop.theme.colors.muted }
+        Label { Layout.fillWidth: true; visible: drop.networkMode && !!drop.receiveState.error; text: qsTranslate("Spectrum", drop.receiveState.error || ""); color: drop.theme.colors.muted }
         Label { Layout.fillWidth: true; objectName: "drop-error"; visible: !!drop.backend.error; text: qsTranslate("Spectrum", drop.backend.error); color: drop.theme.colors.accent }
     }
 }

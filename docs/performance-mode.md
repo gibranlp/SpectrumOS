@@ -30,13 +30,42 @@ start=/usr/lib/spectrumos/performance-mode --game-start
 end=/usr/lib/spectrumos/performance-mode --game-end
 ```
 
-`--game-start`/`--game-end` use a reference count (`.../spectrumos/performance-mode/game-count`) for Spectrum power requests. GameMode calls its custom hooks when its overall session starts and ends; manual Gaming also acquires a separate Spectrum request. The first Spectrum request remembers the previous mode (`.../spectrumos/performance-mode/pre-game-mode`) and selects Performance; the final request restores the saved mode. Multiple external clients keep GameMode active until the last one exits. Power notifications appear only when the selected mode actually changes. A manual power selection during the session changes the current mode; the final release still restores the mode saved at the beginning.
+`--game-start`/`--game-end` maintain idempotent requests in
+`.../spectrumos/performance-mode/game-requests.json`. GameMode owns one request for
+its overall active session; Spectrum's manual Gaming or detected Steam game owns
+a separate `session` request. The first request remembers the previous mode in
+`pre-game-mode`, and the final release restores it. `game-count` is a derived
+compatibility value, not an accumulating client counter. The shell reconciles
+these requests against actual activity on startup and transitions, recovering
+stale counts from interrupted older sessions. Hook updates share a file lock;
+failed power changes retain their requests for retry. Power notifications appear
+only when the selected mode changes. A manual power selection during a session
+changes the current mode; the final release still restores the saved mode.
 
 GameMode is now a required desktop dependency for the SpectrumShell Gaming profile. The shell holds a registered client for the duration of that profile, and games can register their own clients independently. Gaming also requests the available Performance power mode and restores its prior mode when no other GameMode clients remain. The Gaming helper verifies the real registration and reports activation failures in Control Center. Hook reference-count updates are serialized to handle concurrent clients. See [SpectrumShell Gaming](spectrum-shell.md#gaming-profile) for profile behavior and validation limits.
 
 
 ## Automatic bar profile
 
-SpectrumShell observes the real GameMode status and temporarily uses the Gaming bar profile while an external GameMode client is active. It does not infer gaming from Performance mode and does not create an extra GameMode client for this automatic override. Saved global and per-monitor profiles remain unchanged; the last client exiting restores them. Manual Gaming still owns its own GameMode registration. An explicit bar-profile selection or Leave Gaming suspends automatic activation until the current GameMode session ends. UKVM reads the same private runtime status.
+SpectrumShell observes external GameMode clients and running processes owned by
+the current user with a nonzero `SteamAppId` or `SteamGameId`. Opening Steam alone
+does not activate Gaming. A running Steam game activates the Gaming bar profile,
+Performance power mode, and a verified Spectrum GameMode registration, even when
+the game does not request GameMode itself. Its own registration is excluded from
+external-client detection, so it cannot keep automatic Gaming alive after games
+exit. Other GameMode clients keep their session active independently.
 
-For games that do not request GameMode themselves, configure their launcher to use GameMode or set a Steam game's launch options to `gamemoderun %command%`. Simply opening Steam does not guarantee a GameMode request. When diagnosing missed power changes, check `gamemoded -s`: if Performance was already selected, there is no new power-mode notification. A stale `game-count` from an interrupted older session can also block the existing power hook's restore; only reset it after verifying GameMode has no clients and manual Gaming is off.
+Saved global and per-monitor profiles remain unchanged and return when the last
+game exits. Manual Gaming remains active until explicitly left. Selecting another
+bar profile or Leave Gaming suspends the automatic visual override until the
+current game session ends. UKVM reads the same private runtime status.
+
+For games outside Steam that do not request GameMode, enable it in their launcher
+or use `gamemoderun`. Native game registration can still provide process-specific
+GameMode optimizations in addition to Spectrum's session registration. Inspect
+`gamemoded -s` and `$XDG_RUNTIME_DIR/spectrumos/gaming-status.json` when diagnosing
+activation. An already selected Performance profile produces no new power toast.
+
+The desktop installs `50-spectrumos-gamemode.rules`, allowing active local members
+of `spectrumos` to use GameMode's CPU governor and kernel tuning helpers. This
+avoids the authorization failures when the desktop user is not in `gamemode`.

@@ -112,6 +112,7 @@ ShellRoot {
     property var displays: ({ monitors: [] })
     property var workspaceAssignments: ({ workspace_monitors: {} })
     property var weather: ({ temperature: "—", icon: "", location: "" })
+    property bool weatherRefreshPending: false
     property var recording: ({ active: false })
     property var audioRecording: ({ active: false })
     property var performance: ({ available: false, mode: "balanced" })
@@ -138,6 +139,7 @@ ShellRoot {
     function removeToast(toastId): void {
         for (let index = 0; index < toastModel.count; index++) {
             if (toastModel.get(index).toastId === toastId) {
+                if ((toastModel.get(index).closingAt || 0) > Date.now()) return;
                 toastModel.remove(index);
                 return;
             }
@@ -233,7 +235,28 @@ ShellRoot {
         for(let i=0;i<toastModel.count;i++) if(toastModel.get(i).notificationId===id) toastModel.setProperty(i,"actionBusy",busy);
     }
     function removeNotificationToasts(id): void {
-        for(let i=toastModel.count-1;i>=0;i--) if(toastModel.get(i).notificationId===id) toastModel.remove(i);
+        for(let i=toastModel.count-1;i>=0;i--) if(toastModel.get(i).notificationId===id) {
+            if (shell.animationsEnabled === true) {
+                if (!toastModel.get(i).closing) {
+                    toastModel.setProperty(i,"closingAt",Date.now()+260);
+                    toastModel.setProperty(i,"closing",true);
+                    toastRemovalTimer.start();
+                }
+            } else toastModel.remove(i);
+        }
+    }
+    Timer {
+        id: toastRemovalTimer
+        interval: 30; repeat: true
+        onTriggered: {
+            let pending = false;
+            for (let i = toastModel.count - 1; i >= 0; i--) {
+                const deadline = toastModel.get(i).closingAt || 0;
+                if (deadline > 0 && deadline <= Date.now()) toastModel.remove(i);
+                else if (deadline > 0) pending = true;
+            }
+            if (!pending) stop();
+        }
     }
     function invokeNotificationAction(id,identifier): void {
         const item=Array.from(notificationServer.trackedNotifications.values).find(item=>item.id===id);
@@ -265,7 +288,7 @@ ShellRoot {
         shell.notificationHistory=[{notification:notification,notificationId:id,appName:notification.appName,summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actions:[]},...shell.notificationHistory.filter(item=>item.notificationId!==id)].slice(0,50);
         const persistent=NotificationStyle.palette(notification,shell.colors).persistent || notification.expireTimeout===0;
         const timeout=notification.expireTimeout>0 ? notification.expireTimeout : 5000;
-        toastModel.append({toastId:++shell.nextToastId,notificationId:id,expiresAt:persistent?0:Date.now()+timeout,appName:notification.appName,iconSource:shell.notificationIcon(notification),summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actionsJson:actions,actionBusy:false});
+        toastModel.append({toastId:++shell.nextToastId,notificationId:id,closing:false,closingAt:0,expiresAt:persistent?0:Date.now()+timeout,appName:notification.appName,iconSource:shell.notificationIcon(notification),summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actionsJson:actions,actionBusy:false});
         notification.closed.connect(reason=> {
             shell.removeNotificationToasts(id);
             if(kind==="hydration" && reason!==NotificationCloseReason.Expired) questlineNotificationActions.enqueue("dismiss_hydration_reminder",id,token);
@@ -280,6 +303,10 @@ ShellRoot {
 
     function backend(name): string { return backendDir + "/" + name; }
     function notificationIcon(notification): string {
+        const appName = String(notification.appName || "").toLowerCase();
+        if ((appName === "spectrumos" || appName.startsWith("spectrumos "))
+                && !String(notification.appIcon || "").startsWith("/"))
+            return "file:///usr/share/spectrumos/branding/logo.svg";
         const entry = DesktopEntries.byId(notification.desktopEntry || "")
             || DesktopEntries.heuristicLookup(notification.appName || "")
             || DesktopEntries.applications.values.find(application =>
@@ -318,11 +345,12 @@ ShellRoot {
     }
 
     function refreshControls(page): void {
+        if (page === "weather" && weatherProcess.running) weatherRefreshPending = true;
         const groups = {
-            audio: [audioProcess], wifi: [networkProcess], displays: [displayProcess],
+            audio: [audioProcess], wifi: [networkProcess], displays: [displayProcess], brightness: [brightnessProcess],
             typography: [overviewProcess, keyboardLayoutProcess], battery: [overviewProcess],
             wallpapers: [themeProcess], dashboard: [], bluetooth: [], mouse: [], time: [],
-            appimages: [], extras: [], weather: []
+            appimages: [], extras: [], weather: [weatherProcess]
         };
         const processes = groups[page] || [overviewProcess, networkProcess, audioProcess, themeProcess,
             displayProcess, workspaceAssignmentsProcess, workspaceIconsProcess, keyboardLayoutProcess];
@@ -569,11 +597,15 @@ ShellRoot {
 
     Timer {
         interval: 3000
-        running: shell.controlsVisible || bars.instances.some(bar => bar.widgetOpen && bar.widgetPage === "displays")
+        running: shell.controlsVisible || bars.instances.some(bar => bar.widgetOpen && ["displays", "brightness"].includes(bar.widgetPage))
         triggeredOnStart: true
         repeat: true
         onTriggered: { if (!shell.brightnessBusy) shell.refreshBrightness(); }
     }
+
+    readonly property bool remoteControlActive: ukvmControl.active
+    readonly property string remoteControlPeer: ukvmControl.peerName
+    UkvmControlState { id: ukvmControl }
 
     Process {
         id: overviewProcess
@@ -829,6 +861,12 @@ ShellRoot {
     Process {
         id: weatherProcess
         command: [shell.backend("weather-adapter"), "--json"]
+        onExited: {
+            if (shell.weatherRefreshPending) {
+                shell.weatherRefreshPending = false;
+                Qt.callLater(() => { if (!weatherProcess.running) weatherProcess.running = true; });
+            }
+        }
         stdout: StdioCollector { onStreamFinished: {
             try { shell.weather = JSON.parse(text); } catch (error) { console.warn("SpectrumShell weather:", error); }
         } }
@@ -1127,6 +1165,7 @@ ShellRoot {
         function openPicker(directory: string): void {
             const target = shell.focusedBar();
             if (target) pickerPanel.targetScreen = target.modelData;
+            pickerPanel.sourceBar = target;
             pickerPanel.open(directory);
         }
 
@@ -1170,7 +1209,7 @@ ShellRoot {
         function screensaverState(): string {
             return JSON.stringify({active: screensaver.active, blocked: screensaver.blocked,
                 mediaPlaying: screensaver.mediaPlaying, fullscreenActive: screensaver.fullscreenActive,
-                settings: screensaver.settings, effect: screensaver.effect, error: screensaver.error});
+                settings: screensaver.settings, effect: screensaver.effect, error: screensaver.error, diagnostics: screensaver.diagnostics});
         }
         function toggleWeather(): void { shell.openWidgetOnFocused("weather"); }
         function toggleTimeRegion(): void { shell.openWidgetOnFocused("time"); }
@@ -1227,7 +1266,8 @@ ShellRoot {
             if (toastModel.count) {
                 const index = toastModel.count - 1;
                 const notificationId = toastModel.get(index).notificationId;
-                toastModel.remove(index);
+                if (shell.animationsEnabled === true) shell.removeNotificationToasts(notificationId);
+                else toastModel.remove(index);
                 const notification = items.find(item => item.id === notificationId);
                 if (notification)
                     notification.dismiss();
@@ -1237,7 +1277,11 @@ ShellRoot {
                 items[items.length - 1].dismiss();
         }
         function clearNotifications(): void {
-            toastModel.clear();
+            if (shell.animationsEnabled === true) {
+                const ids = [];
+                for (let i = 0; i < toastModel.count; i++) ids.push(toastModel.get(i).notificationId);
+                for (const id of ids) shell.removeNotificationToasts(id);
+            } else toastModel.clear();
             for (const item of Array.from(notificationServer.trackedNotifications.values))
                 item.dismiss();
             shell.notificationHistory = [];
@@ -1258,6 +1302,9 @@ ShellRoot {
                 monitors: bars.instances.map(bar => ({ name: bar.modelData.name, profile: bar.barProfile,
                     barVisible: bar.barVisible, leftInset: bar.panelLeftInset, topInset: bar.panelTopInset }))
             });
+        }
+        function remoteControlState(): string {
+            return JSON.stringify({active: ukvmControl.active, peerName: ukvmControl.peerName});
         }
         function barState(): string {
             return JSON.stringify({ style: shell.barStyle, position: shell.barPosition,
@@ -1321,6 +1368,8 @@ ShellRoot {
             readonly property string activeWindowIdentity: titleWindow ? titleWindow.address || "" : ""
             readonly property bool widgetOpen: barWidget.expanded
             readonly property string widgetPage: barWidget.page
+            readonly property rect weatherPickerAnchor: barWidget.pickerAnchor
+            readonly property string weatherPickerBarPosition: shell.barPosition
             readonly property bool dashboardOpen: dashboard.expanded
             readonly property bool favoritesOpen: favoritesPanel.expanded
             readonly property bool appStoreOpen: appStorePanel.expanded
@@ -1352,7 +1401,8 @@ ShellRoot {
                 focusable: false
                 visible: !shell.gamingActive && bar.barProfile !== "gaming"
                     && (bar.barProfile === "minimal" || shell.barPosition === "left")
-                    && (cornerFocus.active || shell.recording.active || shell.audioRecording.active)
+                    && (cornerFocus.active || shell.recording.active || shell.audioRecording.active
+                        || (bar.barProfile === "minimal" && ukvmControl.active))
                 mask: Region { item: cornerContents }
                 ShellSurface {
                     x: shellFrame.curveRadius
@@ -1387,6 +1437,14 @@ ShellRoot {
                             animationsEnabled: shell.animationsEnabled
                             onScreenRequested: bar.toggleRecorder()
                             onAudioRequested: bar.toggleAudioRecorder()
+                        }
+                        RemoteControlIndicator {
+                            id: cornerRemoteControl
+                            theme: shell
+                            active: bar.barProfile === "minimal" && ukvmControl.active
+                            peerName: ukvmControl.peerName
+                            animationsEnabled: shell.animationsEnabled && focusCorner.visible
+                            onActivated: Quickshell.execDetached(["spectrum-ukvm"])
                         }
                     }
                 }
@@ -1502,13 +1560,13 @@ ShellRoot {
                 const methods = {dashboard:"toggleDashboard", favorites:"toggleFavorites", "app-store":"toggleAppStore",
                     spectrumdrop:"toggleSpectrumDrop", wallpapers:"toggleWallpapers", notifications:"toggleNotifications",
                     screenshot:"toggleScreenshot", recorder:"toggleRecorder", "audio-recorder":"toggleAudioRecorder",
-                    control:"toggleControlCenter", session:"toggleSession", updates:"toggleUpdates", color:"toggleColorPicker",
+                    control:"toggleControlCenter", session:"toggleSession", extras:"toggleBarExtras", updates:"toggleUpdates", color:"toggleColorPicker",
                     "color-history":"toggleColorHistory"};
                 if (methods[action]) bar[methods[action]]();
                 else if (action === "keep-awake") shell.toggleKeepAwake();
                 else if (action === "ukvm") Quickshell.execDetached(["/usr/bin/spectrum-ukvm"]);
                 else if (["questline", "focus", "breaks", "services", "default-apps", "search", "calculator", "password", "emoji", "hotkey", "shortcuts"].includes(action)) bar.openUtility(action);
-                else if (["appimages", "audio", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
+                else if (["appimages", "audio", "brightness", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
             }
 
             function toggleFileSearch(): void { openUtility("search"); }
@@ -1519,7 +1577,7 @@ ShellRoot {
                 closeSidePanels();
                 appLauncher.expanded = false;
                 wallpaperBrowser.expanded = false;
-                utilityPanel.open("spectrumdrop");
+                utilityPanel.openSpectrumDropSelection();
             }
             function toggleBarExtras(): void { toggleBarWidget("extras"); }
             function toggleHotKey(): void { openUtility("hotkey"); }
@@ -1553,7 +1611,7 @@ ShellRoot {
                         width: topRecordingStatus.width, height: topRecordingStatus.height},
                     corner: {visible: focusCorner.visible, width: focusCorner.width, height: focusCorner.height,
                         focus: cornerFocus.active, screenRecording: cornerRecordingStatus.screenRecording,
-                        audioRecording: cornerRecordingStatus.audioRecording}};
+                        audioRecording: cornerRecordingStatus.audioRecording, remoteControl: cornerRemoteControl.visible}};
             }
 
             function openFocusTimer(): void {
@@ -1952,7 +2010,7 @@ ShellRoot {
                 WlrLayershell.layer: WlrLayer.Top
                 WlrLayershell.namespace: "spectrum-widget-toasts"
                 focusable: false
-                implicitWidth: Math.min(Math.max(260, shell.fontSize * 20) + 8, bar.modelData.width - 20)
+                implicitWidth: Math.min(Math.max(300, shell.fontSize * 22) + 8, bar.modelData.width - 20)
                 mask: Region { item: toastStack }
                 visible: shell.toastNotifications.count > 0 && shell.focusedBar() === bar && !shell.doNotDisturb && !shell.gamingActive && !barWidget.expanded
                 color: "transparent"
@@ -1968,14 +2026,16 @@ ShellRoot {
                             theme: shell
                             notification: model
                             presented: notificationToast.visible
+                            revealed: !model.closing
+                            maximumHeight: Math.max(140, Math.min(520, (notificationToast.height - 4 * shellFrame.curveRadius - Math.max(0, shell.toastNotifications.count - 1) * (2 * shellFrame.curveRadius + 8)) / Math.max(1, shell.toastNotifications.count)))
                             width: toastStack.width
                             onActivated: bar.toggleNotifications()
                             onDismissed: shell.removeToast(model.toastId)
                             onActionInvoked:identifier=>shell.invokeNotificationAction(model.notificationId,identifier)
                             Timer {
                                 interval: Math.max(1, toastCard.model.expiresAt - Date.now())
-                                running: toastCard.revealed && toastCard.model.expiresAt>0
-                                onTriggered: toastCard.revealed = false
+                                running: !toastCard.model.closing && toastCard.model.expiresAt>0
+                                onTriggered: shell.removeNotificationToasts(toastCard.model.notificationId)
                             }
                         }
                     }
@@ -2127,7 +2187,20 @@ ShellRoot {
                             onOpenRequested: bar.openFocusTimer()
                         }
 
+                        BarControls {
+                            visible: bar.barProfile !== "minimal"
+                            theme: shell
+                            profile: bar.barProfile
+                            trayItems: SystemTray.items
+                            panelWindow: bar
+                            batteryDevice: UPower.displayDevice
+                            charging: UPower.displayDevice.state === UPowerDeviceState.Charging
+                            externalPower: !UPower.onBattery
+                            onChosen: action => bar.openWidgetIcon(action)
+                        }
+
                         RowLayout {
+                            visible: bar.barProfile === "minimal"
                             spacing: 8
                             Text {
                                 text: shell.performance.available ? (shell.performance.mode === "performance" ? "󰓅" : shell.performance.mode === "power-saver" ? "󰌪" : "") : ""
@@ -2256,7 +2329,7 @@ ShellRoot {
                         id: trayGroup
                         spacing: 8
                         Repeater {
-                            model: ["standard", "detailed"].includes(bar.barProfile) ? [] : SystemTray.items
+                            model: bar.barProfile === "minimal" ? SystemTray.items : []
                             Item {
                                 required property var modelData
                                 width: 22
@@ -2291,6 +2364,13 @@ ShellRoot {
                             onScreenRequested: bar.toggleRecorder()
                             onAudioRequested: bar.toggleAudioRecorder()
                         }
+                        RemoteControlIndicator {
+                            theme: shell
+                            active: bar.barProfile !== "minimal" && ukvmControl.active
+                            peerName: ukvmControl.peerName
+                            animationsEnabled: shell.animationsEnabled && bar.visible
+                            onActivated: Quickshell.execDetached(["spectrum-ukvm"])
+                        }
                     }
 
                 }
@@ -2318,7 +2398,7 @@ ShellRoot {
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                     visible: false
-                    text: qsTranslate("Spectrum", "CPU ") + shell.overview.load + qsTranslate("Spectrum", "   RAM ") + shell.overview.memory + (shell.overview.gpu ? qsTranslate("Spectrum", "   GPU ") + shell.overview.gpu : "") + (shell.overview.temperature ? "   " + shell.overview.temperature : "")
+                    text: qsTranslate("Spectrum", "CPU ") + shell.overview.load + qsTranslate("Spectrum", "   RAM ") + shell.overview.memory + (shell.overview.gpu ? qsTranslate("Spectrum", "   GPU ") + shell.overview.gpu : "") + (shell.overview.temperature ? "   " + shell.overview.temperature : "") + (shell.overview.fan ? "   " + shell.overview.fan : "") + (shell.overview.disk_usage ? "   " + shell.overview.disk_usage : "")
                     color: shell.colors.foreground
                     font { family: shell.fontFamily; pixelSize: shell.fontSize - 1; bold: true }
                 }
@@ -2397,7 +2477,7 @@ ShellRoot {
                 barPosition: shell.barPosition
                 panelLeftInset: bar.panelLeftInset
                 panelTopInset: bar.panelTopInset
-                blocked: barWidget.expanded && ["audio", "displays"].includes(barWidget.page)
+                blocked: barWidget.expanded && ["audio", "displays", "brightness"].includes(barWidget.page)
             }
 
             BarWidget {

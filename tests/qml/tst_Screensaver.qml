@@ -17,7 +17,7 @@ Item {
         property bool actionBusy: false
         property bool screensaverBusy: false
         property string screensaverError: ""
-        property var screensaverSettings: ({enabled: true, timeout: 180, effect: "matrix", branding: "alternate"})
+        property var screensaverSettings: ({enabled: true, timeout: 180})
         property var commands: []
         function configureScreensaver(key, value) { commands = commands.concat([[key, value]]); }
         function previewScreensaver() { commands = commands.concat([["preview"]]); }
@@ -27,7 +27,6 @@ Item {
         id: scene
         y: 490; width: 600; height: 210
         colors: theme.colors
-        masks: ({wordmark: {points: Array.from({length: 25}, (_, index) => [index % 5 / 4, Math.floor(index / 5) / 4]), aspect: 3}, logo: {points: [], aspect: 1}})
     }
     TestCase {
         name: "Screensaver"
@@ -36,8 +35,8 @@ Item {
             saverState.dismiss(); saverState.enabled = true; saverState.blocked = false;
             saverState.idle = false; saverState.armed = true; saverState.sessionAllowed = true;
             theme.commands = []; theme.screensaverBusy = false;
-            theme.screensaverSettings = {enabled: true, timeout: 180, effect: "matrix", branding: "alternate"};
-            scene.running = false; scene.visible = true; scene.effect = "matrix"; scene.branding = "alternate";
+            theme.screensaverSettings = {enabled: true, timeout: 180};
+            scene.running = false; scene.visible = true;
             selectedPlayer.isPlaying = false; videoPlayer.isPlaying = false; videoWindow.fullscreen = false;
             activity.players = [selectedPlayer, videoPlayer]; activity.windows = [videoWindow];
         }
@@ -79,6 +78,18 @@ Item {
             verify(!saverState.start(false)); saverState.idle = false; saverState.idle = true;
             verify(saverState.start(false));
         }
+        function test_recording_or_gaming_block_idle_start_and_dismiss_active_saver() {
+            saverState.idle = true;
+            verify(saverState.start(false));
+            saverState.blocked = true;
+            verify(!saverState.active);
+            verify(!saverState.start(false));
+            verify(!saverState.start(true));
+            saverState.blocked = false;
+            saverState.idle = false;
+            saverState.idle = true;
+            verify(saverState.start(false));
+        }
         function test_lock_and_inhibition_hide_active_saver() {
             verify(saverState.start(true)); saverState.sessionAllowed = false; verify(!saverState.active);
             verify(!saverState.start(true)); saverState.sessionAllowed = true; verify(saverState.start(true));
@@ -94,14 +105,12 @@ Item {
             verify(findChild(controls, "screensaver-enabled").checked);
             mouseClick(findChild(controls, "screensaver-timeout-300"));
             compare(theme.commands[1], ["timeout", 300]);
-            mouseClick(findChild(controls, "screensaver-effect-rain"));
-            compare(theme.commands[2], ["effect", "rain"]);
-            mouseClick(findChild(controls, "screensaver-branding-logo"));
-            compare(theme.commands[3], ["branding", "logo"]);
             mouseClick(findChild(controls, "screensaver-timeout-600"));
-            compare(theme.commands[4], ["timeout", 600]);
+            compare(theme.commands[2], ["timeout", 600]);
             mouseClick(findChild(controls, "screensaver-timeout-900"));
-            compare(theme.commands[5], ["timeout", 900]);
+            compare(theme.commands[3], ["timeout", 900]);
+            compare(findChild(controls, "screensaver-branding-logo"), null);
+            compare(findChild(controls, "screensaver-effect-rain"), null);
         }
         function test_busy_disables_actions() {
             theme.screensaverBusy = true;
@@ -109,21 +118,40 @@ Item {
             verify(!findChild(controls, "screensaver-timeout-900").enabled);
         }
         function test_animation_stops_when_inactive() {
-            scene.running = true; wait(90); verify(scene.frameCount > 0);
+            scene.running = true; tryVerify(() => scene.frameCount > 0, 2000);
             scene.running = false; const frames = scene.frameCount; wait(90); compare(scene.frameCount, frames);
+        }
+        function test_matrix_distance_field_atlas_is_available() {
+            const atlas = findChild(scene, "screensaver-matrix-glyphs");
+            tryCompare(atlas, "status", Image.Ready, 2000);
+            compare(atlas.sourceSize.width, 512);
+            compare(atlas.sourceSize.height, 512);
         }
         function test_matrix_glyphs_are_cached_for_reuse() {
             const atlas = findChild(scene, "screensaver-glyph-atlas");
             tryCompare(atlas, "ready", true, 1000);
-            compare(atlas.height, 48);
+            compare(atlas.height, scene.glyphCell * 3);
             verify(atlas.width > 500);
+        }
+        function test_animation_reuses_alphabet_without_rasterizing_columns() {
+            const atlas = findChild(scene, "screensaver-glyph-atlas");
+            tryCompare(atlas, "ready", true, 1000);
+            const builds = atlas.builds;
+            scene.reset();
+            for (let index = 0; index < 3; index++) {
+                scene.elapsed = index + 1;
+                findChild(scene, "screensaver-canvas").requestPaint();
+                wait(40);
+            }
+            compare(atlas.builds, builds);
+            compare(findChild(scene, "screensaver-stream-atlas"), null);
         }
         function test_palette_changes_rebuild_matrix_glyph_colors() {
             const previous = theme.colors;
             try {
                 theme.colors = {foreground: "#ff6666", background: "#110000", surface_alt: "#330000", accent: "#ff2222", accent_alt: "#ff4444", muted: "#aa5555"};
                 tryCompare(findChild(scene, "screensaver-glyph-atlas"), "ready", true, 1000);
-                scene.reset(); scene.elapsed = 7;
+                scene.reset(); scene.elapsed = 21;
                 findChild(scene, "screensaver-canvas").requestPaint(); wait(50);
                 const image = grabImage(scene);
                 let red = 0;
@@ -133,8 +161,8 @@ Item {
                 verify(red > 10);
             } finally { theme.colors = previous; }
         }
-        function test_sixty_frame_budget_is_unchanged_during_formation_hold() {
-            for (const time of [0, 7]) {
+        function test_sixty_frame_budget_continues_through_long_sessions() {
+            for (const time of [0, 21]) {
                 scene.running = true; scene.reset(); scene.elapsed = time;
                 for (let index = 0; index < 120; index++) scene.advance(1 / 120);
                 compare(scene.frameCount, 60);
@@ -157,43 +185,24 @@ Item {
             verify(scene.paintBudget < 1 / scene.targetFps);
             scene.running = false;
         }
-        function test_branding_forms_and_disperses_and_cycles() {
-            scene.elapsed = 7; compare(scene.formation, 1); compare(scene.currentBranding, "wordmark");
-            scene.elapsed = 13; compare(scene.formation, 0);
-            scene.elapsed = 21; compare(scene.currentBranding, "logo"); compare(scene.targetMask, scene.masks.wordmark);
-            scene.effect = "cycle"; scene.elapsed = 0; compare(scene.currentEffect, "matrix");
-            scene.elapsed = 28; compare(scene.currentEffect, "rain");
-            scene.elapsed = 56; compare(scene.currentEffect, "constellation");
-        }
-        function test_assembled_brand_keeps_moving_in_all_effects() {
-            for (const effect of ["matrix", "rain", "constellation"]) {
-                scene.effect = effect; scene.reset(); scene.elapsed = 7;
-                const canvas = findChild(scene, "screensaver-canvas");
+        function test_rain_remains_animated_after_old_branding_times() {
+            const canvas = findChild(scene, "screensaver-canvas");
+            for (const time of [2, 21, 57, 150]) {
+                scene.elapsed = time;
                 canvas.requestPaint(); wait(40);
                 const first = grabImage(scene);
-                scene.elapsed = 7.7;
-                compare(scene.formation, 1);
+                scene.elapsed = time + 0.17;
                 canvas.requestPaint(); wait(40);
                 const second = grabImage(scene);
+                let lit = 0;
                 let changed = 0;
                 for (let y = 0; y < first.height; y += 2)
-                    for (let x = 0; x < first.width; x += 2)
-                        if (first.red(x, y) !== second.red(x, y) || first.blue(x, y) !== second.blue(x, y)) changed++;
-                verify(changed > 5, effect + " must keep moving while the brand holds");
-            }
-        }
-        function test_all_effects_render_and_track_palette() {
-            for (const effect of ["matrix", "rain", "constellation"]) {
-                scene.effect = effect; scene.reset(); scene.elapsed = 9;
-                findChild(scene, "screensaver-canvas").requestPaint(); wait(60);
-                const image = grabImage(scene);
-                verify(image.width > 0);
-                verify(image.red(0, 0) < 40);
-                let illuminated = 0;
-                for (let y = 0; y < image.height; y += 2)
-                    for (let x = 0; x < image.width; x += 2)
-                        if (image.blue(x, y) > 60) illuminated++;
-                verify(illuminated > 10, effect + " must actually render the assembled particles");
+                    for (let x = 0; x < first.width; x += 2) {
+                        if (second.blue(x, y) > 60) lit++;
+                        if (first.blue(x, y) !== second.blue(x, y)) changed++;
+                    }
+                verify(lit > 10, "Matrix rain must stay visible");
+                verify(changed > 10, "Symbols and trails must keep changing");
             }
         }
     }

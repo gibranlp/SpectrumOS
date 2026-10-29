@@ -5,6 +5,7 @@ Item {
     property real headReveal: 1
     property bool showPaws: true
     property bool active: false
+    property bool outfitVisitActive: active
     property bool playing: false
     property bool watching: false
     property bool meeting: false
@@ -134,6 +135,10 @@ Item {
                     sourceSize.width: Math.ceil(cat.width * 2)
                 }
             }
+        }
+        IgorSeasonalOutfit {
+            anchors.fill: parent
+            visitActive: cat.outfitVisitActive
         }
         Canvas {
             id: headphones

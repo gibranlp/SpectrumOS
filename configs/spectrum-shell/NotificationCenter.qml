@@ -57,7 +57,7 @@ PanelWindow {
         attachTop: true
         attachBottom: true
         attachRight: true
-        width: Math.min(352, parent.width)
+        width: Math.min(380, parent.width)
         height: parent.height - center.topInset
         x: center.width - width
         y: center.topInset

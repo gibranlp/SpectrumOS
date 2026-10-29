@@ -61,6 +61,10 @@ class ControlHandler(socketserver.StreamRequestHandler):
                 result = node.start(value.get('minutes'))
             elif action == 'stop':
                 result = node.stop()
+            elif action in ('accept-pair', 'decline-pair'):
+                result = node.decide_pair(value.get('id'), action == 'accept-pair')
+            elif action == 'forget':
+                result = node.forget(value.get('id'))
             elif action in ('accept', 'decline', 'cancel'):
                 if action == 'cancel':
                     with node.lock:
@@ -74,7 +78,7 @@ class ControlHandler(socketserver.StreamRequestHandler):
             elif action == 'scan':
                 import time
                 time.sleep(2)
-                result = {'peers': node.discovery.snapshot() if node.discovery else [],
+                result = {'peers': node.trust.peers(node.discovery.snapshot() if node.discovery else []),
                           'error': node.discovery.error if node.discovery else 'Automatic discovery is unavailable. Use the receiver IP address.'}
             else:
                 raise TransferError('Unknown local SpectrumDrop action.')

@@ -55,7 +55,7 @@ class BootAppearanceTests(unittest.TestCase):
             self.assertNotIn("/Arch Linux", updated)
             self.assertIn("wallpaper: boot():/EFI/BOOT/spectrumos-wallpaper.png", updated)
             self.assertIn("term_foreground: 70a0d0\n", updated)
-            self.assertIn("term_background: cc102030\n", updated)
+            self.assertIn("term_background: 40102030\n", updated)
             self.assertIn("term_background_bright: 203040\n", updated)
             self.assertIn("term_foreground_bright: a080c0\n", updated)
             self.assertIn("interface_branding_colour: a080c0\n", updated)

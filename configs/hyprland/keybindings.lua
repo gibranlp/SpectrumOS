@@ -47,6 +47,8 @@ hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open questline"))
 hl.bind("Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --capture"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --screenshot-area"))
+hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --screenshot-monitor"))
+hl.bind(mainMod .. " + SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/spectrumos/panel --screenshot-window"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/lib/spectrumos/theme-adapter random"))
 hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open mouse"))
 hl.bind(mainMod .. " + SHIFT + A", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open audio-recorder"))

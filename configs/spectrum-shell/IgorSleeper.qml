@@ -55,6 +55,7 @@ Item {
         anchors.fill: parent
         showPaws: true
         headReveal: cat.headReveal
+        outfitVisitActive: cat.active
         blink: cat.eyelids
     }
     Repeater {

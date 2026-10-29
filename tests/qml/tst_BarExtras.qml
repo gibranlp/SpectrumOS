@@ -6,7 +6,7 @@ TestCase {
     id: tests
     name: "BarExtras"
     visible: true
-    width: 440; height: 600
+    width: 440; height: 1400
     when: windowShown
     QtObject {
         id: theme
@@ -20,9 +20,9 @@ TestCase {
     function test_detailed_menu_preserves_secondary_widgets() {
         extras.detailed = true;
         const actions = extras.actions.map(item => item.action);
-        for (const action of ["questline", "updates", "network", "bluetooth", "notifications", "screenshot", "recorder", "audio-recorder", "ukvm"])
+        for (const action of ["questline", "updates", "time", "screenshot", "recorder", "audio-recorder", "ukvm"])
             verify(actions.includes(action), action + " must remain available in More");
-        for (const action of ["weather", "time", "keep-awake", "audio", "battery"])
+        for (const action of ["favorites", "breaks", "brightness", "weather", "keep-awake", "audio", "battery", "displays", "typography", "network", "bluetooth", "notifications"])
             verify(!actions.includes(action), action + " stays on the bar");
         compare(new Set(actions).size, actions.length);
         waitForRendering(extras);
@@ -31,7 +31,7 @@ TestCase {
         compare(chosen.signalArguments[0][0], "dashboard");
     }
     function test_actions_data() {
-        return ["spectrumdrop", "appimages", "time", "battery", "displays", "mouse", "typography", "control", "session"].map(action => ({tag:action, action:action}));
+        return ["spectrumdrop", "appimages", "time", "brightness", "displays", "mouse", "typography", "control", "session"].map(action => ({tag:action, action:action}));
     }
     function test_actions(data) {
         const button = findChild(extras, "bar-extra-" + data.action);

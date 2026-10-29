@@ -16,6 +16,11 @@ PanelWindow {
     property bool expanded: false
     property int selectedIndex: 0
     property var targetScreen: Quickshell.screens[0]
+    property var sourceBar: null
+    property string anchorContext: ""
+    readonly property bool besideWeather: anchorContext === "weather" && !!sourceBar && sourceBar.widgetOpen && sourceBar.widgetPage === "weather"
+    readonly property bool weatherOnLeft: besideWeather && sourceBar.weatherPickerBarPosition === "left"
+    readonly property var weatherAnchor: besideWeather ? sourceBar.weatherPickerAnchor : Qt.rect(0, 0, 0, 0)
     readonly property var filteredRows: rows.filter(row => row.toLowerCase().includes(query.text.toLowerCase()))
 
     screen: targetScreen
@@ -53,6 +58,7 @@ PanelWindow {
         onTextChanged: {
             try {
                 const request = JSON.parse(text());
+                picker.anchorContext = request.anchor || "";
                 picker.prompt = request.prompt || "Select";
                 picker.password = !!request.password;
                 picker.rows = request.rows || [];
@@ -81,15 +87,17 @@ PanelWindow {
             expanded: picker.expanded
             animationsEnabled: picker.theme.animationsEnabled !== false
             bounceEnabled: picker.theme.widgetBounceEnabled !== false
-            edge: "bottom"
+            edge: picker.besideWeather ? (picker.weatherOnLeft ? "left" : "top") : "bottom"
             viewportWidth: picker.width
             viewportHeight: picker.height
         }
         Keys.onEscapePressed: picker.respond("")
-        width: Math.min(520, picker.width - 32)
-        height: Math.min(480, picker.height - 32)
-        x: (picker.width - width) / 2
-        y: picker.height - height - (picker.theme.gamingActive ? 0 : 12)
+        width: Math.min(520, picker.besideWeather
+            ? Math.max(120, picker.weatherOnLeft ? picker.width - picker.weatherAnchor.x - picker.weatherAnchor.width - 24 : picker.weatherAnchor.x - 24)
+            : picker.width - 32)
+        height: Math.min(480, picker.height - (picker.besideWeather ? Math.max(16, picker.weatherAnchor.y) + 16 : 32))
+        x: picker.besideWeather ? (picker.weatherOnLeft ? picker.weatherAnchor.x + picker.weatherAnchor.width + 12 : picker.weatherAnchor.x - width - 12) : (picker.width - width) / 2
+        y: picker.besideWeather ? Math.max(8, Math.min(picker.weatherAnchor.y, picker.height - height - 12)) : picker.height - height - (picker.theme.gamingActive ? 0 : 12)
         radius: 17
         color: picker.theme.colors.surface
         border { color: picker.theme.colors.accent; width: 1 }

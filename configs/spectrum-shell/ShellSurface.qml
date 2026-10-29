@@ -111,7 +111,7 @@ Rectangle {
         curveRadius: surface.joinRadius
         visible: surface.attachTop && !surface.attachLeft
         y: -surface.topAttachmentHeight
-        x: -width + frameThickness
+        x: -width + frameThickness + 1
         frameThickness: surface.topFrameThickness
         mirrorX: true
         surfaceColor: surface.color
@@ -121,7 +121,7 @@ Rectangle {
         curveRadius: surface.joinRadius
         visible: surface.attachTop && !surface.attachRight
         y: -surface.topAttachmentHeight
-        x: surface.width - frameThickness
+        x: surface.width - frameThickness - 1
         frameThickness: surface.topFrameThickness
         surfaceColor: surface.color
     }

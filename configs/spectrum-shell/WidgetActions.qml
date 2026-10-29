@@ -23,6 +23,7 @@ QtObject {
         {icon:"󰚰", label:qsTranslate("Spectrum", "Updates"), action:"updates"},
         {icon:"󰸉", label:qsTranslate("Spectrum", "Wallpapers"), action:"wallpapers"},
         {icon:"󰕾", label:qsTranslate("Spectrum", "Audio"), action:"audio"},
+        {icon:"󰃠", label:qsTranslate("Spectrum", "Brightness"), action:"brightness"},
         {icon:"󰖩", label:qsTranslate("Spectrum", "Network"), action:"network"},
         {icon:"󰂯", label:qsTranslate("Spectrum", "Bluetooth"), action:"bluetooth"},
         {icon:"󰍹", label:qsTranslate("Spectrum", "Displays"), action:"displays"},

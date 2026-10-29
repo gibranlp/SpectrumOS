@@ -96,7 +96,8 @@ def main() -> int:
         "wallpaper": f"boot():/{relative}",
         "wallpaper_style": "stretched",
         "backdrop": colors["background"],
-        "term_background": "cc" + colors["background"],
+        # Una transparencia del 25 % deja ver el fondo sin perder contraste en el menú.
+        "term_background": "40" + colors["background"],
         "term_foreground": colors["accent"],
         "term_background_bright": colors["surface"],
         "term_foreground_bright": colors["accent_alt"],

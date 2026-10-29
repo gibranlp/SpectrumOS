@@ -1,6 +1,6 @@
 pkgname=spectrum-hyprland
-pkgver=1.0.0
-pkgrel=13
+pkgver=1.0.1
+pkgrel=1
 pkgdesc="Hyprland session defaults for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
@@ -8,10 +8,11 @@ license=(MIT)
 depends=('spectrum-base>=1.0.0' hyprland hypridle hyprlock polkit-gnome uwsm spectrum-theme xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
 install=spectrum-hyprland.install
 options=(!strip !debug)
-_source_revision=a1d68347eb8e7fe9
-_source_root="spectrumos-source-$pkgver"
-source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
-sha256sums=('223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20')
+_source_revision=0e71973ee120e7cd
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
+sha256sums=('6b96c066265447787da0cfb07dceaec81509cbe9fa02d41b983aac70295274a5')
 
 check() {
     local _project="$srcdir/$_source_root"

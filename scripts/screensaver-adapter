@@ -7,12 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image, ImageDraw, ImageFont
-
-DEFAULTS = {"enabled": True, "timeout": 180, "effect": "matrix", "branding": "alternate"}
-EFFECTS = ("matrix", "rain", "constellation", "cycle")
-BRANDING = ("wordmark", "logo", "alternate")
-LOGO = Path('/var/lib/spectrumos/appearance/logo.png')
+DEFAULTS = {"enabled": True, "timeout": 180}
 
 
 def config_path():
@@ -30,9 +25,6 @@ def read_settings():
     timeout = data.get('timeout')
     if isinstance(timeout, int) and not isinstance(timeout, bool) and 30 <= timeout <= 900:
         settings['timeout'] = timeout
-    for key, choices in [('effect', EFFECTS), ('branding', BRANDING)]:
-        if data.get(key) in choices:
-            settings[key] = data[key]
     return data, settings
 
 
@@ -41,7 +33,7 @@ def save(key, value):
         value = value == 'on'
     elif key == 'timeout' and value.isdecimal() and 30 <= int(value) <= 900:
         value = int(value)
-    elif not ((key == 'effect' and value in EFFECTS) or (key == 'branding' and value in BRANDING)):
+    else:
         raise ValueError('Choose a valid screensaver setting; delay must be 30–900 seconds')
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,40 +72,13 @@ def session_state():
     if not isinstance(entries, list):
         raise ValueError('Invalid idle inhibitor state')
     inhibited = any('idle' in str(entry.get('what', '')).split(':') and entry.get('mode') == 'block'
+                    and not (entry.get('who') == 'SpectrumOS'
+                             and entry.get('why') == 'SpectrumOS keep awake'
+                             and entry.get('uid') == os.getuid())
                     for entry in entries)
     locked = fields.get('LockedHint') != 'no' or locker.returncode == 0
     return {'allowed': fields.get('Active') == 'yes' and fields.get('Type') == 'wayland'
             and not locked and not inhibited, 'locked': locked, 'inhibited': inhibited}
-
-
-def points(image):
-    image = image.convert('RGBA')
-    alpha = image.getchannel('A')
-    found = [(x / (image.width - 1), y / (image.height - 1))
-             for y in range(1, image.height, 2) for x in range(1, image.width, 2)
-             if alpha.getpixel((x, y)) > 96]
-    stride = max(1, (len(found) + 699) // 700)
-    return {'points': found[::stride], 'aspect': image.width / image.height}
-
-
-def masks():
-    font_path = subprocess.run(['fc-match', '-f', '%{file}', 'sans-serif:style=Bold'],
-                               capture_output=True, text=True, timeout=3).stdout
-    font = ImageFont.truetype(font_path, 40) if Path(font_path).is_file() else ImageFont.load_default(size=40)
-    box = font.getbbox('SpectrumOS')
-    word = Image.new('RGBA', (box[2] - box[0] + 8, box[3] - box[1] + 8))
-    ImageDraw.Draw(word).text((4 - box[0], 4 - box[1]), 'SpectrumOS', font=font, fill='white')
-    word = word.resize((180, max(12, round(180 * word.height / word.width))))
-    logo = {'points': [], 'aspect': 1}
-    if LOGO.is_file():
-        with Image.open(LOGO) as image:
-            image = image.convert('RGBA')
-            box = image.getchannel('A').getbbox()
-            if box:
-                image = image.crop(box)
-                image.thumbnail((84, 76))
-                logo = points(image)
-    return {'wordmark': points(word), 'logo': logo}
 
 
 def main(args):
@@ -124,10 +89,8 @@ def main(args):
             response = save(args[1], args[2])
         elif args == ['session']:
             response = session_state()
-        elif args == ['masks']:
-            response = masks()
         else:
-            raise ValueError('Usage: screensaver-adapter --json|set KEY VALUE|session|masks')
+            raise ValueError('Usage: screensaver-adapter --json|set KEY VALUE|session')
         print(json.dumps(response, separators=(',', ':')))
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:

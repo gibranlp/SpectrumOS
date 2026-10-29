@@ -125,6 +125,7 @@ def prepare_selection(payload):
         if read_state('transfer').get('active'):
             raise ValueError('Finish or cancel the current transfer before selecting more files.')
         write_state('selection', {'paths': paths, 'expires': time.time() + 900})
+        write_state('transfer', {})
     return dict(ok=True, selection=selection_summary())
 
 
@@ -174,9 +175,9 @@ def scan_lan():
     return dict(ok=True, peers=peers, warning=value.get('error', ''))
 
 
-def send_lan(address, payload):
+def send_lan(address, payload, pair=False):
     code = payload.get('code', '')
-    if not isinstance(code, str) or not re.fullmatch(r'[A-Z2-7]{16}', code.upper().replace('-', '').replace(' ', '')):
+    if not isinstance(code, str) or ((code or pair or address == 'manual') and not re.fullmatch(r'[A-Z2-7]{16}', code.upper().replace('-', '').replace(' ', ''))):
         raise ValueError('Enter the 16-character code shown on the receiving Spectrum PC.')
     if address == 'manual':
         value = payload.get('address', '').strip()
@@ -193,6 +194,15 @@ def send_lan(address, payload):
         target = {'addresses': [host], 'port': port, 'name': 'Spectrum PC'}
     else:
         target = next((row for row in read_state('lan-peers').get('peers', []) if row['mac'] == address), None)
+        if not code:
+            identifier = address.removeprefix('lan:')
+            saved = next((row for row in lan_status().get('paired', []) if row['id'] == identifier), None)
+            if saved is None:
+                raise ValueError('Pair this PC first or enter its receiver code.')
+            if target is None:
+                target = saved
+            if target['fingerprint'] != saved['fingerprint']:
+                raise ValueError('This paired PC identity changed. Check the other PC, then forget and pair again.')
         if target is None:
             raise ValueError('This device is no longer listed. Search again.')
     with open(runtime() / 'send.lock', 'a') as lock:
@@ -202,17 +212,18 @@ def send_lan(address, payload):
             raise ValueError('A transfer is already running.')
         import secrets
         job_id = secrets.token_hex(16)
-        job = {'peer': target, 'code': code}
+        job = {'peer': target, 'code': code, 'pair': pair}
         queued = selection()
-        if queued:
+        if queued and not pair:
             job['paths'] = selected_files(queued.get('paths'))
         write_state('lan-job-' + job_id, job)
-        write_state('transfer', dict(active=True, phase='choosing', peer=address, transport='lan', message='Choose files…', updated=time.time()))
+        write_state('transfer', dict(active=True, phase='preparing' if pair else 'choosing', peer=address, transport='lan', message='Pairing PCs…' if pair else 'Choose files…', updated=time.time()))
         try:
             run(['systemd-run', '--user', '--quiet', '--collect', '--unit=' + UNIT,
                  '--property=Type=exec', '--property=TimeoutStopSec=12s',
                  '--property=KillMode=control-group', sys.argv[0], 'worker-lan', job_id])
-            (runtime() / 'selection.json').unlink(missing_ok=True)
+            if not pair:
+                (runtime() / 'selection.json').unlink(missing_ok=True)
         except (OSError, ValueError):
             (runtime() / ('lan-job-' + job_id + '.json')).unlink(missing_ok=True)
             write_state('transfer', dict(active=False, phase='failed', message='Could not start sending.'))
@@ -236,7 +247,9 @@ def worker_lan(job_id):
     signal.signal(signal.SIGTERM, stopping)
     signal.signal(signal.SIGINT, stopping)
     try:
-        if 'paths' in job:
+        if job.get('pair'):
+            pass
+        elif 'paths' in job:
             job['paths'] = selected_files(job['paths'])
         else:
             directory = lan_status().get('dir') or str(Path.home() / 'Downloads')
@@ -449,6 +462,11 @@ def action(args, payload=None):
         return scan_lan()
     if command == 'send-lan' and len(args) == 2:
         return send_lan(args[1], payload)
+    if command == 'pair-lan' and len(args) == 2:
+        return send_lan(args[1], payload, pair=True)
+    if command in ('accept-pair-lan', 'decline-pair-lan', 'forget-lan') and len(args) == 2:
+        lan_command(command.removesuffix('-lan'), args[1])
+        return status('lan')
     if command == 'copy-lan-code' and len(args) == 1:
         code = lan_status().get('code', '')
         if code:
@@ -499,7 +517,7 @@ if __name__ == '__main__':
     else:
         try:
             payload = {}
-            if sys.argv[1:2] in (['send-lan'], ['prepare-selection']):
+            if sys.argv[1:2] in (['send-lan'], ['pair-lan'], ['prepare-selection']):
                 limit = 128 * 1024 if sys.argv[1] == 'prepare-selection' else 8192
                 raw = sys.stdin.buffer.readline(limit + 1)
                 if len(raw) > limit:

@@ -13,7 +13,7 @@ PanelWindow {
     screen: targetScreen
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.layer: WlrLayer.Top
     color: "transparent"
     focusable: false
     mask: Region {}

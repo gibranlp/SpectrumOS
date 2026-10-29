@@ -14,7 +14,7 @@ PanelWindow {
     property int leftInset: 0
     readonly property bool leftBar: theme.barPosition === "left"
     property bool expanded: false
-    property bool annotate: true
+    property bool annotate: false
     property string pendingMode: ""
     signal captureRequested(string mode)
 

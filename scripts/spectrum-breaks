@@ -40,8 +40,10 @@ def main():
                 Path(temporary).unlink(missing_ok=True)
         elif action == 'notify':
             kind = sys.argv[2]
-            messages = {'eyes': ('Rest your eyes', 'Look at something about 6 metres away for 20 seconds.'),
-                        'movement': ('Time to move', 'Take a short break, stand up if comfortable, and change your position.')}
+            messages = {'started': ('Break reminders started', 'Your work timer is running. We will notify you when it is time for a break.'),
+                        'resumed': ('Break finished', 'Your three-minute break is over. A new work timer has started.'),
+                        'eyes': ('Rest your eyes', 'Take a three-minute break. Rest your eyes and look away from the screen.'),
+                        'movement': ('Time to move', 'Take a three-minute break. Stand up if comfortable and change your position.')}
             title, message = messages[kind]
             subprocess.run(['notify-send', '--app-name=SpectrumOS', '--icon=preferences-desktop-accessibility',
                             '--expire-time=12000', translate(title), translate(message)], check=True, timeout=5)

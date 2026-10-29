@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import Quickshell
-import Quickshell.Services.SystemTray
 import Quickshell.Services.UPower
 import Quickshell.Wayland
 
@@ -18,6 +17,7 @@ PanelWindow {
     property int panelLeftInset: theme.panelLeftInset
     property int panelTopInset: theme.panelTopInset
     property bool expanded: false
+    readonly property rect pickerAnchor: Qt.rect(card.x, card.y, card.width, card.height)
     property int previewMasterVolume: -1
     readonly property bool draggingVolume: volumeSlider.pressed || deviceDragging(outputDevices) || deviceDragging(inputDevices)
     function deviceDragging(repeater): bool {
@@ -94,6 +94,7 @@ PanelWindow {
         MouseArea { anchors.fill: parent }
 
         Flickable {
+            id: bodyScroll
             objectName: "audio-scroll"
             interactive: !widget.draggingVolume
             flickableDirection: Flickable.VerticalFlick
@@ -112,7 +113,7 @@ PanelWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: widget.page === "appimages" ? qsTranslate("Spectrum", "APPIMAGES") : widget.page === "extras" ? qsTranslate("Spectrum", "MORE") : widget.page === "mouse" ? qsTranslate("Spectrum", "MOUSE") : widget.page === "time" ? qsTranslate("Spectrum", "TIME & REGION") : widget.page === "typography" ? qsTranslate("Spectrum", "TYPOGRAPHY") : widget.page === "wifi" ? qsTranslate("Spectrum", "NETWORK") : widget.page === "bluetooth" ? qsTranslate("Spectrum", "BLUETOOTH") : widget.page === "displays" ? qsTranslate("Spectrum", "DISPLAYS") : widget.page === "weather" ? qsTranslate("Spectrum", "WEATHER") : widget.page === "battery" ? (widget.hasBattery ? qsTranslate("Spectrum", "POWER & BATTERY") : qsTranslate("Spectrum", "POWER & SYSTEM")) : qsTranslate("Spectrum", "AUDIO")
+                        text: widget.page === "appimages" ? qsTranslate("Spectrum", "APPIMAGES") : widget.page === "extras" ? qsTranslate("Spectrum", "MORE") : widget.page === "mouse" ? qsTranslate("Spectrum", "MOUSE") : widget.page === "time" ? qsTranslate("Spectrum", "TIME & REGION") : widget.page === "typography" ? qsTranslate("Spectrum", "TYPOGRAPHY") : widget.page === "wifi" ? qsTranslate("Spectrum", "NETWORK") : widget.page === "bluetooth" ? qsTranslate("Spectrum", "BLUETOOTH") : widget.page === "brightness" ? qsTranslate("Spectrum", "Brightness") : widget.page === "displays" ? qsTranslate("Spectrum", "DISPLAYS") : widget.page === "weather" ? qsTranslate("Spectrum", "WEATHER") : widget.page === "battery" ? (widget.hasBattery ? qsTranslate("Spectrum", "POWER & BATTERY") : qsTranslate("Spectrum", "POWER & SYSTEM")) : qsTranslate("Spectrum", "AUDIO")
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize + 3; bold: true }
                     }
@@ -137,7 +138,6 @@ PanelWindow {
                         detailed: widget.barProfile === "detailed"
                         theme: widget.theme
                         window: widget
-                        trayItems: SystemTray.items
                         onChosen: action => { widget.expanded = false; widget.extraRequested(action); }
                     }
                 }
@@ -173,6 +173,13 @@ PanelWindow {
                         id: timeRegionContent
                         active: widget.expanded && visible
                         theme: widget.theme
+                        onPickerOpened: selector => {
+                            const top = selector.mapToItem(body, 0, 0).y;
+                            const bottom = top + selector.height;
+                            const target = bottom > bodyScroll.contentY + bodyScroll.height
+                                ? bottom - bodyScroll.height : Math.min(bodyScroll.contentY, top);
+                            bodyScroll.contentY = Math.max(0, Math.min(target, bodyScroll.contentHeight - bodyScroll.height));
+                        }
                     }
                 }
 
@@ -705,6 +712,11 @@ PanelWindow {
                     onSettingsRequested: widget.expanded = false
                 }
 
+                BrightnessControls {
+                    visible: widget.page === "brightness"
+                    Layout.fillWidth: true
+                    theme: widget.theme
+                }
                 DisplayWidgetContent {
                     visible: widget.page === "displays"
                     Layout.fillWidth: true

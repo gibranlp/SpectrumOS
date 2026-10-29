@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls as Controls
 import "NotificationStyle.js" as NotificationStyle
 
 ShellSurface {
@@ -12,39 +13,54 @@ ShellSurface {
     signal actionInvoked(string identifier)
     property bool revealed: true
     required property bool presented
+    property real maximumHeight: 520
+    property real exitProgress: 0
+    opacity: 1 - exitProgress
     onRevealedChanged: {
-        if (!revealed && !motion.active)
-            Qt.callLater(() => dismissed());
+        if (!revealed) {
+            if (theme.animationsEnabled !== false && presented) exitAnimation.start();
+            else { exitProgress = 1; Qt.callLater(() => dismissed()); }
+        }
     }
     signal activated()
     signal dismissed()
-    transform: ShellMotion {
+    transform: [Translate { x: card.width * card.exitProgress }, ShellMotion {
         id: motion
         surface: card
         animationsEnabled: card.theme.animationsEnabled !== false
         bounceEnabled: card.theme.widgetBounceEnabled !== false
-        expanded: card.revealed && card.presented
+        expanded: card.presented
         edge: "right"
         viewportWidth: card.parent.width
         viewportHeight: card.parent.height
-        onActiveChanged: {
-            if (!active && !card.revealed)
-                card.dismissed();
-        }
+    }]
+    NumberAnimation {
+        id: exitAnimation
+        target: card; property: "exitProgress"
+        to: 1; duration: 240; easing.type: Easing.InCubic
+        onFinished: card.dismissed()
     }
 
-    height: content.implicitHeight + 28
+    height: Math.min(content.implicitHeight + 36, maximumHeight)
     radius: 18
     color: card.palette.background
 
     KeyboardAction {anchors.fill:parent;onActivated:card.activated()}
 
+    Flickable {
+        id: viewport
+        anchors.fill: parent
+        anchors.margins: 18
+        contentWidth: width
+        contentHeight: content.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+        clip: true
+        Controls.ScrollBar.vertical: Controls.ScrollBar { policy: Controls.ScrollBar.AsNeeded }
     RowLayout {
         id: content
         z:1
-        x: 14
-        y: 14
-        width: card.width - 28
+        width: viewport.width
         spacing: 12
 
         Rectangle {
@@ -86,8 +102,6 @@ ShellSurface {
                 text: card.notification.summary
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
                 color: card.palette.foreground
                 font { family: card.theme.fontFamily; pixelSize: card.theme.fontSize + 1; bold: true }
             }
@@ -97,8 +111,6 @@ ShellSurface {
                 text: card.notification.body
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
-                maximumLineCount: card.palette.persistent ? 5 : 2
-                elide: Text.ElideRight
                 color: card.palette.muted
                 font { family: card.theme.fontFamily; pixelSize: card.theme.fontSize }
             }
@@ -123,6 +135,7 @@ ShellSurface {
                 }
             }
         }
+    }
     }
 
 }

@@ -142,6 +142,7 @@ Item {
                 height: stage.catDepth
                 rotation: stage.edge === "top" ? 180 : stage.edge === "left" ? 90 : stage.edge === "right" ? -90 : 0
                 headReveal: stage.headReveal
+                outfitVisitActive: stage.visiting
                 active: stage.visiting && motion.progress > 0.98 && stage.headReveal === 1
                 playing: stage.playing
                 watching: stage.watching

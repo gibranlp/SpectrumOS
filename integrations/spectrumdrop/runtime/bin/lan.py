@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lan.common import MAX_JSON, TransferError, configuration, data_dir, ensure_identity, runtime_dir
 from lan.control import ControlServer, rpc
 from lan.service import Node
+from lan.trust import TrustStore
 
 UNIT = 'spectrumdrop-lan.service'
 
@@ -101,10 +102,15 @@ def send():
         if cancel.is_set():
             raise InterruptedError('Transfer cancelled.')
         print(json.dumps({'ok': True, **value}), flush=True)
-    client = Client(job['peer'], job['code'], progress=progress, cancel=cancel)
+    identity = ensure_identity(data_dir())
+    client = Client(job['peer'], job.get('code', ''), progress=progress, cancel=cancel, identity=identity)
     try:
-        client.send(job['paths'], sender=socket.gethostname())
-        progress({'phase': 'complete', 'message': 'Files sent and verified successfully.', 'percent': 100})
+        if job.get('pair'):
+            client.pair(name=configuration()['name'])
+            progress({'phase': 'complete', 'message': 'PCs paired. You can now send files without a code.', 'percent': 100})
+        else:
+            client.send(job['paths'], sender=socket.gethostname())
+            progress({'phase': 'complete', 'message': 'Files sent and verified successfully.', 'percent': 100})
     except BaseException:
         client.abort()
         raise
@@ -125,7 +131,8 @@ def main():
             value = rpc('status')
         except (FileNotFoundError, ConnectionRefusedError):
             value = {'ok': True, 'available': True, 'receiving': False, 'name': socket.gethostname(),
-                     'remaining': 0, 'dir': configuration()['directory'], 'code': '', 'incoming': [], 'addresses': []}
+                     'remaining': 0, 'dir': configuration()['directory'], 'code': '', 'incoming': [], 'addresses': [],
+                     'paired': TrustStore(data_dir()).public(), 'pair_requests': []}
     elif len(args) == 2 and args[0] == 'receive':
         minutes = int(args[1])
         if minutes not in (5, 10, 30):
@@ -140,8 +147,11 @@ def main():
             value = rpc('stop')
         except (FileNotFoundError, ConnectionRefusedError):
             value = {'ok': True, 'receiving': False}
-    elif len(args) == 2 and args[0] in ('accept', 'decline'):
+    elif len(args) == 2 and args[0] in ('accept', 'decline', 'accept-pair', 'decline-pair'):
         value = rpc(args[0], id=args[1])
+    elif len(args) == 2 and args[0] == 'forget':
+        ensure_service()
+        value = rpc('forget', id=args[1])
     else:
         raise TransferError('Usage: lan.py status|receive MINUTES|scan|stop|accept ID|decline ID|send|daemon')
     print(json.dumps(value), flush=True)

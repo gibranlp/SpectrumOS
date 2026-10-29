@@ -182,6 +182,8 @@ Game compatibility depends on drivers, Proton, and anti-cheat support. Calling e
 | `Super + Shift + G` | Default applications |
 | `Super + S` | File search |
 | `Print` | Screenshot widget and annotations |
+| `Super + Print` | Select a monitor for a screenshot |
+| `Super + Shift + Print` | Select a window for a screenshot |
 | `Super + Shift + S` / `Super + Shift + A` | Screen / audio recording |
 | `Super + Shift + D` | SpectrumDrop |
 | `Super + Shift + U` | App Store |

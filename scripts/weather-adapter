@@ -275,7 +275,7 @@ def lockscreen_weather() -> str:
 
 def choose(prompt: str, options: list[str]) -> str:
     result = subprocess.run(
-        (WOFI, "calculator", "--dmenu", "--prompt", prompt),
+        (WOFI, "calculator", "--dmenu", "--anchor", "weather", "--prompt", prompt),
         input="\n".join(options),
         check=False,
         capture_output=True,
@@ -311,11 +311,28 @@ def select_location() -> None:
     if selected not in by_label:
         return
     result = by_label[selected]
-    token = hashlib.sha256(f'{result.get("id", "")}:{result.get("latitude")}:{result.get("longitude")}'.encode()).hexdigest()[:16]
+    add_location(result)
+
+
+def search_locations(query: str) -> dict:
+    if not 2 <= len(query.strip()) <= 200:
+        return {"ok": False, "error": "Enter at least two characters."}
+    try:
+        response = request_json(GEOCODING_URL, {"name": query.strip(), "count": 8, "language": "en", "format": "json"})
+        return {"ok": True, "results": response.get("results", [])[:8]}
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+        return {"ok": False, "error": "City search failed. Check the connection and try again."}
+
+
+def add_location(result: dict) -> None:
+    latitude, longitude = float(result['latitude']), float(result['longitude'])
+    if not math.isfinite(latitude) or not math.isfinite(longitude) or not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise ValueError('Invalid city coordinates.')
+    token = hashlib.sha256(f'{result.get("id", "")}:{latitude}:{longitude}'.encode()).hexdigest()[:16]
     state = load_state()
     location = {
         "token": token,
-        "name": str(result.get("name", "Location")),
+        "name": str(result.get("name", "Location"))[:200],
         "region": ", ".join(part for part in (str(result.get("admin1", "")), str(result.get("country", ""))) if part),
         "latitude": float(result["latitude"]),
         "longitude": float(result["longitude"]),
@@ -359,6 +376,11 @@ def main() -> None:
         launch_job("_select")
     elif arguments == ["select-native"]:
         launch_job("_select-native")
+    elif len(arguments) == 2 and arguments[0] == "search":
+        print(json.dumps(search_locations(arguments[1])))
+    elif len(arguments) == 2 and arguments[0] == "add-location":
+        add_location(json.loads(arguments[1]))
+        print(json.dumps({"ok": True}))
     elif arguments == ["_select-native"]:
         select_location()
     elif arguments == ["_select"]:

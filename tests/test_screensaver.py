@@ -8,8 +8,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PIL import Image
-
 ROOT = Path(__file__).resolve().parents[1]
 loader = importlib.machinery.SourceFileLoader('screensaver', str(ROOT / 'scripts/screensaver-adapter'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -28,8 +26,7 @@ class ScreensaverTests(unittest.TestCase):
             path = saver.config_path()
             path.parent.mkdir()
             path.write_text('{"personal":"preserved"}')
-            for key, values in [('enabled', ['off', 'on']), ('timeout', ['30', '180', '540', '600', '900']),
-                                ('effect', saver.EFFECTS), ('branding', saver.BRANDING)]:
+            for key, values in [('enabled', ['off', 'on']), ('timeout', ['30', '180', '540', '600', '900'])]:
                 for value in values:
                     saver.save(key, value)
                     self.assertEqual(json.loads(path.read_text())['personal'], 'preserved')
@@ -39,7 +36,7 @@ class ScreensaverTests(unittest.TestCase):
 
     def test_invalid_settings_cannot_modify_saved_values(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'XDG_CONFIG_HOME': directory}):
-            saver.save('effect', 'rain')
+            saver.save('timeout', '180')
             original = saver.config_path().read_bytes()
             for key, value in [('enabled', 'yes'), ('timeout', '0'), ('timeout', '901'),
                                ('timeout', '1; echo unsafe'), ('effect', 'bad'), ('branding', '../logo'), ('bad', 'on')]:
@@ -71,33 +68,42 @@ class ScreensaverTests(unittest.TestCase):
             with self.subTest(allowed=allowed), patch.object(saver.subprocess, 'run', side_effect=responses):
                 self.assertEqual(saver.session_state()['allowed'], allowed)
 
+    def test_keep_awake_allows_screensaver_but_other_idle_inhibitors_still_block(self):
+        keep_awake = {'who': 'SpectrumOS', 'why': 'SpectrumOS keep awake',
+                      'uid': os.getuid(), 'what': 'sleep:idle', 'mode': 'block'}
+        for entries, allowed in [([keep_awake], True),
+                                 ([keep_awake, {'what': 'idle', 'mode': 'block'}], False),
+                                 ([dict(keep_awake, uid=os.getuid() + 1)], False),
+                                 ([dict(keep_awake, why='Other task')], False)]:
+            with self.subTest(entries=entries), patch.object(
+                    saver.subprocess, 'run', side_effect=self.session_responses(inhibitors=entries)):
+                self.assertEqual(saver.session_state()['allowed'], allowed)
+
     def test_session_failure_is_closed(self):
         responses = self.session_responses()
         responses[0].returncode = 1
         with patch.object(saver.subprocess, 'run', side_effect=responses):
             self.assertFalse(saver.session_state()['allowed'])
 
-    def test_branding_masks_are_bounded_and_logo_falls_back(self):
-        with tempfile.TemporaryDirectory() as directory:
-            logo = Path(directory) / 'logo.png'
-            image = Image.new('RGBA', (200, 200))
-            image.paste('white', (50, 20, 150, 180))
-            image.save(logo)
-            with patch.object(saver, 'LOGO', logo):
-                masks = saver.masks()
-            for mask in masks.values():
-                self.assertGreater(len(mask['points']), 20)
-                self.assertLessEqual(len(mask['points']), 700)
-                self.assertTrue(all(0 <= coordinate <= 1 for point in mask['points'] for coordinate in point))
-            self.assertAlmostEqual(masks['logo']['aspect'], 100 / 160, places=1)
-            with patch.object(saver, 'LOGO', Path(directory) / 'missing.png'):
-                self.assertEqual(saver.masks()['logo']['points'], [])
+    def test_legacy_visual_settings_do_not_restore_branding_or_other_effects(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'XDG_CONFIG_HOME': directory}):
+            path = saver.config_path()
+            path.parent.mkdir()
+            path.write_text('{"effect":"cycle","branding":"logo","timeout":600}')
+            self.assertEqual(saver.read_settings()[1], {'enabled': True, 'timeout': 600})
+            saver.save('enabled', 'off')
+            self.assertEqual(json.loads(path.read_text())['branding'], 'logo')
+            self.assertEqual(saver.read_settings()[1], {'enabled': False, 'timeout': 600})
 
     def test_packaging_and_adoption_include_screensaver(self):
         recipe = ROOT / 'packages/spectrum-desktop/PKGBUILD'
         if not recipe.exists():
             recipe = Path('/startdir/PKGBUILD')
         self.assertIn('screensaver-adapter', recipe.read_text())
+        self.assertIn('configs/spectrum-shell/*.qsb', recipe.read_text())
+        self.assertIn('configs/spectrum-shell/matrix-*', recipe.read_text())
+        self.assertIn('Copyright (c) 2018 Rezmason', (ROOT / 'configs/spectrum-shell/matrix-LICENSE.txt').read_text())
+        self.assertIn('configs/spectrum-shell/*.qsb', (ROOT / 'install.sh').read_text())
         self.assertIn("'quickshell>=0.3.0'", recipe.read_text())
         self.assertIn('scripts/screensaver-adapter', (ROOT / 'install.sh').read_text())
         self.assertIn('ScreensaverController', (ROOT / 'configs/spectrum-shell/shell.qml').read_text())

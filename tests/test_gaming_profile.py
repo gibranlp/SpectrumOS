@@ -11,11 +11,14 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def load():
+def load(detection=False):
     loader = SourceFileLoader('gaming_session', str(ROOT / 'scripts/spectrum-gaming-session'))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
+    if not detection:
+        module.steam_game_active = mock.Mock(return_value=False)
+    module.run = mock.Mock(return_value=mock.Mock(returncode=0))
     return module
 
 
@@ -138,7 +141,7 @@ class GamingProfileTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 session.start()
             self.assertEqual(animations.call_args_list, [mock.call(False), mock.call(True)])
-            self.assertEqual([call.args[-1] for call in run.call_args_list], ['--game-start', '--game-end'])
+            self.assertEqual([call.args[1:] for call in run.call_args_list], [('--game-start', 'session'), ('--game-end', 'session')])
             library.real_gamemode_request_end.assert_not_called()
 
     def test_successful_session_restores_both_prior_animation_states(self):
@@ -160,7 +163,7 @@ class GamingProfileTests(unittest.TestCase):
                 self.assertEqual(animations.call_args_list, [mock.call(False), mock.call(previous)])
                 library.real_gamemode_request_end.assert_called_once()
 
-    def test_stale_game_hooks_do_not_block_performance_or_restoration(self):
+    def test_session_power_requests_use_separate_owner(self):
         module = load()
         library = mock.Mock()
         library.real_gamemode_request_start.return_value = 0
@@ -177,7 +180,7 @@ class GamingProfileTests(unittest.TestCase):
             session.start()
             session.stop()
             self.assertEqual([call.args[1:] for call in run.call_args_list],
-                             [('--game-start',), ('--set', 'performance'), ('--game-end',), ('--set', 'balanced')])
+                             [('--game-start', 'session'), ('--set', 'performance'), ('--game-end', 'session')])
 
     def test_configuration_reload_cannot_enable_animation_during_gaming(self):
         module = load()
@@ -201,3 +204,62 @@ class GamingProfileTests(unittest.TestCase):
                 module.GamingSession().start()
             self.assertEqual(animations.call_args_list, [mock.call(False), mock.call(True)])
             run.assert_not_called()
+
+
+class SteamDetectionTests(unittest.TestCase):
+    def test_game_environment_detected_but_launcher_and_other_users_ignored(self):
+        module = load(detection=True)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(module, 'PROC', Path(directory)):
+            process = Path(directory) / '123'
+            process.mkdir()
+            environment = process / 'environ'
+            for content, expected in [(b'SteamAppId=0\0', False), (b'PATH=/usr/bin\0', False),
+                                      (b'SteamAppId=12345\0', True), (b'SteamGameId=98765\0', True)]:
+                environment.write_bytes(content)
+                self.assertEqual(module.steam_game_active(), expected)
+            with mock.patch.object(module.os, 'getuid', return_value=-1):
+                self.assertFalse(module.steam_game_active())
+            environment.unlink()
+            self.assertFalse(module.steam_game_active())
+
+    def test_steam_game_owns_registration_and_releases_without_feedback(self):
+        module = load()
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(module, 'RUNTIME', Path(directory)), \
+             mock.patch.object(module, 'game_active', side_effect=[False, False, False]), \
+             mock.patch.object(module, 'steam_game_active', side_effect=[False, True, False]), \
+             mock.patch.object(module, 'GamingSession') as session:
+            session.return_value.stop.return_value = ''
+            controller = module.GamingController()
+            self.assertFalse(controller.update(False)['active'])
+            self.assertTrue(controller.update(False)['automatic'])
+            self.assertFalse(controller.update(False)['active'])
+            session.return_value.start.assert_called_once()
+            session.return_value.stop.assert_called_once()
+            self.assertEqual([call.args[-1] for call in module.run.call_args_list], ['0', '2', '0'])
+
+    def test_steam_ending_keeps_external_gamemode_session_active(self):
+        module = load()
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(module, 'RUNTIME', Path(directory)), \
+             mock.patch.object(module, 'game_active', side_effect=[False, True, False]), \
+             mock.patch.object(module, 'steam_game_active', side_effect=[True, False, False]), \
+             mock.patch.object(module, 'GamingSession') as steam, \
+             mock.patch.object(module, 'AutomaticGamingSession') as automatic:
+            steam.return_value.stop.return_value = automatic.return_value.stop.return_value = ''
+            controller = module.GamingController()
+            self.assertTrue(controller.update(False)['automatic'])
+            self.assertTrue(controller.update(False)['automatic'])
+            steam.return_value.stop.assert_called_once()
+            automatic.return_value.start.assert_called_once()
+            self.assertFalse(controller.update(False)['active'])
+
+    def test_own_registration_is_excluded_from_external_detection(self):
+        module = load()
+        library = mock.Mock()
+        library.real_gamemode_query_status.return_value = 2
+        with mock.patch.object(module.ctypes, 'CDLL', return_value=library):
+            for clients, expected in [([[os.getpid(), '/self']], False),
+                                      ([[os.getpid(), '/self'], [os.getpid() + 1, '/external']], True)]:
+                module.run.return_value = mock.Mock(returncode=0, stdout=json.dumps({'data': [clients]}))
+                self.assertEqual(module.game_active(), expected)

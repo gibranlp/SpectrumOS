@@ -1,6 +1,6 @@
 pkgname=spectrum-base
-pkgver=1.0.0
-pkgrel=6
+pkgver=1.0.2
+pkgrel=1
 pkgdesc="Core identity and shared appearance handoff for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
@@ -8,10 +8,11 @@ license=(MIT)
 depends=(python ffmpeg limine btrfs-progs exfatprogs libarchive pacman neovim thefuck zram-generator zsh zsh-autosuggestions zsh-completions zsh-syntax-highlighting)
 install=spectrum-base.install
 options=(!strip !debug)
-_source_revision=a1d68347eb8e7fe9
-_source_root="spectrumos-source-$pkgver"
-source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
-sha256sums=('223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20')
+_source_revision=fae8caa461f4b93c
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
+sha256sums=('427342449fac2c1d561007b5777dcde1b55155e6e903894579be59b1daa03142')
 
 check() {
     local _project="$srcdir/$_source_root"

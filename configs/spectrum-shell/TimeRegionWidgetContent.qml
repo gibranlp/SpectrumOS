@@ -11,6 +11,7 @@ ColumnLayout {
     property string error: ""
     property string message: ""
     property string picker: ""
+    signal pickerOpened(Item selector)
     property string selectedZone: ""
     property string selectedLanguage: ""
     property string selectedRegion: ""
@@ -49,7 +50,6 @@ ColumnLayout {
     }
     function choose(kind): void {
         picker = picker === kind ? "" : kind;
-        search.text = "";
     }
     onActiveChanged: {
         if (active) {
@@ -139,6 +139,48 @@ ColumnLayout {
         }
     }
 
+    component Selector: ColumnLayout {
+        id: selector
+        required property string kind
+        objectName: "time-region-picker-" + kind
+        Layout.fillWidth: true
+        visible: content.picker === kind
+        onHeightChanged: if (visible)
+            Qt.callLater(() => { if (selector.visible) content.pickerOpened(selector); });
+        onVisibleChanged: if (visible) {
+            search.text = "";
+            Qt.callLater(() => { if (selector.visible) content.pickerOpened(selector); });
+        }
+        Input { id: search; objectName: selector.visible ? "time-region-search" : ""; placeholder: selector.kind === "interface" ? qsTranslate("Spectrum", "Search interface language…") : selector.kind === "timezone" ? qsTranslate("Spectrum", "Search city or time zone…") : qsTranslate("Spectrum", "Search locale, e.g. en_US or es_MX…") }
+        ListView {
+            id: choices
+            objectName: selector.visible ? "time-region-choices" : ""
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(160, contentHeight)
+            clip: true
+            spacing: 4
+            model: selector.visible ? (selector.kind === "interface" ? content.interfaceChoices : selector.kind === "timezone" ? content.settings.timezones || [] : content.settings.locales || []).filter(name => (selector.kind === "interface" ? content.interfaceName(name) + " " + name : name).toLowerCase().includes(search.text.toLowerCase())) : []
+            delegate: Button {
+                required property string modelData
+                width: choices.width
+                label: selector.kind === "interface" ? content.interfaceName(modelData) : modelData.replace(/_/g, " ")
+                enabled: !content.busy && (selector.kind === "interface" || content.settings.available)
+                onClicked: {
+                    if (selector.kind === "interface") {
+                        content.setInterfaceLanguage(modelData);
+                        return;
+                    }
+                    if (selector.kind === "timezone") content.selectedZone = modelData;
+                    else if (selector.kind === "language") content.selectedLanguage = modelData;
+                    else content.selectedRegion = modelData;
+                    content.picker = "";
+                }
+            }
+            onModelChanged: positionViewAtBeginning()
+        }
+        Label { visible: choices.count === 0; text: qsTranslate("Spectrum", "No matching results"); color: content.theme.colors.muted }
+    }
+
     Label { text: content.now.toLocaleString(Qt.locale(Translator.region), "ddd d MMM yyyy  HH:mm:ss"); font.bold: true }
     Label {
         text: content.settings.available ? (content.settings.timezone || "") + "\n" +
@@ -160,9 +202,10 @@ ColumnLayout {
     Label { text: qsTranslate("Spectrum", "TIME ZONE"); font.bold: true }
     RowLayout {
         Layout.fillWidth: true
-        Button { Layout.fillWidth: true; label: content.selectedZone || content.settings.timezone || qsTranslate("Spectrum", "Choose time zone"); onClicked: content.choose("timezone") }
+        Button { objectName: "timezone-selector"; Layout.fillWidth: true; label: content.selectedZone || content.settings.timezone || qsTranslate("Spectrum", "Choose time zone"); onClicked: content.choose("timezone") }
         Button { label: qsTranslate("Spectrum", "Apply"); enabled: !!content.selectedZone && !content.busy; onClicked: content.apply(["timezone", content.selectedZone]) }
     }
+    Selector { kind: "timezone" }
     Label { text: qsTranslate("Spectrum", "LANGUAGE & REGION"); font.bold: true }
     Label { text: qsTranslate("Spectrum", "Spectrum interface language"); font.bold: true }
     Button {
@@ -172,48 +215,20 @@ ColumnLayout {
         enabled: !content.busy
         onClicked: content.choose("interface")
     }
+    Selector { kind: "interface" }
     Label {
         text: qsTranslate("Spectrum", "Applies immediately to translated Spectrum controls. Untranslated text uses English.")
         color: content.theme.colors.muted
         font.pixelSize: content.theme.fontSize - 2
     }
     Label { text: qsTranslate("Spectrum", "System language"); color: content.theme.colors.muted }
-    Button { Layout.fillWidth: true; label: content.selectedLanguage || content.settings.language || qsTranslate("Spectrum", "Choose language"); onClicked: content.choose("language") }
+    Button { objectName: "system-language-selector"; Layout.fillWidth: true; label: content.selectedLanguage || content.settings.language || qsTranslate("Spectrum", "Choose language"); onClicked: content.choose("language") }
+    Selector { kind: "language" }
     Label { text: qsTranslate("Spectrum", "Regional formats · dates, numbers and currency"); color: content.theme.colors.muted }
-    Button { Layout.fillWidth: true; label: content.selectedRegion || content.settings.region || qsTranslate("Spectrum", "Choose region"); onClicked: content.choose("region") }
+    Button { objectName: "region-selector"; Layout.fillWidth: true; label: content.selectedRegion || content.settings.region || qsTranslate("Spectrum", "Choose region"); onClicked: content.choose("region") }
 
-    ColumnLayout {
-        Layout.fillWidth: true
-        visible: content.picker.length > 0
-        Input { id: search; objectName: "time-region-search"; placeholder: content.picker === "interface" ? qsTranslate("Spectrum", "Search interface language…") : content.picker === "timezone" ? qsTranslate("Spectrum", "Search city or time zone…") : qsTranslate("Spectrum", "Search locale, e.g. en_US or es_MX…") }
-        ListView {
-            id: choices
-            objectName: "time-region-choices"
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(160, contentHeight)
-            clip: true
-            spacing: 4
-            model: (content.picker === "interface" ? content.interfaceChoices : content.picker === "timezone" ? content.settings.timezones || [] : content.settings.locales || []).filter(name => (content.picker === "interface" ? content.interfaceName(name) + " " + name : name).toLowerCase().includes(search.text.toLowerCase()))
-            delegate: Button {
-                required property string modelData
-                width: choices.width
-                label: content.picker === "interface" ? content.interfaceName(modelData) : modelData.replace(/_/g, " ")
-                enabled: !content.busy && (content.picker === "interface" || content.settings.available)
-                onClicked: {
-                    if (content.picker === "interface") {
-                        content.setInterfaceLanguage(modelData);
-                        return;
-                    }
-                    if (content.picker === "timezone") content.selectedZone = modelData;
-                    else if (content.picker === "language") content.selectedLanguage = modelData;
-                    else content.selectedRegion = modelData;
-                    content.picker = "";
-                }
-            }
-            onModelChanged: positionViewAtBeginning()
-        }
-        Label { visible: choices.count === 0; text: qsTranslate("Spectrum", "No matching results"); color: content.theme.colors.muted }
-    }
+    Selector { kind: "region" }
+
     Button {
         Layout.fillWidth: true
         label: qsTranslate("Spectrum", "Apply language and region")

@@ -11,7 +11,7 @@ Controls.ScrollView {
     clip: true
     ColumnLayout {
         width: widget.availableWidth
-        spacing: 14
+        spacing: 10
         Text {
             Layout.fillWidth: true
             text: widget.manager.status
@@ -48,7 +48,7 @@ Controls.ScrollView {
                     Layout.fillWidth:true
                     spacing:6
                     Repeater {
-                        model: reminder.modelData.key === "eye_minutes" ? [15,20,30,45] : [30,45,50,60,90]
+                        model: reminder.modelData.key === "eye_minutes" ? [15,20,30] : [30,50,60]
                         ShellButton {
                             required property int modelData
                             label: modelData + qsTranslate("Spectrum", " min")
@@ -64,36 +64,18 @@ Controls.ScrollView {
             }
         }
         ShellButton {
-            Layout.fillWidth:true
-            label: widget.manager.settings.pause_focus ? qsTranslate("Spectrum", "Pause during Focus · On") : qsTranslate("Spectrum", "Pause during Focus · Off")
-            enabled:widget.manager.ready && !widget.manager.busy
-            fontFamily:widget.theme.fontFamily
-            fontSize:widget.theme.fontSize
-            backgroundColor:widget.theme.colors.surface_alt
-            foregroundColor:widget.theme.colors.foreground
-            onClicked:widget.manager.configure({pause_focus:!widget.manager.settings.pause_focus})
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            Repeater {
-                model: ["Snooze 10 min", "I took a break"]
-                ShellButton {
-                    required property int index
-                    required property string modelData
-                    Layout.fillWidth:true
-                    label:modelData
-                    enabled:widget.manager.settings.enabled
-                    fontFamily:widget.theme.fontFamily
-                    fontSize:widget.theme.fontSize
-                    backgroundColor:widget.theme.colors.surface_alt
-                    foregroundColor:widget.theme.colors.foreground
-                    onClicked: { if (index === 0) widget.manager.snooze(); else widget.manager.reset(); }
-                }
-            }
+            Layout.fillWidth: true
+            label: qsTranslate("Spectrum", "Snooze 10 minutes")
+            enabled: widget.manager.settings.enabled
+            fontFamily: widget.theme.fontFamily
+            fontSize: widget.theme.fontSize
+            backgroundColor: widget.theme.colors.surface_alt
+            foregroundColor: widget.theme.colors.foreground
+            onClicked: widget.manager.snooze()
         }
         Text {
             Layout.fillWidth:true
-            text: qsTranslate("Spectrum", widget.manager.error) || qsTranslate("Spectrum", "Games, calls, recording and Do Not Disturb pause reminders. Two minutes away resets the timers. Eye reminders suggest a 20-second distance break; movement reminders suggest changing position. Timers restart when the shell reloads.")
+            text: qsTranslate("Spectrum", widget.manager.error) || qsTranslate("Spectrum", "A three-minute break follows each reminder, then the timer starts again. Games, calls and Do Not Disturb pause reminders.")
             color:widget.manager.error ? "#f38ba8" : widget.theme.colors.muted
             wrapMode:Text.WordWrap
             font { family:widget.theme.fontFamily; pixelSize:widget.theme.fontSize - 1 }

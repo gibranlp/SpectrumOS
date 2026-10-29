@@ -75,8 +75,8 @@ PanelWindow {
             { start: contents.y + launcherButton.y, length: (lastWorkspace ? lastWorkspace.y + lastWorkspace.height : igorButton.y + igorButton.height) - launcherButton.y },
             { start: contents.y + windowTitleGroup.y, length: windowTitleGroup.height, visible: windowTitleGroup.visible },
             { start: contents.y + mediaGroup.y + mediaContent.y, length: mediaContent.height, visible: mediaGroup.visible },
-            { start: contents.y + statsGroup.y + statsContent.y, length: statsContent.height, visible: statsGroup.visible },
-            { start: contents.y + statusGroup.y, length: contents.y + clockText.y + clockText.height - (contents.y + statusGroup.y) }
+            { start: contents.y + statsGroup.y + statsContent.y, length: Math.min(statsGroup.height, statsContent.height), visible: statsGroup.visible },
+            { start: contents.y + statusGroup.y, length: contents.y + (remoteControlIndicator.visible ? remoteControlIndicator.y + remoteControlIndicator.height : clockText.y + clockText.height) - (contents.y + statusGroup.y) }
         ]
     }
 
@@ -254,17 +254,23 @@ PanelWindow {
             }
         }
 
-        Item {
+        Flickable {
             id: statsGroup
             Layout.alignment: Qt.AlignHCenter
             visible: bar.barProfile === "detailed"
             Layout.preferredWidth: 44
             Layout.maximumWidth: 44
             Layout.fillHeight: bar.barProfile === "detailed"
+            Layout.minimumHeight: 80
             implicitHeight: statsContent.implicitHeight
+            contentWidth: width
+            contentHeight: Math.max(height, statsContent.implicitHeight)
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
             ColumnLayout {
                 id: statsContent
-                anchors.centerIn: parent
+                x: (statsGroup.width - width) / 2
+                y: Math.max(0, (statsGroup.height - implicitHeight) / 2)
                 spacing: 3
                 Text {
                     Layout.alignment: Qt.AlignHCenter
@@ -316,6 +322,28 @@ PanelWindow {
                     color: bar.theme.colors.muted
                     font { family: bar.theme.fontFamily; pixelSize: Math.max(8, bar.theme.fontSize - 4) }
                 }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 44
+                    visible: !!bar.overview.fan
+                    text: bar.overview.fan || ""
+                    wrapMode: Text.Wrap
+                    horizontalAlignment: Text.AlignHCenter
+                    color: bar.theme.colors.muted
+                    font { family: bar.theme.fontFamily; pixelSize: Math.max(8, bar.theme.fontSize - 4) }
+                }
+                Repeater {
+                    model: bar.overview.disks || []
+                    Text {
+                        required property var modelData
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.preferredWidth: 44
+                        text: "󰋊\n" + Math.round(modelData.used / 1e9) + "G/\n" + Math.round(modelData.total / 1e9) + "G"
+                        horizontalAlignment: Text.AlignHCenter
+                        color: bar.theme.colors.muted
+                        font { family: bar.theme.fontFamily; pixelSize: Math.max(8, bar.theme.fontSize - 4) }
+                    }
+                }
             }
         }
 
@@ -326,7 +354,21 @@ PanelWindow {
             Layout.maximumWidth: 44
             spacing: bar.theme.barStyle === "islands" ? 5 : 7
             HoverHandler { id: minimalStatusHover }
+            BarControls {
+                visible: bar.barProfile !== "minimal"
+                Layout.alignment: Qt.AlignHCenter
+                theme: bar.theme
+                profile: bar.barProfile
+                vertical: true
+                trayItems: SystemTray.items
+                panelWindow: bar
+                batteryDevice: UPower.displayDevice
+                charging: UPower.displayDevice.state === UPowerDeviceState.Charging
+                externalPower: !UPower.onBattery
+                onChosen: action => action === "extras" ? bar.extrasRequested() : bar.widgetRequested(action)
+            }
             ColumnLayout {
+                visible: bar.barProfile === "minimal"
                 Layout.fillWidth: true
                 spacing: bar.theme.barStyle === "islands" ? 5 : 7
                 Text {
@@ -512,7 +554,7 @@ PanelWindow {
         }
 
         Repeater {
-            model: ["standard", "detailed"].includes(bar.barProfile) ? [] : [
+            model: ["standard", "detailed", "multimedia"].includes(bar.barProfile) ? [] : [
                 { icon: "󰒓", action: "control" },
                 { icon: "󰐥", action: "session" }
             ]
@@ -554,5 +596,15 @@ PanelWindow {
             font { family: bar.theme.fontFamily; pixelSize: Math.max(9, bar.theme.fontSize - 3); bold: true }
             KeyboardAction { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onActivated: bar.timeRegionRequested() }
         }
+        RemoteControlIndicator {
+            id: remoteControlIndicator
+            Layout.alignment: Qt.AlignHCenter
+            theme: bar.theme
+            active: bar.barProfile !== "minimal" && bar.theme.remoteControlActive
+            peerName: bar.theme.remoteControlPeer
+            animationsEnabled: bar.theme.animationsEnabled && bar.active
+            onActivated: Quickshell.execDetached(["spectrum-ukvm"])
+        }
+
     }
 }

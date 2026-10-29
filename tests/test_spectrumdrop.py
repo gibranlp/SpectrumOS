@@ -166,6 +166,41 @@ class SpectrumDropTests(unittest.TestCase):
         self.assertEqual(jobs[0].stat().st_mode & 0o777,0o600)
         self.assertEqual(json.loads(jobs[0].read_text())['code'],'ABCD-EFGH-JKLM-NPQR')
 
+    def test_paired_send_uses_saved_pc_without_code_or_discovery(self):
+        identifier='d'*32
+        saved={'id':identifier,'name':'Saved PC','addresses':['127.0.0.1'],'port':8857,'fingerprint':'b'*64}
+        commands=[]
+        def run(command, **kwargs):
+            commands.append(command)
+            return ('inactive',3) if command[:3]==['systemctl','--user','is-active'] else ('',0)
+        with patch.dict(G,run=run,lan_status=lambda:{'paired':[saved]},status=lambda *args:{'ok':True}):
+            MODULE['send_lan']('lan:'+identifier,{})
+        job=json.loads(next(MODULE['runtime']().glob('lan-job-*.json')).read_text())
+        self.assertEqual(job['code'],'');self.assertEqual(job['peer']['fingerprint'],'b'*64)
+        self.assertTrue(any('worker-lan' in command for command in commands))
+
+    def test_pairing_preserves_selected_files_and_requires_a_code(self):
+        identifier='d'*32
+        MODULE['write_state']('lan-peers',{'peers':[{'mac':'lan:'+identifier,'id':identifier,'name':'PC','addresses':['127.0.0.1'],'port':8857}]})
+        MODULE['write_state']('selection',{'paths':['keep-selection']})
+        def run(command, **kwargs):
+            return ('inactive',3) if command[:3]==['systemctl','--user','is-active'] else ('',0)
+        with patch.dict(G,run=run,status=lambda *args:{'ok':True}):
+            with self.assertRaises(ValueError):
+                MODULE['send_lan']('lan:'+identifier,{},pair=True)
+            MODULE['send_lan']('lan:'+identifier,{'code':'ABCD-EFGH-JKLM-NPQR'},pair=True)
+        job=json.loads(next(MODULE['runtime']().glob('lan-job-*.json')).read_text())
+        self.assertTrue(job['pair']);self.assertNotIn('paths',job)
+        self.assertTrue((MODULE['runtime']()/'selection.json').exists())
+
+    def test_paired_discovery_identity_change_does_not_queue_a_send(self):
+        identifier='d'*32
+        MODULE['write_state']('lan-peers',{'peers':[{'mac':'lan:'+identifier,'id':identifier,'fingerprint':'c'*64}]})
+        with patch.dict(G,lan_status=lambda:{'paired':[{'id':identifier,'fingerprint':'b'*64}]}):
+            with self.assertRaisesRegex(ValueError,'identity changed'):
+                MODULE['send_lan']('lan:'+identifier,{})
+        self.assertEqual(list(MODULE['runtime']().glob('lan-job-*.json')),[])
+
     def test_network_actions_do_not_toggle_or_require_wifi_radio(self):
         calls=[]
         with patch.dict(G,lan_command=lambda *args,**kwargs:calls.append(args) or {'ok':True},status=lambda *args:{'ok':True},run=lambda *args,**kwargs:self.fail('No radio or external process should run')):

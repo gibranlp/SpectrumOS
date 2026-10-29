@@ -1,16 +1,17 @@
 pkgname=spectrum-plymouth
-pkgver=1.0.0
-pkgrel=3
+pkgver=1.0.1
+pkgrel=1
 pkgdesc="Animated Plymouth boot theme for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
 license=(MIT)
 depends=(plymouth python)
 options=(!strip !debug)
-_source_revision=a1d68347eb8e7fe9
-_source_root="spectrumos-source-$pkgver"
-source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
-sha256sums=('223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20')
+_source_revision=5d17390a7fc3a972
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
+sha256sums=('6a3c40ef489a3b8d90b58fd571500fc9834b4c0260e797ba74d226e6676f9f08')
 
 package() {
     local _project="$srcdir/$_source_root"

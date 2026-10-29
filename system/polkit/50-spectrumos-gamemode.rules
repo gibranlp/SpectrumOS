@@ -1,0 +1,7 @@
+polkit.addRule(function(action, subject) {
+    if (subject.local && subject.active && subject.isInGroup("spectrumos") &&
+        (action.id === "com.feralinteractive.GameMode.governor-helper" ||
+         action.id === "com.feralinteractive.GameMode.procsys-helper")) {
+        return polkit.Result.YES;
+    }
+});

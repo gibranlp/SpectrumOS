@@ -17,10 +17,10 @@ PanelWindow {
     property bool expanded: false
     property int leftInset: 0
     property int topInset: 8
-    readonly property bool cornerPanel: page === "spectrumdrop"
+    readonly property bool cornerPanel: page === "spectrumdrop" || page === "breaks"
     readonly property bool cornerTop: cornerPanel && theme.barPosition === "top"
     readonly property bool sidePanel: page === "shortcuts"
-    readonly property bool topPanel: page === "questline" || page === "focus" || page === "breaks" || page === "services" || page === "default-apps"
+    readonly property bool topPanel: page === "questline" || page === "focus" || page === "services" || page === "default-apps"
     property var questline: ({ available: false, installed: false })
     required property var questlineWorkspace
     property bool questlineRestoring: false
@@ -163,6 +163,8 @@ PanelWindow {
         { combo: "Super + H", action: qsTranslate("Spectrum", "HotKey"), command: [backendDir + "/spectrum-shell-open", "hotkey"] },
         { combo: "Super + K", action: qsTranslate("Spectrum", "Keyboard shortcuts"), command: [backendDir + "/spectrum-shell-open", "shortcuts"] },
         { combo: "Super + Shift + C", action: qsTranslate("Spectrum", "Local services"), command: [backendDir + "/spectrum-shell-open", "services"] },
+        { combo: "Super + L", action: qsTranslate("Spectrum", "Lock computer"), command: [backendDir + "/session-menu", "lock"] },
+        { combo: "Super + Print", action: qsTranslate("Spectrum", "Monitor screenshot"), command: [backendDir + "/panel", "--screenshot-monitor"] },
         { combo: "Super + Shift + X", action: qsTranslate("Spectrum", "More widgets"), command: [backendDir + "/spectrum-shell-open", "more"] },
         { combo: "Super + Shift + M", action: qsTranslate("Spectrum", "Mouse Settings"), command: [backendDir + "/spectrum-shell-open", "mouse"] },
         { combo: "Super + Shift + Down", action: qsTranslate("Spectrum", "Move window down"), command: ["hyprctl", "eval", "require(\"window-actions\").move(\"down\")"] },
@@ -210,7 +212,8 @@ PanelWindow {
         { combo: "Super + Shift + Y", action: qsTranslate("Spectrum", "Typography"), command: [backendDir + "/spectrum-shell-open", "typography"] },
         { combo: "Super + Shift + K", action: qsTranslate("Spectrum", "UniversalKVM"), command: ["/usr/bin/spectrum-ukvm"] },
         { combo: "Super + W", action: qsTranslate("Spectrum", "Wallpapers"), command: [backendDir + "/spectrum-shell-open", "wallpapers"] },
-        { combo: "Super + Shift + W", action: qsTranslate("Spectrum", "Weather"), command: [backendDir + "/spectrum-shell-open", "weather"] }
+        { combo: "Super + Shift + W", action: qsTranslate("Spectrum", "Weather"), command: [backendDir + "/spectrum-shell-open", "weather"] },
+        { combo: "Super + Shift + Print", action: qsTranslate("Spectrum", "Window screenshot"), command: [backendDir + "/panel", "--screenshot-window"] }
     ].sort((a, b) => a.action.localeCompare(b.action))
 
     visible: motion.active
@@ -260,6 +263,14 @@ PanelWindow {
             Qt.callLater(() => query.forceActiveFocus());
         if (name === "emoji")
             emojiDelay.restart();
+    }
+
+    function openSpectrumDropSelection(): void {
+        spectrumDrop.selectTransport("pc");
+        open("spectrumdrop");
+        dropContent.ensureLoaded();
+        Qt.callLater(() => { if (dropContent.item) dropContent.item.revealSelection(); });
+        spectrumDrop.scan();
     }
 
     function openQuestlineDueItem(taskId, stepId): void {
@@ -1191,8 +1202,8 @@ PanelWindow {
             ? Math.max(0, y - 8) : 0
         leftAttachmentWidth: panel.theme.barStyle === "islands" && panel.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
-        width: panel.cornerPanel ? Math.min(680, panel.screen.width - (panel.cornerTop ? 16 : panel.panelLeftInset + 16)) : panel.sidePanel ? Math.min(660, panel.screen.width - panel.panelLeftInset) : panel.page === "questline" ? Math.min(1500, panel.screen.width * 0.88) : Math.min(680, panel.screen.width - 40)
-        height: panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : (panel.page === "hotkey" || panel.page === "breaks" || panel.page === "services" || panel.page === "default-apps") ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "calculator" ? Math.min(calculatorContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "focus" ? Math.min(focusContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
+        width: panel.page === "breaks" ? Math.min(390, panel.screen.width - panel.panelLeftInset - 16) : panel.cornerPanel ? Math.min(680, panel.screen.width - (panel.cornerTop ? 16 : panel.panelLeftInset + 16)) : panel.sidePanel ? Math.min(660, panel.screen.width - panel.panelLeftInset) : panel.page === "questline" ? Math.min(1500, panel.screen.width * 0.88) : Math.min(680, panel.screen.width - 40)
+        height: panel.page === "breaks" ? Math.min(460, panel.screen.height - panel.topInset - 24) : panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : (panel.page === "hotkey" || panel.page === "breaks" || panel.page === "services" || panel.page === "default-apps") ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "calculator" ? Math.min(calculatorContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "focus" ? Math.min(focusContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
         x: panel.cornerPanel ? (panel.cornerTop ? panel.screen.width - width : panel.panelLeftInset) : panel.sidePanel ? panel.panelLeftInset : (panel.screen.width + panel.leftInset - width) / 2
         y: panel.cornerTop || panel.sidePanel || panel.topPanel ? panel.topInset : panel.screen.height - height - (panel.theme.gamingActive ? 0 : 8)
 

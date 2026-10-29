@@ -99,6 +99,55 @@ TestCase {
         findChild(editor,"drop-accept-abc").clicked();compare(backend.calls[0][0],"accept-lan");compare(backend.calls[0][1],"abc");
     }
 
+    function test_pair_request_uses_code_once_and_clears_it() {
+        backend.transport="pc";
+        const id="lan:0123456789abcdef0123456789abcdef";
+        backend.peers=[{id:id.slice(4),name:"Other PC",mac:id,fingerprint:"b".repeat(64)}];
+        tryVerify(()=>findChild(editor,"drop-pair-"+id)!==null);
+        const code=findChild(editor,"drop-code-"+id),pair=findChild(editor,"drop-pair-"+id);
+        verify(!pair.enabled);code.text="ABCD-EFGH-JKLM-NPQR";verify(pair.enabled);pair.clicked();
+        compare(backend.calls[0],["pair-lan",id]);compare(backend.lastPayload.code,"ABCD-EFGH-JKLM-NPQR");compare(code.text,"");
+    }
+
+    function test_paired_pc_sends_without_code_and_can_be_forgotten() {
+        backend.transport="pc";
+        const id="0123456789abcdef0123456789abcdef",fingerprint="b".repeat(64);
+        backend.state={transfer:{},lan:{paired:[{id:id,name:"Saved PC",fingerprint:fingerprint}]}};
+        backend.peers=[{id:id,name:"Saved PC",mac:"lan:"+id,fingerprint:fingerprint}];
+        tryVerify(()=>findChild(editor,"drop-send-lan:"+id)!==null);
+        verify(!findChild(editor,"drop-code-lan:"+id).visible);
+        const send=findChild(editor,"drop-send-lan:"+id);verify(send.enabled);send.clicked();
+        compare(backend.calls[0],["send-lan","lan:"+id]);compare(backend.lastPayload.code,"");
+        findChild(editor,"drop-forget-"+id).clicked();compare(backend.calls[1],["forget-lan",id]);
+    }
+
+    function test_saved_pc_can_send_without_discovery() {
+        backend.transport="pc";
+        const id="0123456789abcdef0123456789abcdef";
+        backend.state={transfer:{},lan:{paired:[{id:id,name:"Saved PC",fingerprint:"b".repeat(64)}]}};
+        tryVerify(()=>findChild(editor,"drop-saved-send-"+id)!==null);
+        findChild(editor,"drop-saved-send-"+id).clicked();
+        compare(backend.calls[0],["send-lan","lan:"+id]);compare(backend.lastPayload.code,"");
+    }
+
+    function test_changed_identity_blocks_nearby_send() {
+        backend.transport="pc";
+        const id="0123456789abcdef0123456789abcdef";
+        backend.state={transfer:{},lan:{paired:[{id:id,name:"Saved PC",fingerprint:"b".repeat(64)}]}};
+        backend.peers=[{id:id,name:"Saved PC",mac:"lan:"+id,fingerprint:"c".repeat(64)}];
+        tryVerify(()=>findChild(editor,"drop-send-lan:"+id)!==null);
+        verify(!findChild(editor,"drop-send-lan:"+id).enabled);
+    }
+
+    function test_pairing_needs_explicit_local_consent() {
+        backend.transport="pc";
+        backend.state={transfer:{},lan:{pair_requests:[{id:"abc",name:"Other PC"}]}};
+        tryVerify(()=>findChild(editor,"drop-accept-pair-abc")!==null);
+        compare(backend.calls.length,0);
+        findChild(editor,"drop-accept-pair-abc").clicked();compare(backend.calls[0],["accept-pair-lan","abc"]);
+        findChild(editor,"drop-decline-pair-abc").clicked();compare(backend.calls[1],["decline-pair-lan","abc"]);
+    }
+
     function test_thunar_selection_is_visible_and_clears_in_the_current_transport() {
         backend.transport="pc";
         backend.state={selection:{count:2,names:["code <test>.py","notes.txt"]},transfer:{}};
@@ -109,6 +158,20 @@ TestCase {
         compare(backend.calls[0],["clear-selection","pc"]);
         backend.state={selection:{count:0,names:[]},transfer:{}};
         verify(!findChild(editor,"drop-selected-files").visible);
+    }
+
+    function test_thunar_selection_reveals_recipient_view_at_top() {
+        backend.transport="pc";
+        backend.state={selection:{count:1,names:["photo.png"]},transfer:{},lan:{receiving:false,incoming:[{id:"old",phase:"cancelled",files:[]}]}};
+        tryVerify(()=>editor.choosingRecipient);
+        editor.contentItem.contentY=120;
+        editor.revealSelection();
+        compare(editor.contentItem.contentY,0);
+        verify(findChild(editor,"drop-choose-recipient").visible);
+        verify(!findChild(editor,"drop-receive-5").visible);
+        verify(findChild(editor,"drop-accept-old")===null);
+        backend.state={selection:{count:1,names:["another.png"]},transfer:{},lan:{}};
+        tryCompare(editor.contentItem,"contentY",0);
     }
 
 }

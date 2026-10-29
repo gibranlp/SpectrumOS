@@ -30,6 +30,8 @@ Item {
             wait(30);
             const perch = findChild(stage, "igorPerch");
             const cat = perch.children[0];
+            findChild(cat, "igorOutfitClock").running = false;
+            findChild(cat, "igorSeasonalOutfit").currentDate = new Date(2026, 0, 1);
             cat.headTilt = data.tilt;
             cat.headLift = -7;
             wait(350);

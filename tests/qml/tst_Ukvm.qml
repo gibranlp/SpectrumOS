@@ -124,6 +124,22 @@ TestCase {
         compare(JSON.stringify(backend.actions[1]), JSON.stringify(["apply"]));
         verify(findChild(page, "confirm-service-restart") === null);
     }
+    function test_remote_control_stays_discoverable() {
+        const launch = findChild(page, "open-remote");
+        page.selectedId = "";
+        wait(20);
+        verify(launch.visible);
+        verify(!launch.enabled);
+        page.selectedId = "a".repeat(64);
+        page.showDetails = true;
+        wait(20);
+        verify(launch.visible);
+        verify(launch.enabled);
+        compare(launch.text, "Remote control");
+        launch.clicked();
+        compare(JSON.stringify(backend.actions[0]), JSON.stringify(["remote", "a".repeat(64)]));
+        page.showDetails = false;
+    }
     function test_remote_view_permission_is_separate_from_launch() {
         const original = backend.status;
         backend.status = Object.assign({}, original, {peers:[{node_id:"a".repeat(64),name:"io",permissions:{connect:true,view_screen:false,control_this_node:false}}]});

@@ -1,13 +1,5 @@
 #!/usr/bin/env python
-"""Performance/Balanced power profile toggle, backed by whichever profile daemon the
-active form factor actually installs: `power-profiles-daemon` (laptop) or `tuned`
-(desktop, per bootstrap/packages/form-factor and desktop.txt) -- never both, so the two
-never fight over the same knob. Manual control is a single toggle (the Eww header icon,
-or `--set MODE`); automatic control comes from GameMode's `[custom]` start/end hooks
-(wired by appearance-sync's `ensure_gamemode_hook`), which call `--game-start`/`--game-end`
-for *any* game that already integrates with GameMode -- the vast majority of Steam/Proton
-titles out of the box, without SpectrumOS needing to recognize individual games itself.
-"""
+"""Power profiles with serialized GameMode and Spectrum session requests."""
 from __future__ import annotations
 
 import json
@@ -193,46 +185,50 @@ def _write_count(value: int) -> None:
     os.replace(temporary, GAME_COUNT_FILE)
 
 
-def game_start() -> int:
-    # A count, not a flag: GameMode's start/end hooks fire per client process, and more
-    # than one game (or a game plus another GameMode-aware app) can overlap. Only the
-    # first arrival remembers the pre-game mode and switches; only the last departure
-    # restores it, so a second game ending doesn't undo the first game's own restore.
+def game_requests() -> set[str]:
+    try:
+        value = json.loads((STATE_DIR / "game-requests.json").read_text())
+        return set(value) & {"gamemode", "session"}
+    except (OSError, ValueError, TypeError):
+        # Conserva el modo anterior al migrar una cuenta antigua, aunque esté desfasada.
+        return {"gamemode"} if _read_count() else set()
+
+
+def update_game_requests(requests: set[str]) -> int:
+    previous_requests = game_requests()
     active_backend = backend()
-    if active_backend == "none":
-        return 0
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    count = _read_count()
-    if count == 0:
+    if active_backend != "none":
         current = current_mode(active_backend)
-        PRE_GAME_FILE.write_text(current, encoding="utf-8")
-        # Only announce it if this game launch is actually the thing turning Performance
-        # on -- not if it was already active (manually, or from an earlier overlapping
-        # game), which would just repeat a toast for no real change.
-        if current != "performance" and set_mode("performance", active_backend):
-            notify("performance")
-    _write_count(count + 1)
+        if requests:
+            if not previous_requests:
+                PRE_GAME_FILE.write_text(current, encoding="utf-8")
+            target = "performance" if "performance" in available_modes(active_backend) else current
+        else:
+            try:
+                target = PRE_GAME_FILE.read_text(encoding="utf-8").strip()
+            except OSError:
+                target = "balanced"
+            target = target if target in MODES else "balanced"
+        transition = bool(requests) != bool(previous_requests)
+        stale_count = _read_count() != len(previous_requests)
+        if (transition or stale_count) and current != target:
+            if not set_mode(target, active_backend):
+                return 1
+            notify(target)
+    temporary = STATE_DIR / ".game-requests.tmp"
+    temporary.write_text(json.dumps(sorted(requests)))
+    temporary.replace(STATE_DIR / "game-requests.json")
+    _write_count(len(requests))
     return 0
 
 
-def game_end() -> int:
-    active_backend = backend()
-    if active_backend == "none":
-        return 0
-    count = max(0, _read_count() - 1)
-    _write_count(count)
-    if count == 0:
-        try:
-            previous = PRE_GAME_FILE.read_text(encoding="utf-8").strip()
-        except OSError:
-            previous = "balanced"
-        previous = previous if previous in MODES else "balanced"
-        # Same rule as game_start: only announce the restore if it's an actual change --
-        # e.g. not if the mode was already manually switched back while the game was
-        # still running, which would make this restore a no-op.
-        if current_mode(active_backend) != previous and set_mode(previous, active_backend):
-            notify(previous)
-    return 0
+def game_start(owner="gamemode") -> int:
+    return update_game_requests(game_requests() | {owner})
+
+
+def game_end(owner="gamemode") -> int:
+    return update_game_requests(game_requests() - {owner})
 
 
 def main() -> int:
@@ -247,13 +243,20 @@ def main() -> int:
         return toggle()
     if len(arguments) == 2 and arguments[0] == "--set":
         return set_command(arguments[1])
-    if arguments in (["--game-start"], ["--game-end"]):
+    if (arguments in (["--game-start"], ["--game-end"]) or
+            len(arguments) == 2 and arguments[0] in ("--game-start", "--game-end") and arguments[1] == "session" or
+            len(arguments) == 2 and arguments[0] == "--game-reconcile" and arguments[1] in ("0", "1", "2")):
         STATE_DIR.mkdir(parents=True, exist_ok=True)
-        # Los hooks de GameMode y el perfil Gaming pueden llegar al mismo tiempo.
+        # Los hooks y el controlador comparten el candado y solicitudes idempotentes.
         with (STATE_DIR / "game.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            return game_start() if arguments == ["--game-start"] else game_end()
-    print("Usage: performance-mode --json|--status|--toggle|--set MODE|--game-start|--game-end", file=sys.stderr)
+            if arguments[0] == "--game-reconcile":
+                requests = ({"gamemode", "session"} if arguments[1] == "2" else
+                            {"gamemode"} if arguments[1] == "1" else set())
+                return update_game_requests(requests)
+            owner = arguments[1] if len(arguments) == 2 else "gamemode"
+            return game_start(owner) if arguments[0] == "--game-start" else game_end(owner)
+    print("Usage: performance-mode --json|--status|--toggle|--set MODE|--game-start [session]|--game-end [session]|--game-reconcile 0|1|2", file=sys.stderr)
     return 2
 
 

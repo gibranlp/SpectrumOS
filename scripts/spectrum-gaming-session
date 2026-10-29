@@ -14,6 +14,7 @@ import time
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "spectrumos/shell.json"
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/spectrumos-{os.getuid()}") / "spectrumos"
 BACKEND = Path(__file__).resolve().parent
+PROC = Path("/proc")
 
 
 def run(*args):
@@ -75,7 +76,7 @@ class GamingSession:
                 function.argtypes = []
                 function.restype = ctypes.c_int
             self.previous_power = power_state()
-            result = run(str(BACKEND / "performance-mode"), "--game-start")
+            result = run(str(BACKEND / "performance-mode"), "--game-start", "session")
             if result.returncode:
                 raise RuntimeError("Could not activate the performance profile.")
             self.performance_owned = True
@@ -108,15 +109,9 @@ class GamingSession:
                 errors.append("Could not release GameMode.")
             self.registered = False
         if self.performance_owned:
-            if run(str(BACKEND / "performance-mode"), "--game-end").returncode:
+            if run(str(BACKEND / "performance-mode"), "--game-end", "session").returncode:
                 errors.append("Could not restore the performance profile.")
             self.performance_owned = False
-            # Una cuenta antigua de hooks no debe impedir restaurar el perfil de esta sesión.
-            if self.previous_power.get("available") and self.library.real_gamemode_query_status() == 0:
-                previous = self.previous_power.get("mode")
-                if previous in ("balanced", "power-saver", "performance") and power_state().get("mode") != previous:
-                    if run(str(BACKEND / "performance-mode"), "--set", previous).returncode:
-                        errors.append("Could not restore the previous power profile.")
         if self.previous_animations is not None:
             try:
                 set_animations(self.previous_animations)
@@ -135,7 +130,31 @@ def game_active():
     value = query()
     if value < 0:
         raise RuntimeError("Could not query GameMode.")
-    return value > 0
+    if value != 2:
+        return value > 0
+    result = run("busctl", "--user", "--json=short", "call", "com.feralinteractive.GameMode",
+                 "/com/feralinteractive/GameMode", "com.feralinteractive.GameMode", "ListGames")
+    if result.returncode:
+        raise RuntimeError("Could not query external GameMode clients.")
+    return any(pid != os.getpid() for pid, path in json.loads(result.stdout)["data"][0])
+
+
+def steam_game_active():
+    for process in PROC.iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            # Steam asigna estos IDs a los procesos del juego, incluidos Proton y sus hijos.
+            environment = process.joinpath("environ").read_bytes().split(b"\0")
+            for entry in environment:
+                key, separator, value = entry.partition(b"=")
+                if key in (b"SteamAppId", b"SteamGameId") and value.isdigit() and int(value) > 0:
+                    return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 def publish_status(status):
@@ -177,6 +196,9 @@ class GamingController:
         self.manual = None
         self.automatic = None
         self.retry_at = 0
+        self.steam_owned = False
+        self.power_requests = None
+        self.reconcile_at = 0
 
     def update(self, wanted):
         status = {"active": False, "automatic": False, "detected": False, "error": ""}
@@ -192,13 +214,14 @@ class GamingController:
                 self.retry_at = 0
                 if error:
                     raise RuntimeError(error)
-            # La detección automática nunca registra un cliente: así no se mantiene viva a sí misma.
+            steam_detected = steam_game_active()
             detected = game_active() if self.manual is None else True
+            detected = detected or steam_detected
             status["detected"] = detected
             if not detected:
                 (RUNTIME / "gaming-auto-suppressed").unlink(missing_ok=True)
             automatic_wanted = not wanted and detected and not (RUNTIME / "gaming-auto-suppressed").exists()
-            if not automatic_wanted and self.automatic is not None:
+            if self.automatic is not None and (not automatic_wanted or steam_detected != self.steam_owned):
                 error = self.automatic.stop()
                 if error:
                     raise RuntimeError(error)
@@ -209,14 +232,21 @@ class GamingController:
                 candidate.start()
                 self.manual = candidate
             elif automatic_wanted and self.automatic is None and time.monotonic() >= self.retry_at:
-                candidate = AutomaticGamingSession()
+                candidate = GamingSession() if steam_detected else AutomaticGamingSession()
                 candidate.start()
                 self.automatic = candidate
+                self.steam_owned = steam_detected
             current = self.manual or self.automatic
             if current is not None:
                 current.maintain()
                 status["active"] = True
                 status["automatic"] = self.automatic is not None
+            requests = 2 if self.manual is not None or self.automatic is not None and self.steam_owned else int(detected)
+            if requests != self.power_requests or time.monotonic() >= self.reconcile_at:
+                if run(str(BACKEND / "performance-mode"), "--game-reconcile", str(requests)).returncode:
+                    raise RuntimeError("Could not synchronize the gaming power profile.")
+                self.power_requests = requests
+                self.reconcile_at = time.monotonic() + 5
         except (OSError, RuntimeError, ValueError, AttributeError) as error:
             status["error"] = str(error)
             self.retry_at = time.monotonic() + 10

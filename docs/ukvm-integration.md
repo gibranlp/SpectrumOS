@@ -33,6 +33,19 @@ spectrum-ukvm
 
 ## Use
 
+Select a trusted computer and click **Remote control** to open its desktop in
+UKVM's native viewer. The button remains visible in Details and is disabled until
+a computer is selected. The other computer must allow screen viewing; keyboard
+and mouse control also require its control permission and normal portal consent.
+Click the remote desktop to control it. Ctrl+Alt+Shift+Escape releases control
+while keeping the viewer open.
+
+While another computer controls this PC, a red pulsing remote-control icon appears
+at the far right of the top bar or at the bottom of the left bar. Click to open UKVM. The indicator follows fresh
+incoming control sessions, including physical edge switching, and clears when
+control ends. Permission alone, idle sharing and outgoing control do not activate
+it. With shell animations disabled, the icon stays solid red.
+
 M19 adds **Share clipboard** to each selected trusted machine, separate from
 **Allow control**. Sharing is off by default. Enable the checkbox explicitly on both
 computers to synchronize regular UTF-8 text, including sensitive copied text,

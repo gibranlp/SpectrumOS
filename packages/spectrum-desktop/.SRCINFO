@@ -1,6 +1,6 @@
 pkgbase = spectrum-desktop
 	pkgdesc = Integrated SpectrumOS desktop frontends and visual defaults
-	pkgver = 1.1.0
+	pkgver = 1.1.20
 	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	arch = x86_64
@@ -12,7 +12,7 @@ pkgbase = spectrum-desktop
 	makedepends = python-polib
 	makedepends = qt6-tools
 	depends = ukvm>=0.1.0.r21
-	depends = spectrumdrop>=1.0.0-5
+	depends = spectrumdrop>=1.0.1
 	depends = acl
 	depends = adwaita-cursors
 	depends = alacritty
@@ -183,11 +183,11 @@ pkgbase = spectrum-desktop
 	backup = etc/xdg/mimeapps.list
 	backup = etc/xdg/xdg-terminals.list
 	backup = etc/xdg/fastfetch/config.jsonc
-	source = spectrumos-source-1.0.0-2fdeff3a7ac14a39.tar.zst
+	source = spectrumos-source-1.0.0-0e71973ee120e7cd.tar.zst
 	source = questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst
 	source = questline.LICENSE
 	source = stash-0.7.0-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v0.7.0/stash-linux-x86_64
-	sha256sums = 1c81a59793fa8e1921ba8091f5c60217091160f4fc0c8bcc8759a0f817db47fb
+	sha256sums = 6b96c066265447787da0cfb07dceaec81509cbe9fa02d41b983aac70295274a5
 	sha256sums = a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495
 	sha256sums = 3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa
 	sha256sums = 01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802

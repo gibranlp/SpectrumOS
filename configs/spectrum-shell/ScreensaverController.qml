@@ -9,21 +9,23 @@ import Quickshell.Services.Mpris
 Item {
     id: saver
     required property var theme
-    property var settings: ({enabled: false, timeout: 180, effect: "matrix", branding: "alternate"})
-    property var masks: ({wordmark: {points: [], aspect: 6}, logo: {points: [], aspect: 1}})
+    property var settings: ({enabled: false, timeout: 180})
     property string error: ""
+    readonly property var diagnostics: ({
+        idle: idleMonitor.isIdle, monitorEnabled: idleMonitor.monitoring, armed: lifecycle.armed,
+        sessionAllowed: lifecycle.sessionAllowed, pendingStart: pendingStart,
+        gaming: theme.gamingActive, recording: theme.recording.active,
+        audioRecording: theme.audioRecording.active, keepAwake: theme.idle.active
+    })
     readonly property bool busy: settingsAction.running
     readonly property bool active: lifecycle.active
     readonly property bool mediaPlaying: activity.mediaPlaying
     readonly property bool fullscreenActive: activity.fullscreenActive
     readonly property bool mediaBlocked: activity.blocked
-    readonly property bool blocked: theme.gamingActive || theme.recording.active || theme.audioRecording.active || theme.idle.active || mediaBlocked
+    readonly property bool blocked: theme.gamingActive || theme.recording.active || theme.audioRecording.active || mediaBlocked
     property bool pendingStart: false
     property bool pendingPreview: false
-    property bool maskReady: false
-    property bool guardReady: false
-    property string previewEffect: ""
-    readonly property string effect: lifecycle.previewing && previewEffect ? previewEffect : settings.effect
+    readonly property string effect: "matrix"
 
     ScreensaverActivity {
         id: activity
@@ -36,11 +38,10 @@ Item {
         blocked: saver.blocked
         idle: idleMonitor.isIdle
     }
-    IdleMonitor {
+    ScreensaverIdleMonitor {
         id: idleMonitor
-        enabled: saver.settings.enabled && !saver.blocked
+        monitoring: saver.settings.enabled && !saver.blocked
         timeout: saver.settings.timeout
-        respectInhibitors: true
         onIsIdleChanged: {
             if (isIdle && saver.settings.enabled && !saver.blocked) saver.requestStart(false);
             else if (!isIdle && !lifecycle.previewing) saver.pendingStart = false;
@@ -59,24 +60,20 @@ Item {
         if (blocked || pendingStart || lifecycle.active) return;
         pendingStart = true;
         pendingPreview = preview;
-        maskReady = false;
-        guardReady = false;
         error = "";
-        if (!maskProcess.running) maskProcess.running = true;
         if (!sessionProcess.running) sessionProcess.running = true;
     }
     function finishStart(): void {
-        if (!pendingStart || !maskReady || !guardReady) return;
+        if (!pendingStart || !lifecycle.sessionAllowed) return;
         pendingStart = false;
         if (lifecycle.start(pendingPreview) && pendingPreview) previewDeadline.restart();
     }
     function preview(effectName): bool {
         if (blocked) {
             error = mediaBlocked ? "Pause playback and leave fullscreen before previewing."
-                : "Finish recording or disable Keep awake / Gaming before previewing.";
+                : "Finish recording or disable Gaming before previewing.";
             return false;
         }
-        previewEffect = ["matrix", "rain", "constellation", "cycle"].includes(effectName) ? effectName : "";
         requestStart(true);
         return true;
     }
@@ -113,25 +110,6 @@ Item {
         onExited: exitCode => { if (exitCode !== 0 && !saver.error) saver.error = qsTranslate("Spectrum", "Could not save screensaver settings."); }
     }
     Process {
-        id: maskProcess
-        command: [saver.theme.backend("screensaver-adapter"), "masks"]
-        onExited: exitCode => { if (exitCode !== 0) { saver.dismiss(); saver.error = qsTranslate("Spectrum", "Could not prepare screensaver branding."); } }
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const value = JSON.parse(text);
-                    if (!value.wordmark || !value.wordmark.points.length) throw new Error("Missing wordmark");
-                    saver.masks = value;
-                    saver.maskReady = true;
-                    saver.finishStart();
-                } catch (exception) {
-                    saver.error = qsTranslate("Spectrum", "Could not prepare screensaver branding.");
-                    saver.dismiss();
-                }
-            }
-        }
-    }
-    Process {
         id: sessionProcess
         command: [saver.theme.backend("screensaver-adapter"), "session"]
         onExited: exitCode => { if (exitCode !== 0) { lifecycle.sessionAllowed = false; saver.dismiss(); saver.error = qsTranslate("Spectrum", "Could not check the session idle state."); } }
@@ -140,7 +118,6 @@ Item {
                 try {
                     const value = JSON.parse(text);
                     lifecycle.sessionAllowed = value.allowed === true;
-                    saver.guardReady = true;
                     if (!lifecycle.sessionAllowed) {
                         saver.dismiss();
                         if (value.error) saver.error = value.error;
@@ -178,9 +155,6 @@ Item {
                 ScreensaverScene {
                     anchors.fill: parent
                     colors: saver.theme.colors
-                    effect: saver.effect
-                    branding: saver.settings.branding
-                    masks: saver.masks
                     running: lifecycle.active
                 }
                 MouseArea {

@@ -4,7 +4,10 @@ import Quickshell
 import Spectrum.I18n 1.0
 import "../../configs/spectrum-shell" as Shell
 
-Scope {
+FloatingWindow {
+    visible: true
+    implicitWidth: 420
+    implicitHeight: 1200
     TestCase {
         id: test
         name: "TimeRegionLanguage"
@@ -94,6 +97,44 @@ Scope {
             const choices = findChild(editor, "time-region-choices");
             tryCompare(choices, "count", 1);
             compare(choices.model[0], "pt_BR");
+        }
+        function test_picker_opens_beside_its_setting_data() {
+            return [
+                {tag:"timezone", kind:"timezone", button:"timezone-selector"},
+                {tag:"interface", kind:"interface", button:"interface-language"},
+                {tag:"language", kind:"language", button:"system-language-selector"},
+                {tag:"region", kind:"region", button:"region-selector"}
+            ];
+        }
+        function test_picker_opens_beside_its_setting(data) {
+            editor.settings = {available:true, timezones:["America/Cancun", "Europe/London"], locales:["en_US.UTF-8", "es_MX.UTF-8"]};
+            const button = findChild(editor, data.button);
+            button.clicked();
+            tryCompare(editor, "picker", data.kind);
+            wait(60);
+            const selector = findChild(editor, "time-region-picker-" + data.kind);
+            verify(selector.visible);
+            const buttonBottom = button.mapToItem(editor, 0, button.height).y;
+            verify(selector.y >= buttonBottom);
+            verify(selector.y - buttonBottom <= editor.spacing + 1, "The list must appear directly below its own setting");
+            for (const other of ["timezone", "interface", "language", "region"])
+                compare(findChild(editor, "time-region-picker-" + other).visible, other === data.kind);
+            findChild(editor, "time-region-search").text = "no matching choice";
+            editor.choose(data.kind);
+            verify(!selector.visible);
+            editor.choose(data.kind);
+            compare(findChild(editor, "time-region-search").text, "");
+        }
+        function test_timezone_selection_keeps_the_apply_step() {
+            editor.settings = {available:true, timezones:["America/Cancun"], locales:[]};
+            editor.choose("timezone");
+            const choices = findChild(editor, "time-region-choices");
+            tryCompare(choices, "count", 1);
+            wait(60);
+            choices.itemAtIndex(0).clicked();
+            compare(editor.selectedZone, "America/Cancun");
+            compare(editor.picker, "");
+            verify(!editor.busy);
         }
         function test_helper_result_uses_the_current_interface_language() {
             editor.setInterfaceLanguage("pt_BR");

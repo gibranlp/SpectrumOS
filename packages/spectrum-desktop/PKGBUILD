@@ -1,12 +1,12 @@
 pkgname=spectrum-desktop
-pkgver=1.1.0
+pkgver=1.1.20
 pkgrel=1
 pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
 arch=(x86_64)
 url="https://spectrum.gibranlp.dev"
 license=(MIT)
 depends=(
-    'ukvm>=0.1.0.r21' 'spectrumdrop>=1.0.0-5' acl adwaita-cursors alacritty alsa-lib awww blueman bluez bluez-utils brightnessctl cava curl dbus ddcutil evolution fastfetch ffmpeg flatpak gcc-libs glibc gnome-disk-utility gnome-keyring grim gtk-layer-shell gtk3 gvfs gvfs-mtp hyprpicker git
+    'ukvm>=0.1.0.r21' 'spectrumdrop>=1.0.1' acl adwaita-cursors alacritty alsa-lib awww blueman bluez bluez-utils brightnessctl cava curl dbus ddcutil evolution fastfetch ffmpeg flatpak gcc-libs glibc gnome-disk-utility gnome-keyring grim gtk-layer-shell gtk3 gvfs gvfs-mtp hyprpicker git
     imagemagick htop hypridle hyprland hyprlock kdeconnect kitty kvantum kvantum-qt5 libdbusmenu-gtk3 libnotify networkmanager nm-connection-editor noto-fonts noto-fonts-cjk noto-fonts-emoji ntfs-3g numbat pavucontrol pipewire pipewire-alsa pipewire-jack pipewire-pulse
     playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct 'satty>=0.21' sddm slurp spectrum-base 'spectrum-hyprland>=1.0.0-11' spectrum-plymouth spectrum-sddm 'spectrum-theme>=1.0.0-4' swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
     ttf-jetbrains-mono-nerd ttf-firacode-nerd ttf-sourcecodepro-nerd ttf-cascadia-code-nerd ttf-hack-nerd ttf-ibmplex-mono-nerd ttf-iosevka-nerd ttf-victor-mono-nerd ttf-ubuntu-mono-nerd ttf-meslo-nerd
@@ -36,7 +36,7 @@ conflicts=(eww eww-git wofi waybar dunst)
 replaces=(eww eww-git wofi waybar dunst)
 options=(!strip !debug)
 backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-terminals.list' 'etc/xdg/fastfetch/config.jsonc')
-_source_revision=2fdeff3a7ac14a39
+_source_revision=0e71973ee120e7cd
 _source_version=1.0.0
 _source_root="spectrumos-source-$_source_version"
 _questline_version=2.0.3
@@ -45,7 +45,7 @@ source=("spectrumos-source-$_source_version-$_source_revision.tar.zst"
         "questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst"
         'questline.LICENSE'
         "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
-sha256sums=('1c81a59793fa8e1921ba8091f5c60217091160f4fc0c8bcc8759a0f817db47fb'
+sha256sums=('6b96c066265447787da0cfb07dceaec81509cbe9fa02d41b983aac70295274a5'
             'a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495'
             '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
             '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')
@@ -90,6 +90,7 @@ check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_shell_focus.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_launcher.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_capture_notifications.py
+    python3 tests/run_break_reminders.py
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_questline_notifications.py
     local _media_runtime="$srcdir/media-test-runtime"
     install -d -m 700 "$_media_runtime"
@@ -127,6 +128,7 @@ check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorMovie.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorChin.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_Igor.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorOutfits.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorSleeper.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_KeyboardNavigation.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_MediaArtwork.qml
@@ -143,6 +145,7 @@ package() {
     "$srcdir/$_source_root/integrations/ukvm/install" "$srcdir/$_source_root" "$pkgdir"
     local _project="$srcdir/$_source_root"
     local spectrum="$pkgdir/usr/share/spectrumos" script
+    install -Dm 0644 "$_project/assets/branding/logo.svg" "$spectrum/branding/logo.svg"
     install -d -m 0755 "$pkgdir/usr/lib/qt6/qml" "$spectrum/translations"
     cp -r "$srcdir/localization/qml/." "$pkgdir/usr/lib/qt6/qml/"
     cp -r "$srcdir/localization/translations/." "$spectrum/translations/"
@@ -159,6 +162,8 @@ package() {
 
     install -m 0644 "$_project"/configs/spectrum-shell/*.qml "$spectrum/spectrum-shell/"
     install -m 0644 "$_project"/configs/spectrum-shell/*.js "$spectrum/spectrum-shell/"
+    install -m 0644 "$_project"/configs/spectrum-shell/*.qsb "$spectrum/spectrum-shell/"
+    install -m 0644 "$_project"/configs/spectrum-shell/matrix-* "$spectrum/spectrum-shell/"
     install -d -m 0755 "$spectrum/spectrum-shell/igor"
     install -m 0644 "$_project"/configs/spectrum-shell/igor/*.svg "$spectrum/spectrum-shell/igor/"
     install -m 0644 "$_project"/configs/terminal/* "$spectrum/terminal/"
@@ -203,6 +208,8 @@ package() {
         "$pkgdir/usr/share/libalpm/hooks/90-spectrumos-desktop-cleanup.hook"
     install -m 0644 "$_project/system/pacman-hooks/91-spectrumos-browser-defaults.hook" \
         "$pkgdir/usr/share/libalpm/hooks/91-spectrumos-browser-defaults.hook"
+    install -Dm 0644 "$_project/system/polkit/50-spectrumos-gamemode.rules" \
+        "$pkgdir/usr/share/polkit-1/rules.d/50-spectrumos-gamemode.rules"
     install -Dm 0644 "$_project/system/polkit/org.spectrumos.time-region.policy" \
         "$pkgdir/usr/share/polkit-1/actions/org.spectrumos.time-region.policy"
     install -m 0755 "$_project/integrations/questline/spectrum-focus" "$pkgdir/usr/lib/spectrumos/questline-focus"

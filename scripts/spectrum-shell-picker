@@ -33,10 +33,13 @@ def main() -> int:
             prompt = arguments[position + 1]
     password = "--password" in arguments
     rows = [] if password else sys.stdin.read().splitlines()
+    context = {}
+    if "--anchor" in arguments and arguments[arguments.index("--anchor") + 1:][:1] == ["weather"]:
+        context["anchor"] = "weather"
     with tempfile.TemporaryDirectory(prefix="spectrum-picker-") as directory:
         request_dir = Path(directory)
         (request_dir / "request.json").write_text(
-            json.dumps({"prompt": prompt, "password": password, "rows": rows}), encoding="utf-8"
+            json.dumps({"prompt": prompt, "password": password, "rows": rows, **context}), encoding="utf-8"
         )
         shell_path = os.environ.get("SPECTRUM_SHELL_CONFIG_DIR", "/usr/share/spectrumos/spectrum-shell")
         for _ in range(3):
