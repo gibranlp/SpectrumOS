@@ -1353,6 +1353,8 @@ ShellRoot {
             screen: modelData
             implicitHeight: islandStats.visible ? Math.max(34, Math.ceil(islandStats.implicitHeight) + 8) : 34
             exclusionMode: ExclusionMode.Ignore
+            // El estilo guardado puede pedir transparencia después de crear la ventana.
+            surfaceFormat.opaque: false
             color: shell.barStyle === "islands" ? "transparent" : shell.colors.surface
             mask: BarInputRegion { backdrop: topIslands; islands: shell.barStyle === "islands"; hoverTarget: dashboardBarHover }
             anchors { top: true; left: true; right: true }

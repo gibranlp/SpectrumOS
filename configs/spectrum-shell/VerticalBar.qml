@@ -59,6 +59,8 @@ PanelWindow {
     implicitHeight: targetScreen ? targetScreen.height : 0
     exclusionMode: ExclusionMode.Ignore
     visible: active
+    // El estilo guardado puede pedir transparencia después de crear la ventana.
+    surfaceFormat.opaque: false
     color: theme.barStyle === "islands" ? "transparent" : theme.colors.surface
 
     mask: BarInputRegion { backdrop: leftIslands; islands: bar.theme.barStyle === "islands" }
