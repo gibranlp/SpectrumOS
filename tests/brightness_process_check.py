@@ -6,7 +6,7 @@ import tempfile
 root=Path(__file__).resolve().parents[1]
 s=(root/'configs/spectrum-shell/shell.qml').read_text()
 functions=s[s.index('    function refreshBrightness()'):s.index('    function runAction(')]
-processes=s[s.index('    Process {\n        id: brightnessProcess'):s.index('    Process {\n        id: overviewProcess')]
+processes=s[s.index('    Process {\n        id: brightnessProcess'):s.index('    readonly property bool remoteControlActive:')]
 with tempfile.TemporaryDirectory(prefix='spectrum-brightness-process-') as temp:
     path=Path(temp)
     helper=path/'helper'

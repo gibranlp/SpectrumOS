@@ -1,0 +1,115 @@
+{
+  "date": "2026-11-01",
+  "environment": "sandbox",
+  "private_commits": [
+    "4f3bc14",
+    "d7a42d6"
+  ],
+  "runtime": "0.1.4",
+  "package": "spectrum-igor-0.1.4-1",
+  "source": {
+    "path": "igor-runtime-0.1.4-d5dec2ffc252ce90.tar.zst",
+    "version": "0.1.4",
+    "revision": "d5dec2ffc252ce90",
+    "sha256": "4d54f06710e8721cea702eb67a1be6499e0c26ea6c116ed214a5ead8c7e2e856",
+    "files": 34,
+    "published": true,
+    "url": "https://spectrum.gibranlp.dev/sources/igor-runtime-0.1.4-d5dec2ffc252ce90.tar.zst"
+  },
+  "checks": [
+    {
+      "argv": "python3 -m unittest discover -s /tmp/igor-packs-work/tests -p test_*.py",
+      "exit_code": 0,
+      "passed": 87,
+      "scope": "desktop clients, service, signatures, safe installation, export, release builder"
+    },
+    {
+      "argv": "python3 /tmp/igor-deploy-pack-api.py",
+      "exit_code": 0,
+      "passed": 61,
+      "scope": "deployed server tests"
+    },
+    {
+      "argv": "python3 /tmp/igor-packs-work/scripts/check.py --suite tst_IgorAccount,tst_IgorWardrobe,tst_IgorSelection",
+      "exit_code": 0,
+      "passed": 17
+    },
+    {
+      "argv": "python3 /tmp/igor-packs-work/tests/check_wardrobe_state.py",
+      "exit_code": 0
+    },
+    {
+      "argv": "makepkg --cleanbuild --force",
+      "exit_code": 0,
+      "scope": "spectrum-igor package",
+      "contract_checks_passed": 7,
+      "nonfatal_output": "libfakeroot internal error: payload not recognized; package creation completed and installed-file verification passed"
+    },
+    {
+      "argv": "python3 /tmp/igor-pack-https-e2e.py",
+      "exit_code": 0,
+      "scope": "isolated HTTPS signed manifest and receipt, authenticated archive download, validation, installation, catalog",
+      "unauthenticated_download_status": 401,
+      "temporary_account_and_release_removed": true
+    },
+    {
+      "argv": "scripts/update-translations --check --complete es_MX pt_BR",
+      "exit_code": 0,
+      "source_messages": 1454
+    },
+    {
+      "argv": "python3 /tmp/igor-check-live-account-state.py",
+      "exit_code": 0,
+      "installed_qml_state": "signed_in",
+      "owned_pack_count": 1
+    }
+  ],
+  "local_deployment": {
+    "installed_files_match_source": true,
+    "pacman_missing_files": 0,
+    "shell_runtime": "0.1.4",
+    "visual_workspace": 6,
+    "visual_monitor": "HDMI-A-1",
+    "screenshot": "/tmp/igor-packs-workspace6.png",
+    "account_signed_in": true,
+    "owned_pack_count": 1,
+    "restore_unreleased_pack_result": "no_downloadable_files",
+    "preferences_avatar_preserved": true
+  },
+  "failures_resolved": [
+    {
+      "failure": "legacy hyprctl dispatcher syntax rejected",
+      "resolution": "hl.dsp.focus({workspace=6})"
+    },
+    {
+      "failure": "workspace focus changed after shell restart before final assertion",
+      "resolution": "explicitly focused workspace 6 and checked target monitor before final visual verification"
+    },
+    {
+      "failure": "additional restore button caused account-panel control layout failure",
+      "resolution": "restore control moved to a separate row; QML checks passed"
+    },
+    {
+      "failure": "public PEM excluded by generic private-key gitignore rule",
+      "resolution": "explicit public-key exception added, key tracked, all allowlisted files verified tracked and public archive reproduced"
+    }
+  ],
+  "policy": {
+    "authorized_pcs": 3,
+    "receipt_offline_days": 7,
+    "pack_format": 1,
+    "accepted_images": "static 400x280 PNG overlays",
+    "new_animation_data_supported": false
+  },
+  "real_purchased_pack_contains_assets": false,
+  "paid_assets_published": false,
+  "live_payments_enabled": false,
+  "iso_built": false,
+  "remaining": [
+    "first_paid_outfit_artwork",
+    "validated_animation_pack_format",
+    "device_session_renewal",
+    "customer_offline_policy_review",
+    "live_approval_and_delivery_validation"
+  ]
+}

@@ -29,7 +29,7 @@ class HyprlandConfigTests(unittest.TestCase):
         represented = {routes[route] for route in re.findall(r'backendDir \+ "/spectrum-shell-open", "([^"]+)"', catalog)}
         if '"/panel", "--capture"' in catalog:
             represented.add(routes["screenshot"])
-        menu_only = {routes[name] for name in ("appearance",)}
+        menu_only = {routes[name] for name in ("appearance", "igor")}
         self.assertEqual(set(routes.values()) - represented, menu_only)
         bindings = (CONFIG_DIR / "keybindings.lua").read_text()
         actual = {}

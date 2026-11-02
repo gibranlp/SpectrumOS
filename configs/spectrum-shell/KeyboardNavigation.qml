@@ -9,21 +9,6 @@ Item {
 
     readonly property bool textFocused: focusedItem !== null && contains(focusedItem) && focusedItem.cursorPosition !== undefined
 
-    Rectangle {
-        objectName: "keyboard-input-focus-outline"
-        parent: navigation.textFocused ? navigation.focusedItem : navigation
-        anchors.fill: parent
-        visible: navigation.textFocused
-        color: "transparent"
-        border.width: 1
-        border.color: {
-            for (let item = parent; item; item = item.parent)
-                if (item.theme && item.theme.colors) return item.theme.colors.accent;
-            return navigation.textFocused ? navigation.focusedItem.color : "transparent";
-        }
-        radius: 4
-    }
-
     function contains(item): bool {
         for (let node = item; node; node = node.parent)
             if (node === target) return true;

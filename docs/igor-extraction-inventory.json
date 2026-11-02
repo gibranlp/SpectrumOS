@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "5b7d9f92937582ee2caf0944a658b78e0f069908",
+  "baseline_includes_uncommitted_source": true,
+  "files": [
+    {
+      "path": "assets/branding/igor.svg",
+      "sha256": "f19ab77aaae68d154a7107ed659d3bf9495dd4a2233d26f6bae7a6f1eda52c0a",
+      "bytes": 20719,
+      "disposition": "baseline_artwork",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorButton.qml",
+      "sha256": "0545b65ff86f0f5fd351aeaaca50f5756fcb75a392965d73e7d4f757c51760b7",
+      "bytes": 904,
+      "disposition": "host_integration",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorIllustration.qml",
+      "sha256": "f46bd8a16e3d6de33cfda5778ded3e4ba6941a3eaaadafd0fcb5e9410536c13f",
+      "bytes": 15556,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorMusicNote.qml",
+      "sha256": "6d4a92544f8c05c62da28008f3e4aff536a4e21b43d1e0666908210148ef78ae",
+      "bytes": 2261,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorNapStage.qml",
+      "sha256": "71ed549e1c4eb0e399e4b650daac35324e837e862a03e7621595373b6551c3c4",
+      "bytes": 4062,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorOutfits.js",
+      "sha256": "d0146418e1d08cacf70a531f5a0b7f6a8a8d50e3d8baa5efa61b05b34dda5636",
+      "bytes": 627,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorRoutine.qml",
+      "sha256": "ea7c7e70a74fb199ef27aad6e57da865c5ca941ea017308c9aa6302006dd683f",
+      "bytes": 8158,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorSeasonalOutfit.qml",
+      "sha256": "37c169b86bc536ce861d7f51d9e73cd47bf58109a963385fa3671ea77bce17fa",
+      "bytes": 1251,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorSleeper.qml",
+      "sha256": "b786d427589750cb25e702b7ca9e7bff69047b112dd008fedb7fad30c5ec0d7d",
+      "bytes": 4526,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorStage.qml",
+      "sha256": "10359e76f0999805b303ec6201ff833ee4d2240e879436143a37d038c24dd479",
+      "bytes": 8550,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/IgorVisitor.qml",
+      "sha256": "0b15b13a4eb70dc629b1dc7cc61d95a6b365749203070512dce5e914a6362653",
+      "bytes": 3344,
+      "disposition": "host_integration",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/chin.svg",
+      "sha256": "1e2ce828ee78a5891e8252f11878ee2bb25d2c21755ee5a2f923050896631676",
+      "bytes": 210,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/christmas-lights.svg",
+      "sha256": "da72699a86c340d2eef608b7b3ad4cfd87f56328efe6873a19f78ec7fa6701e2",
+      "bytes": 6129,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/day-of-the-dead-mask.svg",
+      "sha256": "ec6be4ace8d1c22e6d81f1aa64b59a3682db911dd82a527c57e9317a3ac53caa",
+      "bytes": 1696,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/face.svg",
+      "sha256": "4abd8eeb17cce755ae24843d4baccb9aafea2f0cfa2e08d7357dae02fdce396d",
+      "bytes": 15822,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/head-base.svg",
+      "sha256": "2e5a4b40ab98bb2a60b5294b0c02d54a1f985e531fdf05ef81b71989576b1914",
+      "bytes": 3512,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/head.svg",
+      "sha256": "87f57ef260d27d51f9a5cf451090508e4b631a0fb6b11d1a481b53d64bee2479",
+      "bytes": 15821,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/left-paw.svg",
+      "sha256": "eb5fffd31e10c574f793f49888c17b1a9288a1a2d68a30b7bc340f700695ed5c",
+      "bytes": 2791,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/movie-glasses.svg",
+      "sha256": "9fe721de02c6ad1cc30a15747751dbe93dc8b9994531e458e62f5fda2c202980",
+      "bytes": 1070,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/right-paw.svg",
+      "sha256": "fec7e1b4a230e21a13f54b5eb21c2533a0e033e0359ff9f29ecc1c80d9119985",
+      "bytes": 2597,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "configs/spectrum-shell/igor/santa-hat.svg",
+      "sha256": "44e49c1c7a76ff9c5c73e86322bddd01c5662ec4ea94c667c485e954fb1d0af1",
+      "bytes": 688,
+      "disposition": "private_runtime",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "igor.svg",
+      "sha256": "f19ab77aaae68d154a7107ed659d3bf9495dd4a2233d26f6bae7a6f1eda52c0a",
+      "bytes": 20719,
+      "disposition": "baseline_artwork",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "scripts/prepare-igor-assets",
+      "sha256": "f75fa93140aa0652a80cfea68af3f56b82cfa27f475ba6489d917d1216d16374",
+      "bytes": 3560,
+      "disposition": "private_asset_tool",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_Igor.qml",
+      "sha256": "2925a72b184d441164caab924cc5596db07dffcff3aea083c0ea655d3cac1c13",
+      "bytes": 16970,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorChin.qml",
+      "sha256": "9d58d04d23818991c657643d401a13a14f7ba881f4560159935944f6db18f1be",
+      "bytes": 1859,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorCoverage.qml",
+      "sha256": "7f9574aeea25994ecc797e314646468849e0d11bf15ef2428b4635e5630b5841",
+      "bytes": 1681,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorMovie.qml",
+      "sha256": "8f9a75daa8f84b52af714e93da7784da371bb985ca86c30ebf960daa2d244100",
+      "bytes": 7410,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorMusicNote.qml",
+      "sha256": "7f6d876609ea0e6586258ef4f420a4e408da78d749126e1e1c04505aabecabdc",
+      "bytes": 2910,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorOutfits.qml",
+      "sha256": "8c3b1efda371b1745c8835b91b5078adbc0694ec033e7a0cdbdbcde8a69ea3b7",
+      "bytes": 6671,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorSleeper.qml",
+      "sha256": "fb8e3a2dae7dc7ee5707cec4705b3462a49326f7d4a203f82671ed434fa25880",
+      "bytes": 8292,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/qml/tst_IgorStage.qml",
+      "sha256": "4e459bf6a06206745a18435b7e9c2ce4be26fe753b10e47ab758444fe6c8294e",
+      "bytes": 4545,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    },
+    {
+      "path": "tests/test_igor.py",
+      "sha256": "f62d2169ae845c8c1e71943fefc80a351ac68362da4a1a4003c7d4c70bf5c144",
+      "bytes": 3130,
+      "disposition": "baseline_regression",
+      "license_evidence": "packages/spectrum-desktop/LICENSE; file-level authorship requires confirmation"
+    }
+  ],
+  "website": {
+    "root": "/home/gibranlp/gibranlp_site/spectrum-site",
+    "assets": [
+      {
+        "path": "assets/igor/chin.svg",
+        "sha256": "1e2ce828ee78a5891e8252f11878ee2bb25d2c21755ee5a2f923050896631676",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/christmas-lights.svg",
+        "sha256": "da72699a86c340d2eef608b7b3ad4cfd87f56328efe6873a19f78ec7fa6701e2",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/day-of-the-dead-mask.svg",
+        "sha256": "ec6be4ace8d1c22e6d81f1aa64b59a3682db911dd82a527c57e9317a3ac53caa",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/face.svg",
+        "sha256": "4abd8eeb17cce755ae24843d4baccb9aafea2f0cfa2e08d7357dae02fdce396d",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/head-base.svg",
+        "sha256": "2e5a4b40ab98bb2a60b5294b0c02d54a1f985e531fdf05ef81b71989576b1914",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/head.svg",
+        "sha256": "87f57ef260d27d51f9a5cf451090508e4b631a0fb6b11d1a481b53d64bee2479",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/left-paw.svg",
+        "sha256": "eb5fffd31e10c574f793f49888c17b1a9288a1a2d68a30b7bc340f700695ed5c",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/movie-glasses.svg",
+        "sha256": "9fe721de02c6ad1cc30a15747751dbe93dc8b9994531e458e62f5fda2c202980",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/right-paw.svg",
+        "sha256": "fec7e1b4a230e21a13f54b5eb21c2533a0e033e0359ff9f29ecc1c80d9119985",
+        "disposition": "free_website_export"
+      },
+      {
+        "path": "assets/igor/santa-hat.svg",
+        "sha256": "44e49c1c7a76ff9c5c73e86322bddd01c5662ec4ea94c667c485e954fb1d0af1",
+        "disposition": "free_website_export"
+      }
+    ],
+    "shared_implementation_files": [
+      "src/build.py",
+      "assets/js/site.js",
+      "assets/css/site.css",
+      "src/content/en.json",
+      "src/content/es.json"
+    ]
+  },
+  "public_history_rewritten": false,
+  "free_outfits": [
+    "day-of-the-dead",
+    "christmas",
+    "christmas-lights"
+  ],
+  "runtime_host_api_version": 1,
+  "additional_migration_consumers": [
+    "install.sh",
+    "scripts/spectrum-user-avatar",
+    "tests/test_user_avatar.py",
+    "tests/qml/tst_MediaArtwork.qml",
+    "configs/spectrum-shell/shell.qml",
+    "configs/spectrum-shell/VerticalBar.qml",
+    "scripts/build-source-archive",
+    "docs/spectrum-shell.md"
+  ],
+  "legacy_source_retirement": "done_in_current_tree_and_local_desktop_package"
+}

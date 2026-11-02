@@ -1,5 +1,7 @@
 from pathlib import Path
 import runpy
+import json
+import tempfile
 import subprocess
 import unittest
 from copy import deepcopy
@@ -80,7 +82,7 @@ class DisplayMenuTests(unittest.TestCase):
         }
         self.assertEqual(dimensions(settings), (720, 1280))
 
-    def test_scale_preserves_live_modes_geometry_and_other_monitors(self):
+    def test_scale_preserves_live_modes_and_reflows_neighbors(self):
         action = runpy.run_path(str(MENU))["cli_action"]
         live = {
             "DP-1": {"disabled": False, "mode": "3840x2160@119.88", "scale": 1,
@@ -98,7 +100,63 @@ class DisplayMenuTests(unittest.TestCase):
                 self.assertEqual(exit_result.exception.code, 0)
                 expected = deepcopy(live)
                 expected["DP-1"]["scale"] = float(value)
-                saved.assert_called_once_with(expected)
+                expected["HDMI-A-1"]["position"] = f"{round(2160 / float(value))}x0"
+                saved.assert_called_once_with(expected, live)
+
+    def test_scaling_round_trip_keeps_monitor_edges_attached(self):
+        reflow = runpy.run_path(str(MENU))["reflow_geometry"]
+        for positions in [("0x0", "3840x0"), ("0x0", "-1920x0"), ("0x0", "0x2160"), ("0x0", "0x-1080")]:
+            for changed in ("DP-1", "HDMI-A-1"):
+                state = {
+                    "DP-1": {"disabled":False,"mode":"3840x2160@60","scale":1,"transform":0,"position":positions[0]},
+                    "HDMI-A-1": {"disabled":False,"mode":"1920x1080@60","scale":1,"transform":0,"position":positions[1]},
+                }
+                original = deepcopy(state)
+                for scale in (1.25, 1, 1.25, 1):
+                    previous = deepcopy(state)
+                    state[changed]["scale"] = scale
+                    reflow(state, previous)
+                self.assertEqual(state, original, (positions, changed))
+
+    def test_three_monitor_chain_and_bottom_alignment_reflow(self):
+        reflow = runpy.run_path(str(MENU))["reflow_geometry"]
+        state = {name:{"disabled":False,"mode":"1920x1080@60","scale":1,"transform":0,"position":f"{index * 1920}x0"} for index,name in enumerate(("left","middle","right"))}
+        previous = deepcopy(state)
+        state["middle"]["scale"] = 1.25
+        reflow(state, previous)
+        self.assertEqual(state["right"]["position"], "3456x0")
+        state.pop("right")
+        state["middle"]["position"] = "1920x216"
+        previous = deepcopy(state)
+        state["left"]["scale"] = 1.25
+        reflow(state, previous)
+        self.assertEqual(state["middle"]["position"], "1536x0")
+
+    def test_live_enumeration_order_is_stable(self):
+        live = runpy.run_path(str(MENU))["live_state"]
+        with patch.dict(live.__globals__, monitors=lambda:[{"id":1,"name":"HDMI"},{"id":0,"name":"DP"}]):
+            self.assertEqual(list(live()), ["DP", "HDMI"])
+
+    def test_readback_reflows_using_compositor_adjusted_scale(self):
+        namespace = runpy.run_path(str(MENU))
+        apply = namespace["save_and_apply"]
+        original = {
+            "DP": {"disabled":False,"mode":"3840x2160@60","scale":1,"transform":0,"position":"0x0"},
+            "HDMI": {"disabled":False,"mode":"1920x1080@60","scale":1,"transform":0,"position":"3840x0"},
+        }
+        requested = deepcopy(original)
+        requested["DP"]["scale"] = 1.75
+        namespace["reflow_geometry"](requested, original)
+        observed = deepcopy(requested)
+        observed["DP"]["scale"] = 1.7777778
+        ok = subprocess.CompletedProcess([],0,"","")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            with patch.dict(apply.__globals__, CONFIG_DIR=path, STATE_FILE=path/"state.json", LUA_FILE=path/"monitors.lua", live_state=lambda:observed, command=Mock(return_value=ok), notify=Mock()), patch.object(namespace["time"],"sleep"):
+                self.assertTrue(apply(requested,original))
+                saved = json.loads((path/"state.json").read_text())
+                self.assertEqual(saved["HDMI"]["position"], "2160x0")
+                self.assertEqual(saved["DP"]["scale"], 1.7777778)
 
     def test_invalid_scale_or_disconnected_monitor_does_not_save(self):
         action = runpy.run_path(str(MENU))["cli_action"]

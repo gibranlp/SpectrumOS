@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-01",
+  "private_commit": "7dce8f4",
+  "runtime_version": "0.2.0",
+  "api_version": 1,
+  "model_version": 2,
+  "model_coordinates": [
+    400,
+    216
+  ],
+  "original_features_preserved": [
+    "ears",
+    "eyes",
+    "nose",
+    "colors",
+    "paw_artwork"
+  ],
+  "added": [
+    "lower_cheek_silhouette",
+    "muzzle",
+    "mouth",
+    "chin",
+    "whiskers",
+    "yawn",
+    "surprised_mouth",
+    "meeting_speech_movement",
+    "sleeping_mouth"
+  ],
+  "free_outfits_updated": [
+    "original",
+    "day-of-the-dead",
+    "christmas",
+    "christmas-lights"
+  ],
+  "accessories_updated": [
+    "headphones",
+    "meeting_microphone",
+    "movie_glasses"
+  ],
+  "checks": [
+    {
+      "argv": "python3 /tmp/igor-face-work/scripts/check.py",
+      "exit_code": 0,
+      "scope": "all 13 QML suites",
+      "passed": 185,
+      "failed": 0
+    },
+    {
+      "argv": "python3 /tmp/igor-face-work/scripts/check.py --suite tst_IgorFace",
+      "exit_code": 0,
+      "scope": "final face suite including yawn/meeting reset",
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "argv": "python3 -m unittest discover -s /tmp/igor-face-work/tests -p test_*.py",
+      "exit_code": 0,
+      "passed": 87
+    },
+    {
+      "argv": "makepkg --cleanbuild --force",
+      "scope": "spectrum-igor package",
+      "exit_code": 0,
+      "contract_checks_passed": 7
+    },
+    {
+      "argv": "python3 /tmp/igor-deploy-complete-face.py",
+      "exit_code": 0,
+      "installed_files_match": true,
+      "pacman_missing_files": 0,
+      "runtime_loaded": "0.2.0",
+      "visual_workspace": 6,
+      "preferences_avatar_preserved": true,
+      "stored_account_signed_in": true,
+      "owned_pack_count": 1
+    },
+    {
+      "argv": "python3 /home/gibranlp/Projects/Igor/scripts/build-free-runtime.py --output /tmp/igor-complete-face-repro",
+      "exit_code": 0,
+      "published_archive_reproduced": true
+    }
+  ],
+  "resolved_failures": [
+    {
+      "issue": "initial extended neck visible in standalone previews",
+      "resolution": "complete chin asset with separate frame-only backing"
+    },
+    {
+      "issue": "12 initial four-edge attachment checks failed",
+      "resolution": "fixed frame backing covers lifted and tilted head at every edge; 14-suite checks passed"
+    },
+    {
+      "issue": "3 ear joint checks used old short model dimensions",
+      "resolution": "reference and rendered fixtures use 400x216 model proportions; 5-suite checks passed"
+    }
+  ],
+  "visual_artifacts": [
+    "/tmp/igor-complete-face-sheet.png",
+    "/tmp/igor-complete-face-workspace6.png"
+  ],
+  "source": {
+    "path": "igor-runtime-0.2.0-a31fa5ae8e860a4e.tar.zst",
+    "version": "0.2.0",
+    "revision": "a31fa5ae8e860a4e",
+    "sha256": "8432a33a364e342f763a934bca26f32917d1924b3f008573dacd0a14f0034b77",
+    "files": 34,
+    "published": true,
+    "url": "https://spectrum.gibranlp.dev/sources/igor-runtime-0.2.0-a31fa5ae8e860a4e.tar.zst"
+  },
+  "scope": "free existing model outfits animations only",
+  "paid_artwork_added": false,
+  "iso_built": false,
+  "next": [
+    "review_completed_model_appearance",
+    "fit_future_paid_artwork_to_model2",
+    "validated_animation_pack_format",
+    "device_session_renewal",
+    "offline_policy_and_live_validation"
+  ],
+  "muzzle_correction": {
+    "runtime": "0.2.1",
+    "private_commit": "82554dc",
+    "removed": [
+      "round_muzzle_pads",
+      "nostril_dots",
+      "chin_spot",
+      "round_skull_mask_muzzle_opening"
+    ],
+    "preserved": "original_small_triangular_nose",
+    "mouth": "narrower_feline_shape",
+    "verification": {
+      "python_tests": 87,
+      "face_outfit_qml_checks": 14,
+      "package_checks": 7,
+      "installed_files_match": true,
+      "workspace": 6
+    },
+    "screenshot": "/tmp/igor-small-nose-workspace6.png"
+  },
+  "current_status": "reverted_by_owner_request",
+  "restoration": {
+    "private_commit": "34fc8ac",
+    "installed_package": "spectrum-igor-0.1.4-1",
+    "runtime_tree_matches": "d7a42d6:runtime",
+    "all_installed_qml_svg_match": true,
+    "workspace": 6,
+    "screenshot": "/tmp/igor-original-restored-workspace6.png",
+    "preferences_avatar_preserved": true,
+    "argv": "python3 /tmp/igor-restore-original-local.py",
+    "exit_code": 0,
+    "account_and_pack_delivery_preserved": true,
+    "new_design_approved": false
+  }
+}

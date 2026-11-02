@@ -205,11 +205,7 @@ def update_game_requests(requests: set[str]) -> int:
                 PRE_GAME_FILE.write_text(current, encoding="utf-8")
             target = "performance" if "performance" in available_modes(active_backend) else current
         else:
-            try:
-                target = PRE_GAME_FILE.read_text(encoding="utf-8").strip()
-            except OSError:
-                target = "balanced"
-            target = target if target in MODES else "balanced"
+            target = "balanced"
         transition = bool(requests) != bool(previous_requests)
         stale_count = _read_count() != len(previous_requests)
         if (transition or stale_count) and current != target:

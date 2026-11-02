@@ -162,6 +162,18 @@ Item {
         changed();
         flush();
     }
+    function discard(key): bool {
+        if (!ready || busy || blocked || !drafts[key]) return false;
+        const next = copy(drafts);
+        delete next[key];
+        const nextViews = copy(views);
+        for (const tab of Object.keys(nextViews))
+            if (nextViews[tab].key === key) delete nextViews[tab];
+        drafts = next;
+        views = nextViews;
+        changed();
+        return true;
+    }
     function forget(id): void {
         const next = copy(drafts);
         for (const key of Object.keys(next)) if (next[key].payload.id === id) delete next[key];

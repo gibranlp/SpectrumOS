@@ -1,5 +1,5 @@
 pkgname=spectrum-desktop
-pkgver=1.1.20
+pkgver=1.1.29
 pkgrel=1
 pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
 arch=(x86_64)
@@ -14,7 +14,7 @@ depends=(
     webp-pixbuf-loader libheif uwsm vlc
     wayland libxkbcommon wf-recorder wireplumber wl-clipboard xdg-desktop-portal-gtk spectrum-xdg-desktop-portal-hyprland xdg-user-dirs xdg-utils xdg-terminal-exec
 )
-depends+=('quickshell>=0.3.0' qt6-declarative gamemode)
+depends+=('quickshell>=0.3.0' qt6-declarative gamemode 'spectrum-igor>=0.3.2')
 depends+=(fuse2 squashfs-tools zenity pacman-contrib fakeroot python-gobject util-linux)
 depends+=(file-roller 7zip unrar unzip zip libarchive tar gzip bzip2 xz zstd lzip lz4 cpio arj lhasa bzip3)
 makedepends=(cmake desktop-file-utils git pkgconf python-polib qt6-tools)
@@ -36,7 +36,7 @@ conflicts=(eww eww-git wofi waybar dunst)
 replaces=(eww eww-git wofi waybar dunst)
 options=(!strip !debug)
 backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-terminals.list' 'etc/xdg/fastfetch/config.jsonc')
-_source_revision=0e71973ee120e7cd
+_source_revision=eb3842330d7c789e
 _source_version=1.0.0
 _source_root="spectrumos-source-$_source_version"
 _questline_version=2.0.3
@@ -45,7 +45,7 @@ source=("spectrumos-source-$_source_version-$_source_revision.tar.zst"
         "questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst"
         'questline.LICENSE'
         "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
-sha256sums=('6b96c066265447787da0cfb07dceaec81509cbe9fa02d41b983aac70295274a5'
+sha256sums=('733e76e4cf2f168b6dfa08fa2898223615b4ea82228703159359f049e6ebe280'
             'a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495'
             '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
             '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')
@@ -117,23 +117,17 @@ check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_DashboardHover.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineCalendar.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python tests/run_questline_workspace.py
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorCoverage.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellMotion.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_WidgetAction.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_BarExtras.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_ShellSurface.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_BarIslands.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_DetailedBarStats.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorStage.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorMovie.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorChin.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_Igor.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorOutfits.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorSleeper.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorBridge.qml
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorButton.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_KeyboardNavigation.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_MediaArtwork.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_MediaTitle.qml
-    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_IgorMusicNote.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTasks.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTreasury.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineFocus.qml
@@ -164,8 +158,6 @@ package() {
     install -m 0644 "$_project"/configs/spectrum-shell/*.js "$spectrum/spectrum-shell/"
     install -m 0644 "$_project"/configs/spectrum-shell/*.qsb "$spectrum/spectrum-shell/"
     install -m 0644 "$_project"/configs/spectrum-shell/matrix-* "$spectrum/spectrum-shell/"
-    install -d -m 0755 "$spectrum/spectrum-shell/igor"
-    install -m 0644 "$_project"/configs/spectrum-shell/igor/*.svg "$spectrum/spectrum-shell/igor/"
     install -m 0644 "$_project"/configs/terminal/* "$spectrum/terminal/"
     install -Dm644 "$_project/configs/terminal/kitty-user.conf" "$pkgdir/etc/skel/.config/kitty/kitty.conf"
     install -Dm644 "$_project/configs/terminal/alacritty-user.toml" "$pkgdir/etc/skel/.config/alacritty/alacritty.toml"

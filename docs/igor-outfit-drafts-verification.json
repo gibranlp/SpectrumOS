@@ -1,0 +1,212 @@
+{
+  "date": "2026-11-01",
+  "private_commit": "382a896",
+  "outfits": [
+    "sushi-bandana",
+    "questline-wizard",
+    "pirate-igor",
+    "business-cat"
+  ],
+  "status": "artwork_drafts",
+  "model": "original_0.1.4_400x164",
+  "face_and_runtime_unchanged": true,
+  "pack_assignment": null,
+  "pricing": null,
+  "installed_or_published": false,
+  "private_assets_excluded_from_free_export": true,
+  "artwork": {
+    "sources/business-cat.svg": "f6d7d01743301df323140ef223c72239003974ad4d6f76aa0d8180edbc95efb8",
+    "sources/pirate-igor.svg": "1137c9b281308f7c3e48f2e86ec4a01e48b365627fff509cd9bb3a4aca6bb0c4",
+    "sources/questline-wizard.svg": "01dd800186b21763d4f1ef0874174025d5b7e446f0507d834cfe3a23537fd534",
+    "sources/sushi-bandana.svg": "2cf7dc0981326511d8804a1eb72f6e6380e734eaee3bc9be18ee0ea025e69bf1",
+    "png/business-cat.png": "1fc8ab081b489dfbc9ba6387aa81ba0b327bc76862d1f678123c9939c94a26ea",
+    "png/pirate-igor.png": "9d89eecc3940baa77751a20fadebcbb586f98cf3521c61b92918a9fa79d3e0af",
+    "png/questline-wizard.png": "26f1c2cdcb0cc88285f2bfaeac2f157fe0b97e3fc8e879ca4823fad64336fcff",
+    "png/sushi-bandana.png": "095f3c2d95bf715d0d3c362e8b27a9ea3f2fb4060fc5fd70d20d0b1faff04733"
+  },
+  "checks": [
+    {
+      "argv": "python3 /tmp/igor-outfit-drafts/preview/test_artwork.py",
+      "exit_code": 0,
+      "passed": 4,
+      "scope": "metadata, static PNG dimensions, transparent eye centers, self-contained vector sources"
+    },
+    {
+      "argv": "qmltestrunner -input /tmp/igor-outfit-drafts/preview/tst_Animations.qml",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QML_IMPORT_PATH": "/home/gibranlp/Projects/Igor/runtime"
+      },
+      "exit_code": 0,
+      "passed": 46,
+      "outfit_animation_combinations": 44
+    },
+    {
+      "argv": "qmltestrunner -input /tmp/igor-outfit-drafts/preview/tst_Outfits.qml",
+      "exit_code": 0,
+      "passed": 3,
+      "scope": "contact sheet rendering"
+    },
+    {
+      "argv": "python3 /tmp/igor-open-outfit-studio.py",
+      "exit_code": 0,
+      "workspace": 6,
+      "wow_geometry_preserved": true,
+      "shell_restarted": false
+    }
+  ],
+  "visual_artifacts": [
+    "/tmp/igor-first-outfits.png",
+    "/tmp/igor-outfit-studio-workspace6.png"
+  ],
+  "live_preview": {
+    "root": "/tmp/igor-outfit-drafts",
+    "entry": "shell.qml",
+    "title": "Igor \u2014 outfit drafts",
+    "workspace": 6,
+    "controls": [
+      "animation_picker",
+      "pause_play",
+      "replay",
+      "normal_or_enlarged_size",
+      "cycle_animations"
+    ]
+  },
+  "resolved_failures": [
+    {
+      "issue": "live preview direct Studio entry and private module import produced blank cards",
+      "resolution": "root shell.qml wrapper and installed Spectrum.Igor module resolved asset snapshot paths"
+    },
+    {
+      "issue": "initial animation checks expected hidden Stage during nap and immediate visiting during reset",
+      "resolution": "check visiting asynchronously; 44 combinations passed without runtime changes"
+    }
+  ],
+  "next": [
+    "user_artwork_review",
+    "refine_first_four_designs",
+    "additional_outfit_concepts",
+    "choose_pack_contents_and_prices_later"
+  ],
+  "iso_built": false,
+  "wizard_revision": {
+    "palette": "muted_blue_gray",
+    "scale": [
+      1.08,
+      1.03
+    ],
+    "other_three_outfits_byte_identical": true,
+    "user_accepted": [
+      "sushi-bandana",
+      "pirate-igor",
+      "business-cat-glasses"
+    ],
+    "artwork_checks": 4,
+    "animation_qml_checks": 46,
+    "contact_sheet_checks": 3,
+    "live_preview_workspace": 6,
+    "live_preview_refreshed": true,
+    "wow_geometry_preserved": true,
+    "shell_restarted": false
+  },
+  "owner_approved_first_four": true,
+  "second_set": {
+    "private_commit": "15cfad3",
+    "outfits": [
+      "developer-hoodie",
+      "gamer-igor",
+      "tux-costume",
+      "hacker-igor"
+    ],
+    "status": "artwork_review",
+    "pack_assignment": null,
+    "pricing": null,
+    "original_runtime_unchanged": true,
+    "approved_first_four_tree_unchanged": true,
+    "private_assets_excluded_from_free_export": true,
+    "artwork": {
+      "sources/developer-hoodie.svg": "36e3d1f98620ffedac0b44fd1d244f3acdfe08b488b8e221dd09c6b1043fb3c1",
+      "sources/gamer-igor.svg": "8dacb6da18e743ea8c6957ff45863a7efbb4bea9447eef36ef75aaa83a48dd86",
+      "sources/hacker-igor.svg": "35efcd6856d34b550f36ebbe06070b9988c5f6c84da6ae94583aa9daca7bdb49",
+      "sources/tux-costume.svg": "8d46714f744afe65d08b79659ced31a5384ed3559dc2cbf48e044dd16b907bd0",
+      "png/developer-hoodie.png": "eb4d3d9f7309e749ad6252ee3473a6bbee39fde0bce7d81dc33271e06f0f0a87",
+      "png/gamer-igor.png": "2fe708b0cb7a5ff3afcc1cde4c1777473690dc470ee47d050290bde1502c271f",
+      "png/hacker-igor.png": "5fddd327f896451bc3564c5f041beeddce1e06cf3b69e165715ec17b29a42100",
+      "png/tux-costume.png": "065cbf105e1687a44b21f900ad7a451e59c3fe79b51d140973779c8372ea76be"
+    },
+    "checks": [
+      {
+        "argv": "python3 /tmp/igor-outfit-second/preview/test_artwork.py",
+        "exit_code": 0,
+        "passed": 4
+      },
+      {
+        "argv": "qmltestrunner -input /tmp/igor-outfit-second/preview/tst_Animations.qml",
+        "exit_code": 0,
+        "passed": 46,
+        "outfit_animation_combinations": 44
+      },
+      {
+        "argv": "qmltestrunner -input /tmp/igor-outfit-second/preview/tst_Outfits.qml",
+        "exit_code": 0,
+        "passed": 3
+      },
+      {
+        "argv": "python3 /tmp/igor-open-next-outfit-studio.py",
+        "exit_code": 0,
+        "workspace": 6,
+        "game_geometry_preserved": true,
+        "shell_restarted": false
+      }
+    ],
+    "visual_artifacts": [
+      "/tmp/igor-second-outfits.png",
+      "/tmp/igor-next-outfit-studio-workspace6.png"
+    ],
+    "remaining_original_concepts": [
+      "space-suit",
+      "halloween",
+      "holiday"
+    ],
+    "review_revision": {
+      "reason": [
+        "initial_designs_too_generic",
+        "outer_black_ear_fur_covered"
+      ],
+      "full_ear_openings": true,
+      "hood_fronts_open": true,
+      "developer_details": [
+        "coffee_heart_patch",
+        "code_stitching",
+        "contrasting_drawstrings"
+      ],
+      "gamer_details": [
+        "mint_D_pad_earcup",
+        "rose_button_earcup",
+        "controller_band_badge"
+      ],
+      "tux_details": [
+        "fitted_penguin_hood",
+        "gold_flaps",
+        "small_bow_tie"
+      ],
+      "hacker_details": [
+        "asymmetric_cowl",
+        "angular_green_frames",
+        "terminal_badge",
+        "circuit_stitching"
+      ],
+      "native_vector_boolean_fitting": true,
+      "new_artwork_tests_passed": 5,
+      "animation_checks_passed": 46,
+      "contact_sheet_checks_passed": 3,
+      "ear_clearance_points_per_outfit": 10,
+      "workspace6_visual_verified": true,
+      "wow_geometry_preserved": true,
+      "shell_restarted": false,
+      "original_runtime_and_approved_first_set_unchanged": true,
+      "resolved_issue": "evenodd_openings_outside_hood_initially_created_extra_fabric_polygons; native_path_subtraction_resolved_it"
+    }
+  }
+}

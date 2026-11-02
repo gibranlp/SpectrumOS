@@ -59,23 +59,17 @@ Item {
         when: windowShown
         property int activations: 0
         function init() { editorViewport.visible = false; directionGrid.visible = false; activations = 0; scroll.contentY = 0; surface.forceActiveFocus(); }
-        function test_textFocusOutlineFollowsScrolledAndMovedEditor() {
+        function test_textEditorKeepsNativeCursorWithoutOutline() {
             editorViewport.visible = true;
             editor.forceActiveFocus();
-            const outline = findChild(surface.keyboardController, "keyboard-input-focus-outline");
-            verify(outline !== null);
-            compare(outline.parent, editor);
-            compare(outline.color.a, 0);
-            verify(outline.visible);
-            editorViewport.contentY = 120;
-            editorViewport.y = 140;
-            wait(20);
-            compare(outline.mapToItem(surface, 0, 0).y, editor.mapToItem(surface, 0, 0).y);
-            compare(outline.parent.parent.parent, editorViewport);
-            verify(editorViewport.clip);
+            verify(editor.activeFocus);
+            verify(surface.keyboardController.textFocused);
+            compare(findChild(surface.keyboardController, "keyboard-input-focus-outline"), null);
+            verify(editor.cursorDelegate === null);
+            keyClick(Qt.Key_T);
+            verify(editor.text.includes("t"));
             surface.forceActiveFocus();
-            verify(!outline.visible);
-            editorViewport.y = 120;
+            verify(!surface.keyboardController.textFocused);
         }
         function test_arrowsFollowRowsAndColumnsAndScroll() {
             directionGrid.visible = true;

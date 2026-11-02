@@ -401,6 +401,45 @@ PanelWindow {
             questlineProcess.exec([backendDir + "/questline-adapter", "--json"]);
     }
 
+    property string questlineSearchQuery: ""
+    readonly property var questlineSearchResults: {
+        const words = questlineSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        if (!words.length) return [];
+        const results = [];
+        for (const pair of [["Tasks","search_tasks"],["Steps","steps"],["Scrolls","scrolls"],["Treasury","entries"],["Accounts","accounts"],["Chronicles","chronicles"],["Sidequests","sidequests"],["Campaigns","campaigns"]]) {
+            for (const item of (pair[1] === "search_tasks" ? questline.search_tasks || questline.tasks : questline[pair[1]]) || []) {
+                const text = Object.values(item).join(" ").toLowerCase();
+                if (words.every(word => text.includes(word))) results.push({kind:pair[0],item:item});
+            }
+        }
+        return results;
+    }
+    function openQuestlineSearchResult(result): void {
+        const item = result.item;
+        const task = result.kind === "Steps" ? (questline.search_tasks || questline.tasks || []).find(task => task.id === item.parent_task_id) : null;
+        if (result.kind === "Steps" && !task) {
+            questlineError = qsTranslate("Spectrum", "This step's task is no longer available.");
+            return;
+        }
+        const tab = result.kind === "Steps" ? "Tasks" : result.kind === "Accounts" ? "Treasury" : result.kind === "Campaigns" ? "Overview" : result.kind;
+        switchQuestlineTab(tab);
+        selectQuestlineProject((task || item).project_id || item.campaign_id || (result.kind === "Campaigns" ? item.id : ""));
+        questlineQuickScrollPicker = false;
+        if (result.kind !== "Campaigns" && result.kind !== "Accounts") questlineSelected = task || item;
+        if (task) beginQuestlineStepEdit(item);
+        questlineSearchQuery = "";
+        rememberQuestline();
+        Qt.callLater(() => {
+            if (result.kind === "Accounts") {
+                const list = questlineView.questlineAccountList;
+                list.positionViewAtIndex(list.model.findIndex(account => account.id === item.id), ListView.Contain);
+            } else if (!task && questlineView) {
+                questlineView.questlineItemList.positionViewAtIndex(questlineItems().findIndex(row => row.id === item.id), ListView.Contain);
+                questlineView.questlineDetailFlick.contentY = 0;
+            }
+        });
+    }
+
     function questlineItems() {
         if (questlineTab === "Tasks") return questlineTasks.items;
         if (questlineTab === "Scrolls") return (questline.scrolls || []).filter(item => (item.project_id || "") === questlineScrollProjectId);
@@ -1435,13 +1474,39 @@ PanelWindow {
                     property alias questlineAmount: viewQuestlineAmount
                     property alias questlineEditorFlick: viewQuestlineEditorFlick
                     property alias questlineBody: viewQuestlineBody
+                    property alias questlineAccountList: questlineAccountList
                     property alias questlineItemList: viewQuestlineItemList
                     property alias questlineDetailFlick: viewQuestlineDetailFlick
                     property alias questlineFocusEditor: viewQuestlineFocusEditor
                     RowLayout {
                         Layout.fillWidth: true
                         visible: panel.page === "questline"
-                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 38
+                            radius: 8
+                            color: panel.theme.colors.background
+                            TextInput {
+                                id: globalQuestlineSearch
+                                objectName: "questline-global-search"
+                                anchors { fill: parent; margins: 10 }
+                                verticalAlignment: TextInput.AlignVCenter
+                                clip: true
+                                activeFocusOnTab: true
+                                text: panel.questlineSearchQuery
+                                onTextEdited: panel.questlineSearchQuery = text
+                                color: panel.theme.colors.foreground
+                                font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                                Keys.onEscapePressed: panel.questlineSearchQuery = ""
+                                onAccepted: if (panel.questlineSearchResults.length) panel.openQuestlineSearchResult(panel.questlineSearchResults[0])
+                                Text {
+                                    visible: !parent.text && !parent.activeFocus
+                                    text: qsTranslate("Spectrum", "Search all Questline…")
+                                    color: panel.theme.colors.muted
+                                    font: parent.font
+                                }
+                            }
+                        }
                         ShellButton {
                             label: qsTranslate("Spectrum", "Open full app")
                             visible: panel.questline.available
@@ -1577,6 +1642,31 @@ PanelWindow {
                         color: panel.theme.colors.muted
                         font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
                     }
+                    ListView {
+                        objectName: "questline-search-results"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(190, Math.max(42, contentHeight))
+                        visible: panel.questlineSearchQuery.trim().length > 0
+                        clip: true
+                        spacing: 4
+                        model: panel.questlineSearchResults
+                        Text {
+                            visible: parent.count === 0
+                            text: qsTranslate("Spectrum", "No results")
+                            color: panel.theme.colors.muted
+                            font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                        }
+                        delegate: ShellButton {
+                            required property var modelData
+                            width: ListView.view.width
+                            label: modelData.kind + " · " + (modelData.item.title || modelData.item.name) + (modelData.item.campaign ? " · " + modelData.item.campaign : "")
+                            fontFamily: panel.theme.fontFamily
+                            fontSize: panel.theme.fontSize
+                            backgroundColor: panel.theme.colors.surface_alt
+                            foregroundColor: panel.theme.colors.foreground
+                            onClicked: panel.openQuestlineSearchResult(modelData)
+                        }
+                    }
                     QuestlineCampaignBar {
                         objectName:"questline-campaign-bar"
                         Layout.fillWidth:true
@@ -1662,11 +1752,31 @@ PanelWindow {
                                 const d = panel.questlineWorkspace.drafts[key];
                                 return d.tab === panel.questlineTab && d.view && (!d.valid || d.error || d.saved !== JSON.stringify(d.payload));
                             })
-                            ShellButton {
+                            Row {
+                                id: draftButtons
                                 required property string modelData
-                                label: qsTranslate("Spectrum", "Resume draft: ") + (panel.questlineWorkspace.drafts[modelData].view.title || qsTranslate("Spectrum", "Untitled"))
-                                fontFamily: panel.theme.fontFamily; fontSize: panel.theme.fontSize
-                                onClicked: panel.restoreQuestline(panel.questlineTab,panel.questlineWorkspace.drafts[modelData].view)
+                                readonly property var draft: panel.questlineWorkspace.drafts[modelData]
+                                spacing: 2
+                                ShellButton {
+                                    objectName: "questline-resume-draft-" + draftButtons.modelData
+                                    label: qsTranslate("Spectrum", "Resume draft: ") + (draftButtons.draft && draftButtons.draft.view.title || qsTranslate("Spectrum", "Untitled"))
+                                    fontFamily: panel.theme.fontFamily; fontSize: panel.theme.fontSize
+                                    onClicked: if (draftButtons.draft) panel.restoreQuestline(panel.questlineTab,draftButtons.draft.view)
+                                }
+                                ShellButton {
+                                    objectName: "questline-discard-draft-" + draftButtons.modelData
+                                    label: "×"
+                                    Accessible.name: qsTranslate("Spectrum", "Discard draft: ") + (draftButtons.draft && draftButtons.draft.view.title || qsTranslate("Spectrum", "Untitled"))
+                                    enabled: !panel.questlineWorkspace.busy && !panel.questlineWorkspace.blocked
+                                    fontFamily: panel.theme.fontFamily; fontSize: panel.theme.fontSize
+                                    onClicked: {
+                                        const key = draftButtons.modelData;
+                                        if (panel.questlineWorkspace.discard(key) && panel.questlineDraftKey === key) {
+                                            panel.questlineDraftKey = "";
+                                            panel.rememberQuestline();
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1685,7 +1795,7 @@ PanelWindow {
                             onClicked: panel.beginQuestlineEdit(null)
                         }
                         ShellButton {
-                            visible: panel.questlineSelected !== null && ["Tasks", "Sidequests", "Scrolls", "Treasury", "Chronicles"].includes(panel.questlineTab)
+                            visible: panel.questlineSelected !== null && ["Tasks", "Scrolls", "Treasury", "Chronicles"].includes(panel.questlineTab)
                             enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available)
                             objectName: "questline-edit-item"
                             label: qsTranslate("Spectrum", "Edit")
@@ -1696,7 +1806,7 @@ PanelWindow {
                             onClicked: panel.beginQuestlineEdit(panel.questlineSelected)
                         }
                         ShellButton {
-                            visible: panel.questlineSelected !== null && ["Tasks", "Sidequests", "Scrolls"].includes(panel.questlineTab)
+                            visible: panel.questlineSelected !== null && ["Tasks", "Scrolls"].includes(panel.questlineTab)
                             enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy
                             label: qsTranslate("Spectrum", "Delete")
                             fontFamily: panel.theme.fontFamily
@@ -1707,7 +1817,7 @@ PanelWindow {
                         }
                         Item { Layout.fillWidth: true }
                         ShellButton {
-                            visible: panel.questlineSelected !== null && ["Tasks", "Sidequests"].includes(panel.questlineTab)
+                            visible: panel.questlineSelected !== null && panel.questlineTab === "Tasks"
                             enabled: !!panel.questline.actions_available && (panel.questlineTab !== "Sidequests" || !!panel.questline.sidequests_available) && (panel.questlineTab !== "Chronicles" || !!panel.questline.chronicles_available) && !questlineActionProcess.running && !panel.questlineWorkspace.busy && (panel.questlineTab !== "Sidequests" || (!!panel.questlineSelected && panel.questlineSelected.completion_count < panel.questlineSelected.daily_target))
                             label: panel.questlineTab === "Sidequests" ? qsTranslate("Spectrum", "Complete sidequest") : qsTranslate("Spectrum", "Complete task")
                             fontFamily: panel.theme.fontFamily
@@ -2044,7 +2154,7 @@ PanelWindow {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            visible: panel.questlineTab !== "Treasury"
+                            visible: panel.questlineTab !== "Treasury" && panel.questlineTab !== "Sidequests"
                             radius: 8
                             color: panel.theme.colors.background
                             Flickable {
@@ -2343,10 +2453,58 @@ PanelWindow {
                             }
                         }
                     }
+                    ListView {
+                        objectName: "questline-sidequest-list"
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: panel.questlineTab === "Sidequests" && !panel.questlineEditing
+                        clip: true
+                        spacing: 8
+                        model: panel.questline.sidequests || []
+                        delegate: RowLayout {
+                            required property var modelData
+                            width: ListView.view.width
+                            ShellButton {
+                                Layout.fillWidth: true
+                                label: (modelData.completion_count >= modelData.daily_target ? "✓ " : "○ ") + modelData.title + " · " + modelData.completion_count + "/" + modelData.daily_target
+                                enabled: !!panel.questline.actions_available && !!panel.questline.sidequests_available && !questlineActionProcess.running && !panel.questlineWorkspace.busy && modelData.completion_count < modelData.daily_target
+                                fontFamily: panel.theme.fontFamily
+                                fontSize: panel.theme.fontSize + 2
+                                backgroundColor: panel.theme.colors.surface_alt
+                                foregroundColor: panel.theme.colors.foreground
+                                onClicked: panel.runQuestlineAction({action:"complete_sidequest",id:modelData.id})
+                            }
+                            Text {
+                                text: (modelData.current_streak || 0) + qsTranslate("Spectrum", " days in a row")
+                                color: panel.theme.colors.accent
+                                font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize }
+                            }
+                            ShellButton {
+                                label: "✎"
+                                Accessible.name: qsTranslate("Spectrum", "Edit sidequest") + ": " + modelData.title
+                                enabled: !!panel.questline.actions_available && !!panel.questline.sidequests_available && !questlineActionProcess.running && !panel.questlineWorkspace.busy
+                                fontFamily: panel.theme.fontFamily
+                                fontSize: panel.theme.fontSize
+                                backgroundColor: panel.theme.colors.surface_alt
+                                foregroundColor: panel.theme.colors.foreground
+                                onClicked: panel.beginQuestlineEdit(modelData)
+                            }
+                            ShellButton {
+                                label: "×"
+                                Accessible.name: qsTranslate("Spectrum", "Delete sidequest") + ": " + modelData.title
+                                enabled: !!panel.questline.actions_available && !!panel.questline.sidequests_available && !questlineActionProcess.running && !panel.questlineWorkspace.busy
+                                fontFamily: panel.theme.fontFamily
+                                fontSize: panel.theme.fontSize
+                                backgroundColor: panel.theme.colors.surface_alt
+                                foregroundColor: panel.theme.colors.error
+                                onClicked: panel.askQuestlineDelete("sidequest", modelData)
+                            }
+                        }
+                    }
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        visible: panel.page === "questline" && panel.questline.available && panel.questlineTab !== "Tree" && panel.questlineTab !== "Overview" && panel.questlineTab !== "Focus" && panel.questlineTab !== "Hero" && panel.questlineTab !== "Sync" && !panel.questlineEditing && !panel.questlineQuickScrollPicker
+                        visible: panel.page === "questline" && panel.questline.available && panel.questlineTab !== "Sidequests" && panel.questlineTab !== "Tree" && panel.questlineTab !== "Overview" && panel.questlineTab !== "Focus" && panel.questlineTab !== "Hero" && panel.questlineTab !== "Sync" && !panel.questlineEditing && !panel.questlineQuickScrollPicker
                         spacing: 14
 
                         Rectangle {

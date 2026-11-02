@@ -9,7 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 
 def storage_path():
@@ -29,10 +29,24 @@ def sidequests(connection):
         return []
     items = rows(connection, "SELECT id, name AS title, description, frequency, reward_xp, daily_target FROM rituals ORDER BY name COLLATE NOCASE")
     counts = {}
+    history = {}
     if "ritual_history" in tables:
         counts = dict(connection.execute("SELECT ritual_id, completion_count FROM ritual_history WHERE completed_date = ?", (date.today().isoformat(),)))
+    if "ritual_history" in tables:
+        for ritual_id, completed_date, count in connection.execute("SELECT ritual_id, completed_date, completion_count FROM ritual_history"):
+            history.setdefault(ritual_id, {})[completed_date] = count
     for item in items:
         item["completion_count"] = counts.get(item["id"], 0)
+        days = history.get(item["id"], {})
+        cursor = date.today()
+        target = max(1, item["daily_target"] or 1)
+        if days.get(cursor.isoformat(), 0) < target:
+            cursor -= timedelta(days=1)
+        streak = 0
+        while days.get(cursor.isoformat(), 0) >= target:
+            streak += 1
+            cursor -= timedelta(days=1)
+        item["current_streak"] = streak
     return items
 
 
@@ -204,6 +218,12 @@ def snapshot(connection):
         "campaigns": campaigns,
         "scrolls": scrolls,
         "tasks": tasks,
+        "search_tasks": rows(connection, """
+            SELECT tasks.*, COALESCE(projects.name, 'Unfiled') AS campaign
+            FROM tasks LEFT JOIN projects ON projects.id = tasks.project_id
+            WHERE tasks.parent_task_id IS NULL
+            ORDER BY tasks.created_at DESC
+        """),
         "steps": steps,
         "finances": finances,
         "accounts": account_balances(connection),

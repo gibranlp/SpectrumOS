@@ -365,10 +365,6 @@ phase_system() {
     for source in "$PROJECT_ROOT"/configs/spectrum-shell/*.qml "$PROJECT_ROOT"/configs/spectrum-shell/*.js "$PROJECT_ROOT"/configs/spectrum-shell/*.qsb "$PROJECT_ROOT"/configs/spectrum-shell/matrix-*; do
         run sudo install -m 0644 "$source" "/usr/share/spectrumos/spectrum-shell/$(basename "$source")"
     done
-    run sudo install -d -m 0755 /usr/share/spectrumos/spectrum-shell/igor
-    for source in "$PROJECT_ROOT"/configs/spectrum-shell/igor/*.svg; do
-        run sudo install -m 0644 "$source" "/usr/share/spectrumos/spectrum-shell/igor/$(basename "$source")"
-    done
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/50-spectrumos-gamemode.rules" \
         /usr/share/polkit-1/rules.d/50-spectrumos-gamemode.rules
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/polkit/org.spectrumos.time-region.policy" \
@@ -616,7 +612,7 @@ phase_user() {
     run_as_target /usr/lib/spectrumos/thunar-actions sync
     run_as_target xdg-user-dirs-update
     run_as_target /usr/lib/spectrumos/spectrum-user-avatar \
-        /usr/share/spectrumos/spectrum-shell/igor/face.svg "$TARGET_HOME/$TARGET_USER.png"
+        /usr/lib/qt6/qml/Spectrum/Igor/igor/face.svg "$TARGET_HOME/$TARGET_USER.png"
     run_as_target mkdir -p -- "$projects_dir" "$hypr_dir" "$spectrum_dir" "$kitty_dir" "$alacritty_dir" "$environment_dir" "$wallpaper_dir" "$vlc_dir" "$transmission_download_dir"
     run_as_target /usr/lib/spectrumos/spectrum-session-profile seed --home "$TARGET_HOME" \
         --profile "$([[ $LEAN == true ]] && printf lean || printf full)"

@@ -34,15 +34,15 @@ end=/usr/lib/spectrumos/performance-mode --game-end
 `.../spectrumos/performance-mode/game-requests.json`. GameMode owns one request for
 its overall active session; Spectrum's manual Gaming or detected Steam game owns
 a separate `session` request. The first request remembers the previous mode in
-`pre-game-mode`, and the final release restores it. `game-count` is a derived
+`pre-game-mode`, and the final release returns to Balanced. `game-count` is a derived
 compatibility value, not an accumulating client counter. The shell reconciles
 these requests against actual activity on startup and transitions, recovering
 stale counts from interrupted older sessions. Hook updates share a file lock;
 failed power changes retain their requests for retry. Power notifications appear
 only when the selected mode changes. A manual power selection during a session
-changes the current mode; the final release still restores the saved mode.
+changes the current mode; the final release returns to Balanced.
 
-GameMode is now a required desktop dependency for the SpectrumShell Gaming profile. The shell holds a registered client for the duration of that profile, and games can register their own clients independently. Gaming also requests the available Performance power mode and restores its prior mode when no other GameMode clients remain. The Gaming helper verifies the real registration and reports activation failures in Control Center. Hook reference-count updates are serialized to handle concurrent clients. See [SpectrumShell Gaming](spectrum-shell.md#gaming-profile) for profile behavior and validation limits.
+GameMode is now a required desktop dependency for the SpectrumShell Gaming profile. The shell holds a registered client for the duration of that profile, and games can register their own clients independently. Gaming also requests the available Performance power mode and returns to Balanced when no detected games remain. The Gaming helper verifies the real registration and reports activation failures in Control Center. Hook reference-count updates are serialized to handle concurrent clients. See [SpectrumShell Gaming](spectrum-shell.md#gaming-profile) for profile behavior and validation limits.
 
 
 ## Automatic bar profile
@@ -69,3 +69,9 @@ activation. An already selected Performance profile produces no new power toast.
 The desktop installs `50-spectrumos-gamemode.rules`, allowing active local members
 of `spectrumos` to use GameMode's CPU governor and kernel tuning helpers. This
 avoids the authorization failures when the desktop user is not in `gamemode`.
+
+Battle.net launch wrappers and runtime containers are checked for descendant game
+processes and mapped game windows. Battle.net itself and its background agents do
+not hold automatic Gaming active after a title exits. WoW process detection also
+covers startup before its window appears. External native GameMode clients retain
+their normal lifetime behavior.

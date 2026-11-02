@@ -9,14 +9,14 @@ Rectangle {
     color: theme.igorEnabled ? theme.colors.accent : (mouse.containsMouse ? theme.colors.surface_alt : "transparent")
     Accessible.role: Accessible.CheckBox
     Accessible.name: "Igor"
-    Accessible.description: qsTranslate("Spectrum", "Show occasional visits from Igor")
+    Accessible.description: qsTranslate("Spectrum", "Toggle Igor visits. Right-click to open his wardrobe.")
     Accessible.checked: theme.igorEnabled
 
     Image {
         anchors.centerIn: parent
         width: 26
         height: 20
-        source: Qt.resolvedUrl("igor/face.svg")
+        source: "file:///usr/lib/qt6/qml/Spectrum/Igor/igor/face.svg"
         sourceSize.width: 52
         fillMode: Image.PreserveAspectFit
         opacity: button.theme.igorEnabled ? 1 : 0.6
@@ -26,6 +26,10 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onActivated: button.theme.toggleIgor()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onActivated: mouseButton => {
+            if (mouseButton === Qt.RightButton) button.theme.openIgorWardrobe();
+            else button.theme.toggleIgor();
+        }
     }
 }

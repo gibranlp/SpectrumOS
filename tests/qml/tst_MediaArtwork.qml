@@ -15,12 +15,12 @@ Item {
             compare(artwork.imageStatus, Image.Null);
         }
         function test_loadChangeErrorAndRecovery() {
-            artwork.artUrl = Qt.resolvedUrl("../../configs/spectrum-shell/igor/head-base.svg").toString();
+            artwork.artUrl = Qt.resolvedUrl("../fixtures/avatar.svg").toString();
             tryCompare(artwork, "hasArtwork", true);
             artwork.artUrl = Qt.resolvedUrl("missing-album-cover.png").toString();
             tryCompare(artwork, "imageStatus", Image.Error);
             compare(artwork.hasArtwork, false);
-            artwork.artUrl = Qt.resolvedUrl("../../configs/spectrum-shell/igor/head-base.svg").toString();
+            artwork.artUrl = Qt.resolvedUrl("../fixtures/avatar.svg").toString();
             tryCompare(artwork, "hasArtwork", true);
             artwork.artUrl = "";
             compare(artwork.hasArtwork, false);

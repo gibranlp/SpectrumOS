@@ -1,13 +1,14 @@
 import QtQuick
 import QtTest
+import Spectrum.Igor 1.0 as Runtime
 import "../../configs/spectrum-shell" as Shell
 import "../../configs/spectrum-shell/MeetingDetection.js" as Detection
 
 Item {
     id: scene
     width: 640; height: 420
-    Shell.IgorRoutine { id: routine }
-    Shell.IgorStage { id: stage; anchors.fill: parent; catSize: 260; animationDuration: 0; pawsFirstProbability: 0 }
+    Runtime.IgorRoutine { id: routine }
+    Shell.IgorStageModule { id: stage; anchors.fill: parent; catSize: 260; animationDuration: 0; pawsFirstProbability: 0 }
     TestCase {
         name: "IgorMeeting"
         when: windowShown

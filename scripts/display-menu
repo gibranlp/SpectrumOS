@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import fcntl
+from copy import deepcopy
 import os
 from pathlib import Path
 import subprocess
@@ -54,7 +56,7 @@ def notify(title: str, body: str = "", critical: bool = False) -> None:
 
 def live_state() -> dict[str, dict]:
     state = {}
-    for monitor in monitors():
+    for monitor in sorted(monitors(), key=lambda item: (item.get("id", 0), item["name"])):
         refresh = f'{monitor.get("refreshRate", 60):.2f}'.rstrip("0").rstrip(".")
         state[monitor["name"]] = {
             "description": monitor.get("description", monitor["name"]),
@@ -124,6 +126,65 @@ def explicit_arrangement(state: dict[str, dict], direction: str) -> None:
             state[name]["position"] = f"0x{offset}"
 
 
+def reflow_geometry(state: dict[str, dict], previous: dict[str, dict]) -> None:
+    active = [name for name in previous if not previous[name]["disabled"]]
+    if len(active) < 2:
+        return
+    rectangles = {}
+    for name in active:
+        x, y = map(int, previous[name]["position"].split("x"))
+        width, height = mode_dimensions(previous[name])
+        rectangles[name] = (x, y, width, height)
+    placed = {active[0]}
+    pending = set(active[1:])
+    while pending:
+        candidates = []
+        for anchor in active:
+            if anchor not in placed:
+                continue
+            ax, ay, aw, ah = rectangles[anchor]
+            for name in active:
+                if name not in pending:
+                    continue
+                x, y, width, height = rectangles[name]
+                horizontal_overlap = min(ax + aw, x + width) - max(ax, x)
+                vertical_overlap = min(ay + ah, y + height) - max(ay, y)
+                for direction, gap, overlap in (("right", x - ax - aw, vertical_overlap),
+                                                ("left", ax - x - width, vertical_overlap),
+                                                ("down", y - ay - ah, horizontal_overlap),
+                                                ("up", ay - y - height, horizontal_overlap)):
+                    if gap >= -1 and overlap > 0:
+                        candidates.append((max(0, gap), active.index(anchor), active.index(name), direction))
+        if not candidates:
+            return
+        gap, anchor_index, index, direction = min(candidates)
+        anchor, name = active[anchor_index], active[index]
+        ax, ay, aw, ah = rectangles[anchor]
+        x, y, width, height = rectangles[name]
+        new_ax, new_ay = map(int, state[anchor]["position"].split("x"))
+        new_aw, new_ah = mode_dimensions(state[anchor])
+        new_width, new_height = mode_dimensions(state[name])
+
+        def aligned(start, size, anchor_start, anchor_size, new_start, new_size, new_anchor_size):
+            if start == anchor_start:
+                return new_start
+            if start + size == anchor_start + anchor_size:
+                return new_start + new_anchor_size - new_size
+            if 2 * start + size == 2 * anchor_start + anchor_size:
+                return new_start + round((new_anchor_size - new_size) / 2)
+            return new_start + start - anchor_start
+
+        if direction in ("left", "right"):
+            new_x = new_ax + new_aw + gap if direction == "right" else new_ax - new_width - gap
+            new_y = aligned(y, height, ay, ah, new_ay, new_height, new_ah)
+        else:
+            new_x = aligned(x, width, ax, aw, new_ax, new_width, new_aw)
+            new_y = new_ay + new_ah + gap if direction == "down" else new_ay - new_height - gap
+        state[name]["position"] = f"{new_x}x{new_y}"
+        placed.add(name)
+        pending.remove(name)
+
+
 def relative_position(state: dict[str, dict], name: str, anchor: str, direction: str) -> None:
     if name == anchor or name not in state or anchor not in state:
         raise ValueError("A secondary and primary display are required")
@@ -182,7 +243,7 @@ def atomic_write(path: Path, content: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def save_and_apply(state: dict[str, dict]) -> bool:
+def save_and_apply(state: dict[str, dict], previous: dict[str, dict] | None = None) -> bool:
     previous_lua = LUA_FILE.read_text(encoding="utf-8") if LUA_FILE.exists() else None
     previous_state = STATE_FILE.read_text(encoding="utf-8") if STATE_FILE.exists() else None
     atomic_write(STATE_FILE, json.dumps(state, indent=2, sort_keys=True) + "\n")
@@ -190,6 +251,25 @@ def save_and_apply(state: dict[str, dict]) -> bool:
     reload_result = command("hyprctl", "reload", "config-only", check=False)
     errors = command("hyprctl", "configerrors", check=False).stdout.strip()
     if reload_result.returncode == 0 and not errors:
+        last = None
+        settled = None
+        for attempt in range(12):
+            time.sleep(0.15)
+            observed = live_state()
+            signature = [(name, item["mode"], item["scale"], item["position"], item["transform"], item["disabled"]) for name, item in observed.items()]
+            if signature == last and attempt >= 2:
+                settled = observed
+                break
+            last = signature
+        if previous is not None and settled is not None:
+            corrected = deepcopy(state)
+            for name in corrected:
+                if name in settled and not settled[name]["disabled"]:
+                    for field in ("mode", "scale", "transform"):
+                        corrected[name][field] = settled[name][field]
+            reflow_geometry(corrected, previous)
+            if corrected != state:
+                return save_and_apply(corrected)
         notify("Displays updated", "Monitor configuration saved")
         return True
     if previous_lua is None:
@@ -211,6 +291,7 @@ def monitor_label(name: str, settings: dict) -> str:
 
 
 def configure_monitor(state: dict[str, dict], name: str) -> None:
+    previous = deepcopy(state)
     settings = state[name]
     action = choose(
         name,
@@ -251,7 +332,11 @@ def configure_monitor(state: dict[str, dict], name: str) -> None:
         explicit_arrangement(state, "right")
     else:
         return
-    save_and_apply(state)
+    if action.startswith(("Mode", "Scale", "Rotation")):
+        reflow_geometry(state, previous)
+        save_and_apply(state, previous)
+    else:
+        save_and_apply(state)
 
 
 def arrange(state: dict[str, dict]) -> None:
@@ -311,7 +396,7 @@ def main() -> None:
 
 def cli_action(arguments: list[str]) -> None:
     # Al escalar conservamos los modos y la geometría reales, sin restaurar ajustes guardados.
-    state = live_state() if arguments and arguments[0] == "--scale" else load_state()
+    state = live_state() if arguments and arguments[0] in ("--scale", "--rotate", "--mode", "--arrange", "--relative", "--json") else load_state()
     if arguments == ["--json"]:
         payload = []
         for name, settings in state.items():
@@ -336,6 +421,7 @@ def cli_action(arguments: list[str]) -> None:
         raise SystemExit(0 if save_and_apply(state) else 1)
     if len(arguments) != 3 or arguments[1] not in state:
         raise SystemExit("Invalid display action or monitor")
+    previous = deepcopy(state)
     action, name, value = arguments[0], arguments[1], arguments[2]
     settings = state[name]
     if action == "--scale" and value in ("1", "1.25", "1.5", "1.75", "2", "auto"):
@@ -353,13 +439,18 @@ def cli_action(arguments: list[str]) -> None:
             explicit_arrangement(state, "right")
     else:
         raise SystemExit("Invalid display value")
-    raise SystemExit(0 if save_and_apply(state) else 1)
+    if action in ("--scale", "--rotate", "--mode"):
+        reflow_geometry(state, previous)
+    raise SystemExit(0 if save_and_apply(state, previous) else 1)
 
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--status"]:
         status()
     elif sys.argv[1:]:
-        cli_action(sys.argv[1:])
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with (CONFIG_DIR / ".display-action.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            cli_action(sys.argv[1:])
     else:
         main()

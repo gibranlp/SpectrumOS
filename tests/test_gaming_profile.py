@@ -263,3 +263,49 @@ class SteamDetectionTests(unittest.TestCase):
                                       ([[os.getpid(), '/self'], [os.getpid() + 1, '/external']], True)]:
                 module.run.return_value = mock.Mock(returncode=0, stdout=json.dumps({'data': [clients]}))
                 self.assertEqual(module.game_active(), expected)
+
+
+class LauncherLifetimeTests(unittest.TestCase):
+    def test_battlenet_wrapper_tracks_wow_process_without_a_window(self):
+        module = load()
+        with tempfile.TemporaryDirectory() as directory:
+            module.PROC = Path(directory)
+            for pid, parent, name, command in [(100, 1, "python3", b"umu-run\0Battle.net Launcher.exe"),
+                                                (101, 100, "pv-adverb", b"runtime"),
+                                                (102, 101, "WoW.exe", b"WoW.exe")]:
+                process = module.PROC / str(pid)
+                process.mkdir()
+                (process / "cmdline").write_bytes(command)
+                (process / "stat").write_text(f"{pid} ({name}) S {parent} 0")
+                (process / "comm").write_text(name)
+            self.assertTrue(module.launcher_game_active(100))
+            (module.PROC / "102/comm").write_text("WowVoiceProxy.e")
+            module.run.return_value = mock.Mock(returncode=0, stdout=json.dumps([
+                {"pid": 101, "class": "battle.net.exe", "title": "Battle.net"}]))
+            self.assertFalse(module.launcher_game_active(100))
+            module.run.return_value.stdout = json.dumps([
+                {"pid": 102, "class": "Diablo IV.exe", "title": "Diablo IV"}])
+            self.assertTrue(module.launcher_game_active(100))
+            module.run.return_value.stdout = json.dumps([
+                {"pid": 999, "class": "game", "title": "Unrelated"}])
+            self.assertFalse(module.launcher_game_active(100))
+
+    def test_non_launcher_registration_is_preserved(self):
+        module = load()
+        with tempfile.TemporaryDirectory() as directory:
+            module.PROC = Path(directory)
+            process = module.PROC / "100"
+            process.mkdir()
+            (process / "cmdline").write_bytes(b"native-game")
+            self.assertTrue(module.launcher_game_active(100))
+
+    def test_unavailable_window_query_does_not_report_game_exit(self):
+        module = load()
+        with tempfile.TemporaryDirectory() as directory:
+            module.PROC = Path(directory)
+            process = module.PROC / "100"
+            process.mkdir()
+            (process / "cmdline").write_bytes(b"Battle.net Launcher.exe")
+            module.run.return_value = mock.Mock(returncode=1)
+            with self.assertRaises(RuntimeError):
+                module.launcher_game_active(100)

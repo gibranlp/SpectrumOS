@@ -1,0 +1,103 @@
+{
+  "runtime_version": "0.1.0",
+  "qml_suites": [
+    {
+      "suite": "tst_Igor",
+      "passed": 38,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorChin",
+      "passed": 14,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorCoverage",
+      "passed": 5,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorMovie",
+      "passed": 46,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorMusicNote",
+      "passed": 8,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorOutfits",
+      "passed": 9,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorSleeper",
+      "passed": 20,
+      "exit_code": 0
+    },
+    {
+      "suite": "tst_IgorStage",
+      "passed": 19,
+      "exit_code": 0
+    }
+  ],
+  "qml_passed": 159,
+  "release_tests": {
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_release.py"
+    ],
+    "passed": 3,
+    "exit_code": 0
+  },
+  "package_build": {
+    "argv": [
+      "makepkg",
+      "--nodeps",
+      "--force",
+      "--noconfirm"
+    ],
+    "cwd": "packages/spectrum-igor",
+    "exit_code": 0
+  },
+  "resolved_failures": [
+    {
+      "scope": "QML_stage_extraction",
+      "cause": "mixed_expression_object_transform_list_and_abstract_Transform_property",
+      "resolution": "named_Translate_property_and_transform_expression_list"
+    },
+    {
+      "scope": "movie_test_fixture",
+      "cause": "missing_MediaKind.js_host_fixture",
+      "resolution": "copy_SpectrumOS_classifier_into_integration_fixture"
+    }
+  ],
+  "bridge_checks": {
+    "argv": [
+      "/usr/lib/qt6/bin/qmltestrunner",
+      "-input",
+      "tests/qml/tst_IgorBridge.qml"
+    ],
+    "exit_code": 0,
+    "passed": 5
+  },
+  "installed_runtime_contract_checks": {
+    "passed": 7,
+    "exit_code": 0
+  },
+  "live_host_preview": "PASS",
+  "live_shell": {
+    "runtimeReady": true,
+    "runtimeVersion": "0.1.0",
+    "service": "active",
+    "configuration_loaded": true,
+    "desktop_cutover": true
+  }
+}

@@ -17,7 +17,7 @@ def main():
         path = Path(directory) / 'shell.qml'
         path.write_text(source)
         result = subprocess.run(['qs', '-p', str(path)], capture_output=True, text=True, timeout=20,
-                                env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'QT_QUICK_BACKEND': 'software'})
+                                env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'QT_QUICK_BACKEND': 'software', 'XDG_RUNTIME_DIR': directory})
         output = result.stdout + result.stderr
         print(output)
         if result.returncode or 'BREAK_TESTS 5 0' not in output:

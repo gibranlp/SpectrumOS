@@ -25,6 +25,18 @@ TERMINAL = load("spectrum-terminal-config")
 UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 
+class DisplayArrangementTests(unittest.TestCase):
+    def test_direction_uses_live_scaled_geometry_and_stable_output_order(self):
+        primary = {"id":0,"name":"DP","width":3840,"height":2160,"scale":1.25,"x":0,"y":0}
+        secondary = {"id":1,"name":"HDMI","width":1920,"height":1080,"scale":1,"x":3072,"y":0}
+        for direction, position in [("right",(3072,0)),("left",(-1920,0)),("down",(0,1728)),("up",(0,-1080))]:
+            secondary.update(x=position[0],y=position[1])
+            self.assertEqual(AUDIO.current_arrangement([secondary,primary]),direction)
+        secondary["x"] = 100
+        self.assertEqual(AUDIO.current_arrangement([primary,secondary]), "")
+        self.assertEqual(AUDIO.current_arrangement([primary]), "")
+
+
 class AudioDeviceTests(unittest.TestCase):
     def test_per_device_volume_and_mute_do_not_change_default(self):
         devices = {"sinks":[{"id":"3","name":"speaker"}], "sources":[{"id":"9","name":"microphone"}]}

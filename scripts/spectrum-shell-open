@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (($# < 1 || $# > 2)); then
-    printf 'Usage: %s {bar|dashboard|control|appearance|favorites|app-store|appimages|more|typography|mouse|displays|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|breaks|services|default-apps|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
+    printf 'Usage: %s {bar|dashboard|control|appearance|favorites|app-store|appimages|more|typography|mouse|displays|igor|weather|time|wallpapers|audio|power|battery|network|bluetooth|notifications|session|screenshot|recorder|audio-recorder|search|calculator|password|emoji|color|color-history|shortcuts|hotkey|spectrumdrop|updates|focus|breaks|services|default-apps|questline|new-task|new-scroll|dismiss-notification|clear-notifications} [--repo]\n' "$0" >&2
     exit 2
 fi
 
@@ -18,6 +18,7 @@ case $1 in
     typography) method=toggleTypography; fallback=none ;;
     mouse) method=toggleMouse; fallback=none ;;
     displays) method=toggleDisplays; fallback=displays ;;
+    igor|igor-wardrobe) method=toggleIgorWardrobe; fallback=none ;;
     weather) method=toggleWeather; fallback=weather ;;
     time) method=toggleTimeRegion; fallback=none ;;
     wallpapers) method=toggleWallpapers; fallback=wallpapers ;;

@@ -1,0 +1,35 @@
+{
+  "packages": {
+    "spectrum-desktop": "1.1.29-1",
+    "spectrum-hyprland": "1.0.3-1",
+    "spectrum-igor": "0.3.2-1"
+  },
+  "source_archive": "spectrumos-source-1.0.0-eb3842330d7c789e.tar.zst",
+  "source_sha256": "733e76e4cf2f168b6dfa08fa2898223615b4ea82228703159359f049e6ebe280",
+  "iso_built": false,
+  "stable_published": true,
+  "https_verified_packages": [
+    "spectrum-desktop-1.1.29-1-x86_64.pkg.tar.zst",
+    "spectrum-hyprland-1.0.3-1-any.pkg.tar.zst",
+    "spectrum-igor-0.3.2-1-any.pkg.tar.zst"
+  ],
+  "sources_published": [
+    "spectrumos-source-1.0.0-eb3842330d7c789e.tar.zst",
+    "igor-runtime-0.3.2-dbdf0ecf9d81d388.tar.zst"
+  ],
+  "website_unchanged": true,
+  "testing_unchanged": true,
+  "snapshot_created_at": "2026-11-02T14:26:24+00:00",
+  "channel": "stable",
+  "url": "https://spectrum.gibranlp.dev/repo/stable/x86_64",
+  "signing_fingerprint": "0F4B4D2D8AE036D1972B89192F4F88BAFD59BA24",
+  "builds": "clean-chroot",
+  "packaged_files_verified": 255,
+  "migration_preferences_and_avatar_preserved": true,
+  "local_deployment_verified": true,
+  "winter_activation_week": "2026-W45-winter",
+  "new_outfits_in_free_package": [
+    "winter"
+  ],
+  "shortcut": "Super+Control+I"
+}

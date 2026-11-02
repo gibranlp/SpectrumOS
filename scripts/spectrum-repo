@@ -23,6 +23,7 @@ PACKAGE_NAMES = (
     "spectrum-theme",
     "spectrum-hyprland",
     "spectrum-base",
+    "spectrum-igor",
     "spectrum-desktop",
     "spectrum-plymouth",
     "spectrum-sddm",

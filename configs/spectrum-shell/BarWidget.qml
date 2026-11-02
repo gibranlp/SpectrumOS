@@ -80,10 +80,13 @@ PanelWindow {
         attachLeft: widget.barPosition === "left"
         leftAttachmentWidth: widget.theme.barStyle === "islands" && widget.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
-        attachBottom: widget.barPosition === "left"
+        attachBottom: widget.barPosition === "left" || widget.page === "igor"
         readonly property int contentHeight: body.implicitHeight + 44
-        width: Math.min(["displays", "appimages"].includes(widget.page) ? 560 : 440, widget.width - (widget.barPosition === "left" ? widget.panelLeftInset + 16 : 16))
-        height: Math.min(contentHeight, widget.height - (widget.barPosition === "top" ? widget.panelTopInset + 16 : 24))
+        width: Math.min(widget.page === "igor" ? 640 : ["displays", "appimages"].includes(widget.page) ? 560 : 440, widget.width - (widget.barPosition === "left" ? widget.panelLeftInset + 16 : 16))
+        readonly property int availableHeight: widget.height - (widget.barPosition === "top" ? widget.panelTopInset + 16 : 24)
+        height: widget.page === "igor"
+            ? widget.height - (widget.barPosition === "top" ? widget.panelTopInset : 16) - (widget.theme.gamingActive ? 0 : 8)
+            : Math.min(contentHeight, availableHeight)
         x: widget.barPosition === "top" ? widget.width - width : widget.panelLeftInset
         y: widget.barPosition === "top" ? widget.panelTopInset : widget.height - height - (widget.theme.gamingActive ? 0 : 8)
         radius: 26
@@ -96,7 +99,7 @@ PanelWindow {
         Flickable {
             id: bodyScroll
             objectName: "audio-scroll"
-            interactive: !widget.draggingVolume
+            interactive: widget.page !== "igor" && !widget.draggingVolume
             flickableDirection: Flickable.VerticalFlick
             anchors.fill: parent
             anchors.margins: 22
@@ -108,12 +111,13 @@ PanelWindow {
             ColumnLayout {
                 id: body
                 width: parent.width
+                height: widget.page === "igor" ? bodyScroll.height : implicitHeight
                 spacing: 9
 
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: widget.page === "appimages" ? qsTranslate("Spectrum", "APPIMAGES") : widget.page === "extras" ? qsTranslate("Spectrum", "MORE") : widget.page === "mouse" ? qsTranslate("Spectrum", "MOUSE") : widget.page === "time" ? qsTranslate("Spectrum", "TIME & REGION") : widget.page === "typography" ? qsTranslate("Spectrum", "TYPOGRAPHY") : widget.page === "wifi" ? qsTranslate("Spectrum", "NETWORK") : widget.page === "bluetooth" ? qsTranslate("Spectrum", "BLUETOOTH") : widget.page === "brightness" ? qsTranslate("Spectrum", "Brightness") : widget.page === "displays" ? qsTranslate("Spectrum", "DISPLAYS") : widget.page === "weather" ? qsTranslate("Spectrum", "WEATHER") : widget.page === "battery" ? (widget.hasBattery ? qsTranslate("Spectrum", "POWER & BATTERY") : qsTranslate("Spectrum", "POWER & SYSTEM")) : qsTranslate("Spectrum", "AUDIO")
+                        text: widget.page === "igor" ? qsTranslate("Spectrum", "IGOR WARDROBE") : widget.page === "appimages" ? qsTranslate("Spectrum", "APPIMAGES") : widget.page === "extras" ? qsTranslate("Spectrum", "MORE") : widget.page === "mouse" ? qsTranslate("Spectrum", "MOUSE") : widget.page === "time" ? qsTranslate("Spectrum", "TIME & REGION") : widget.page === "typography" ? qsTranslate("Spectrum", "TYPOGRAPHY") : widget.page === "wifi" ? qsTranslate("Spectrum", "NETWORK") : widget.page === "bluetooth" ? qsTranslate("Spectrum", "BLUETOOTH") : widget.page === "brightness" ? qsTranslate("Spectrum", "Brightness") : widget.page === "displays" ? qsTranslate("Spectrum", "DISPLAYS") : widget.page === "weather" ? qsTranslate("Spectrum", "WEATHER") : widget.page === "battery" ? (widget.hasBattery ? qsTranslate("Spectrum", "POWER & BATTERY") : qsTranslate("Spectrum", "POWER & SYSTEM")) : qsTranslate("Spectrum", "AUDIO")
                         color: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize + 3; bold: true }
                     }
@@ -716,6 +720,17 @@ PanelWindow {
                     visible: widget.page === "brightness"
                     Layout.fillWidth: true
                     theme: widget.theme
+                }
+                CachedContent {
+                    requested: widget.expanded && widget.page === "igor"
+                    visible: widget.page === "igor"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 0
+                    sourceComponent: IgorWardrobeContent {
+                        theme: widget.theme
+                        previewActive: widget.expanded && widget.page === "igor"
+                    }
                 }
                 DisplayWidgetContent {
                     visible: widget.page === "displays"

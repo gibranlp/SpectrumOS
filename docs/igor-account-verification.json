@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-01",
+  "environment": "sandbox",
+  "private_commit": "34fc8ac",
+  "device_policy": {
+    "maximum": 3,
+    "counted": [
+      "active_desktop_sessions",
+      "approved_unexpired_pending_grants"
+    ],
+    "browser_sessions_count": false,
+    "revocation_preserves_purchases": true,
+    "expired_sessions_release_slot": true,
+    "desktop_session_days": 30,
+    "hardware_fingerprinting": false
+  },
+  "checks": [
+    {
+      "argv": "python3 -m unittest discover -s tests -p test_*.py",
+      "scope": "private Igor checkout",
+      "exit_code": 0,
+      "passed": 64
+    },
+    {
+      "argv": "python3 -m unittest discover -s tests -p test_*.py",
+      "scope": "deployed server backend and client tests",
+      "exit_code": 0,
+      "passed": 58
+    },
+    {
+      "argv": "node --check service/account.js",
+      "scope": "staged private source",
+      "exit_code": 0
+    },
+    {
+      "argv": "python3 /tmp/igor-check-account-deployment.py",
+      "scope": "HTTPS sandbox endpoints",
+      "exit_code": 0
+    },
+    {
+      "argv": "python3 /tmp/igor-probe-bearer.py",
+      "scope": "isolated HTTPS authentication after Apache fix",
+      "exit_code": 0,
+      "http_status": 200
+    },
+    {
+      "argv": "python3 /home/gibranlp/Projects/Igor/scripts/check.py --suite tst_IgorAccount,tst_IgorWardrobe",
+      "scope": "QML account and wardrobe",
+      "exit_code": 0,
+      "passed": 10
+    },
+    {
+      "argv": "python3 /tmp/igor-check-live-account-state.py",
+      "scope": "installed QML component and real secure desktop session",
+      "exit_code": 0,
+      "owned_pack_count": 1
+    }
+  ],
+  "public_account_page_has_device_management": true,
+  "installed_account_helper_and_qml_match_private_source": true,
+  "ownership": {
+    "transaction_id": "txn_01m6c9ggx7w4tp7gv24vf1vc33",
+    "order_state": "completed",
+    "pack_id": "sandbox-outfits",
+    "grant_state": "active"
+  },
+  "remaining": [
+    "device_session_renewal",
+    "final_customer_offline_policy",
+    "first_paid_assets",
+    "validated_animation_pack_format",
+    "live_approval_and_delivery_validation"
+  ],
+  "live_payments_enabled": false,
+  "iso_built": false,
+  "desktop_sync": {
+    "cause": "Apache CGI did not forward Authorization header",
+    "fix": "CGIPassAuth On",
+    "isolated_https_probe_before": 401,
+    "isolated_https_probe_after": 200,
+    "isolated_probe_removed": true,
+    "desktop_signed_in": true,
+    "owned_packs": [
+      "sandbox-outfits"
+    ],
+    "survives_shell_restart": true,
+    "installed_qml_state": "signed_in",
+    "installed_qml_owned_pack_count": 1,
+    "credential_values_recorded": false
+  },
+  "installed_runtime": "0.1.4-1"
+}

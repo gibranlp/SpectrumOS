@@ -122,6 +122,45 @@ class GamingSession:
 
 
 
+def launcher_game_active(pid):
+    try:
+        arguments = (PROC / str(pid) / "cmdline").read_bytes().lower()
+    except OSError:
+        return True
+    if b"battle.net launcher.exe" not in arguments:
+        return True
+
+    # El contenedor de Battle.net vive más que el juego; seguimos sus ventanas y procesos reales.
+    descendants = {pid}
+    processes = {}
+    for process in PROC.iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            stat = process.joinpath("stat").read_text().rpartition(")")[2].split()
+            processes[int(process.name)] = (int(stat[1]), process.joinpath("comm").read_text().strip().lower())
+        except (OSError, ValueError, IndexError):
+            continue
+    while True:
+        children = {child for child, (parent, name) in processes.items() if parent in descendants}
+        if children <= descendants:
+            break
+        descendants.update(children)
+    if any(name in {"wow.exe", "wowclassic.exe", "wowclassic_t.exe", "wowb.exe"}
+           for child, (parent, name) in processes.items() if child in descendants):
+        return True
+    result = run("hyprctl", "-j", "clients")
+    if result.returncode:
+        raise RuntimeError("Could not inspect Battle.net game windows.")
+    ignored = {"battle.net", "battle.net.exe", "agent.exe", "wowvoiceproxy.exe", "explorer.exe"}
+    return any(client.get("pid") in descendants and
+               str(client.get("class", "")).lower() not in ignored and
+               client.get("mapped", True) and client.get("title")
+               for client in json.loads(result.stdout))
+
+
 def game_active():
     library = ctypes.CDLL("libgamemode.so.0")
     query = library.real_gamemode_query_status
@@ -130,13 +169,14 @@ def game_active():
     value = query()
     if value < 0:
         raise RuntimeError("Could not query GameMode.")
-    if value != 2:
-        return value > 0
+    if value == 0:
+        return False
     result = run("busctl", "--user", "--json=short", "call", "com.feralinteractive.GameMode",
                  "/com/feralinteractive/GameMode", "com.feralinteractive.GameMode", "ListGames")
     if result.returncode:
         raise RuntimeError("Could not query external GameMode clients.")
-    return any(pid != os.getpid() for pid, path in json.loads(result.stdout)["data"][0])
+    return any(pid != os.getpid() and launcher_game_active(pid)
+               for pid, path in json.loads(result.stdout)["data"][0])
 
 
 def steam_game_active():

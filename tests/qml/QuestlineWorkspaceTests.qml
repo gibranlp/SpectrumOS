@@ -50,6 +50,52 @@ Scope {
             tryCompare(panel,"questlineLoaded",true,3000);
             wait(80);
         }
+        function test_global_search_and_navigation() {
+            panel.questlineSearchQuery = "original scroll";
+            compare(panel.questlineSearchResults.length, 1);
+            compare(panel.questlineSearchResults[0].kind, "Scrolls");
+            panel.openQuestlineSearchResult(panel.questlineSearchResults[0]);
+            compare(panel.questlineTab, "Scrolls");
+            compare(panel.questlineSelected.id, "scroll-a");
+            assertCampaign("campaign-a");
+            panel.questlineSearchQuery = "original step";
+            compare(panel.questlineSearchResults.length, 1);
+            panel.openQuestlineSearchResult(panel.questlineSearchResults[0]);
+            compare(panel.questlineStepSelected.id, "step-a");
+            verify(panel.questlineEditing);
+            panel.questlineSearchQuery = "no-such-result";
+            compare(panel.questlineSearchResults.length, 0);
+            panel.questlineSearchQuery = "";
+        }
+        function test_discard_button_removes_only_chosen_draft_and_stale_view() {
+            panel.switchQuestlineTab("Scrolls");
+            const first = "Scrolls:discard-first";
+            const second = "Scrolls:keep-second";
+            workspace.drafts = ({
+                [first]: {tab:"Scrolls",valid:false,payload:{action:"create_scroll"},view:{title:"Discard me",key:first,editing:true}},
+                [second]: {tab:"Scrolls",valid:false,payload:{action:"create_scroll"},view:{title:"Keep me",key:second,editing:true}}
+            });
+            workspace.views = {Scrolls:{key:first,editing:true}};
+            wait(40);
+            const close = field("discard-draft-" + first);
+            verify(close !== null); verify(close.visible);
+            workspace.inFlight = {key:first,payload:{},revision:1};
+            verify(!close.enabled);
+            verify(!workspace.discard(first));
+            workspace.inFlight = null;
+            mouseClick(close);
+            verify(!workspace.drafts[first]);
+            verify(!!workspace.drafts[second]);
+            verify(!workspace.views.Scrolls || workspace.views.Scrolls.key !== first);
+            wait(200);
+            const saved = JSON.parse(JSON.stringify(workspace.snapshot()));
+            verify(!saved.drafts[first]);
+            verify(!!saved.drafts[second]);
+            panel.switchQuestlineTab("Tasks");
+            panel.switchQuestlineTab("Scrolls");
+            verify(!panel.questlineEditing);
+            workspace.drafts = ({});
+        }
         function assertCampaign(id) {
             compare(panel.questlineCampaignId,id);compare(panel.questlineScrollProjectId,id);compare(panel.questlineTreasuryCampaignId,id);
             compare(workspace.selectedProjectId,id);

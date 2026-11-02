@@ -53,6 +53,32 @@ def audio_state() -> dict[str, object]:
     }
 
 
+def current_arrangement(monitors: list[dict]) -> str:
+    active = sorted((item for item in monitors if not item.get("disabled", False)), key=lambda item: (item.get("id", 0), item.get("name", "")))
+    if len(active) < 2:
+        return ""
+    sizes = []
+    for item in active:
+        width, height = item["width"], item["height"]
+        if item.get("transform", 0) % 2:
+            width, height = height, width
+        sizes.append((round(width / item.get("scale", 1)), round(height / item.get("scale", 1))))
+    for direction in ("right", "left", "down", "up"):
+        matches = True
+        for index in range(1, len(active)):
+            previous, item = active[index - 1], active[index]
+            pw, ph = sizes[index - 1]
+            width, height = sizes[index]
+            x, y = previous.get("x", 0), previous.get("y", 0)
+            expected = {"right":(x + pw,y), "left":(x - width,y), "down":(x,y + ph), "up":(x,y - height)}[direction]
+            if abs(item.get("x", 0) - expected[0]) > 1 or abs(item.get("y", 0) - expected[1]) > 1:
+                matches = False
+                break
+        if matches:
+            return direction
+    return ""
+
+
 def display_state() -> dict[str, object]:
     try:
         monitors = json.loads(run(("hyprctl", "-j", "monitors")).stdout or "[]")
@@ -116,7 +142,7 @@ def display_state() -> dict[str, object]:
             ],
         })
     focused = next((row["name"] for row in rows if row["focused"]), rows[0]["name"] if rows else "")
-    return {"count": len(rows), "focused": focused, "monitors": rows}
+    return {"count": len(rows), "focused": focused, "monitors": rows, "arrangement": current_arrangement(monitors)}
 
 
 def display_action(name: str, value: str = "", setting: str = "") -> None:

@@ -136,3 +136,5 @@ adwaita-cursors
 fuse2
 squashfs-tools
 zenity
+
+spectrum-igor

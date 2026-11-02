@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts/spectrum-user-avatar'
-FACE = ROOT / 'configs/spectrum-shell/igor/face.svg'
+FACE = Path('/usr/lib/qt6/qml/Spectrum/Igor/igor/face.svg')
 
 
 class UserAvatarTests(unittest.TestCase):
@@ -62,6 +62,6 @@ class UserAvatarTests(unittest.TestCase):
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('/usr/lib/spectrumos/spectrum-user-avatar', result.stdout)
-            self.assertIn('/usr/share/spectrumos/spectrum-shell/igor/face.svg', result.stdout)
+            self.assertIn('/usr/lib/qt6/qml/Spectrum/Igor/igor/face.svg', result.stdout)
             self.assertLess(result.stdout.index('/usr/lib/spectrumos/spectrum-user-avatar'),
                             result.stdout.index('/usr/lib/spectrumos/appearance-stage'))

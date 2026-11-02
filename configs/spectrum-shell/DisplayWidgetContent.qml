@@ -103,21 +103,9 @@ ColumnLayout {
             }
         }
     }
-    Flow {
+    DisplayArrangementControl {
         Layout.fillWidth: true
-        spacing: 5
-        Repeater {
-            model: ["left", "right", "up", "down"]
-            ShellButton {
-                required property string modelData
-                label: qsTranslate("Spectrum", "Arrange ") + modelData
-                fontFamily: content.theme.fontFamily
-                fontSize: content.theme.fontSize - 1
-                backgroundColor: content.theme.colors.surface_alt
-                foregroundColor: content.theme.colors.foreground
-                onClicked: content.theme.runAction([content.theme.backend("control-adapter"), "display", modelData])
-            }
-        }
+        theme: content.theme
     }
     BrightnessControls {
         Layout.fillWidth: true

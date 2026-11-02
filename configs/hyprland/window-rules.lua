@@ -4,6 +4,13 @@ local floatingTitles = "^(Picture-in-Picture|Save File|Open File|Select a File|O
 
 hl.window_rule({ name = "spectrum-floating-classes", match = { class = floatingClasses }, float = true })
 hl.window_rule({ name = "spectrum-floating-dialogs", match = { title = floatingTitles }, float = true })
+hl.window_rule({ name = "spectrum-modal-dialogs", match = { modal = true }, float = true, center = true })
+hl.window_rule({
+    name = "spectrum-thunar-rename-dialogs",
+    match = { class = "^(thunar|Thunar|org.xfce.Thunar)$", title = "^(Rename.*|Bulk Rename.*)$" },
+    float = true,
+    center = true,
+})
 hl.window_rule({ name = "spectrum-file-dialog-border", match = { title = fileDialogTitles }, border_size = 0, no_blur = true })
 -- El selector de archivos nativo (usado por apps sin GTK propio, como Electron) no lo dibuja la
 -- app: lo dibuja xdg-desktop-portal-gtk, un servicio aparte que corre siempre en segundo plano.

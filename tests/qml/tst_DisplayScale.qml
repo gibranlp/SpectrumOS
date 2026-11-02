@@ -5,21 +5,37 @@ import "../../configs/spectrum-shell" as Shell
 TestCase {
     id: tests
     name: "DisplayScale"
-    width: 500; height: 240
+    width: 500; height: 320
     visible: true
     when: windowShown
     QtObject {
         id: theme
-        property var colors: ({foreground:"#eeeeee", background:"#111111", surface:"#222222", muted:"#aaaaaa", accent:"#66ccee"})
+        property var colors: ({foreground:"#eeeeee", background:"#111111", surface:"#222222", surface_alt:"#333333", muted:"#aaaaaa", accent:"#66ccee"})
         property string fontFamily: "sans-serif"
         property int fontSize: 14
         property bool actionBusy: false
+        property var displays: ({arrangement:"right",monitors:[{},{}]})
         property var commands: []
         function backend(name) { return "/usr/lib/spectrumos/" + name; }
         function runAction(command) { commands = commands.concat([command]); }
     }
     Shell.DisplayScaleControl { id: first; width: 480; theme: theme; monitorName: "DP-1"; currentScale: 1 }
     Shell.DisplayScaleControl { id: second; y: 100; width: 480; theme: theme; monitorName: "HDMI-A-1"; currentScale: 2 }
+    Shell.DisplayArrangementControl { id: arrangement; y: 240; width: 480; theme: theme }
+    function test_arrangement_highlight_follows_readback() {
+        theme.displays = {arrangement:"right",monitors:[{},{}]};
+        const right = findChild(arrangement,"display-arrange-right");
+        const left = findChild(arrangement,"display-arrange-left");
+        verify(right.selected); verify(!left.selected);
+        compare(right.backgroundColor,theme.colors.accent);
+        mouseClick(left);
+        compare(theme.commands[theme.commands.length-1],["/usr/lib/spectrumos/control-adapter","display","left"]);
+        verify(right.selected);
+        theme.displays = {arrangement:"left",monitors:[{},{}]};
+        verify(left.selected); verify(!right.selected);
+        theme.displays = {arrangement:"",monitors:[{},{}]};
+        verify(!left.selected); verify(!right.selected);
+    }
     function init() { theme.commands = []; theme.actionBusy = false; first.currentScale = 1; first.width = 480; }
     function test_each_preset_targets_its_monitor() {
         for (const scale of [1,1.5,1.75,2]) {

@@ -1,0 +1,96 @@
+{
+  "versions": {
+    "desktop": "1.1.27-1",
+    "igor_package": "0.1.1-1",
+    "runtime": "0.1.0",
+    "runtime_api": 1
+  },
+  "free_source_url": "https://spectrum.gibranlp.dev/sources/igor-runtime-0.1.0-b62e612ce3a23ec2.tar.zst",
+  "public_package": {
+    "free_package_published": true,
+    "package": "spectrum-igor-0.1.1-1-any.pkg.tar.zst",
+    "public_packages": 10,
+    "previous_packages_unchanged": 9,
+    "public_desktop_version": "1.1.20-1",
+    "https_database_package_and_signatures_match": true
+  },
+  "clean_builds": {
+    "spectrum-desktop": {
+      "package": "spectrum-desktop-1.1.27-1-x86_64.pkg.tar.zst",
+      "pkgbase": "spectrum-desktop",
+      "pkgver": "1.1.27-1",
+      "pkgbuild_sha256": "983e3cec0625eed8a62aaaef1f0c1773ed621fc10a771165b43476fc6a584f3d",
+      "buildtool": "devtools",
+      "buildtool_version": "1:1.5.3-1-any"
+    },
+    "spectrum-igor": {
+      "package": "spectrum-igor-0.1.1-1-any.pkg.tar.zst",
+      "pkgbase": "spectrum-igor",
+      "pkgver": "0.1.1-1",
+      "pkgbuild_sha256": "1e8ac961b73a6f144084c38160635f8fc08df6cfa08d53943c0ae8bbffc3475a",
+      "buildtool": "devtools",
+      "buildtool_version": "1:1.5.3-1-any"
+    }
+  },
+  "full_desktop_package_checks_exit_code": 0,
+  "isolated_upgrade": {
+    "old_desktop": "1.1.20-1",
+    "desktop": "1.1.27-1",
+    "igor": "0.1.1-1",
+    "file_conflicts": false,
+    "legacy_files_removed": true,
+    "preferences_preserved": true,
+    "avatar_preserved": true,
+    "runtime_dependency_satisfied": true,
+    "scope": "isolated_payload_ownership_upgrade",
+    "system_dependency_closure_tested": false,
+    "package_scriptlets_and_hooks_run": false,
+    "artifacts": {
+      "spectrum-desktop-1.1.20-1-x86_64.pkg.tar.zst": "38af5d1c16b63e24c0e05a386d21040cf51b873e45ba574c524d09bb24761f78",
+      "spectrum-desktop-1.1.27-1-x86_64.pkg.tar.zst": "c27e60b1c23a84fceb22f488c3a2fcc7833aebf7c8852b9f3aece32b6179fb26",
+      "spectrum-igor-0.1.1-1-any.pkg.tar.zst": "631645ca994a6759afc1496258f6fc31d33f89ac6ad304ca540eb8072d9dfe92"
+    }
+  },
+  "local_upgrade": {
+    "desktop_installed": "1.1.27-1",
+    "igor_package_installed": "0.1.1-1",
+    "runtime_version": "0.1.0",
+    "runtime_ready": true,
+    "preferences_unchanged": true,
+    "avatar_unchanged": true,
+    "legacy_files_removed": true,
+    "identical_unowned_files_adopted": [
+      "usr/share/spectrumos/spectrum-shell/IgorVisitorModule.qml",
+      "usr/share/spectrumos/spectrum-shell/IgorVisitorBridge.qml",
+      "usr/share/spectrumos/spectrum-shell/IgorStageModule.qml",
+      "usr/share/spectrumos/spectrum-shell/IgorRoutineModule.qml",
+      "usr/share/spectrumos/spectrum-shell/IgorBridge.qml",
+      "usr/share/spectrumos/spectrum-shell/DisplayArrangementControl.qml"
+    ],
+    "service": "active"
+  },
+  "resolved_failures": [
+    {
+      "scope": "translation_check",
+      "resolution": "34_missing_messages_translated_in_es_MX_and_pt_BR"
+    },
+    {
+      "scope": "break_reminder_test_chroot_timeout",
+      "resolution": "isolated_XDG_RUNTIME_DIR"
+    },
+    {
+      "scope": "brightness_fixture",
+      "resolution": "exclude_unrelated_UKVM_state_from_extracted_brightness_section"
+    },
+    {
+      "scope": "build_dependency_injection",
+      "resolution": "deduplicate_new_Igor_package_after_repository_addition"
+    },
+    {
+      "scope": "staged_repository_upload",
+      "resolution": "materialize_database_aliases_as_regular_files_before_upload"
+    }
+  ],
+  "iso_built": false,
+  "desktop_publication_pending": true
+}

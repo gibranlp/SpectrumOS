@@ -1,0 +1,51 @@
+{
+  "started": "2026-11-01T17:14:04.270553+00:00",
+  "versions": [
+    "spectrum-desktop 1.1.28-1",
+    "spectrum-igor 0.1.2-1"
+  ],
+  "runtime_status": {
+    "runtimeReady": true,
+    "runtimeVersion": "0.1.2",
+    "meeting": false,
+    "playing": true,
+    "mediaKind": "video",
+    "headphones": false,
+    "glasses": true
+  },
+  "service": "active",
+  "preferences_preserved": true,
+  "avatar_preserved": true,
+  "widget_opened": true,
+  "host_files_verified": 9,
+  "helper_verified": true,
+  "private_head": "de1bb3850807a5acd2bcfeba1a576e479ea3b611",
+  "widget_visible": true,
+  "widget_layer": 2,
+  "bar_and_frame_layer": 3,
+  "live_screenshot_verified": true,
+  "checks": {
+    "full_desktop_package_checks_exit_code": 0,
+    "private_qml_suites": 11,
+    "private_qml_passed": 174,
+    "private_python_tests_passed": 6,
+    "host_python_tests_passed": 20,
+    "shortcut_tests_passed": 28,
+    "button_qml_passed": 4,
+    "bridge_qml_passed": 5,
+    "runtime_package_contract_passed": 7,
+    "state_external_watch_exit_code": 0,
+    "host_selection_integration_exit_code": 0
+  },
+  "production_paid_entries": 0,
+  "checkout_connected": false,
+  "private_contributors": [
+    "gibranlp"
+  ],
+  "public_desktop_release_pending": true,
+  "iso_built": false,
+  "artifacts": {
+    "spectrum-desktop-1.1.28-1-x86_64.pkg.tar.zst": "a978e1a9f4b413f44f1a8c16349b23dc07b33c1ceeb182fd0f741485fb635500",
+    "spectrum-igor-0.1.2-1-any.pkg.tar.zst": "17c8ddfdbf13f6dfa22e3e8145f89a8adc4dcd271f5a9a19f1bd3a80a451ed6d"
+  }
+}

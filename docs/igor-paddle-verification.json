@@ -1,0 +1,184 @@
+{
+  "provider": "paddle",
+  "environment": "sandbox_only",
+  "private_head": "5f7a1f6d3f2032d12dcd6b38710b63ea33001c57",
+  "private_contributors": [
+    "gibranlp"
+  ],
+  "keyboard_shortcut_added": false,
+  "local_tests": {
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_*.py"
+    ],
+    "cwd": "/home/gibranlp/Projects/Igor",
+    "exit_code": 0,
+    "passed": 21
+  },
+  "shortcut_tests": {
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "tests.test_hyprland_config"
+    ],
+    "exit_code": 0,
+    "passed": 28
+  },
+  "server": {
+    "python": "3.9.25",
+    "sqlite": "3.34.1",
+    "cpanel_passengerapps": true,
+    "private_staging_path": "/home2/gibranlp/igor-commerce/sandbox-eaa5fb5b8f384b2d",
+    "source_archive_sha256": "eaa5fb5b8f384b2dfc9c16e602aaaba1f6b47a74da1291dc022cac1ffe6d1fe6",
+    "tests": {
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_paddle_service.py"
+      ],
+      "exit_code": 0,
+      "passed": 15
+    },
+    "public_endpoint_activated": true,
+    "passenger_application_registered": true,
+    "passenger_application_enabled": false,
+    "gateway": "apache_cgi_wsgi",
+    "private_application_path": "/home2/gibranlp/igor-commerce/app-sandbox",
+    "public_base_url": "https://spectrum.gibranlp.dev/igor-sandbox-api",
+    "health_status": 200,
+    "webhook_ready": true,
+    "unconfigured_webhook_status": 503,
+    "health_seconds": 0.66,
+    "unconfigured_webhook_seconds": 0.67
+  },
+  "configuration": {
+    "products": 1,
+    "api_key_configured": true,
+    "webhook_secret_configured": true,
+    "client_token_configured": true,
+    "sandbox_price_id": "pri_01m6c49g26j8txavesyc39m2g7",
+    "sandbox_product_id": "pro_01m6c48vd5cg5yt1gnyk3hnvdv",
+    "sandbox_catalog_mapped": true,
+    "transactions_write_verified": true,
+    "pending_webhook_secret_stored": false,
+    "notification_setting_id": "ntfset_01m6c726tn1w01wx3xsw4bdw5q"
+  },
+  "implemented": [
+    "sandbox_only_one_time_checkout_adapter",
+    "paddle_js_checkout_template",
+    "raw_body_signature_verification",
+    "durable_private_sqlite_webhook_inbox",
+    "concurrent_duplicate_and_replay_handling",
+    "passenger_wsgi_entrypoint"
+  ],
+  "pending": [
+    "login_device_authorization",
+    "server_checkout_intents",
+    "entitlement_refund_reconciliation_worker",
+    "signed_pack_delivery_and_restore",
+    "live_account_and_domain_approval"
+  ],
+  "fulfillment_enabled": false,
+  "live_payments_enabled": false,
+  "iso_built": false,
+  "sandbox_connection": {
+    "verified": true,
+    "prices_read_verified": true,
+    "configured_price_count": 0,
+    "credentials_storage": "private_server_file_mode_0600",
+    "transactions_write_verified": false,
+    "client_token_format_valid": true,
+    "client_token_checkout_tested": false
+  },
+  "checkout_page": {
+    "url": "https://spectrum.gibranlp.dev/igor/sandbox-checkout.html",
+    "published": true,
+    "https_hash_verified": true,
+    "sha256": "81fd2c4a881f1977b17b6dd0afc62483f4971de97e4947d2ea46daef6ab48dba",
+    "server_api_key_excluded": true,
+    "default_payment_link_configured": true,
+    "default_payment_link_api_status": 403,
+    "checkout_transaction_tested": false,
+    "default_payment_link_verified_by": "created_transaction_checkout_url",
+    "checkout_transaction_created": true
+  },
+  "sandbox_first_transaction": {
+    "transaction_id": "txn_01m6c4ky0y4rnj7heb174gy2e8",
+    "checkout_url": "https://spectrum.gibranlp.dev/igor/sandbox-checkout.html?_ptxn=txn_01m6c4ky0y4rnj7heb174gy2e8",
+    "creation_verified": true,
+    "browser_checkout_tested": true,
+    "payment_completed": true,
+    "account_scope": "sandbox_operator_test_only",
+    "ownership_granted": false,
+    "status": "completed",
+    "payment_status": "captured",
+    "total_minor": "599",
+    "currency": "USD"
+  },
+  "hosting_checks": {
+    "local_python_tests_passed": 27,
+    "server_gateway_tests_passed": 6,
+    "private_configuration_reload_tested": true,
+    "signature_bytes_preserved_in_cgi_test": true,
+    "real_paddle_webhook_delivery_tested": true,
+    "notification_destination_creation_api_status": 403
+  },
+  "webhook_connection": {
+    "destination_id": "ntfset_01m6c726tn1w01wx3xsw4bdw5q",
+    "sandbox_destination_lookup_http_status": 403,
+    "sandbox_destination_list_http_status": 200,
+    "sandbox_destination_count": 0,
+    "secret_held_pending": false,
+    "actual_paddle_delivery_verified": true,
+    "receiver_signed_transport_probe": {
+      "source": "self_signed_not_paddle",
+      "http_status": 200,
+      "duplicate_status": 200,
+      "tampered_body_status": 401,
+      "probe_rows": 1,
+      "probe_state": "ignored"
+    },
+    "pending_confirmation": null,
+    "destination_validation": "owner_confirmed_sandbox_api_read_forbidden",
+    "simulation_creation_api_status": 403,
+    "unsigned_request_status": 401,
+    "health_status": 200,
+    "simulation_name": "Igor simulation",
+    "simulation_saved": true,
+    "simulation_has_run": true,
+    "last_simulation_error": null,
+    "simulator_id_fix_deployed": true,
+    "simulator_id_pattern": "ntfsimevt_[a-z0-9]{26}",
+    "simulation_inbox_state": "simulation",
+    "simulation_verified_events": [
+      {
+        "event_id": "ntfsimevt_01m6c7wcq40ywzr79nhnp1vdrg",
+        "notification_id": "ntfsimntf_01m6c7wcsg24na1ztm2baydjjq",
+        "event_type": "transaction.completed",
+        "inbox_state": "simulation"
+      }
+    ]
+  },
+  "simulator_id_fix": {
+    "source_sha256": "4740bcef6577bfc0ac9b3ec3a00d2bc1df302c912087554605b7eab7b412c157",
+    "local_tests_passed": 29,
+    "server_tests_passed": 23,
+    "signature_verification_unchanged": true,
+    "normal_event_format_unchanged": true,
+    "simulation_events_excluded_from_purchase_queue": true,
+    "post_deploy_health_ready": true,
+    "real_paddle_rerun_pending": false
+  }
+}

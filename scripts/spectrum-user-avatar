@@ -6,7 +6,7 @@ if (($# > 2)); then
     exit 2
 fi
 
-face=${1:-/usr/share/spectrumos/spectrum-shell/igor/face.svg}
+face=${1:-/usr/lib/qt6/qml/Spectrum/Igor/igor/face.svg}
 user_picture=${2:-$HOME/$(id -un).png}
 if [[ -e $user_picture || -L $user_picture ]]; then
     exit 0

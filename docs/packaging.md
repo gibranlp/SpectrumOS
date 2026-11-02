@@ -73,3 +73,18 @@ Run `scripts/check-release` before building. It checks all nine selected recipes
 Build the seven Spectrum-owned 1.0.0 packages against the new immutable source snapshot. Retain the pinned UKVM and managed portal artifacts only when their current recipes and clean-build evidence still match. Regenerate `.SRCINFO` after recipe changes with `makepkg --dir packages/NAME --printsrcinfo`.
 
 After dependency-ordered clean-chroot builds, run `scripts/check-release --artifacts`. This additionally requires the exact package artifact named by every recipe and reuses the repository importer's `.BUILDINFO` checks for `devtools`, `/build`, `/startdir`, and the current recipe checksum. A source-only pass does not establish artifact readiness, signature validity, publication, or physical acceptance. Signing, repository promotion/publication and ISO creation remain separate actions.
+
+## Igor runtime boundary
+
+`spectrum-igor` owns the free `Spectrum.Igor` module and base/seasonal artwork.
+Its source is a checksummed public runtime artifact exported from the private Igor
+repository. It requires no private Git credential. `spectrum-desktop` depends on
+it and retains only host adapters and the bar button; packages own disjoint files.
+Existing `~/.config/spectrumos/shell.json` preferences and custom avatars are not
+migrated or replaced. The source installer includes `spectrum-igor` in its desktop
+profile and reads its packaged avatar asset.
+
+Publish the free runtime source and signed package before a desktop release that
+depends on it. The runtime and desktop can then be upgraded in one Pacman
+transaction. Paid packs will remain outside both package payloads and the public
+source host. This migration does not rebuild existing ISO files.

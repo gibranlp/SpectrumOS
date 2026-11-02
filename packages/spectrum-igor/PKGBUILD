@@ -1,0 +1,37 @@
+pkgname=spectrum-igor
+pkgver=0.3.2
+pkgrel=1
+pkgdesc="Free Igor desktop companion runtime for SpectrumOS"
+arch=(any)
+url="https://spectrum.gibranlp.dev"
+license=(MIT)
+depends=(qt6-declarative qt6-svg python python-pillow openssl libsecret 'quickshell>=0.3.0')
+makedepends=(qt6-tools)
+options=(!strip !debug)
+_runtime_version=0.3.2
+_runtime_revision=dbdf0ecf9d81d388
+source=("igor-runtime-$_runtime_version-$_runtime_revision.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-$_runtime_version-$_runtime_revision.tar.zst" 'RuntimeTests.qml')
+sha256sums=('b397d2689cef0aea10e49dd4c895287add2426dbc1bcfa3caf43890305d71135'
+            'e2f15aff691355066c4a590ee3dfe4a239209b34617528ea822c5ab8780da647')
+
+check() {
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QML_IMPORT_PATH="$srcdir" \
+        /usr/lib/qt6/bin/qmltestrunner -input "$srcdir/RuntimeTests.qml"
+}
+
+package() {
+    local destination="$pkgdir/usr/lib/qt6/qml/Spectrum/Igor"
+    install -d -m 0755 "$destination/igor"
+    install -m 0644 "$srcdir/Spectrum/Igor/"*.qml "$destination/"
+    install -m 0644 "$srcdir/Spectrum/Igor/IgorOutfits.js" "$destination/"
+    install -m 0644 "$srcdir/Spectrum/Igor/qmldir" "$destination/"
+    install -m 0644 "$srcdir/Spectrum/Igor/igor/"*.svg "$srcdir/Spectrum/Igor/igor/"*.png "$destination/igor/"
+    install -d -m 0755 "$destination/Desktop"
+    install -m 0644 "$srcdir/Spectrum/Igor/Desktop/qmldir" "$srcdir/Spectrum/Igor/Desktop/"*.qml "$destination/Desktop/"
+    install -Dm 0755 "$srcdir/Spectrum/Igor/Desktop/igor-outfits" "$pkgdir/usr/lib/igor/igor-outfits"
+    install -Dm 0755 "$srcdir/Spectrum/Igor/Desktop/igor-account" "$pkgdir/usr/lib/igor/igor-account"
+    install -Dm 0644 "$srcdir/Spectrum/Igor/Desktop/igor_packs.py" "$pkgdir/usr/lib/igor/igor_packs.py"
+    install -Dm 0644 "$srcdir/Spectrum/Igor/Desktop/pack-signing-public.pem" "$pkgdir/usr/share/igor/pack-signing-public.pem"
+    install -Dm 0644 "$srcdir/Spectrum/Igor/catalog.json" "$pkgdir/usr/share/igor/catalog.json"
+    install -Dm 0644 "$srcdir/Spectrum/Igor/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

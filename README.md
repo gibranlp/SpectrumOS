@@ -8,7 +8,7 @@ SpectrumOS is an **Arch Linux distribution** with a keyboard-driven **Hyprland**
 
 **Version 1.0.0 is here.** Your distro-hopping side quest may finally take a nap.
 
-[Explore the desktop and screenshots](https://gibranlp.dev/en/spectrum/) · [Español](https://gibranlp.dev/spectrum/) · [Download and package repository](https://spectrum.gibranlp.dev/) · [Report a bug](https://github.com/gibranlp/SpectrumOS/issues)
+[Website, screenshots and download](https://spectrum.gibranlp.dev/) · [Español](https://spectrum.gibranlp.dev/es/) · [Package repository](https://spectrum.gibranlp.dev/repo/) · [Report a bug](https://github.com/gibranlp/SpectrumOS/issues)
 
 ![SpectrumOS desktop](https://gibranlp.dev/images/spectrumos/screenshots/spectrum.png)
 
@@ -198,7 +198,7 @@ Game compatibility depends on drivers, Proton, and anti-cheat support. Calling e
 
 ## Download, install, update
 
-Get the **x86_64 ISO and its SHA-256 checksum** from [the download page](https://spectrum.gibranlp.dev/), or explore the [visual guide](https://gibranlp.dev/en/spectrum/). Boot the live environment to inspect the installer before committing to a disk.
+Get the **x86_64 ISO and its SHA-256 checksum** from [the download page](https://spectrum.gibranlp.dev/), or explore the [visual guide](https://spectrum.gibranlp.dev/). Boot the live environment to inspect the installer before committing to a disk.
 
 The installer offers Full/Lean selection, hardware profiles, **Btrfs**, and **Limine**. The currently downloadable ISO supports whole-disk erasure. Updated installer sources add **Install alongside** for UEFI/GPT disks with at least 34 GiB of unallocated space, preserving existing partitions and using a dedicated Spectrum EFI partition. Guided shrinking and manual partition selection are still planned. Back up important files before installation; a future explicitly authorized ISO release is required to deliver the new installer on installation media. See the [dual-boot implementation status](docs/dual-boot-installer-plan.md). A VM is useful for exploration; physical hardware acceptance is a separate test.
 

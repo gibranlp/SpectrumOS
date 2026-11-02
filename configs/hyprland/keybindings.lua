@@ -65,6 +65,7 @@ hl.bind(mainMod .. " + SHIFT + G", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open more"))
 hl.bind(mainMod .. " + SHIFT + Y", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open typography"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open weather"))
+hl.bind(mainMod .. " + CTRL + I", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open igor"))
 
 -- Estado y acomodo de ventanas
 hl.bind(mainMod .. " + Space", hl.dsp.window.float({ action = "toggle" }))

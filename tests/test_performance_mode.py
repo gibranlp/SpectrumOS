@@ -135,7 +135,7 @@ class PerformanceModeTests(unittest.TestCase):
             self.assertEqual(self.module.toggle(), 0)
             set_mode.assert_called_once_with("power-saver", "power-profiles-daemon")
 
-    def test_power_saving_before_game_is_restored(self):
+    def test_game_exit_returns_to_balanced_from_saved_power_saver(self):
         self.module._write_count(1)
         self.module.PRE_GAME_FILE.write_text("power-saver")
         with mock.patch.object(self.module, "backend", return_value="tuned"), \
@@ -143,7 +143,7 @@ class PerformanceModeTests(unittest.TestCase):
              mock.patch.object(self.module, "set_mode", return_value=True) as set_mode, \
              mock.patch.object(self.module, "notify"):
             self.module.game_end()
-            set_mode.assert_called_once_with("power-saver", "tuned")
+            set_mode.assert_called_once_with("balanced", "tuned")
 
     def test_toggle_fails_cleanly_without_a_backend(self):
         with mock.patch.object(self.module, "backend", return_value="none"):
@@ -270,7 +270,7 @@ class PerformanceModeTests(unittest.TestCase):
             self.module.game_end()
             self.assertEqual(self.module._read_count(), 0)
 
-    def test_stale_legacy_count_restores_saved_mode(self):
+    def test_stale_legacy_count_returns_to_balanced(self):
         self.module._write_count(5)
         self.module.PRE_GAME_FILE.write_text("power-saver")
         with mock.patch.object(self.module, "backend", return_value="tuned"), \
@@ -278,7 +278,7 @@ class PerformanceModeTests(unittest.TestCase):
              mock.patch.object(self.module, "set_mode", return_value=True) as change, \
              mock.patch.object(self.module, "notify"):
             self.assertEqual(self.module.update_game_requests(set()), 0)
-            change.assert_called_once_with("power-saver", "tuned")
+            change.assert_called_once_with("balanced", "tuned")
             self.assertEqual(self.module._read_count(), 0)
 
     def test_failed_power_change_retains_request_for_retry(self):

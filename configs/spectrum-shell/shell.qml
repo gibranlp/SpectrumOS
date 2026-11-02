@@ -148,6 +148,8 @@ ShellRoot {
     property int nextToastId: 0
     property var notificationHistory: []
     property bool doNotDisturb: false
+    readonly property var igorWardrobe: igorRoutine.wardrobe
+    function openIgorWardrobe(): void { openWidgetOnFocused("igor"); }
     property bool igorEnabled: false
     property bool desktopLogoEnabled: true
     property string desktopLogoCorner: "bottom-right"
@@ -169,7 +171,7 @@ ShellRoot {
         focusActive: ["starting", "work", "paused"].includes(shell.focusState.phase)
     }
 
-    IgorRoutine {
+    IgorBridge {
         id: igorRoutine
         visitsEnabled: shell.igorEnabled && !shell.gamingActive && !screensaver.active
         available: monitorNames.length > 0
@@ -1170,8 +1172,9 @@ ShellRoot {
         }
 
         function toggleIgor(): void { shell.toggleIgor(); }
+        function toggleIgorWardrobe(): void { shell.openIgorWardrobe(); }
         function igorStatus(): string {
-            return JSON.stringify({meeting: meetingState.active, playing: igorRoutine.playing,
+            return JSON.stringify({runtimeReady: igorRoutine.runtimeReady, runtimeVersion: igorRoutine.runtimeVersion, meeting: meetingState.active, playing: igorRoutine.playing,
                 mediaKind: igorRoutine.mediaKind, headphones: igorRoutine.musicPlaying, glasses: igorRoutine.watching});
         }
         function previewIgor(edge: string): bool {
@@ -1461,7 +1464,7 @@ ShellRoot {
                 topInset: bar.barVisible && shell.barPosition === "top" ? bar.implicitHeight : 0
             }
 
-            IgorVisitor {
+            IgorVisitorBridge {
                 id: igorVisitor
                 targetScreen: bar.modelData
                 theme: shell
@@ -1566,7 +1569,7 @@ ShellRoot {
                 else if (action === "keep-awake") shell.toggleKeepAwake();
                 else if (action === "ukvm") Quickshell.execDetached(["/usr/bin/spectrum-ukvm"]);
                 else if (["questline", "focus", "breaks", "services", "default-apps", "search", "calculator", "password", "emoji", "hotkey", "shortcuts"].includes(action)) bar.openUtility(action);
-                else if (["appimages", "audio", "brightness", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
+                else if (["appimages", "audio", "brightness", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery", "igor"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
             }
 
             function toggleFileSearch(): void { openUtility("search"); }
