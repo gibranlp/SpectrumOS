@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import re
 import ipaddress
 import os
 from pathlib import Path
@@ -335,7 +337,82 @@ def open_network_menu() -> None:
     subprocess.Popen(("/usr/lib/spectrumos/network-menu",), start_new_session=True)
 
 
+def proton_status() -> dict:
+    if not shutil.which("protonvpn"):
+        return {"installed": False, "connected": False, "status": "Install proton-vpn-cli to use Proton VPN"}
+    result = run("protonvpn", "status", timeout=20)
+    if result.returncode:
+        return {"installed": True, "connected": False, "status": "Proton VPN unavailable. Check your session or sign in."}
+    account = run("protonvpn", "info", timeout=20)
+    signed_in = account.returncode == 0 and "Account: 'None'" not in account.stdout and "Account:" in account.stdout
+    return {"installed": True, "connected": "Status: Connected" in result.stdout,
+            "signed_in": signed_in,
+            "status": result.stdout.strip()[:2000] if signed_in else "Sign in to Proton VPN to connect"}
+
+
+def proton_error(result: subprocess.CompletedProcess[str], fallback: str) -> str:
+    detail = result.stderr.strip()
+    match = re.search(r"(?m)^Error: (.+)", detail)
+    if match:
+        return match.group(1)[:2000]
+    return (result.stdout.strip() or detail or fallback)[:2000]
+
+
+def proton_signin_prompt() -> int:
+    try:
+        username = input("Proton account username or email: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return 1
+    if not username or any(ord(character) < 32 for character in username):
+        print("A Proton account username or email is required.", file=sys.stderr)
+        return 1
+    return subprocess.run(["protonvpn", "signin", "--", username], check=False).returncode
+
+
+def proton_action(name: str, value: str | None) -> None:
+    if not shutil.which("protonvpn"):
+        raise ValueError("Install proton-vpn-cli first")
+    if name == "vpn-signin":
+        subprocess.Popen(["kitty", "--title", "Proton VPN sign in", "--hold", sys.executable,
+                          str(Path(__file__).resolve()), "vpn-signin-prompt"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        return
+    if name == "vpn-connect":
+        command = ["protonvpn", "connect"]
+        if value:
+            if not re.fullmatch(r"[A-Za-z]{2}", value):
+                raise ValueError("Enter a two-letter country code, or leave it empty for fastest server")
+            command += ["--country", value.upper()]
+    elif name in ("vpn-disconnect", "vpn-signout"):
+        command = ["protonvpn", name.removeprefix("vpn-")]
+    elif name == "vpn-config":
+        option, _, setting = (value or "").partition(":")
+        allowed = {"kill-switch": {"off", "standard"},
+                   "netshield": {"off", "malware-only", "malware-ads-trackers"},
+                   "vpn-accelerator": {"on", "off"}, "ipv6": {"on", "off"}}
+        if setting not in allowed.get(option, set()):
+            raise ValueError("Invalid Proton VPN setting")
+        command = ["protonvpn", "config", "set", option, setting]
+    elif name == "vpn-settings":
+        result = run("protonvpn", "config", "list", timeout=20)
+        if result.returncode:
+            raise ValueError(proton_error(result, "Sign in to view Proton VPN settings"))
+        print(result.stdout.strip())
+        return
+    else:
+        raise ValueError("Unknown Proton VPN action")
+    result = run(*command, timeout=90)
+    if result.returncode:
+        raise ValueError(proton_error(result, "Proton VPN action failed. Check your connection and try again."))
+    invalidate_public_ip()
+    print(result.stdout.strip() or "Proton VPN settings saved")
+
+
 def action(name: str, value: str | None = None) -> None:
+    if name.startswith("vpn-"):
+        proton_action(name, value)
+        return
     if name == "toggle":
         enabled = run("nmcli", "--terse", "--fields", "WIFI", "radio").stdout.strip() == "enabled"
         result = run("nmcli", "radio", "wifi", "off" if enabled else "on")
@@ -375,6 +452,10 @@ if __name__ == "__main__":
     try:
         if not sys.argv[1:] or sys.argv[1:] == ["--json"]:
             state()
+        elif sys.argv[1:] == ["vpn-signin-prompt"]:
+            raise SystemExit(proton_signin_prompt())
+        elif sys.argv[1:] == ["vpn-status"]:
+            print(json.dumps(proton_status()))
         elif sys.argv[1:] == ["--refresh-public-ip"]:
             refresh_public_ip()
         elif len(sys.argv) == 5 and sys.argv[1] == "ip-family":

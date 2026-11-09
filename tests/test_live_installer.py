@@ -292,13 +292,12 @@ class LiveInstallerTests(unittest.TestCase):
         # env preload and `uwsm app` (used below) both work normally.
         live = (INSTALLER / "live-hyprland.lua").read_text(encoding="utf-8")
         self.assertIn("spectrum-installer", live)
-        self.assertIn("wallpaper.png", live)
-        self.assertIn('hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("uwsm app -- foot"))', live)
-        self.assertIn('hl.bind(mainMod .. " + Q", hl.dsp.window.close())', live)
-        self.assertIn('hl.exec_cmd("uwsm app -s s -- /usr/local/bin/spectrum-installer")', live)
-        self.assertIn("live-network", live)
-        self.assertIn("qs --path /usr/share/spectrumos/installer/shell", live)
-        self.assertIn("disable_splash_rendering = true", live)
+        self.assertIn('require("keybindings")', live)
+        self.assertIn('require("monitors")', live)
+        self.assertIn('spectrum-shell.service', live)
+        self.assertIn('spectrum-live-welcome', live)
+        self.assertNotIn('hl.exec_cmd("uwsm app -s s -- /usr/local/bin/spectrum-installer")', live)
+        self.assertNotIn('qs --path /usr/share/spectrumos/installer/shell', live)
         session = (INSTALLER / "spectrum-live-session").read_text(encoding="utf-8")
         self.assertIn("HYPRLAND_CONFIG=/etc/spectrumos/live-hyprland.lua", session)
         self.assertIn("exec uwsm start -e -D Hyprland hyprland.desktop", session)
@@ -388,7 +387,7 @@ class LiveInstallerTests(unittest.TestCase):
 
         live = (INSTALLER / "live-hyprland.lua").read_text(encoding="utf-8")
         self.assertIn(
-            'hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("uwsm app -- foot --title=\\"Rescue system\\" -e /usr/local/bin/spectrum-rescue-shell"))',
+            'hl.bind("SUPER + CTRL + R", hl.dsp.exec_cmd("uwsm app -- foot --title=\\"Rescue system\\" -e /usr/local/bin/spectrum-rescue-shell"))',
             live,
         )
 

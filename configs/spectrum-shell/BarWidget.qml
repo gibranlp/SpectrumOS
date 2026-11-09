@@ -498,6 +498,13 @@ PanelWindow {
                     }
                 }
 
+                ProtonVpnControl {
+                    Layout.fillWidth: true
+                    visible: widget.page === "wifi"
+                    active: widget.page === "wifi" && widget.visible
+                    theme: widget.theme
+                }
+
                 Text {
                     visible: widget.page === "wifi" && (widget.theme.network.profiles || []).length > 0
                     text: qsTranslate("Spectrum", "CONNECTION PROTOCOLS")

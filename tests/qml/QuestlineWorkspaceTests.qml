@@ -3,9 +3,16 @@ import QtTest
 import Quickshell
 import "../../configs/spectrum-shell" as Shell
 Scope {
+    id: testScope
+    property bool calculatorKeyboard: true
     Shell.QuestlineWorkspace { id: workspace; backendDir: Quickshell.env("SPECTRUM_QUESTLINE_TEST_DIR") }
     Shell.UtilityPanel {
         id: panel
+        keyboardEnabled: !companion.paired || !testScope.calculatorKeyboard
+        onKeyboardRequested: testScope.calculatorKeyboard = false
+        calculatorCompanion: companion.paired
+        companionWidth: companion.panelWidth
+        companionHeight: companion.panelHeight
         questlineWorkspace: workspace
         breakState: ({settings:{enabled:false,eye_minutes:20,movement_minutes:50,pause_focus:true},ready:true,busy:false,status:"Off",error:"",eyeElapsed:0,movementElapsed:0,minutesLeft:function(){return "";}})
         backendDir: Quickshell.env("SPECTRUM_QUESTLINE_TEST_DIR")
@@ -22,6 +29,16 @@ Scope {
         questlineLoaded: panel.questlineLoaded
         onRefreshDueDates: panel.refreshQuestline()
         onDueItemRequested: (taskId,stepId) => { dashboard.expanded=false;panel.openQuestlineDueItem(taskId,stepId); }
+    }
+    Shell.CalculatorPanel {
+        id: companion
+        keyboardEnabled: !paired || testScope.calculatorKeyboard
+        onKeyboardRequested: testScope.calculatorKeyboard = true
+        theme: panel.theme
+        backendDir: panel.backendDir
+        leftInset: panel.panelLeftInset
+        topInset: panel.topInset
+        paired: expanded && panel.expanded && panel.page === "questline"
     }
     TestCase {
         name: "QuestlineWorkspace"
@@ -41,6 +58,7 @@ Scope {
         function init() {
             tryCompare(workspace,"ready",true,3000);
             tryCompare(workspace,"busy",false,3000);
+            companion.expanded=false;
             dashboard.expanded=false;
             panel.expanded=false;
             panel.page="search";
@@ -49,6 +67,86 @@ Scope {
             panel.open("questline");
             tryCompare(panel,"questlineLoaded",true,3000);
             wait(80);
+        }
+        function test_calculator_companion_preserves_questline_editor() {
+            try {
+            panel.openQuestlineSearchResult({kind:"Scrolls", item:panel.questline.scrolls[0]});
+            panel.questlineTab = "Scrolls";
+            panel.beginQuestlineEdit(panel.questlineSelected);
+            field("body").text = "Draft while calculating";
+            const tab = panel.questlineTab;
+            const selected = panel.questlineSelected;
+            companion.open();
+            wait(50);
+            verify(panel.expanded);
+            verify(companion.expanded);
+            verify(companion.paired);
+            compare(panel.questlineTab, tab);
+            compare(panel.questlineSelected, selected);
+            verify(panel.questlineEditing);
+            compare(field("body").text, "Draft while calculating");
+            const quest = panel.panelGeometry;
+            const calc = companion.panelGeometry;
+            verify(quest.width > 0 && quest.height > 0);
+            verify(calc.width > 0 && calc.height > 0);
+            verify(quest.x + quest.width + 7 <= calc.x || quest.y + quest.height + 7 <= calc.y);
+            const input = findChild(companion.contentItem, "calculator-input");
+            verify(input !== null);
+            verify(companion.keyboardEnabled);
+            verify(!panel.keyboardEnabled);
+            const surface = findChild(panel.contentItem, "utility-surface");
+            mouseClick(surface, surface.width / 2, 20);
+            wait(30);
+            verify(panel.keyboardEnabled);
+            verify(!companion.keyboardEnabled);
+            mouseClick(input, 10, 10);
+            wait(30);
+            verify(companion.keyboardEnabled);
+            verify(!panel.keyboardEnabled);
+            input.text = "123 + 45";
+            companion.expanded = false;
+            wait(20);
+            verify(panel.expanded);
+            companion.open();
+            wait(20);
+            compare(input.text, "123 + 45");
+            compare(panel.questlineTab, tab);
+            compare(field("body").text, "Draft while calculating");
+            keyClick(Qt.Key_Escape);
+            wait(30);
+            verify(!companion.expanded);
+            verify(panel.expanded);
+            companion.open();
+            wait(20);
+            panel.expanded = false;
+            wait(20);
+            verify(companion.expanded);
+            verify(!companion.paired);
+            } catch (error) { console.warn("Calculator companion", error.message, String(error.stack)); throw error; }
+        }
+        function test_password_copy_confirmation_resets_and_repeated_copy_extends_it() {
+            panel.open("password");
+            wait(100);
+            panel.password = "fixture-password";
+            const copy = findChild(panel.contentItem, "password-copy");
+            verify(copy !== null);
+            mouseClick(copy);
+            verify(panel.passwordCopied);
+            verify(copy.label.indexOf("Password copied") >= 0);
+            compare(copy.backgroundColor, panel.theme.colors.accent);
+            wait(1400);
+            mouseClick(copy);
+            wait(1400);
+            verify(panel.passwordCopied);
+            tryCompare(panel, "passwordCopied", false, 1800);
+            mouseClick(copy);
+            panel.password = "another-fixture";
+            verify(!panel.passwordCopied);
+            mouseClick(copy);
+            panel.expanded = false;
+            verify(!panel.passwordCopied);
+            panel.password = "";
+            verify(!copy.enabled);
         }
         function test_global_search_and_navigation() {
             panel.questlineSearchQuery = "original scroll";

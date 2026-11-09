@@ -18,12 +18,29 @@ TestCase {
     Shell.BarControls { id: controls; theme: test.theme }
     SignalSpy { id: chosen; target: controls; signalName:"chosen" }
     function init() {
+        test.theme = Object.assign({}, test.theme, {liveSession:false});
         chosen.clear();
         controls.trayItems = [];
         controls.batteryDevice = null;
         controls.charging = false;
         controls.externalPower = false;
         test.trayActivations = 0;
+    }
+    function test_live_installer_control_is_available_in_both_orientations() {
+        test.theme = Object.assign({}, test.theme, {liveSession:true});
+        for (const vertical of [false, true]) {
+            controls.vertical = vertical;
+            wait(30);
+            compare(controls.actions[0], "install");
+            const installer = findChild(controls, "bar-control-install");
+            verify(installer !== null);
+            compare(installer.Accessible.name, "Install SpectrumOS");
+            mouseClick(installer);
+            compare(chosen.signalArguments[chosen.count - 1][0], "install");
+        }
+        controls.vertical = false;
+        test.theme = Object.assign({}, test.theme, {liveSession:false});
+        verify(!controls.actions.includes("install"));
     }
     function test_battery_level_precedes_power_mode_data() { return test_order_and_actions_data(); }
     function test_battery_level_precedes_power_mode(data) {

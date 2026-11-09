@@ -13,12 +13,13 @@ GridLayout {
     property bool externalPower: false
     readonly property bool hasBattery: !!batteryDevice && batteryDevice.ready && batteryDevice.isLaptopBattery
     readonly property real batteryPercent: hasBattery ? batteryDevice.percentage * 100 : 0
-    readonly property var actions: hasBattery
+    readonly property var actions: (theme.liveSession === true ? ["install"] : []).concat(batteryActions)
+    readonly property var batteryActions: hasBattery
         ? baseActions.slice(0, baseActions.indexOf("battery")).concat(["battery-level"], baseActions.slice(baseActions.indexOf("battery"))) : baseActions
     readonly property var baseActions: profile === "detailed"
         ? ["favorites", "breaks", "battery", "keep-awake", "brightness", "weather", "displays", "typography", "network", "bluetooth", "audio", "notifications", "extras"]
         : ["battery", "keep-awake", "weather", "network", "bluetooth", "audio", "notifications", "extras"]
-    readonly property var labels: ({favorites:qsTranslate("Spectrum", "Favorites"), breaks:qsTranslate("Spectrum", "Break reminders"),
+    readonly property var labels: ({install:qsTranslate("Spectrum", "Install SpectrumOS"), favorites:qsTranslate("Spectrum", "Favorites"), breaks:qsTranslate("Spectrum", "Break reminders"),
         battery:qsTranslate("Spectrum", "Power & battery"), "keep-awake":qsTranslate("Spectrum", "Keep Awake"),
         "battery-level":qsTranslate("Spectrum", "Power & battery"),
         brightness:qsTranslate("Spectrum", "Brightness"), weather:qsTranslate("Spectrum", "Weather"),
@@ -32,6 +33,7 @@ GridLayout {
     rowSpacing: 5
 
     function icon(action): string {
+        if (action === "install") return vertical ? "󰋩" : "󰋩  " + qsTranslate("Spectrum", "Install SpectrumOS");
         if (action === "battery") return theme.performance.mode === "performance" ? "󰓅" : theme.performance.mode === "power-saver" ? "󰌪" : "";
         if (action === "keep-awake") return theme.idle.active ? "󰅶" : "󰾪";
         if (action === "weather") return (theme.weather.icon || "󰖕") + (!vertical && theme.weather.temperature !== "—" ? " " + theme.weather.temperature : "");

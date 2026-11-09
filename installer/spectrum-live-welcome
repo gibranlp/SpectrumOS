@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+for directory in (Path(__file__).resolve().parents[1] / "scripts",
+                  Path("/usr/lib/spectrumos"), Path("/usr/local/lib/spectrumos")):
+    if (directory / "spectrum_i18n.py").is_file():
+        sys.path.insert(0, str(directory))
+        break
+
+from spectrum_i18n import language, languages, msg, retranslate_widgets, set_language, tr_set, tr_widget
+import gi
+
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gdk, Gtk
+
+
+class LiveWelcome(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id="dev.spectrumos.LiveWelcome")
+        self.connect("activate", self.activate_window)
+
+    def activate_window(self, _application):
+        if hasattr(self, "window"):
+            self.window.present()
+            return
+        self.window = Gtk.ApplicationWindow(application=self)
+        tr_set(self.window, "set_title", msg("Welcome to SpectrumOS"))
+        self.window.set_default_size(620, 420)
+        data = Path(os.environ.get("SPECTRUM_INSTALLER_DATA", "/usr/share/spectrumos/installer"))
+        if (data / "style.css").is_file():
+            css = Gtk.CssProvider()
+            css.load_from_path(str(data / "style.css"))
+            Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
+                                                      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        content.add_css_class("installer-shell")
+        self.window.set_child(content)
+        title = tr_widget(Gtk.Label, label=msg("Welcome to SpectrumOS"), xalign=0)
+        title.add_css_class("title-1")
+        content.append(title)
+        content.append(tr_widget(Gtk.Label,
+            label=msg("Choose your language and explore the desktop before installing."),
+            xalign=0, wrap=True))
+        content.append(tr_widget(Gtk.Label, label=msg("Interface language"), xalign=0))
+        self.rows = languages()
+        self.choice = Gtk.DropDown.new_from_strings([row["name"] for row in self.rows])
+        self.choice.set_selected(next((index for index, row in enumerate(self.rows)
+                                       if row["id"] == language()), 0))
+        self.choice.connect("notify::selected", self.change_language)
+        content.append(self.choice)
+        content.append(tr_widget(Gtk.Label,
+            label=msg("You can install SpectrumOS at any time using the button on the bar."),
+            xalign=0, wrap=True, vexpand=True))
+        self.error = Gtk.Label(xalign=0, wrap=True)
+        content.append(self.error)
+        actions = Gtk.Box(spacing=12, homogeneous=True)
+        explore = tr_widget(Gtk.Button, label=msg("Try SpectrumOS"))
+        explore.add_css_class("accent")
+        explore.connect("clicked", lambda *_: self.quit())
+        install = tr_widget(Gtk.Button, label=msg("Install SpectrumOS"))
+        install.connect("clicked", self.install)
+        actions.append(explore)
+        actions.append(install)
+        content.append(actions)
+        self.window.present()
+
+    def change_language(self, *_arguments):
+        index = self.choice.get_selected()
+        if index >= len(self.rows):
+            return
+        try:
+            row = self.rows[index]
+            set_language(row["id"])
+            retranslate_widgets()
+            environment = {"LANG": row["locale"], "LC_MESSAGES": row["locale"], "LANGUAGE": row["language"]}
+            os.environ.update(environment)
+            if os.environ.get("SPECTRUM_LIVE_SESSION") == "1":
+                subprocess.run(["dbus-update-activation-environment", "--systemd",
+                                *[key + "=" + value for key, value in environment.items()]],
+                               check=True, capture_output=True, text=True, timeout=5)
+            self.error.set_text("")
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            self.error.set_text(str(error))
+
+    def install(self, *_arguments):
+        try:
+            subprocess.Popen(["/usr/local/bin/spectrum-installer"], start_new_session=True)
+        except OSError as error:
+            self.error.set_text(str(error))
+            return
+        self.quit()
+
+
+if __name__ == "__main__":
+    raise SystemExit(LiveWelcome().run(sys.argv))

@@ -1,6 +1,6 @@
 pkgbase = spectrum-igor
 	pkgdesc = Free Igor desktop companion runtime for SpectrumOS
-	pkgver = 0.3.2
+	pkgver = 0.3.4
 	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	arch = any
@@ -15,9 +15,9 @@ pkgbase = spectrum-igor
 	depends = quickshell>=0.3.0
 	options = !strip
 	options = !debug
-	source = igor-runtime-0.3.2-dbdf0ecf9d81d388.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-0.3.2-dbdf0ecf9d81d388.tar.zst
+	source = igor-runtime-0.3.4-967c714997740029.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-0.3.4-967c714997740029.tar.zst
 	source = RuntimeTests.qml
-	sha256sums = b397d2689cef0aea10e49dd4c895287add2426dbc1bcfa3caf43890305d71135
-	sha256sums = e2f15aff691355066c4a590ee3dfe4a239209b34617528ea822c5ab8780da647
+	sha256sums = ab2fb92bc565670c7f3ff506e516f521f21628602a5db762c94ccaada2f2f307
+	sha256sums = fb67391626ee089b15a49842a396f309c61641fcaaeeb5c867242cdf20527c5d
 
 pkgname = spectrum-igor

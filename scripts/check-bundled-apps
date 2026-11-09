@@ -11,10 +11,29 @@ filename=$(bsdtar -xOf "$database" "$entry" | awk '/^%FILENAME%$/ { getline; pri
     exit 1
 }
 contents=$(bsdtar -tf "$repository/$filename")
-for required in usr/bin/stash usr/bin/questline usr/lib/spectrumos/stash-open usr/lib/spectrumos/questline-open usr/share/applications/stash.desktop; do
+for required in usr/bin/stash usr/bin/questline usr/lib/spectrumos/stash-open usr/lib/spectrumos/questline-open usr/share/applications/stash.desktop usr/lib/spectrumos/magnet-open usr/lib/spectrumos/magnet-adapter usr/share/applications/magnet.desktop usr/share/spectrumos/spectrum-shell/MagnetDownloads.qml; do
     if ! printf '%s\n' "$contents" | grep -Fx "$required" >/dev/null; then
         printf 'The offline desktop package is missing %s. Rebuild and sign it before creating an ISO.\n' "$required" >&2
         exit 1
     fi
 done
 printf 'Offline desktop package includes Stash, Questline-cli, and their launchers.\n'
+magnet_entry=$(bsdtar -tf "$database" | awk '/^spectrum-magnet-[^/]+\/desc$/ { print; exit }')
+[[ -n $magnet_entry ]] || { printf 'The offline repository has no spectrum-magnet package.\n' >&2; exit 1; }
+magnet_filename=$(bsdtar -xOf "$database" "$magnet_entry" | awk '/^%FILENAME%$/ { getline; print; exit }')
+[[ -n $magnet_filename && $magnet_filename != */* && -f $repository/$magnet_filename ]] || {
+    printf 'The offline repository is missing its indexed spectrum-magnet artifact.\n' >&2
+    exit 1
+}
+magnet_contents=$(bsdtar -tf "$repository/$magnet_filename")
+for required in usr/bin/magnet usr/share/licenses/spectrum-magnet/LICENSE; do
+    if ! printf '%s\n' "$magnet_contents" | grep -Fx "$required" >/dev/null; then
+        printf 'The offline Magnet package is missing %s. Rebuild and sign it before creating an ISO.\n' "$required" >&2
+        exit 1
+    fi
+done
+if ! bsdtar -xOf "$database" "$entry" | grep -E '^spectrum-magnet(>=|=|$)' >/dev/null; then
+    printf 'The offline desktop package must require spectrum-magnet so installed systems receive it in updates.\n' >&2
+    exit 1
+fi
+printf 'Offline repository includes the required Magnet engine and desktop integration.\n'

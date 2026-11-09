@@ -73,7 +73,7 @@ if ! ln -- "$compressed_archive" "$output_dir/$archive_name" 2>/dev/null; then
 fi
 archive_sha256=$(sha256sum "$output_dir/$archive_name" | awk '{print $1}')
 
-for package in spectrum-base spectrum-desktop spectrum-hyprland spectrum-plymouth spectrum-sddm spectrum-theme spectrumdrop; do
+for package in spectrum-base spectrum-desktop spectrum-hyprland spectrum-plymouth spectrum-sddm spectrum-theme spectrumdrop spectrum-magnet; do
     ln -f -- "$output_dir/$archive_name" "$project_root/packages/$package/$archive_name"
 done
 

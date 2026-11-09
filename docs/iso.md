@@ -1,6 +1,31 @@
 # SpectrumOS2 ISO
 
-## Current release: SpectrumOS 1.1
+## Live desktop and welcome flow
+
+The next ISO boots the regular SpectrumOS desktop with a welcome window instead of opening the installer immediately. Choose English, Spanish, or Portuguese, then select **Try SpectrumOS** to explore or **Install SpectrumOS** to open the installation wizard. Closing the welcome window also leaves the desktop available. The live desktop uses stock settings and the packaged applications; it does not copy this PC's accounts, preferences, files, or credentials.
+
+The language selection updates the shared SpectrumOS preference immediately, including the shell widgets and installer. Newly launched applications receive the selected locale through the live session's activation environment. The image generates all three supported UTF-8 locales. The installer starts with the selected language and matching initial regional format; its language page remains available for adjustments.
+
+An **Install SpectrumOS** control stays on the live bar in both orientations. **Super+Ctrl+I** opens the installer and **Super+Ctrl+R** opens the rescue terminal. The regular desktop shortcuts remain available. The install control is hidden in installed sessions.
+
+The ISO package list includes `spectrum-desktop` and its dependencies from the signed Edge repository. The build uses a temporary Pacman keyring and checks that the indexed desktop package matches the current shell source. Refresh, build, and sign the desktop package before building an ISO after shell changes. The generated live theme uses paths inside the image, and live user configuration ownership is recorded in ArchISO's permission table.
+
+This flow is included in the local SpectrumOS 1.2 image below.
+
+## Deferred local build: SpectrumOS 1.2
+
+The owner reported installation failure involving `spectrum-magnet` or `spectrum-igor`. This image is not accepted for installation or publication. Continue using the working published SpectrumOS 1.1 image. Further ISO investigation and a virtual-machine testing system are deferred; package updates proceed separately.
+
+The rebuilt image is [spectrumos-1.2-x86_64.iso](../artifacts/iso/spectrumos-1.2-x86_64.iso), with its [SHA-256 checksum](../artifacts/iso/spectrumos-1.2-x86_64.iso.sha256). Volume label: `SPEC_1_2`. Size: 3,843,006,464 bytes. SHA-256: `570a5f844cc2780f50aa9718356ea41630131bba375baf11d0262f9492559350`.
+
+The image embeds a production-signed local Edge snapshot, including Desktop 1.1.36, Hyprland 1.0.5 and Magnet 0.1.0. These packages were built on the development host; this snapshot does not carry clean-chroot release evidence. Public repositories and downloads were not changed.
+
+Checksum, embedded package hashes, installer/source parity and live service configuration checks passed. Both BIOS and UEFI guests booted the image as a read-only raw disk and verified live SSH, a mapped welcome window, shell layers, notification-server readiness, the stock wallpaper and the desktop after welcome closes. No physical installation or complete VM installation was performed. Evidence and screenshots: `artifacts/iso-v1.2-20261107/`.
+
+The live profile masks SDDM and explicitly enables tty1 autologin. Its shell service waits up to 120 seconds for the notification bus name, allowing cold QML startup from compressed media, then restores the wallpaper. The builder selects PipeWire's JACK provider, seeds a temporary package cache from the verified snapshot to avoid stale same-version artifacts, and obtains Plymouth files from their signed package.
+
+
+## Current published release: SpectrumOS 1.1
 
 Download [Spectrum1.1.iso](https://spectrum.gibranlp.dev/downloads/Spectrum1.1.iso) and its [SHA-256 checksum](https://spectrum.gibranlp.dev/downloads/Spectrum1.1.iso.sha256). The unchanged local build is [spectrumos-1.1-r3-x86_64.iso](../artifacts/iso/spectrumos-1.1-r3-x86_64.iso), with its [SHA-256 checksum](../artifacts/iso/spectrumos-1.1-r3-x86_64.iso.sha256). It includes the five-step installer wizard, fresh English/Spanish/Portuguese catalogs, disk-discovery fixes and corrected device readiness/lock ordering. Size: 2,408,747,008 bytes. SHA-256: `8584e889efe79ae7f7df46d3ce3f5cb67e27ebbb1bdc749e01c87676bf7ce059`.
 

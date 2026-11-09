@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if ! command -v magnet >/dev/null 2>&1; then
+    notify-send "Magnet" "Install Magnet to search and download torrents."
+    exit 1
+fi
+exec kitty --class magnet -e magnet "$@"

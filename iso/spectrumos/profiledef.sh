@@ -2,10 +2,10 @@
 # shellcheck disable=SC2034
 
 iso_name="spectrumos"
-iso_label="SPEC_1_1"
+iso_label="SPEC_1_2"
 iso_publisher="SpectrumOS <https://spectrum.gibranlp.dev>"
 iso_application="SpectrumOS Installer and Recovery"
-iso_version="1.1"
+iso_version="1.2"
 if [[ -n ${SPECTRUM_ISO_REVISION:-} ]]; then
     [[ $SPECTRUM_ISO_REVISION =~ ^[1-9][0-9]*$ ]] || { printf 'Invalid ISO revision\n' >&2; exit 1; }
     iso_version+="-r$SPECTRUM_ISO_REVISION"
@@ -30,6 +30,7 @@ file_permissions=(
   ["/usr/local/bin/spectrum-installer"]="0:0:755"
   ["/usr/local/bin/spectrum-recovery"]="0:0:755"
   ["/usr/local/bin/spectrum-rescue-shell"]="0:0:755"
+  ["/usr/local/bin/spectrum-live-welcome"]="0:0:755"
   ["/usr/local/bin/spectrum-live-session"]="0:0:755"
   ["/usr/local/bin/spectrum-live-network"]="0:0:755"
   ["/usr/local/lib/spectrumos/network-adapter"]="0:0:755"

@@ -1,0 +1,25 @@
+[package]
+name = "magnet"
+version = "0.1.0"
+edition = "2024"
+description = "Curated torrents straight from your terminal: zero setup, saves to ~/Downloads"
+license = "MIT"
+repository = "https://github.com/gibranlp/Magnet"
+readme = "README.md"
+keywords = ["torrent", "tui", "terminal", "magnet", "bittorrent"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+crossterm = "0.29"
+dirs = "7.0.0"
+futures = "0.3.34"
+libc = "0.2.191"
+librqbit = { version = "9", default-features = false, features = ["rust-tls"] }
+ratatui = "0.30"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "gzip"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1", features = ["full"] }
+urlencoding = "2.1.3"

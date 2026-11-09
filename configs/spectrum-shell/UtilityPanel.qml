@@ -15,12 +15,23 @@ PanelWindow {
     signal spectrumDropReturnRequested()
     property string page: "search"
     property bool expanded: false
+    property bool keyboardEnabled: true
+    signal keyboardRequested()
+    property bool calculatorCompanion: false
+    property real companionWidth: 0
+    property real companionHeight: 0
+    readonly property bool companionBeside: screen.width - panelLeftInset >= 1200
+    readonly property real workspaceWidth: screen.width - panelLeftInset - 16
+    readonly property real workspaceHeight: screen.height - topInset - 16
+    readonly property real companionQuestlineWidth: companionBeside ? Math.min(1500, workspaceWidth - companionWidth - 8) : workspaceWidth
+    readonly property real companionQuestlineHeight: companionBeside ? Math.min(1120, workspaceHeight) : workspaceHeight - companionHeight - 8
+    readonly property rect panelGeometry: Qt.rect(frame.x, frame.y, frame.width, frame.height)
     property int leftInset: 0
     property int topInset: 8
     readonly property bool cornerPanel: page === "spectrumdrop" || page === "breaks"
     readonly property bool cornerTop: cornerPanel && theme.barPosition === "top"
     readonly property bool sidePanel: page === "shortcuts"
-    readonly property bool topPanel: page === "questline" || page === "focus" || page === "services" || page === "default-apps"
+    readonly property bool topPanel: page === "magnet" || page === "questline" || page === "focus" || page === "services" || page === "default-apps"
     property var questline: ({ available: false, installed: false })
     required property var questlineWorkspace
     property bool questlineRestoring: false
@@ -79,6 +90,28 @@ PanelWindow {
     property int emojiSelectedIndex: 0
     property string submittedEmojiQuery: ""
     property string password: ""
+    property bool passwordCopied: false
+    onPasswordChanged: clearPasswordCopyFeedback()
+
+    function clearPasswordCopyFeedback(): void {
+        passwordCopied = false;
+        passwordCopyFeedback.stop();
+    }
+
+    function copyPassword(): void {
+        if (!password.length) return;
+        passwordValue.selectAll();
+        passwordValue.copy();
+        passwordValue.deselect();
+        passwordCopied = true;
+        passwordCopyFeedback.restart();
+    }
+
+    Timer {
+        id: passwordCopyFeedback
+        interval: 2500
+        onTriggered: panel.passwordCopied = false
+    }
     property string colorValue: ""
     property var savedColors: []
     property string pendingColor: ""
@@ -164,6 +197,7 @@ PanelWindow {
         { combo: "Super + K", action: qsTranslate("Spectrum", "Keyboard shortcuts"), command: [backendDir + "/spectrum-shell-open", "shortcuts"] },
         { combo: "Super + Shift + C", action: qsTranslate("Spectrum", "Local services"), command: [backendDir + "/spectrum-shell-open", "services"] },
         { combo: "Super + L", action: qsTranslate("Spectrum", "Lock computer"), command: [backendDir + "/session-menu", "lock"] },
+        { combo: "Super + Shift + J", action: qsTranslate("Spectrum", "Magnet"), command: [backendDir + "/spectrum-shell-open", "magnet"] },
         { combo: "Super + Print", action: qsTranslate("Spectrum", "Monitor screenshot"), command: [backendDir + "/panel", "--screenshot-monitor"] },
         { combo: "Super + Shift + X", action: qsTranslate("Spectrum", "More widgets"), command: [backendDir + "/spectrum-shell-open", "more"] },
         { combo: "Super + Shift + M", action: qsTranslate("Spectrum", "Mouse Settings"), command: [backendDir + "/spectrum-shell-open", "mouse"] },
@@ -219,13 +253,15 @@ PanelWindow {
     visible: motion.active
     color: "transparent"
     WlrLayershell.keyboardFocus: panelFocus.mode
-    ShellFocus { id: panelFocus; window: panel; enabled: expanded }
+    ShellFocus { id: panelFocus; window: panel; enabled: expanded && panel.keyboardEnabled }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "spectrum-widget-utilitypanel"
     anchors { top: true; bottom: true; left: true; right: true }
+    mask: Region { item: panel.calculatorCompanion ? frame : backdrop }
 
     function open(name): void {
+        clearPasswordCopyFeedback();
         if (page === "questline") { rememberQuestline(); questlineWorkspace.flush(); }
         if (name === "questline") questlineContent.ensureLoaded();
         page = name;
@@ -388,6 +424,7 @@ PanelWindow {
     }
 
     function generatePassword(): void {
+        clearPasswordCopyFeedback();
         const options = (useLetters ? "l" : "") + (useNumbers ? "n" : "") + (useSymbols ? "s" : "");
         if (options && !passwordProcess.running) {
             requestedPasswordOptions = options;
@@ -791,6 +828,7 @@ PanelWindow {
     }
     Timer { id: questlineRememberDelay; interval: 80; onTriggered: panel.rememberQuestline() }
     onExpandedChanged: {
+        if (!expanded) clearPasswordCopyFeedback();
         if (!expanded) {
             pendingFocusPage = "";
             if (page === "questline") { rememberQuestline(); questlineWorkspace.flush(); }
@@ -1216,12 +1254,14 @@ PanelWindow {
     Timer { interval: 1000; repeat: true; running: panel.expanded && panel.page === "hotkey"; onTriggered: hotkeys.command(["status"]) }
 
     MouseArea {
+        id: backdrop
         anchors.fill: parent
         onClicked: panel.expanded = false
     }
 
     ShellSurface {
         id: frame
+        objectName: "utility-surface"
         enabled: !panel.questlineWorkspace.incomingProfileKey
         transform: ShellMotion {
             id: motion
@@ -1241,15 +1281,24 @@ PanelWindow {
             ? Math.max(0, y - 8) : 0
         leftAttachmentWidth: panel.theme.barStyle === "islands" && panel.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
-        width: panel.page === "breaks" ? Math.min(390, panel.screen.width - panel.panelLeftInset - 16) : panel.cornerPanel ? Math.min(680, panel.screen.width - (panel.cornerTop ? 16 : panel.panelLeftInset + 16)) : panel.sidePanel ? Math.min(660, panel.screen.width - panel.panelLeftInset) : panel.page === "questline" ? Math.min(1500, panel.screen.width * 0.88) : Math.min(680, panel.screen.width - 40)
-        height: panel.page === "breaks" ? Math.min(460, panel.screen.height - panel.topInset - 24) : panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : (panel.page === "hotkey" || panel.page === "breaks" || panel.page === "services" || panel.page === "default-apps") ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "calculator" ? Math.min(calculatorContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "focus" ? Math.min(focusContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
-        x: panel.cornerPanel ? (panel.cornerTop ? panel.screen.width - width : panel.panelLeftInset) : panel.sidePanel ? panel.panelLeftInset : (panel.screen.width + panel.leftInset - width) / 2
+        width: panel.calculatorCompanion ? panel.companionQuestlineWidth : panel.page === "breaks" ? Math.min(390, panel.screen.width - panel.panelLeftInset - 16) : panel.cornerPanel ? Math.min(680, panel.screen.width - (panel.cornerTop ? 16 : panel.panelLeftInset + 16)) : panel.sidePanel ? Math.min(660, panel.screen.width - panel.panelLeftInset) : panel.page === "questline" ? Math.min(1500, panel.screen.width * 0.88) : Math.min(680, panel.screen.width - 40)
+        height: panel.calculatorCompanion ? panel.companionQuestlineHeight : panel.page === "breaks" ? Math.min(460, panel.screen.height - panel.topInset - 24) : panel.cornerPanel ? Math.min(650, panel.screen.height - (panel.cornerTop ? panel.topInset + 16 : 24)) : panel.sidePanel ? panel.screen.height - panel.topInset - 8 : (panel.page === "magnet" || panel.page === "hotkey" || panel.page === "breaks" || panel.page === "services" || panel.page === "default-apps") ? Math.min(650, panel.screen.height - 70) : panel.page === "questline" ? Math.min(1120, panel.screen.height * 0.82) : panel.page === "search" || panel.page === "emoji" ? Math.min(570, panel.screen.height - 90) : panel.page === "calculator" ? Math.min(calculatorContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "focus" ? Math.min(focusContent.implicitHeight + 100, panel.screen.height - 50) : panel.page === "color" ? Math.min(530, 330 + panel.savedColors.length * 40, panel.screen.height - 50) : panel.page === "updates" ? Math.min(430, panel.screen.height - 50) : Math.min(350, panel.screen.height - 50)
+        x: panel.calculatorCompanion ? panel.companionBeside
+            ? panel.panelLeftInset + (panel.screen.width - panel.panelLeftInset - width - panel.companionWidth - 8) / 2
+            : panel.panelLeftInset + 8
+            : panel.cornerPanel ? (panel.cornerTop ? panel.screen.width - width : panel.panelLeftInset) : panel.sidePanel ? panel.panelLeftInset : (panel.screen.width + panel.leftInset - width) / 2
         y: panel.cornerTop || panel.sidePanel || panel.topPanel ? panel.topInset : panel.screen.height - height - (panel.theme.gamingActive ? 0 : 8)
 
         radius: 32
         color: panel.theme.colors.surface
         focus: panel.visible && panel.page !== "search" && panel.page !== "calculator" && panel.page !== "emoji"
         Keys.onEscapePressed: panel.expanded = false
+        // Cede el clic al control original después de asignar el foco del teclado.
+        MouseArea {
+            anchors.fill: parent
+            z: 1000
+            onPressed: mouse => { panel.keyboardRequested(); mouse.accepted = false; }
+        }
 
         MouseArea { anchors.fill: parent }
 
@@ -1269,7 +1318,7 @@ PanelWindow {
                 }
                 Text {
                     visible: panel.page !== "questline" || !panel.questline.hero
-                    text: panel.page === "default-apps" ? qsTranslate("Spectrum", "Default applications") : panel.page === "breaks" ? qsTranslate("Spectrum", "Break reminders") : panel.page === "services" ? qsTranslate("Spectrum", "Local services") : panel.page === "spectrumdrop" ? "SpectrumDrop" : panel.page === "hotkey" ? "HotKey" : panel.page === "search" ? qsTranslate("Spectrum", "Files") : panel.page === "calculator" ? qsTranslate("Spectrum", "Calculator") : panel.page === "password" ? qsTranslate("Spectrum", "Password generator") : panel.page === "shortcuts" ? qsTranslate("Spectrum", "Keyboard shortcuts") : panel.page === "emoji" ? qsTranslate("Spectrum", "Emoji") : panel.page === "focus" ? qsTranslate("Spectrum", "Focus timer") : panel.page === "questline" ? "Questline" : panel.page === "color" ? qsTranslate("Spectrum", "Color picker") : qsTranslate("Spectrum", "Updates")
+                    text: panel.page === "magnet" ? "Magnet" : panel.page === "default-apps" ? qsTranslate("Spectrum", "Default applications") : panel.page === "breaks" ? qsTranslate("Spectrum", "Break reminders") : panel.page === "services" ? qsTranslate("Spectrum", "Local services") : panel.page === "spectrumdrop" ? "SpectrumDrop" : panel.page === "hotkey" ? "HotKey" : panel.page === "search" ? qsTranslate("Spectrum", "Files") : panel.page === "calculator" ? qsTranslate("Spectrum", "Calculator") : panel.page === "password" ? qsTranslate("Spectrum", "Password generator") : panel.page === "shortcuts" ? qsTranslate("Spectrum", "Keyboard shortcuts") : panel.page === "emoji" ? qsTranslate("Spectrum", "Emoji") : panel.page === "focus" ? qsTranslate("Spectrum", "Focus timer") : panel.page === "questline" ? "Questline" : panel.page === "color" ? qsTranslate("Spectrum", "Color picker") : qsTranslate("Spectrum", "Updates")
                     color: panel.theme.colors.foreground
                     font { family: panel.theme.fontFamily; pixelSize: panel.theme.fontSize + (panel.page === "questline" ? 10 : 5); bold: true }
                 }
@@ -3128,16 +3177,28 @@ PanelWindow {
                 }
                 ShellButton {
                     Layout.fillWidth: true
-                    label: qsTranslate("Spectrum", "Copy")
+                    objectName: "password-copy"
+                    label: panel.passwordCopied ? "✓ " + qsTranslate("Spectrum", "Password copied") : qsTranslate("Spectrum", "Copy")
                     enabled: panel.password.length > 0
                     fontFamily: panel.theme.fontFamily
                     fontSize: panel.theme.fontSize
-                    backgroundColor: panel.theme.colors.surface_alt
-                    foregroundColor: panel.theme.colors.foreground
-                    onClicked: { passwordValue.selectAll(); passwordValue.copy(); passwordValue.deselect(); }
+                    backgroundColor: panel.passwordCopied ? panel.theme.colors.accent : panel.theme.colors.surface_alt
+                    foregroundColor: panel.passwordCopied ? panel.theme.colors.background : panel.theme.colors.foreground
+                    onClicked: panel.copyPassword()
                 }
             }
 
+            CachedContent {
+                requested: panel.expanded && panel.page === "magnet"
+                visible: panel.page === "magnet"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                sourceComponent: MagnetDownloads {
+                    theme: panel.theme
+                    backendDir: panel.backendDir
+                    active: panel.expanded && panel.page === "magnet"
+                }
+            }
             CachedContent {
                 id: dropContent
                 requested: panel.expanded && panel.page === "spectrumdrop"
@@ -3163,7 +3224,7 @@ PanelWindow {
                 }
             }
             Item {
-                visible: !["questline", "search", "emoji", "shortcuts", "hotkey", "spectrumdrop", "color", "calculator", "default-apps"].includes(panel.page)
+                visible: !["magnet", "questline", "search", "emoji", "shortcuts", "hotkey", "spectrumdrop", "color", "calculator", "default-apps"].includes(panel.page)
                 Layout.fillHeight: visible
             }
         }

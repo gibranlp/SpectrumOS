@@ -22,6 +22,8 @@ set -euo pipefail
 [[ $(tty) == /dev/tty1 ]] || exec bash -l
 [[ -z ${WAYLAND_DISPLAY:-} ]] || exec bash -l
 
+export SPECTRUM_LIVE_SESSION=1
+export SPECTRUM_TRANSLATIONS_DIR=/usr/local/share/spectrumos/live-translations
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=Hyprland
 export XDG_SESSION_DESKTOP=Hyprland

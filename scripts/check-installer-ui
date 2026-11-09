@@ -177,7 +177,7 @@ with tempfile.TemporaryDirectory(prefix="spectrum-installer-ui-") as temporary:
                     browser.close()
             print("Installer progress previews saved in " + str(output))
         else:
-            result = subprocess.run(["python", "-m", "unittest", "tests.test_installer_ui", "-v"],
+            result = subprocess.run(["python", "-m", "unittest", "tests.test_installer_ui", "tests.test_live_welcome_ui", "-v"],
                                     cwd=root, env=environment, timeout=60)
             raise SystemExit(result.returncode)
     finally:

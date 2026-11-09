@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "project": "Magnet",
+  "repository": "https://github.com/gibranlp/Magnet",
+  "version": "0.1.0",
+  "base_commit": "c863c43da9f6f964ca9571850d25402be13e6dfd",
+  "snapshot": "maintainer_working_tree",
+  "modified_files": [
+    "README.md",
+    "src/app.rs",
+    "src/main.rs",
+    "src/sources.rs"
+  ],
+  "files": {
+    "Cargo.toml": "975dfc62380d2bd6597a2a2aff959f3f9cedcef4b17cd9a29a7b1dc60aba6209",
+    "Cargo.lock": "412cad54dce69d11916d97124765e86ec858c034fea19be533d601cb762b7313",
+    "LICENSE": "41dd9cc4d8a10d8e92bc533d6f9b8042d7fd422d5a725bd610ab499193904733",
+    "README.md": "cd147788604d6e9162384e78294c70cf8b2de959a6bc6a3273517b0228d1086d",
+    "src/app.rs": "e9003ea7cce153cff7cc8cb24b3fea396bd6d2b8a064443b3c55a8de6d3ce95f",
+    "src/daemon.rs": "a0e26e0ff670b2e04c073e4ade13d8c1f7ea523cbe56e00c944eabd6d79261a3",
+    "src/engine.rs": "9ca3107586acfca996c4f931910d2157c940f0efd24bc63e2e977617bf5aabdc",
+    "src/format.rs": "fb0fb21798a73f456b119437e8b188d36d1ea8a73fa4acd81fe52803d65c2efa",
+    "src/magnet.rs": "fb0b3c33d8d750649e09e69b2532cc66da44903467a08f203555f2151997dd88",
+    "src/main.rs": "e55003034576c400b9e3eb54b5a9fa5e217b3f2fd5ae0a784fa436b1c9f20558",
+    "src/sources.rs": "633a9c84e8c7f14b1c565ac00f773dd121c73735bbbf832ee2a822e49f723433",
+    "src/theme.rs": "1f46c8e8adde43d76decb4d642058a99cb2e540b04cf615571bcf1ae2a1dbd99"
+  }
+}

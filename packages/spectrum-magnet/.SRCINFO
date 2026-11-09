@@ -1,0 +1,19 @@
+pkgbase = spectrum-magnet
+	pkgdesc = Magnet torrent search and background downloads for SpectrumOS
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/gibranlp/Magnet
+	arch = x86_64
+	license = MIT
+	makedepends = cargo
+	depends = gcc-libs
+	depends = glibc
+	provides = magnet=0.1.0
+	conflicts = magnet
+	conflicts = magnet-bin
+	options = !lto
+	options = !debug
+	source = spectrumos-source-1.0.0-423acb6b5c2728a1.tar.zst
+	sha256sums = 2d9a27b1aa9841c2a68119b4a7f2759e2aae1246275f20bc543b4590cd6ca4b0
+
+pkgname = spectrum-magnet

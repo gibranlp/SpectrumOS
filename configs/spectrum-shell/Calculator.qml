@@ -23,6 +23,24 @@ ColumnLayout {
     property string toUnit: "cm"
     property string resultUnit: ""
     property string submittedUnit: ""
+    property string conversionResult: ""
+    property string conversionResultUnit: ""
+    property string conversionError: ""
+    property string currencyRateDate: ""
+    property bool currencyOffline: false
+    readonly property string currencyStatus: currencyRateDate
+        ? "ECB · " + (currencyOffline ? qsTranslate("Spectrum", "Offline. Last updated on %1")
+            : qsTranslate("Spectrum", "Last updated on %1")).arg(currencyRateDate.split("-").reverse().join("/"))
+        : conversionBusy ? qsTranslate("Spectrum", "Checking exchange rates…") : ""
+    property string submittedConversionKey: ""
+    property string submittedConversionUnit: ""
+    property bool conversionPending: false
+    property bool conversionReady: false
+    readonly property string conversionKey: JSON.stringify([conversionValue.text.trim(), fromUnit.trim(), toUnit.trim(), conversionCategory])
+    readonly property bool conversionBusy: conversionDelay.running || conversionEvaluation.running
+    onConversionKeyChanged: scheduleConversion()
+    onConvertingChanged: scheduleConversion()
+    Component.onCompleted: { conversionReady = true; scheduleConversion(); }
     readonly property var conversionGroups: [
         {name:"Length", units:["m","cm","mm","km","in","ft","yd","mi","nmi"]},
         {name:"Mass", units:["kg","g","mg","tonne","lb","oz"]},
@@ -45,7 +63,10 @@ ColumnLayout {
     readonly property bool busy: evaluation.running
     spacing: 8
 
-    function activate(): void { Qt.callLater(() => converting ? conversionValue.forceActiveFocus() : input.forceActiveFocus()); }
+    function activate(): void {
+        if (converting) scheduleConversion();
+        Qt.callLater(() => converting ? conversionValue.forceActiveFocus() : input.forceActiveFocus());
+    }
     function evaluate(unitHint = ""): void {
         if (busy || !input.text.trim()) return;
         error = "";
@@ -59,7 +80,12 @@ ColumnLayout {
         error = "";
         if (key === "=") { evaluate(); return; }
         if (key === "AC") { input.text = ""; result = ""; resultUnit = ""; steps = []; activate(); return; }
-        if (key === "Copy") { if (result) Quickshell.execDetached(["wl-copy", result + (resultUnit ? " " + resultUnit : "")]); return; }
+        if (key === "Copy") {
+            const value = converting ? conversionResult : result;
+            const unit = converting ? conversionResultUnit : resultUnit;
+            if (value && (!converting || !conversionBusy)) Quickshell.execDetached(["wl-copy", value + (unit ? " " + unit : "")]);
+            return;
+        }
         if (key === "⌫") {
             if (input.selectedText) input.remove(input.selectionStart, input.selectionEnd);
             else if (input.cursorPosition > 0) input.remove(input.cursorPosition - 1, input.cursorPosition);
@@ -92,14 +118,65 @@ ColumnLayout {
         toUnit = units.length > 1 ? units[1] : "cm";
         error = "";
     }
+    function scheduleConversion(): void {
+        if (!conversionReady) return;
+        if (!converting) {
+            conversionDelay.stop();
+            conversionPending = false;
+            return;
+        }
+        conversionResult = "";
+        conversionResultUnit = "";
+        conversionError = "";
+        currencyRateDate = "";
+        currencyOffline = false;
+        conversionPending = !!(conversionValue.text.trim() && fromUnit.trim() && toUnit.trim());
+        if (conversionPending) conversionDelay.restart();
+        else conversionDelay.stop();
+    }
     function convert(): void {
-        if (busy) return;
+        conversionDelay.stop();
+        if (!converting || conversionEvaluation.running) return;
         const value = conversionValue.text.trim();
         const source = fromUnit.trim();
         const target = toUnit.trim();
-        if (!value || !source || !target) { error = qsTranslate("Spectrum", "Enter a value and both units"); return; }
-        input.text = "(" + value + ") " + source + " -> " + target;
-        evaluate(conversionGroups[conversionCategory].name === "Temperature" && target !== "K" ? target : "");
+        conversionPending = false;
+        if (!value || !source || !target) return;
+        conversionError = "";
+        conversionResult = "";
+        conversionResultUnit = "";
+        currencyRateDate = "";
+        currencyOffline = false;
+        submittedConversionKey = conversionKey;
+        submittedConversionUnit = conversionGroups[conversionCategory].name === "Temperature" && target !== "K" ? target : "";
+        const currency = conversionGroups[conversionCategory].name === "Currency";
+        conversionEvaluation.exec([backendDir + "/spectrum-shell-tools", currency ? "convert-currency" : "calculate-json",
+            JSON.stringify(currency ? {value: value, from: source, to: target}
+                : {expression: "(" + value + ") " + source + " -> " + target, steps: []})]);
+    }
+    Timer { id: conversionDelay; interval: 180; onTriggered: calculator.convert() }
+    Process {
+        id: conversionEvaluation
+        stdout: StdioCollector {
+            onStreamFinished: {
+                // Descarta respuestas anteriores si cambió el valor o cualquiera de las unidades.
+                if (!calculator.converting || calculator.submittedConversionKey !== calculator.conversionKey) return;
+                try {
+                    const response = JSON.parse(text);
+                    if (!response.ok) { calculator.conversionError = response.error || "Invalid expression"; return; }
+                    calculator.conversionResult = response.result;
+                    calculator.conversionResultUnit = calculator.submittedConversionUnit;
+                    calculator.currencyRateDate = (response.currency || {}).date || "";
+                    calculator.currencyOffline = (response.currency || {}).offline === true;
+                } catch (error) { calculator.conversionError = qsTranslate("Spectrum", "Calculator returned an invalid response"); }
+            }
+        }
+        onExited: (code, status) => {
+            if (code !== 0 && calculator.converting && calculator.submittedConversionKey === calculator.conversionKey && !calculator.conversionError)
+                calculator.conversionError = qsTranslate("Spectrum", "Could not calculate the result");
+            if (calculator.conversionPending && calculator.converting && !conversionDelay.running)
+                Qt.callLater(() => calculator.convert());
+        }
     }
     function scientific(key): void {
         if (busy) return;
@@ -183,6 +260,7 @@ ColumnLayout {
     }
     Text {
         Layout.fillWidth: true
+        visible: !calculator.converting
         text: (calculator.result || "0") + (calculator.resultUnit ? " " + calculator.resultUnit : "")
         horizontalAlignment: Text.AlignRight
         wrapMode: Text.WrapAnywhere
@@ -192,8 +270,8 @@ ColumnLayout {
     }
     Text {
         Layout.fillWidth: true
-        visible: calculator.error.length > 0
-        text: qsTranslate("Spectrum", calculator.error)
+        visible: text.length > 0
+        text: qsTranslate("Spectrum", calculator.converting ? calculator.conversionError : calculator.error)
         wrapMode: Text.Wrap
         color: calculator.theme.colors.error || calculator.theme.colors.foreground
         font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
@@ -243,6 +321,7 @@ ColumnLayout {
         visible: calculator.advanced && calculator.advancedPage === "Conversions"
         spacing: 8
         FocusChoice {
+            objectName: "conversion-category"
             Layout.fillWidth: true
             theme: calculator.theme
             translateModel: true
@@ -264,11 +343,11 @@ ColumnLayout {
             color: calculator.theme.colors.background
             TextInput {
                 id: conversionValue
+                objectName: "conversion-value"
                 anchors { fill: parent; margins: 10 }
                 text: "1"
                 selectByMouse: true
                 activeFocusOnTab: true
-                enabled: !calculator.busy
                 verticalAlignment: TextInput.AlignVCenter
                 color: calculator.theme.colors.foreground
                 selectionColor: calculator.theme.colors.accent
@@ -289,6 +368,7 @@ ColumnLayout {
                     font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
                 }
                 FocusChoice {
+                    objectName: "conversion-from"
                     Layout.fillWidth: true
                     visible: calculator.conversionUnits.length > 0
                     theme: calculator.theme
@@ -317,6 +397,7 @@ ColumnLayout {
                 }
             }
             ShellButton {
+                objectName: "conversion-swap"
                 label: "⇄"
                 enabled: !calculator.busy
                 Accessible.name: qsTranslate("Spectrum", "Swap units")
@@ -334,6 +415,7 @@ ColumnLayout {
                     font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
                 }
                 FocusChoice {
+                    objectName: "conversion-to"
                     Layout.fillWidth: true
                     visible: calculator.conversionUnits.length > 0
                     theme: calculator.theme
@@ -364,31 +446,37 @@ ColumnLayout {
         }
         Text {
             Layout.fillWidth: true
-            visible: calculator.conversionGroups[calculator.conversionCategory].name === "Currency"
-            text: qsTranslate("Spectrum", "Currency rates depend on available exchange-rate data.")
+            objectName: "conversion-currency-status"
+            visible: calculator.conversionGroups[calculator.conversionCategory].name === "Currency" && text.length > 0
+            text: calculator.currencyStatus
             wrapMode: Text.Wrap
             color: calculator.theme.colors.muted
             font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize - 1 }
         }
         RowLayout {
             Layout.fillWidth: true
-            ShellButton {
+            TextEdit {
+                objectName: "conversion-result"
                 Layout.fillWidth: true
-                label: qsTranslate("Spectrum", "Convert")
-                enabled: !calculator.busy
+                Layout.minimumWidth: 0
+                readOnly: true
+                selectByMouse: true
+                activeFocusOnTab: true
+                text: calculator.conversionBusy ? "…" : (calculator.conversionResult || "—")
+                    + (calculator.conversionResultUnit ? " " + calculator.conversionResultUnit : "")
+                wrapMode: TextEdit.WrapAnywhere
+                color: calculator.theme.colors.accent
+                font { family: calculator.theme.fontFamily; pixelSize: calculator.theme.fontSize + 7; bold: true }
+                Accessible.name: qsTranslate("Spectrum", "Result ") + text
+            }
+            ShellButton {
+                objectName: "conversion-copy"
+                label: qsTranslate("Spectrum", "Copy")
+                enabled: !calculator.conversionBusy && calculator.conversionResult.length > 0
                 fontFamily: calculator.theme.fontFamily
                 fontSize: calculator.theme.fontSize
                 backgroundColor: calculator.theme.colors.accent
                 foregroundColor: calculator.theme.colors.background
-                onClicked: calculator.convert()
-            }
-            ShellButton {
-                label: qsTranslate("Spectrum", "Copy")
-                enabled: !calculator.busy && calculator.result.length > 0
-                fontFamily: calculator.theme.fontFamily
-                fontSize: calculator.theme.fontSize
-                backgroundColor: calculator.theme.colors.surface_alt
-                foregroundColor: calculator.theme.colors.foreground
                 onClicked: calculator.press("Copy")
             }
         }
@@ -448,6 +536,7 @@ ColumnLayout {
     }
     Flow {
         Layout.fillWidth: true
+        visible: !calculator.converting
         spacing: 5
         Repeater {
             model: calculator.history.slice(0, 4)

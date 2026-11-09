@@ -15,8 +15,8 @@ Item {
         function cleanup() { routine.visitsEnabled = false; routine.retreat(); }
         function test_supported_api_and_free_baseline() {
             compare(Igor.RuntimeInfo.apiVersion, 1);
-            compare(Igor.RuntimeInfo.version, "0.3.2");
-            compare(Igor.RuntimeInfo.freeOutfitIds, ["day-of-the-dead", "christmas", "christmas-lights", "winter"]);
+            compare(Igor.RuntimeInfo.version, "0.3.4");
+            compare(Igor.RuntimeInfo.freeOutfitIds, ["day-of-the-dead", "christmas", "christmas-lights", "winter", "detective"]);
             verify(String(Igor.RuntimeInfo.faceAsset).endsWith("/igor/face.svg"));
         }
         function test_manual_visit_works_without_accounts_or_network() {

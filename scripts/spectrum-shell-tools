@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import json
+import fcntl
 import os
 import re
 from pathlib import Path
-from decimal import Decimal
+from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation, localcontext
 import secrets
 import string
 import subprocess
@@ -11,8 +13,14 @@ import sys
 import tempfile
 import time
 import unicodedata
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 COLOR_HISTORY_LIMIT = 60
+CURRENCY_CODES = {"EUR", "USD", "MXN", "GBP", "CAD", "JPY", "CHF"}
+CURRENCY_URL = "https://api.frankfurter.dev/v2/providers/ecb/rates?base=EUR&quotes=USD,MXN,GBP,CAD,JPY,CHF"
+CURRENCY_CACHE_SECONDS = 3600
+CURRENCY_RETRY_SECONDS = 300
 
 
 def search(query: str) -> int:
@@ -255,6 +263,143 @@ def calculate_json(request_text: str) -> int:
         return 1
 
 
+def validate_currency_rates(data):
+    if not isinstance(data, dict) or data.get("schema") != 1:
+        raise ValueError("Invalid exchange-rate data")
+    stamp = data.get("date")
+    if not isinstance(stamp, str) or date.fromisoformat(stamp).isoformat() != stamp:
+        raise ValueError("Invalid exchange-rate date")
+    if date.fromisoformat(stamp) > datetime.now(timezone.utc).date():
+        raise ValueError("Invalid exchange-rate date")
+    rates = data.get("rates")
+    if not isinstance(rates, dict) or set(rates) != CURRENCY_CODES:
+        raise ValueError("Incomplete exchange-rate data")
+    for value in rates.values():
+        number = Decimal(str(value))
+        if not number.is_finite() or number <= 0:
+            raise ValueError("Invalid exchange rate")
+    if Decimal(str(rates["EUR"])) != 1:
+        raise ValueError("Invalid exchange-rate base")
+    for field in ("checked_at", "retry_after"):
+        value = data.get(field, 0)
+        if not isinstance(value, (int, float)) or not Decimal(str(value)).is_finite() or value < 0:
+            raise ValueError("Invalid exchange-rate timestamp")
+    return data
+
+
+def fetch_currency_rates():
+    request = Request(CURRENCY_URL, headers={"Accept": "application/json", "User-Agent": "SpectrumOS/1.0"})
+    with urlopen(request, timeout=3) as response:
+        content = response.read(65537)
+    if len(content) > 65536:
+        raise ValueError("Invalid exchange-rate response")
+    rows = json.loads(content, parse_float=Decimal)
+    if not isinstance(rows, list) or len(rows) != len(CURRENCY_CODES) - 1:
+        raise ValueError("Incomplete exchange-rate response")
+    rates = {"EUR": "1"}
+    dates = set()
+    for row in rows:
+        if not isinstance(row, dict) or row.get("base") != "EUR" or row.get("quote") not in CURRENCY_CODES - {"EUR"}:
+            raise ValueError("Invalid exchange-rate response")
+        if row["quote"] in rates:
+            raise ValueError("Duplicate exchange rate")
+        rates[row["quote"]] = str(row.get("rate", ""))
+        dates.add(row.get("date"))
+    if len(dates) != 1:
+        raise ValueError("Exchange-rate dates do not match")
+    return validate_currency_rates({"schema": 1, "date": dates.pop(), "rates": rates,
+                                    "checked_at": time.time(), "retry_after": 0})
+
+
+def save_currency_rates(path, data):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump(data, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def currency_rates():
+    root = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "spectrumos"
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = root / "currency-rates.json"
+    with (root / "currency-rates.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            if path.stat().st_size > 65536:
+                raise ValueError("Invalid exchange-rate cache")
+            cached = validate_currency_rates(json.loads(path.read_text()))
+        except (OSError, ValueError, TypeError, InvalidOperation):
+            cached = None
+        now = time.time()
+        if cached and cached.get("retry_after", 0) > now:
+            return cached, True
+        if cached and 0 <= now - cached.get("checked_at", 0) < CURRENCY_CACHE_SECONDS:
+            return cached, False
+        try:
+            current = fetch_currency_rates()
+        except (OSError, URLError, ValueError, TypeError, InvalidOperation):
+            if cached is None:
+                raise ValueError("Exchange rates unavailable. Connect to the internet to save rates for offline use.") from None
+            # Conserva la fecha real de las tasas y evita repetir solicitudes fallidas al escribir.
+            cached["retry_after"] = now + CURRENCY_RETRY_SECONDS
+            try:
+                save_currency_rates(path, cached)
+            except OSError:
+                pass
+            return cached, True
+        try:
+            save_currency_rates(path, current)
+        except OSError:
+            pass
+        return current, False
+
+
+def convert_currency(request_text):
+    try:
+        request = json.loads(request_text)
+        if not isinstance(request, dict):
+            raise ValueError("Enter a valid currency amount")
+        source, target = request.get("from"), request.get("to")
+        if not isinstance(source, str) or not isinstance(target, str) or source not in CURRENCY_CODES or target not in CURRENCY_CODES:
+            raise ValueError("Choose supported currencies")
+        value = request.get("value")
+        if not isinstance(value, str) or not value.strip() or len(value) > 128:
+            raise ValueError("Enter a valid currency amount")
+        try:
+            amount = Decimal(value.strip())
+        except InvalidOperation:
+            raise ValueError("Enter a valid currency amount") from None
+        if not amount.is_finite() or amount.copy_abs() > Decimal("1e30"):
+            raise ValueError("Enter a valid currency amount")
+        metadata = {}
+        with localcontext() as context:
+            context.prec = 28
+            if source == target:
+                result = amount
+            else:
+                snapshot, offline = currency_rates()
+                result = amount * Decimal(snapshot["rates"][target]) / Decimal(snapshot["rates"][source])
+                metadata = {"date": snapshot["date"], "checked_at": snapshot["checked_at"],
+                            "offline": offline, "source": "ECB via Frankfurter"}
+            context.prec = 12
+            result = +result
+            text = format(result, "f")
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+        print(json.dumps({"ok": True, "result": text + " " + target, "currency": metadata}))
+        return 0
+    except (ValueError, TypeError, OSError, InvalidOperation) as error:
+        print(json.dumps({"ok": False, "error": str(error)}))
+        return 1
+
+
 def password(length: str, options: str) -> int:
     try:
         size = int(length)
@@ -357,6 +502,8 @@ def main() -> int:
         return emoji_search(sys.argv[2])
     if len(sys.argv) == 3 and sys.argv[1] == "calculate-json":
         return calculate_json(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "convert-currency":
+        return convert_currency(sys.argv[2])
     if len(sys.argv) == 3 and sys.argv[1] == "calculate":
         return calculate(sys.argv[2])
     if len(sys.argv) == 4 and sys.argv[1] == "password":

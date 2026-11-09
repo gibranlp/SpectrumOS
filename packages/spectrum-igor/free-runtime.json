@@ -1,9 +1,8 @@
 {
-  "path": "igor-runtime-0.3.2-dbdf0ecf9d81d388.tar.zst",
-  "version": "0.3.2",
-  "revision": "dbdf0ecf9d81d388",
-  "sha256": "b397d2689cef0aea10e49dd4c895287add2426dbc1bcfa3caf43890305d71135",
-  "files": 42,
-  "published": true,
-  "url": "https://spectrum.gibranlp.dev/sources/igor-runtime-0.3.2-dbdf0ecf9d81d388.tar.zst"
+  "path": "igor-runtime-0.3.4-967c714997740029.tar.zst",
+  "version": "0.3.4",
+  "revision": "967c714997740029",
+  "sha256": "ab2fb92bc565670c7f3ff506e516f521f21628602a5db762c94ccaada2f2f307",
+  "files": 45,
+  "published": true
 }

@@ -23,6 +23,7 @@ Scope {
         property var colors: ({surface: "#222222", surface_alt: "#333333", foreground: "#eeeeee", accent: "#66ccee"})
         property string fontFamily: "sans-serif"
         property int fontSize: 14
+        property bool gamingActive: false
         property bool animationsEnabled: false
         property bool widgetBounceEnabled: false
     }
@@ -77,7 +78,7 @@ Scope {
             compare(shell.dismissedIds.join(","), "1,2,3");
             compare(shell.notificationHistory.length, 0);
         }
-        function test_capture_joins_top_left_for_both_positions_and_styles() {
+        function test_capture_joins_top_right_or_bottom_left_for_both_styles() {
             const card = findChild(panel.contentItem, "captureCard");
             verify(card);
             for (const position of ["top", "left"]) {
@@ -85,13 +86,19 @@ Scope {
                     theme.barPosition = position;
                     theme.barStyle = style;
                     wait(30);
-                    compare(card.attachTop, true);
-                    compare(card.attachLeft, true);
-                    compare(card.attachRight, false);
-                    compare(card.x - card.leftAttachmentWidth, position === "left" && style === "full" ? 52 : 8);
-                    compare(card.y - card.topAttachmentHeight, position === "top" && style === "full" ? 34 : 8);
+                    compare(card.attachTop, position === "top");
+                    compare(card.attachRight, position === "top");
+                    compare(card.attachLeft, position === "left");
+                    compare(card.attachBottom, position === "left");
+                    if (position === "top") {
+                        compare(card.x + card.width, panel.width);
+                        compare(card.y - card.topAttachmentHeight, style === "full" ? 34 : 8);
+                    } else {
+                        compare(card.x - card.leftAttachmentWidth, style === "full" ? 52 : 8);
+                        compare(card.y + card.height, panel.height - 8);
+                    }
                     verify(card.height >= 240);
-                    verify(card.x + card.width < panel.width / 2);
+
                 }
             }
         }

@@ -1,6 +1,6 @@
 pkgbase = spectrum-desktop
 	pkgdesc = Integrated SpectrumOS desktop frontends and visual defaults
-	pkgver = 1.1.29
+	pkgver = 1.1.37
 	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	arch = x86_64
@@ -78,7 +78,7 @@ pkgbase = spectrum-desktop
 	depends = sddm
 	depends = slurp
 	depends = spectrum-base
-	depends = spectrum-hyprland>=1.0.0-11
+	depends = spectrum-hyprland>=1.0.5
 	depends = spectrum-plymouth
 	depends = spectrum-sddm
 	depends = spectrum-theme>=1.0.0-4
@@ -128,6 +128,7 @@ pkgbase = spectrum-desktop
 	depends = qt6-declarative
 	depends = gamemode
 	depends = spectrum-igor>=0.3.2
+	depends = spectrum-magnet>=0.1.0
 	depends = fuse2
 	depends = squashfs-tools
 	depends = zenity
@@ -152,6 +153,7 @@ pkgbase = spectrum-desktop
 	depends = arj
 	depends = lhasa
 	depends = bzip3
+	optdepends = proton-vpn-cli: Proton VPN controls in the network widget
 	optdepends = docker: Manage containers through an existing local Docker socket
 	optdepends = podman: Manage containers through an existing rootless Podman socket
 	optdepends = gowall-bin: optional wallpaper recoloring
@@ -184,11 +186,11 @@ pkgbase = spectrum-desktop
 	backup = etc/xdg/mimeapps.list
 	backup = etc/xdg/xdg-terminals.list
 	backup = etc/xdg/fastfetch/config.jsonc
-	source = spectrumos-source-1.0.0-eb3842330d7c789e.tar.zst
+	source = spectrumos-source-1.0.0-842261cdafa09780.tar.zst
 	source = questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst
 	source = questline.LICENSE
 	source = stash-0.7.0-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v0.7.0/stash-linux-x86_64
-	sha256sums = 733e76e4cf2f168b6dfa08fa2898223615b4ea82228703159359f049e6ebe280
+	sha256sums = 98d30ce32153639878e74624aea80febbf9a0fb91a9e3ec93d3b44027eb0e5fd
 	sha256sums = a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495
 	sha256sums = 3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa
 	sha256sums = 01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802

@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='spectrum-extract-translations-') as tem
             for location in message.findall('location'):
                 path = (ts.parent / location.get('filename')).resolve()
                 entry.occurrences.append((str(path.relative_to(root)), location.get('line', '1')))
-for path in [*sorted((root / 'scripts').iterdir()), root / 'installer/spectrum-installer']:
+for path in [*sorted((root / 'scripts').iterdir()), root / 'installer/spectrum-installer', root / 'installer/spectrum-live-welcome']:
     if not path.is_file():
         continue
     try:

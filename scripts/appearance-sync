@@ -195,30 +195,16 @@ def ensure_vencord() -> None:
         temporary_css.write_text(updated, encoding="utf-8")
         os.replace(temporary_css, user_css)
 
-    # QuickCSS custom-property overrides don't reach every screen -- newer
-    # redesigned Discord surfaces (the Friends page, in particular) hardcode
-    # some chrome rather than reading those variables. Vencord's ClientTheme
-    # plugin recreates Discord's own former single-color client theme (and
-    # patches around Discord's gate on it), deriving a full recolor from one
-    # seed color using Discord's own current internals, so it actually
-    # reaches those pages too. Confirmed by a real cold restart.
-    # ClientTheme takes exactly one seed color and derives the whole ramp
-    # from it, including how light or dark the result is -- it does not
-    # separately know about a "dark mode" flag. Seeding it with our accent
-    # role (a light, saturated color even in dark palettes) produced a
-    # washed-out, inappropriately light theme regardless of variant, worst
-    # on light palettes where accent can be lighter still. Seeding it with
-    # our background role instead tracks the palette's actual variant
-    # correctly (dark background -> dark theme, light background -> light
-    # theme) while still carrying that role's hue -- confirmed by a real
-    # restart producing a properly dark result from a dark palette.
+    # Las semillas muy claras de ClientTheme aplastan el contraste; QuickCSS cubre el modo claro.
     settings_path = directory / "settings.json"
     if settings_path.is_file():
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        background = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))["roles"]["background"]
+        palette = json.loads((CURRENT / "palette.json").read_text(encoding="utf-8"))
+        background = palette["roles"]["background"]
+        enabled = palette.get("variant", "dark") != "light"
         client_theme = settings.setdefault("plugins", {}).setdefault("ClientTheme", {})
-        if not client_theme.get("enabled") or client_theme.get("color") != background.lstrip("#"):
-            client_theme["enabled"] = True
+        if client_theme.get("enabled") != enabled or client_theme.get("color") != background.lstrip("#"):
+            client_theme["enabled"] = enabled
             client_theme["color"] = background.lstrip("#")
             temporary_settings = directory / ".settings.json.new"
             temporary_settings.write_text(json.dumps(settings, indent=4), encoding="utf-8")

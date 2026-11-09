@@ -69,13 +69,17 @@ ColumnLayout {
         ColumnLayout {
             id: deviceRow
             required property var modelData
+            objectName: "bluetoothDevice-" + modelData.address
+            readonly property string displayName: String(modelData.name || "").trim()
+            readonly property bool named: displayName.length > 0 && !/^[0-9a-f]{2}(?:[:-]?[0-9a-f]{2}){5}$/i.test(displayName)
             readonly property bool busy: modelData.pairing || modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting
+            visible: named || modelData.paired || modelData.connected || busy
             Layout.fillWidth: true
             spacing: 5
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: content.theme.colors.surface_alt }
             Text {
                 Layout.fillWidth: true
-                text: deviceRow.modelData.name || deviceRow.modelData.address
+                text: deviceRow.displayName || deviceRow.modelData.address
                 elide: Text.ElideRight
                 color: content.theme.colors.foreground
                 font { family: content.theme.fontFamily; pixelSize: content.theme.fontSize; bold: true }

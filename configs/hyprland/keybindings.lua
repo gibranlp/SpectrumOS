@@ -62,6 +62,7 @@ hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open breaks"))
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open services"))
 hl.bind(mainMod .. " + SHIFT + G", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open default-apps"))
+hl.bind(mainMod .. " + SHIFT + J", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open magnet"))
 hl.bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open more"))
 hl.bind(mainMod .. " + SHIFT + Y", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open typography"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open weather"))

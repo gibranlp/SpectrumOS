@@ -325,5 +325,13 @@
   "Restore packs",
   "Purchased packs restored.",
   "Your purchases are synced. No pack files are available yet.",
-  "Owned"
+  "Owned",
+  "Enter a valid currency amount",
+  "Choose supported currencies",
+  "Exchange rates unavailable. Connect to the internet to save rates for offline use.",
+  "Checking Proton VPN…",
+  "Could not read Proton VPN status",
+  "Install proton-vpn-cli to use Proton VPN",
+  "Proton VPN unavailable. Check your session or sign in.",
+  "Sign in to Proton VPN to connect"
 ]

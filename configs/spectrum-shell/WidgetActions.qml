@@ -8,6 +8,7 @@ QtObject {
         {icon:"󰏖", label:"AppImages", action:"appimages"},
         {icon:"󰒡", label:"SpectrumDrop", action:"spectrumdrop"},
         {icon:"󰄬", label:"Questline", action:"questline"},
+        {icon:"󰇚", label:"Magnet", action:"magnet", shortcut:"Super+Shift+J"},
         {icon:"󰄛", label:qsTranslate("Spectrum", "Igor wardrobe"), action:"igor"},
         {icon:"󰔟", label:qsTranslate("Spectrum", "Focus timer"), action:"focus"},
         {icon:"󰒲", label:qsTranslate("Spectrum", "Break reminders"), action:"breaks", shortcut:"Super+Shift+B"},

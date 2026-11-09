@@ -1,5 +1,5 @@
 pkgname=spectrum-desktop
-pkgver=1.1.29
+pkgver=1.1.37
 pkgrel=1
 pkgdesc="Integrated SpectrumOS desktop frontends and visual defaults"
 arch=(x86_64)
@@ -8,17 +8,18 @@ license=(MIT)
 depends=(
     'ukvm>=0.1.0.r21' 'spectrumdrop>=1.0.1' acl adwaita-cursors alacritty alsa-lib awww blueman bluez bluez-utils brightnessctl cava curl dbus ddcutil evolution fastfetch ffmpeg flatpak gcc-libs glibc gnome-disk-utility gnome-keyring grim gtk-layer-shell gtk3 gvfs gvfs-mtp hyprpicker git
     imagemagick htop hypridle hyprland hyprlock kdeconnect kitty kvantum kvantum-qt5 libdbusmenu-gtk3 libnotify networkmanager nm-connection-editor noto-fonts noto-fonts-cjk noto-fonts-emoji ntfs-3g numbat pavucontrol pipewire pipewire-alsa pipewire-jack pipewire-pulse
-    playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct 'satty>=0.21' sddm slurp spectrum-base 'spectrum-hyprland>=1.0.0-11' spectrum-plymouth spectrum-sddm 'spectrum-theme>=1.0.0-4' swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
+    playerctl polkit-gnome python python-pillow qt5-graphicaleffects qt5-quickcontrols2 qt5-wayland qt5ct qt6-wayland qt6ct 'satty>=0.21' sddm slurp spectrum-base 'spectrum-hyprland>=1.0.5' spectrum-plymouth spectrum-sddm 'spectrum-theme>=1.0.0-4' swayimg systemd-libs thunar thunar-archive-plugin thunar-volman tumbler
     ttf-jetbrains-mono-nerd ttf-firacode-nerd ttf-sourcecodepro-nerd ttf-cascadia-code-nerd ttf-hack-nerd ttf-ibmplex-mono-nerd ttf-iosevka-nerd ttf-victor-mono-nerd ttf-ubuntu-mono-nerd ttf-meslo-nerd
     ffmpegthumbnailer gst-thumbnailers gst-libav gst-plugins-bad gst-plugins-ugly gnome-epub-thumbnailer poppler qpdf poppler-glib libgsf libgepub libopenraw
     webp-pixbuf-loader libheif uwsm vlc
     wayland libxkbcommon wf-recorder wireplumber wl-clipboard xdg-desktop-portal-gtk spectrum-xdg-desktop-portal-hyprland xdg-user-dirs xdg-utils xdg-terminal-exec
 )
-depends+=('quickshell>=0.3.0' qt6-declarative gamemode 'spectrum-igor>=0.3.2')
+depends+=('quickshell>=0.3.0' qt6-declarative gamemode 'spectrum-igor>=0.3.2' 'spectrum-magnet>=0.1.0')
 depends+=(fuse2 squashfs-tools zenity pacman-contrib fakeroot python-gobject util-linux)
 depends+=(file-roller 7zip unrar unzip zip libarchive tar gzip bzip2 xz zstd lzip lz4 cpio arj lhasa bzip3)
 makedepends=(cmake desktop-file-utils git pkgconf python-polib qt6-tools)
 optdepends=(
+    'proton-vpn-cli: Proton VPN controls in the network widget'
     'docker: Manage containers through an existing local Docker socket'
     'podman: Manage containers through an existing rootless Podman socket'
     'gowall-bin: optional wallpaper recoloring' 'vesktop-bin: Spectrum-themed Discord client'
@@ -36,7 +37,7 @@ conflicts=(eww eww-git wofi waybar dunst)
 replaces=(eww eww-git wofi waybar dunst)
 options=(!strip !debug)
 backup=('etc/NetworkManager/conf.d/20-spectrumos.conf' 'etc/samba/smb.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-terminals.list' 'etc/xdg/fastfetch/config.jsonc')
-_source_revision=eb3842330d7c789e
+_source_revision=842261cdafa09780
 _source_version=1.0.0
 _source_root="spectrumos-source-$_source_version"
 _questline_version=2.0.3
@@ -45,7 +46,7 @@ source=("spectrumos-source-$_source_version-$_source_revision.tar.zst"
         "questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst"
         'questline.LICENSE'
         "stash-$_stash_version-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v$_stash_version/stash-linux-x86_64")
-sha256sums=('733e76e4cf2f168b6dfa08fa2898223615b4ea82228703159359f049e6ebe280'
+sha256sums=('98d30ce32153639878e74624aea80febbf9a0fb91a9e3ec93d3b44027eb0e5fd'
             'a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495'
             '3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa'
             '01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802')
@@ -77,13 +78,16 @@ check() {
     desktop-file-validate "$_project/system/spectrum-breaks.desktop" "$_project/system/spectrum-services.desktop" "$_project/system/spectrum-default-apps.desktop"
     python "$_project/scripts/check-default-apps-ui"
     python "$_project/scripts/check-file-search-ui"
-    for script in "$_project"/scripts/{volume,brightness,theme-menu,waybar-menu,panel,hyprland-menu,font-size-menu,font-family-menu,calculator-menu,network-menu,bluetooth-menu,recorder-menu,waybar-cava,session-menu,keyboard-layout,spectrum-update-run,spectrum-shell,spectrum-shell-launcher,spectrum-shell-open,spectrum-shell-session,spectrum-user-avatar,media-control,questline-open,stash-open}; do
+    for script in "$_project"/scripts/{volume,brightness,theme-menu,waybar-menu,panel,hyprland-menu,font-size-menu,font-family-menu,calculator-menu,network-menu,bluetooth-menu,recorder-menu,waybar-cava,session-menu,keyboard-layout,spectrum-update-run,spectrum-shell,spectrum-shell-launcher,spectrum-shell-open,spectrum-shell-session,spectrum-user-avatar,media-control,questline-open,stash-open,magnet-open}; do
         bash -n "$script"
     done
     python -m py_compile "$_project/scripts/favorites-adapter" "$_project/scripts/appimage-adapter" "$_project/scripts/network-adapter" "$_project/scripts/theme-adapter" "$_project/scripts/application-adapter" "$_project/scripts/idle-adapter" "$_project/scripts/media-adapter" "$_project/scripts/spectrum-shell-tools" "$_project/scripts/spectrum-shell-picker" "$_project/scripts/time-region-adapter" "$_project/scripts/mouse-adapter" "$_project/scripts/audio-recorder" "$_project/scripts/hotkey-adapter" "$_project/scripts/spectrumdrop-adapter" "$_project/scripts/spectrum-breaks" "$_project/scripts/local-services-adapter" "$_project/scripts/default-apps-adapter" "$_project/scripts/thunar-productivity"
     python -m py_compile "$_project/scripts/spectrum-update-check" "$_project/scripts/spectrum-session-profile"
     python -m py_compile "$_project/scripts/system-adapter" "$_project/scripts/brightness-adapter" "$_project/scripts/control-adapter" "$_project/scripts/display-menu" "$_project/scripts/weather-adapter" "$_project/scripts/workspace-layout" "$_project/scripts/waybar-workspace-icons" "$_project/scripts/appearance-sync" "$_project/scripts/legion-rgb-sync" "$_project/scripts/keychron-rgb-sync" "$_project/scripts/win60-rgb-sync" "$_project/scripts/performance-mode" "$_project/scripts/resource-monitor" "$_project/scripts/window-pin-toggle" "$_project/scripts/spectrum-shell-layout" "$_project/scripts/spectrum-gaming-session" "$_project/scripts/questline-adapter" "$_project/scripts/questline-action" "$_project/scripts/questline-widget-state" "$_project/scripts/questline-notifications" "$_project/scripts/questline-sync" "$_project/scripts/questline-sync-control"
     cd "$_project"
+    desktop-file-validate "$_project/system/magnet.desktop"
+    python -m unittest tests.test_magnet_adapter
+    python3 tests/run_magnet_widget.py
     python -m unittest tests.test_spectrum_shell_tools.SearchLocationTests
     python -m unittest tests.test_packaging.PackagingTests.test_desktop_frontend_install_loop_ships_app_store_helpers
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software python3 tests/run_widget_polling.py
@@ -109,7 +113,7 @@ check() {
     python -m unittest \
         tests.test_stable_updates tests.test_favorites tests.test_flatpak tests.test_bar_style tests.test_gaming_profile tests.test_thunar_actions tests.test_thunar_productivity tests.test_waybar tests.test_wofi tests.test_desktop_cleanup tests.test_network_menu tests.test_spectrum_shell_network tests.test_spectrum_shell_picker tests.test_panel \
         tests.test_hyprland_menu tests.test_display_menu tests.test_recorder_menu tests.test_eww tests.test_weather tests.test_installer tests.test_lean_session tests.test_default_apps tests.test_rescue_shell tests.test_workspace_layout tests.test_appearance_sync tests.test_legion_rgb_sync tests.test_keychron_rgb_sync tests.test_browser_defaults tests.test_performance_mode tests.test_notifications \
-        tests.test_font_size_menu tests.test_font_family_menu tests.test_theme_menu tests.test_idle_adapter tests.test_hyprland_config tests.test_calculator_menu tests.test_resource_monitor tests.test_session_menu tests.test_system_adapter tests.test_spectrum_update_run tests.test_window_pin_toggle tests.test_time_region_adapter tests.test_igor tests.test_shell_idle tests.test_desktop_branding tests.test_user_avatar tests.test_questline_adapter tests.test_questline_widget_state tests.test_media_adapter tests.test_media_control tests.test_fastfetch tests.test_stash tests.test_mouse_adapter tests.test_audio_recorder
+        tests.test_font_size_menu tests.test_font_family_menu tests.test_theme_menu tests.test_idle_adapter tests.test_hyprland_config tests.test_calculator_menu tests.test_resource_monitor tests.test_session_menu tests.test_system_adapter tests.test_spectrum_update_run tests.test_window_pin_toggle tests.test_time_region_adapter tests.test_igor tests.test_shell_idle tests.test_sleep tests.test_desktop_branding tests.test_user_avatar tests.test_questline_adapter tests.test_questline_widget_state tests.test_media_adapter tests.test_media_control tests.test_fastfetch tests.test_stash tests.test_mouse_adapter tests.test_audio_recorder
     QUESTLINE_TEST_BINARY="$srcdir/questline-$_questline_version-linux-x86_64" python -m unittest tests.test_questline_autosave tests.test_questline_notifications
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineTree.qml
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_QuestlineDrafts.qml
@@ -193,8 +197,15 @@ package() {
         volume brightness theme-menu waybar-menu panel hyprland-menu font-size-menu font-family-menu application-menu calculator-menu \
         network-menu bluetooth-menu recorder-menu display-menu appearance-sync legion-rgb-sync keychron-rgb-sync win60-rgb-sync waybar-widgets \
         waybar-cava wallpaper-restore session-menu keyboard-layout spectrum-update-run window-pin-toggle spectrum-browser-defaults \
-        spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder application-adapter app-store-adapter app-store-privileged app-store-paru-bridge idle-adapter screensaver-adapter appimage-adapter favorites-adapter media-adapter media-control weather-adapter workspace-layout waybar-workspace-icons performance-mode resource-monitor spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session spectrum-shell-tools spectrum-shell-picker thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-widget-state questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter spectrum-session-profile; do
+        spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder application-adapter app-store-adapter app-store-privileged app-store-paru-bridge idle-adapter screensaver-adapter appimage-adapter favorites-adapter media-adapter media-control weather-adapter workspace-layout waybar-workspace-icons performance-mode resource-monitor spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session spectrum-shell-tools spectrum-shell-picker thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-widget-state questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open magnet-open magnet-adapter spectrum-sleep spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter spectrum-session-profile; do
         install -m 0755 "$_project/scripts/$script" "$pkgdir/usr/lib/spectrumos/$script"
+    done
+    install -Dm755 "$_project/scripts/spectrum-sleep" "$pkgdir/usr/bin/spectrum-sleep"
+    install -Dm644 "$_project/docs/sleep.md" "$pkgdir/usr/share/doc/spectrumos/sleep.md"
+    local sleep_unit
+    for sleep_unit in suspend hibernate hybrid-sleep suspend-then-hibernate; do
+        install -Dm644 "$_project/system/systemd/system/systemd-$sleep_unit.service.d/60-spectrumos-sleep.conf" \
+            "$pkgdir/usr/lib/systemd/system/systemd-$sleep_unit.service.d/60-spectrumos-sleep.conf"
     done
     install -m 0644 "$_project/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
         "$pkgdir/usr/share/libalpm/hooks/90-spectrumos-desktop-cleanup.hook"
@@ -232,6 +243,7 @@ package() {
     install -m 0644 "$_project/system/spectrum-favorites.desktop" "$pkgdir/usr/share/applications/spectrum-favorites.desktop"
     install -m 0644 "$_project/system/spectrum-appimages.desktop" "$pkgdir/usr/share/applications/spectrum-appimages.desktop"
     install -Dm644 "$_project/system/spectrum-breaks.desktop" "$pkgdir/usr/share/applications/spectrum-breaks.desktop"
+    install -Dm644 "$_project/system/magnet.desktop" "$pkgdir/usr/share/applications/magnet.desktop"
     install -Dm644 "$_project/system/spectrum-services.desktop" "$pkgdir/usr/share/applications/spectrum-services.desktop"
     install -Dm644 "$_project/system/spectrum-default-apps.desktop" "$pkgdir/usr/share/applications/spectrum-default-apps.desktop"
     install -m 0644 "$_project/system/spectrum-app-store.desktop" "$pkgdir/usr/share/applications/spectrum-app-store.desktop"

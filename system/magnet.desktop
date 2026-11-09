@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Magnet
+Comment=Search for torrents and manage downloads in the terminal
+Exec=/usr/lib/spectrumos/magnet-open
+Icon=folder-download
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=Torrent;Magnet;Download;Search;
+Actions=Downloads;
+
+[Desktop Action Downloads]
+Name=Downloads widget
+Exec=/usr/lib/spectrumos/spectrum-shell-open magnet

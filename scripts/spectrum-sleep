@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""Inspect sleep support and retain bounded evidence around system sleep."""
+import argparse
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+SYS = Path('/sys')
+PROC = Path('/proc')
+STATE = Path('/var/lib/spectrumos/sleep')
+MODE_CONFIG = Path('/etc/systemd/sleep.conf.d/60-spectrumos-memory.conf')
+UNITS = ('systemd-suspend.service', 'systemd-hibernate.service',
+         'systemd-hybrid-sleep.service', 'systemd-suspend-then-hibernate.service')
+
+
+def read(path):
+    try:
+        return path.read_text(errors='replace').strip()
+    except OSError:
+        return None
+
+
+def command(argv):
+    try:
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=5,
+                                env={**os.environ, 'LC_ALL': 'C'})
+        return {'exit_code': result.returncode, 'output': result.stdout[-24000:],
+                'error': result.stderr[-2000:]}
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {'exit_code': None, 'output': '', 'error': str(error)}
+
+
+def modes(value):
+    return {'available': (value or '').replace('[', '').replace(']', '').split(),
+            'selected': next(iter(re.findall(r'\[([^]]+)\]', value or '')), None)}
+
+
+def snapshot():
+    batteries = {}
+    for device in sorted((SYS / 'class/power_supply').glob('*')):
+        if read(device / 'type') == 'Battery':
+            batteries[device.name] = {key: read(device / key) for key in
+                                     ('status', 'capacity', 'energy_now', 'energy_full',
+                                      'charge_now', 'charge_full', 'voltage_now')}
+    stats = {p.name: read(p) for p in sorted((SYS / 'power/suspend_stats').glob('*')) if p.is_file()}
+    return {'schema': 1, 'timestamp': time.time(),
+            'boottime': time.clock_gettime(time.CLOCK_BOOTTIME),
+            'monotonic': time.monotonic(), 'boot_id': read(PROC / 'sys/kernel/random/boot_id'),
+            'kernel': platform.release(), 'states': (read(SYS / 'power/state') or '').split(),
+            'memory_sleep': modes(read(SYS / 'power/mem_sleep')), 'stats': stats,
+            'wake_irq': read(SYS / 'power/pm_wakeup_irq'), 'batteries': batteries}
+
+
+def compare(before, after):
+    if not before.get('boot_id') or before.get('boot_id') != after.get('boot_id'):
+        raise ValueError('Snapshots belong to different boots; elapsed sleep cannot be calculated.')
+    elapsed = after['boottime'] - before['boottime']
+    if elapsed <= 0:
+        raise ValueError('The after snapshot must be newer than the before snapshot.')
+    result = {'elapsed_seconds': round(elapsed, 3),
+              'suspended_seconds': round(max(0, elapsed - (after['monotonic'] - before['monotonic'])), 3),
+              'counter_changes': {}, 'battery_changes': {}}
+    for key in ('success', 'fail', 'failed_resume', 'failed_suspend'):
+        a, b = before['stats'].get(key), after['stats'].get(key)
+        if a is not None and b is not None:
+            result['counter_changes'][key] = int(b) - int(a)
+    for name, battery in before['batteries'].items():
+        other = after['batteries'].get(name, {})
+        changes = {}
+        if battery.get('capacity') is not None and other.get('capacity') is not None:
+            changes['capacity_drop_percentage_points'] = int(battery['capacity']) - int(other['capacity'])
+        if battery.get('energy_now') and other.get('energy_now'):
+            changes['energy_change_wh'] = (int(battery['energy_now']) - int(other['energy_now'])) / 1e6
+            changes['average_watts_over_interval'] = round(changes['energy_change_wh'] * 3600 / elapsed, 3)
+        result['battery_changes'][name] = changes
+    return result
+
+
+def atomic_json(path, data):
+    atomic_write(path, json.dumps(data, indent=2) + '\n', 0o600)
+
+
+def atomic_write(path, content, permissions):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.' + path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            os.fchmod(stream.fileno(), permissions)
+            stream.write(content)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def record(phase, unit):
+    if os.geteuid() != 0:
+        raise ValueError('Sleep recording requires root.')
+    STATE.mkdir(parents=True, mode=0o700, exist_ok=True)
+    os.chmod(STATE, 0o700)
+    data = snapshot()
+    data.update(phase=phase, unit=unit, invocation_id=os.environ.get('INVOCATION_ID'),
+                service_result=os.environ.get('SERVICE_RESULT'))
+    if phase == 'post':
+        previous = read(STATE / 'pre.json')
+        if previous:
+            before = json.loads(previous)
+            if data['invocation_id'] and (before.get('unit'), before.get('invocation_id')) == (unit, data['invocation_id']):
+                try:
+                    data['comparison'] = compare(before, data)
+                except ValueError as error:
+                    data['comparison_error'] = str(error)
+    atomic_json(STATE / (phase + '.json'), data)
+    atomic_json(STATE / f'{time.time_ns()}-{phase}.json', data)
+    for old in sorted(STATE.glob('[0-9]*-*.json'))[:-40]:
+        old.unlink()
+
+
+def findings(data):
+    notes = []
+    if 'mem' not in data['states']:
+        notes.append('Suspend-to-memory is not exposed by this kernel/platform.')
+    if 'deep' not in data['memory_sleep']['available']:
+        notes.append('Deep/S3 is unavailable; do not force mem_sleep_default=deep.')
+    swaps = data.get('swap', '').splitlines()[1:]
+    persistent = [line for line in swaps if line.split() and not line.split()[0].startswith('/dev/zram')]
+    if not persistent:
+        notes.append('No active persistent swap: hibernation needs storage and resume configuration; zram alone cannot retain an image.')
+    else:
+        notes.append('Persistent swap exists; hibernation still requires size, encryption, resume/initramfs and restore validation.')
+    if data['stats'].get('success') == '0':
+        notes.append('No successful kernel suspend cycles recorded this boot; hardware acceptance is unverified.')
+    params = data.get('nvidia_parameters') or ''
+    if params:
+        notifier = re.search(r'^UseKernelSuspendNotifiers:\s*1$', params, re.M)
+        preserve = re.search(r'^PreserveVideoMemoryAllocations:\s*1$', params, re.M)
+        if not notifier and not preserve:
+            notes.append('NVIDIA: verify full VRAM preservation for the installed driver/module variant.')
+        if preserve and not notifier:
+            for unit, state in data.get('nvidia_services', {}).items():
+                if state['output'].strip() not in ('enabled', 'static', 'linked', 'enabled-runtime'):
+                    notes.append(f'NVIDIA: inspect {unit} ({state["output"].strip() or state["error"].strip()}); VRAM preservation requires matching sleep integration.')
+        notes.append('NVIDIA: check TemporaryFilePath and free backing space against total VRAM plus 5%; inspect driver-specific notifier/service requirements.')
+    if data.get('lock_inhibitors', {}).get('exit_code') != 0:
+        notes.append('Inhibitors could not be inspected; run the report in the active desktop session.')
+    return notes
+
+
+def report():
+    data = snapshot()
+    data['hardware'] = {key: read(SYS / 'class/dmi/id' / key) for key in
+                        ('sys_vendor', 'product_name', 'board_name', 'bios_version', 'bios_date')}
+    data['swap'] = read(PROC / 'swaps') or ''
+    data['resume'] = {key: read(SYS / 'power' / key) for key in ('resume', 'resume_offset', 'disk')}
+    data['acpi_wakeup'] = read(PROC / 'acpi/wakeup')
+    data['wake_devices'] = {str(p.relative_to(SYS)): read(p) for p in sorted((SYS / 'devices').glob('**/power/wakeup'))}
+    data['nvidia_parameters'] = read(PROC / 'driver/nvidia/params')
+    data['nvidia_services'] = {}
+    data['nvidia_backing_store'] = None
+    if data['nvidia_parameters']:
+        match = re.search(r'^TemporaryFilePath:\s*"?([^"\n]+)', data['nvidia_parameters'], re.M)
+        location = match.group(1).strip() if match else '/tmp'
+        try:
+            space = os.statvfs(location)
+            data['nvidia_backing_store'] = {'path': location, 'available_bytes': space.f_bavail * space.f_frsize,
+                                           'filesystem': command(['findmnt', '-n', '-o', 'FSTYPE', '-T', location])}
+        except OSError as error:
+            data['nvidia_backing_store'] = {'path': location, 'error': str(error)}
+        data['nvidia_vram'] = command(['nvidia-smi', '--query-gpu=memory.total', '--format=csv,noheader,nounits'])
+    if data['nvidia_parameters']:
+        for unit in ('nvidia-suspend.service', 'nvidia-resume.service', 'nvidia-hibernate.service'):
+            data['nvidia_services'][unit] = command(['systemctl', 'is-enabled', unit])
+    for name, argv in {
+        'graphics': ['lspci', '-nnk'],
+        'hibernate_capability': ['busctl', 'call', 'org.freedesktop.login1', '/org/freedesktop/login1',
+                                 'org.freedesktop.login1.Manager', 'CanHibernate'],
+        'idle_service': ['systemctl', '--user', 'list-units', '--no-pager', '--all', '*hypridle*'],
+        'sleep_configuration': ['systemd-analyze', 'cat-config', 'systemd/sleep.conf'],
+        'lid_configuration': ['systemd-analyze', 'cat-config', 'systemd/logind.conf'],
+        'lock_inhibitors': ['systemd-inhibit', '--list', '--no-pager'],
+        'sleep_journal': ['journalctl', '-b', '--no-pager', '-n', '120', '-g',
+                          'PM: suspend|PM: resume|suspend entry|suspend exit|Failed to suspend|spectrum-sleep|systemd-sleep'],
+    }.items():
+        data[name] = command(argv)
+    data['recording'] = {phase: read(STATE / (phase + '.json')) for phase in ('pre', 'post')}
+    data['findings'] = findings(data)
+    return data
+
+
+def configure_mode(mode):
+    if os.geteuid() != 0:
+        raise ValueError('Changing sleep mode requires root.')
+    if mode != 'auto' and mode not in modes(read(SYS / 'power/mem_sleep'))['available']:
+        raise ValueError(f'{mode} is not exposed by this hardware; configuration was not changed.')
+    value = '' if mode == 'auto' else mode
+    atomic_write(MODE_CONFIG, '[Sleep]\nMemorySleepMode=' + value + '\n', 0o644)
+    return {'mode': mode, 'path': str(MODE_CONFIG),
+            'note': 'Applies on the next sleep request. Other administrator drop-ins or kernel defaults may take precedence; inspect doctor output.'}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='action', required=True)
+    doctor = sub.add_parser('doctor', help='Read-only diagnostic report; never suspends or changes settings')
+    doctor.add_argument('--json', action='store_true')
+    sub.add_parser('snapshot', help='Write a compact JSON snapshot to stdout')
+    diff = sub.add_parser('compare', help='Compare two snapshot JSON files from the same boot')
+    diff.add_argument('before', type=Path)
+    diff.add_argument('after', type=Path)
+    mode = sub.add_parser('mode', help='Root: choose auto or a hardware-supported suspend variant')
+    mode.add_argument('value', choices=('auto', 's2idle', 'deep'))
+    rec = sub.add_parser('record', help='Internal: bounded local sleep evidence, without subprocesses')
+    rec.add_argument('phase', choices=('pre', 'post'))
+    rec.add_argument('unit', choices=UNITS)
+    args = parser.parse_args()
+    try:
+        if args.action == 'record':
+            record(args.phase, args.unit)
+            return 0
+        if args.action == 'doctor':
+            data = report()
+            if not args.json:
+                print('SpectrumOS sleep diagnostics\n')
+                print('Kernel:', data['kernel'])
+                print('Hardware:', ' / '.join(v for v in data['hardware'].values() if v))
+                print('Memory sleep:', json.dumps(data['memory_sleep']))
+                print('Suspend counters:', json.dumps(data['stats']))
+                for note in data['findings']:
+                    print('- ' + note)
+                print('\nUse doctor --json for configuration, wake devices, inhibitors and journal evidence.\nUse sudo for access to protected sleep records. Reports may contain local device and process details; review before sharing.')
+                return 0
+        elif args.action == 'snapshot':
+            data = snapshot()
+        elif args.action == 'compare':
+            data = compare(json.loads(args.before.read_text()), json.loads(args.after.read_text()))
+        else:
+            data = configure_mode(args.value)
+        print(json.dumps(data, indent=2))
+        return 0
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'spectrum-sleep: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

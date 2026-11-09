@@ -1,0 +1,28 @@
+{
+  "channel": "stable",
+  "updated": {
+    "spectrum-hyprland": "spectrum-hyprland-1.0.5-1-any.pkg.tar.zst",
+    "spectrum-igor": "spectrum-igor-0.3.3-1-any.pkg.tar.zst",
+    "spectrum-magnet": "spectrum-magnet-0.1.0-1-x86_64.pkg.tar.zst",
+    "spectrum-desktop": "spectrum-desktop-1.1.37-1-x86_64.pkg.tar.zst"
+  },
+  "build_kind": "clean-chroot",
+  "snapshot_created_at": "2026-11-07T23:04:19+00:00",
+  "signing_fingerprint": "0F4B4D2D8AE036D1972B89192F4F88BAFD59BA24",
+  "sources_published": [
+    "spectrumos-source-1.0.0-842261cdafa09780.tar.zst",
+    "spectrumos-source-1.0.0-50c79736c7c3a6cf.tar.zst",
+    "spectrumos-source-1.0.0-423acb6b5c2728a1.tar.zst",
+    "igor-runtime-0.3.3-cd9079af3412441a.tar.zst"
+  ],
+  "https_updated_packages_verified": true,
+  "website_unchanged": true,
+  "testing_unchanged": true,
+  "iso_1_1_download_unchanged": true,
+  "iso_built": false,
+  "local_deployment_verified": true,
+  "preferences_preserved": true,
+  "packaged_source_files_verified": 261,
+  "current_iso": "1.1",
+  "iso_1_2_status": "owner_reported_installation_failure_deferred"
+}

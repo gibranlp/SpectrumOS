@@ -52,15 +52,25 @@ class StashIntegrationTests(unittest.TestCase):
 
     def test_iso_preflight_checks_indexed_package_for_both_apps(self):
         required = ("usr/bin/stash", "usr/bin/questline", "usr/lib/spectrumos/stash-open",
-                    "usr/lib/spectrumos/questline-open", "usr/share/applications/stash.desktop")
+                    "usr/lib/spectrumos/questline-open", "usr/share/applications/stash.desktop",
+                    "usr/lib/spectrumos/magnet-open", "usr/lib/spectrumos/magnet-adapter",
+                    "usr/share/applications/magnet.desktop",
+                    "usr/share/spectrumos/spectrum-shell/MagnetDownloads.qml")
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
             filename = "spectrum-desktop-0.1.0-162-x86_64.pkg.tar.zst"
             with tarfile.open(repository / "spectrumos.db.tar.zst", "w") as archive:
-                payload = f"%NAME%\nspectrum-desktop\n\n%FILENAME%\n{filename}\n".encode()
+                payload = f"%NAME%\nspectrum-desktop\n\n%FILENAME%\n{filename}\n\n%DEPENDS%\nspectrum-magnet>=0.1.0\n".encode()
                 entry = tarfile.TarInfo("spectrum-desktop-0.1.0-162/desc")
                 entry.size = len(payload)
                 archive.addfile(entry, io.BytesIO(payload))
+                payload = b"%NAME%\nspectrum-magnet\n\n%FILENAME%\nspectrum-magnet-0.1.0-1-x86_64.pkg.tar.zst\n"
+                entry = tarfile.TarInfo("spectrum-magnet-0.1.0-1/desc")
+                entry.size = len(payload)
+                archive.addfile(entry, io.BytesIO(payload))
+            with tarfile.open(repository / "spectrum-magnet-0.1.0-1-x86_64.pkg.tar.zst", "w") as archive:
+                for name in ("usr/bin/magnet", "usr/share/licenses/spectrum-magnet/LICENSE"):
+                    archive.addfile(tarfile.TarInfo(name))
             for missing in (None, *required):
                 with self.subTest(missing=missing):
                     with tarfile.open(repository / filename, "w") as archive:

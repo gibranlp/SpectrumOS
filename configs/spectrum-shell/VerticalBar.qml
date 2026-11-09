@@ -357,7 +357,7 @@ PanelWindow {
             spacing: bar.theme.barStyle === "islands" ? 5 : 7
             HoverHandler { id: minimalStatusHover }
             BarControls {
-                visible: bar.barProfile !== "minimal"
+                visible: bar.theme.liveSession === true || bar.barProfile !== "minimal"
                 Layout.alignment: Qt.AlignHCenter
                 theme: bar.theme
                 profile: bar.barProfile

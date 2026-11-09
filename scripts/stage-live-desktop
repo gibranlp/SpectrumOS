@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+import argparse
+import json
+from pathlib import Path
+import shutil
+
+
+def stage(project, destination, theme):
+    home = destination / "home/spectrum"
+    generation = home / ".cache/spectrumos/theme/generations/live"
+    generation.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree((theme / "current").resolve(strict=True), generation)
+    wallpaper = "/usr/share/backgrounds/spectrumos/S30.png"
+    metadata = json.loads((generation / "generation.json").read_text())
+    original = metadata.get("wallpaper")
+    for path in generation.iterdir():
+        if path.suffix in {".json", ".conf", ".lua", ".css", ".svg"}:
+            text = path.read_text()
+            if original:
+                text = text.replace(original, wallpaper)
+            path.write_text(text)
+    (generation.parent.parent / "current").symlink_to("generations/live")
+    for source, target in [
+        ("configs/environment/90-spectrumos-qt.conf", ".config/environment.d/90-spectrumos-qt.conf"),
+        ("configs/terminal/kitty-user.conf", ".config/kitty/kitty.conf"),
+        ("configs/terminal/alacritty-user.toml", ".config/alacritty/alacritty.toml"),
+    ]:
+        path = home / target
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(project / source, path)
+    (home / "Pictures").mkdir(parents=True, exist_ok=True)
+    (home / "Pictures/Wallpapers").symlink_to("/usr/share/backgrounds/spectrumos")
+    state = home / ".local/state/spectrumos/theme"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "last-wallpaper").write_text(wallpaper + "\n")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Stage stock live desktop settings without using host preferences")
+    parser.add_argument("project", type=Path)
+    parser.add_argument("destination", type=Path)
+    parser.add_argument("theme", type=Path)
+    arguments = parser.parse_args()
+    stage(arguments.project, arguments.destination, arguments.theme)

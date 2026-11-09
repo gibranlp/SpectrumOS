@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+import subprocess
+import tempfile
+
+
+def check(project, repository):
+    database = repository / "spectrumos.db.tar.zst"
+    entries = subprocess.check_output(["bsdtar", "-tf", str(database)], text=True).splitlines()
+    description = None
+    for entry in entries:
+        if not entry.startswith("spectrum-desktop-") or not entry.endswith("/desc"):
+            continue
+        candidate = subprocess.check_output(["bsdtar", "-xOf", str(database), entry], text=True).splitlines()
+        if "%NAME%" in candidate and candidate[candidate.index("%NAME%") + 1] == "spectrum-desktop":
+            description = candidate
+            break
+    if description is None:
+        raise ValueError("The signed repository must contain spectrum-desktop")
+    filename = description[description.index("%FILENAME%") + 1]
+    if Path(filename).name != filename:
+        raise ValueError("Invalid Desktop package filename")
+    with tempfile.TemporaryDirectory(prefix="spectrum-live-desktop-") as directory:
+        subprocess.run(["bsdtar", "-xf", str(repository / filename), "-C", directory,
+                        "usr/share/spectrumos/spectrum-shell"], check=True)
+        installed = Path(directory) / "usr/share/spectrumos/spectrum-shell"
+        stale = [path.name for path in (project / "configs/spectrum-shell").iterdir()
+                 if path.is_file() and path.suffix in {".qml", ".js", ".qsb"}
+                 and (not (installed / path.name).is_file()
+                      or path.read_bytes() != (installed / path.name).read_bytes())]
+    if stale:
+        raise ValueError("Rebuild and sign spectrum-desktop before building the ISO; stale desktop files: "
+                         + ", ".join(sorted(stale)))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Require the current desktop in the signed live-image repository")
+    parser.add_argument("repository", type=Path)
+    arguments = parser.parse_args()
+    try:
+        check(Path(__file__).resolve().parents[1], arguments.repository.resolve())
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        raise SystemExit(str(error))
+    print("Live desktop matches current source.")

@@ -3,6 +3,10 @@ import QtQuick
 MouseArea {
     id: action
     property bool highlightEnabled: true
+    property bool keyPressed: false
+    readonly property bool down: pressed || keyPressed
+    onActiveFocusChanged: if (!activeFocus) keyPressed = false
+    onEnabledChanged: if (!enabled) keyPressed = false
     property color focusColor: {
         for (let item = parent; item; item = item.parent)
             if (item.theme && item.theme.colors) return item.theme.colors.accent;
@@ -16,11 +20,14 @@ MouseArea {
             || (key === Qt.Key_Menu && (acceptedButtons & Qt.RightButton));
     }
     Keys.onPressed: event => {
-        if (activationKey(event.key))
+        if (activationKey(event.key)) {
+            keyPressed = true;
             event.accepted = true;
+        }
     }
     Keys.onReleased: event => {
         if (activationKey(event.key)) {
+            keyPressed = false;
             if (!event.isAutoRepeat)
                 activated(event.key === Qt.Key_Menu ? Qt.RightButton : Qt.LeftButton);
             event.accepted = true;

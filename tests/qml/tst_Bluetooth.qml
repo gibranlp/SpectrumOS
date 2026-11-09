@@ -56,6 +56,7 @@ Item {
             adapter.enabled = true;
             adapter.state = BluetoothAdapterState.Enabled;
             adapter.discovering = false;
+            device.name = "Test headphones";
             device.paired = true;
             device.connected = false;
             device.pairing = false;
@@ -98,6 +99,39 @@ Item {
             click("bluetoothConnect"); compare(device.action, "pair");
             device.pairing = true;
             click("bluetoothConnect"); compare(device.action, "cancelPair");
+        }
+        function test_scanHidesAddressOnlyDevicesUntilNameResolves() {
+            device.paired = false;
+            adapter.discovering = true;
+            const row = findChild(content, "bluetoothDevice-" + device.address);
+            for (const name of ["", "   ", device.address, "00-11-22-33-44-55", "001122334455", "AA:BB:CC:DD:EE:FF"]) {
+                device.name = name;
+                tryCompare(row, "visible", false);
+            }
+            device.name = "Living room headphones";
+            tryCompare(row, "visible", true);
+            adapter.discovering = false;
+            device.name = device.address;
+            tryCompare(row, "visible", false);
+        }
+        function test_savedAndActiveDevicesRemainAccessibleWithoutNames() {
+            const row = findChild(content, "bluetoothDevice-" + device.address);
+            device.name = "";
+            tryCompare(row, "visible", true);
+            device.paired = false;
+            tryCompare(row, "visible", false);
+            device.connected = true;
+            tryCompare(row, "visible", true);
+            device.connected = false;
+            device.pairing = true;
+            tryCompare(row, "visible", true);
+            device.pairing = false;
+            device.state = BluetoothDeviceState.Connecting;
+            tryCompare(row, "visible", true);
+            device.state = BluetoothDeviceState.Disconnecting;
+            tryCompare(row, "visible", true);
+            device.state = BluetoothDeviceState.Disconnected;
+            tryCompare(row, "visible", false);
         }
         function test_trustAndConfirmedForget() {
             click("bluetoothTrust"); verify(device.trusted);

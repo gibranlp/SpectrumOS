@@ -114,5 +114,68 @@ class SpectrumShellNetworkTests(unittest.TestCase):
         command.assert_not_called()
 
 
+class ProtonVpnTests(unittest.TestCase):
+    def test_missing_cli_is_reported_without_launching_commands(self):
+        with patch.object(NETWORK.shutil, "which", return_value=None), patch.object(NETWORK, "run") as run:
+            self.assertFalse(NETWORK.proton_status()["installed"])
+            run.assert_not_called()
+
+    def test_signed_out_account_is_not_ready_to_connect(self):
+        responses = [subprocess.CompletedProcess([], 0, "Status: Disconnected", ""),
+                     subprocess.CompletedProcess([], 0, "Account: 'None'", "")]
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(NETWORK, "run", side_effect=responses):
+            state = NETWORK.proton_status()
+        self.assertFalse(state["signed_in"])
+        self.assertIn("Sign in", state["status"])
+
+    def test_country_connection_uses_argument_array_and_invalidates_ip(self):
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(
+            NETWORK, "run", return_value=subprocess.CompletedProcess([], 0, "Connected", "")
+        ) as run, patch.object(NETWORK, "invalidate_public_ip") as invalidate, patch("sys.stdout", io.StringIO()):
+            NETWORK.proton_action("vpn-connect", "mx")
+        run.assert_called_once_with("protonvpn", "connect", "--country", "MX", timeout=90)
+        invalidate.assert_called_once()
+
+    def test_signin_terminal_does_not_hold_widget_pipes_open(self):
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(NETWORK.subprocess, "Popen") as launch:
+            NETWORK.proton_action("vpn-signin", None)
+        self.assertEqual(launch.call_args.args[0][-1], "vpn-signin-prompt")
+        self.assertEqual(launch.call_args.kwargs["stdout"], subprocess.DEVNULL)
+        self.assertEqual(launch.call_args.kwargs["stderr"], subprocess.DEVNULL)
+
+    def test_signin_prompt_passes_username_and_preserves_interactive_password_input(self):
+        with patch("builtins.input", return_value=" person@proton.me "), patch.object(
+            NETWORK.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)
+        ) as run:
+            self.assertEqual(NETWORK.proton_signin_prompt(), 0)
+        run.assert_called_once_with(["protonvpn", "signin", "--", "person@proton.me"], check=False)
+
+    def test_empty_or_cancelled_signin_does_not_launch_proton(self):
+        for result in ["", "  ", EOFError(), KeyboardInterrupt()]:
+            with self.subTest(result=result), patch("builtins.input", side_effect=result if isinstance(result, BaseException) else None, return_value=result), patch.object(NETWORK.subprocess, "run") as run, patch("sys.stderr", io.StringIO()):
+                self.assertEqual(NETWORK.proton_signin_prompt(), 1)
+                run.assert_not_called()
+
+    def test_invalid_country_and_settings_never_launch_cli(self):
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(NETWORK, "run") as run:
+            for operation, value in [("vpn-connect", "--help"), ("vpn-config", "kill-switch:on"), ("vpn-config", "unexpected:on")]:
+                with self.subTest(operation=operation, value=value), self.assertRaises(ValueError):
+                    NETWORK.proton_action(operation, value)
+            run.assert_not_called()
+
+    def test_free_plan_stderr_error_is_shown_without_dependency_warning(self):
+        stderr = "EventletDeprecationWarning: dependency warning\nError: Location selection is not available on the free plan. Leave country empty.\n\nTry help."
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(
+            NETWORK, "run", return_value=subprocess.CompletedProcess([], 2, "", stderr)
+        ), self.assertRaisesRegex(ValueError, "^Location selection is not available on the free plan. Leave country empty.$"):
+            NETWORK.proton_action("vpn-connect", "MX")
+
+    def test_authentication_error_is_returned_to_widget(self):
+        with patch.object(NETWORK.shutil, "which", return_value="/usr/bin/protonvpn"), patch.object(
+            NETWORK, "run", return_value=subprocess.CompletedProcess([], 1, "Authentication required", "")
+        ), self.assertRaisesRegex(ValueError, "Authentication required"):
+            NETWORK.proton_action("vpn-connect", None)
+
+
 if __name__ == "__main__":
     unittest.main()

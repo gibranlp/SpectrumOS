@@ -29,3 +29,9 @@ These checks remain mandatory on physical laptop hardware after a SpectrumOS ISO
 - Reboot into the installed system, repeat the critical display/network/audio checks, and confirm there are no failed system or user units.
 
 Intel, NVIDIA, hybrid-graphics, and laptop power acceptance remain open until tested on matching physical hardware. The VM boundary verifies installation and session integration only; it does not count as GPU, battery, brightness, suspend, controller, or radio acceptance.
+
+## Sleep acceptance
+
+Use the [sleep diagnostics and physical acceptance procedure](sleep.md) for every
+hardware profile. Record per-model results; a successful kernel transition does
+not establish lock security, low battery drain or peripheral recovery.

@@ -433,6 +433,22 @@ class AppearanceSyncTests(unittest.TestCase):
             self.assertEqual(settings["plugins"]["CommandsAPI"], {"enabled": True})
             self.assertIs(settings["useQuickCss"], True)
 
+    def test_vencord_light_palette_disables_client_theme(self):
+        module = load_module()
+        with tempfile.TemporaryDirectory() as directory:
+            module.CONFIG_HOME = Path(directory) / "config"
+            module.CURRENT = Path(directory) / "current"
+            (module.CURRENT / "integrations").mkdir(parents=True)
+            (module.CURRENT / "integrations/vencord-quickcss.css").write_text(":root {}")
+            (module.CURRENT / "palette.json").write_text(json.dumps({"variant": "light", "roles": {"background": "#fefefe"}}))
+            settings = module.CONFIG_HOME / "vesktop/settings/settings.json"
+            settings.parent.mkdir(parents=True)
+            settings.write_text(json.dumps({"plugins": {"ClientTheme": {"enabled": True}, "Other": {"enabled": True}}}))
+            module.ensure_vencord()
+            result = json.loads(settings.read_text())
+            self.assertFalse(result["plugins"]["ClientTheme"]["enabled"])
+            self.assertTrue(result["plugins"]["Other"]["enabled"])
+
     def test_gamemode_hook_is_added_and_preserves_user_additions(self):
         module = load_module()
         with tempfile.TemporaryDirectory() as directory:

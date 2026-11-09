@@ -19,6 +19,7 @@ ShellRoot {
     readonly property string cacheHome: Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")
     readonly property string palettePath: Quickshell.env("SPECTRUM_SHELL_PALETTE") || (cacheHome + "/spectrumos/theme/current/palette.json")
     readonly property string fontPath: cacheHome + "/spectrumos/theme/current/kitty.conf"
+    readonly property bool liveSession: Quickshell.env("SPECTRUM_LIVE_SESSION") === "1"
     readonly property bool leanMode: Quickshell.env("SPECTRUM_LEAN_MODE") === "1"
     readonly property string backendDir: Quickshell.env("SPECTRUM_SHELL_BACKEND_DIR") || "/usr/lib/spectrumos"
     property var colors: ({ background: "#15131a", surface: "#232029", surface_alt: "#2e2c34", foreground: "#eff3fa", muted: "#a6afbe", accent: "#b293e6" })
@@ -1252,6 +1253,7 @@ ShellRoot {
         function toggleUpdates(): void { shell.openOnFocused("toggleUpdates"); }
         function toggleFocusTimer(): void { shell.openOnFocused("toggleFocusTimer"); }
         function toggleBreakReminders(): void { shell.openOnFocused("toggleBreakReminders"); }
+        function toggleMagnet(): void { shell.openOnFocused("toggleMagnet"); }
         function toggleLocalServices(): void { shell.openOnFocused("toggleLocalServices"); }
         function toggleDefaultApps(): void { shell.openOnFocused("toggleDefaultApps"); }
         function focusTimerState(): string {
@@ -1455,8 +1457,9 @@ ShellRoot {
                 }
             }
 
+            property bool calculatorKeyboardActive: true
             readonly property bool updatesOpen: updatePanel.expanded
-            readonly property bool igorSuppressed: shell.gamingActive || shell.recording.active || shell.audioRecording.active || audioRecorderPanel.expanded || barWidget.expanded || controlCenter.expanded || favoritesPanel.expanded || appStorePanel.expanded || appLauncher.expanded || dashboard.expanded || screenshotPanel.expanded || recorderPanel.expanded || updatePanel.expanded || utilityPanel.expanded || notificationCenter.expanded || sessionRail.expanded || wallpaperBrowser.expanded || pickerPanel.visible || notificationToast.visible
+            readonly property bool igorSuppressed: shell.gamingActive || shell.recording.active || shell.audioRecording.active || audioRecorderPanel.expanded || barWidget.expanded || controlCenter.expanded || favoritesPanel.expanded || appStorePanel.expanded || appLauncher.expanded || dashboard.expanded || screenshotPanel.expanded || recorderPanel.expanded || updatePanel.expanded || utilityPanel.expanded || calculatorPanel.expanded || notificationCenter.expanded || sessionRail.expanded || wallpaperBrowser.expanded || pickerPanel.visible || notificationToast.visible
 
             DesktopBranding {
                 targetScreen: bar.modelData
@@ -1479,7 +1482,9 @@ ShellRoot {
                 return {name: modelData.name, barScreen: screen ? screen.name : "", monitor: monitor ? monitor.name : "",
                     profile: barProfile, controlScreen: controlCenter.screen ? controlCenter.screen.name : "",
                     controlOpen: controlCenter.expanded, utilityScreen: utilityPanel.screen ? utilityPanel.screen.name : "",
-                    utilityOpen: utilityPanel.expanded};
+                    utilityOpen: utilityPanel.expanded, utilityPage: utilityPanel.page, calculatorOpen: calculatorPanel.expanded,
+                    calculatorPaired: calculatorPanel.paired, utilityGeometry: utilityPanel.panelGeometry,
+                    calculatorGeometry: calculatorPanel.panelGeometry};
             }
 
             function styleState(): var {
@@ -1506,7 +1511,8 @@ ShellRoot {
                 });
             }
 
-            function closeSidePanels(): void {
+            function closeSidePanels(preserveCalculator = false): void {
+                if (!preserveCalculator) calculatorPanel.expanded = false;
                 keyboardActive = false;
                 barWidget.expanded = false;
                 controlCenter.expanded = false;
@@ -1549,10 +1555,20 @@ ShellRoot {
             }
 
             function openUtility(page): void {
+                if (page === "calculator") {
+                    if (calculatorPanel.expanded) calculatorPanel.expanded = false;
+                    else {
+                        if (!utilityPanel.expanded || utilityPanel.page !== "questline") closeSidePanels();
+                        appLauncher.expanded = false;
+                        wallpaperBrowser.expanded = false;
+                        calculatorPanel.open();
+                    }
+                    return;
+                }
                 if (page === "questline") Quickshell.execDetached(["systemctl", "--user", "--no-block", "start", "spectrum-questline-notifications.service", "spectrum-questline-sync.service"]);
                 const opening = !utilityPanel.expanded || utilityPanel.page !== page;
                 if (opening) {
-                    closeSidePanels();
+                    closeSidePanels(page === "questline");
                     appLauncher.expanded = false;
                     wallpaperBrowser.expanded = false;
                     utilityPanel.open(page);
@@ -1567,10 +1583,11 @@ ShellRoot {
                     screenshot:"toggleScreenshot", recorder:"toggleRecorder", "audio-recorder":"toggleAudioRecorder",
                     control:"toggleControlCenter", session:"toggleSession", extras:"toggleBarExtras", updates:"toggleUpdates", color:"toggleColorPicker",
                     "color-history":"toggleColorHistory"};
-                if (methods[action]) bar[methods[action]]();
+                if (action === "install" && shell.liveSession) Quickshell.execDetached(["/usr/local/bin/spectrum-installer"]);
+                else if (methods[action]) bar[methods[action]]();
                 else if (action === "keep-awake") shell.toggleKeepAwake();
                 else if (action === "ukvm") Quickshell.execDetached(["/usr/bin/spectrum-ukvm"]);
-                else if (["questline", "focus", "breaks", "services", "default-apps", "search", "calculator", "password", "emoji", "hotkey", "shortcuts"].includes(action)) bar.openUtility(action);
+                else if (["magnet", "questline", "focus", "breaks", "services", "default-apps", "search", "calculator", "password", "emoji", "hotkey", "shortcuts"].includes(action)) bar.openUtility(action);
                 else if (["appimages", "audio", "brightness", "network", "bluetooth", "displays", "mouse", "typography", "weather", "time", "battery", "igor"].includes(action)) bar.toggleBarWidget(action === "network" ? "wifi" : action);
             }
 
@@ -1604,6 +1621,7 @@ ShellRoot {
             function levelIndicatorState(): var { return levelIndicator.state(); }
             function toggleFocusTimer(): void { openUtility("focus"); }
             function toggleBreakReminders(): void { openUtility("breaks"); }
+            function toggleMagnet(): void { openUtility("magnet"); }
             function toggleLocalServices(): void { openUtility("services"); }
             function toggleDefaultApps(): void { openUtility("default-apps"); }
             function focusTimerState(): var {
@@ -1887,11 +1905,16 @@ ShellRoot {
             }
 
             UtilityPanel {
+                keyboardEnabled: !calculatorPanel.paired || !bar.calculatorKeyboardActive
+                onKeyboardRequested: bar.calculatorKeyboardActive = false
+                calculatorCompanion: calculatorPanel.paired
+                companionWidth: calculatorPanel.panelWidth
+                companionHeight: calculatorPanel.panelHeight
                 onSpectrumDropReturnRequested: {
                     if (!barWidget.expanded && !controlCenter.expanded && !favoritesPanel.expanded && !notificationCenter.expanded
                         && !appLauncher.expanded && !sessionRail.expanded && !wallpaperBrowser.expanded
                         && !dashboard.expanded && !screenshotPanel.expanded && !recorderPanel.expanded
-                        && !audioRecorderPanel.expanded && !updatePanel.expanded && !appStorePanel.expanded)
+                        && !audioRecorderPanel.expanded && !updatePanel.expanded && !appStorePanel.expanded && !calculatorPanel.expanded)
                         utilityPanel.expanded = true;
                 }
                 onQuestlineCompleted: igorRoutine.celebrate()
@@ -1907,6 +1930,18 @@ ShellRoot {
                 topInset: bar.panelTopInset
                 onFocusAction: action => shell.runAction([shell.backend("spectrum-focus"), action])
                 onFocusStart: request => shell.runAction([shell.backend("spectrum-focus"), "start", JSON.stringify(request)])
+            }
+
+            CalculatorPanel {
+                id: calculatorPanel
+                screen: bar.modelData
+                theme: shell
+                backendDir: shell.backendDir
+                leftInset: bar.panelLeftInset
+                topInset: bar.panelTopInset
+                paired: expanded && utilityPanel.expanded && utilityPanel.page === "questline"
+                keyboardEnabled: !paired || bar.calculatorKeyboardActive
+                onKeyboardRequested: bar.calculatorKeyboardActive = true
             }
 
             AppStorePanel {
@@ -2193,7 +2228,7 @@ ShellRoot {
                         }
 
                         BarControls {
-                            visible: bar.barProfile !== "minimal"
+                            visible: shell.liveSession || bar.barProfile !== "minimal"
                             theme: shell
                             profile: bar.barProfile
                             trayItems: SystemTray.items

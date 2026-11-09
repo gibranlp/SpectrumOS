@@ -546,7 +546,7 @@ phase_system() {
         font-family-menu performance-mode resource-monitor session-menu spectrum-update-run window-pin-toggle spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session \
         waybar-workspace-icons \
         spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder \
-        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter; do
+        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open magnet-open magnet-adapter spectrum-sleep spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter; do
         run sudo install -m 0755 "$PROJECT_ROOT/scripts/$desktop_script" "/usr/lib/spectrumos/$desktop_script"
     done
     run sudo install -m 0644 "$PROJECT_ROOT/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
@@ -559,6 +559,7 @@ phase_system() {
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-appimages.desktop" /usr/share/applications/spectrum-appimages.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-app-store.desktop" /usr/share/applications/spectrum-app-store.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-breaks.desktop" /usr/share/applications/spectrum-breaks.desktop
+    run sudo install -Dm 0644 "$PROJECT_ROOT/system/magnet.desktop" /usr/share/applications/magnet.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-services.desktop" /usr/share/applications/spectrum-services.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/spectrum-default-apps.desktop" /usr/share/applications/spectrum-default-apps.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/configs/app-store/paru.conf" /usr/share/spectrumos/app-store/paru.conf
@@ -566,6 +567,13 @@ phase_system() {
     run sudo install -Dm 0644 "$PROJECT_ROOT/integrations/stash/stash.desktop" /usr/share/applications/stash.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/autostart/spectrum-kdeconnect-indicator.desktop" /etc/xdg/autostart/spectrum-kdeconnect-indicator.desktop
     run sudo install -m 0755 "$PROJECT_ROOT/integrations/questline/spectrum-focus" /usr/lib/spectrumos/questline-focus
+    run sudo install -Dm755 "$PROJECT_ROOT/scripts/spectrum-sleep" /usr/bin/spectrum-sleep
+    run sudo install -Dm644 "$PROJECT_ROOT/docs/sleep.md" /usr/share/doc/spectrumos/sleep.md
+    local sleep_unit
+    for sleep_unit in suspend hibernate hybrid-sleep suspend-then-hibernate; do
+        run sudo install -Dm644 "$PROJECT_ROOT/system/systemd/system/systemd-$sleep_unit.service.d/60-spectrumos-sleep.conf" \
+            "/usr/lib/systemd/system/systemd-$sleep_unit.service.d/60-spectrumos-sleep.conf"
+    done
     local user_service
     for user_service in spectrum-hotkey.service spectrum-resource-monitor.service spectrum-shell.service spectrum-questline-notifications.service spectrum-questline-sync.service spectrum-workspace-layout.service; do
         run sudo install -m 0644 "$PROJECT_ROOT/system/systemd/user/$user_service" "/usr/lib/systemd/user/$user_service"

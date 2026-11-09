@@ -1,5 +1,5 @@
 pkgname=spectrum-igor
-pkgver=0.3.2
+pkgver=0.3.4
 pkgrel=1
 pkgdesc="Free Igor desktop companion runtime for SpectrumOS"
 arch=(any)
@@ -8,11 +8,11 @@ license=(MIT)
 depends=(qt6-declarative qt6-svg python python-pillow openssl libsecret 'quickshell>=0.3.0')
 makedepends=(qt6-tools)
 options=(!strip !debug)
-_runtime_version=0.3.2
-_runtime_revision=dbdf0ecf9d81d388
+_runtime_version=0.3.4
+_runtime_revision=967c714997740029
 source=("igor-runtime-$_runtime_version-$_runtime_revision.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-$_runtime_version-$_runtime_revision.tar.zst" 'RuntimeTests.qml')
-sha256sums=('b397d2689cef0aea10e49dd4c895287add2426dbc1bcfa3caf43890305d71135'
-            'e2f15aff691355066c4a590ee3dfe4a239209b34617528ea822c5ab8780da647')
+sha256sums=('ab2fb92bc565670c7f3ff506e516f521f21628602a5db762c94ccaada2f2f307'
+            'fb67391626ee089b15a49842a396f309c61641fcaaeeb5c867242cdf20527c5d')
 
 check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QML_IMPORT_PATH="$srcdir" \

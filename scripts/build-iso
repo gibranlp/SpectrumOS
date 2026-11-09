@@ -38,6 +38,7 @@ fi
     exit 1
 }
 "$project_root/scripts/spectrum-repo" verify --channel edge
+python "$project_root/scripts/check-live-desktop" "$repository"
 bash "$project_root/scripts/check-bundled-apps" "$repository"
 python "$project_root/scripts/check-ukvm-packages" "$repository"
 bash "$project_root/scripts/check-lean-package" \
@@ -51,6 +52,31 @@ staging=$temporary_root/profile
 install -d -m 0755 "$staging"
 trap 'rm -rf -- "$temporary_root"' EXIT
 cp -a -- "$profile/." "$staging/"
+# El escritorio instala estos archivos desde el paquete firmado de Plymouth.
+rm -rf -- "$staging/airootfs/usr/share/plymouth/themes/spectrumos" \
+    "$staging/airootfs/usr/lib/systemd/system/plymouth-quit.service.d/20-spectrumos-duration.conf"
+# El llavero temporal permite instalar el escritorio firmado sin cambiar el del anfitrión.
+live_keyring=$temporary_root/pacman-gnupg
+pacman-key --gpgdir "$live_keyring" --init
+pacman-key --gpgdir "$live_keyring" --populate archlinux
+pacman-key --gpgdir "$live_keyring" --add "$project_root/repo/keys/spectrumos-production.asc"
+fingerprint=$(tr -d '[:space:]' < "$project_root/repo/keys/spectrumos-production.fingerprint")
+[[ $fingerprint =~ ^[0-9A-Fa-f]{40}$ ]] || { printf 'Invalid repository fingerprint.\n' >&2; exit 1; }
+pacman-key --gpgdir "$live_keyring" --lsign-key "$fingerprint"
+live_cache=$temporary_root/package-cache
+install -d -m 0755 "$live_cache"
+cp -a -- "$repository/"*.pkg.tar.zst "$repository/"*.pkg.tar.zst.sig "$live_cache/"
+python - "$staging/pacman.conf" "$repository" "$live_keyring" "$live_cache" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text().replace('[options]', '[options]\nGPGDir = ' + sys.argv[3]
+                                + '\nCacheDir = ' + sys.argv[4]
+                                + '\nCacheDir = /var/cache/pacman/pkg/', 1)
+repository = '\n[spectrumos]\nSigLevel = Required DatabaseRequired TrustedOnly\nServer = ' + Path(sys.argv[2]).as_uri() + '\n\n'
+path.write_text(text.replace('[core]', repository + '[core]', 1))
+PY
 install -d -m 0755 "$staging/airootfs$source_path" "$staging/airootfs/usr/local/bin" "$output"
 install -d -m 0755 \
     "$staging/airootfs/usr/local/lib/spectrumos" \
@@ -114,17 +140,12 @@ PY
 ln -s "$source_path" "$staging/airootfs/root/SpectrumOS2"
 install -m 0755 "$project_root/scripts/snapshot" "$staging/airootfs/usr/local/bin/spectrum-snapshot"
 install -m 0755 "$project_root/scripts/spectrum" "$staging/airootfs/usr/local/bin/spectrum"
-desktop_entry=$(bsdtar -tf "$repository/spectrumos.db.tar.zst" | awk '/^spectrum-desktop-[^/]+\/desc$/ {print; exit}')
-desktop_filename=$(bsdtar -xOf "$repository/spectrumos.db.tar.zst" "$desktop_entry" | awk '/^%FILENAME%$/ {getline; print; exit}')
-[[ -n $desktop_filename && $desktop_filename != */* ]] || { printf 'Invalid indexed Desktop artifact.\n' >&2; exit 1; }
-bsdtar -xf "$repository/$desktop_filename" -C "$staging/airootfs" \
-    usr/lib/qt6/qml/Spectrum/I18n usr/share/spectrumos/translations usr/lib/spectrumos/spectrum_i18n.py
 "$project_root/scripts/build-localization" --catalogs-only --output "$temporary_root/localization"
-cp -a -- "$temporary_root/localization/translations/." "$staging/airootfs/usr/share/spectrumos/translations/"
-[[ -s $staging/airootfs/usr/lib/qt6/qml/Spectrum/I18n/libspectrumi18n.so && \
-   -s $staging/airootfs/usr/share/spectrumos/translations/spectrum_es_MX.qm && \
-   -s $staging/airootfs/usr/share/spectrumos/translations/es_MX/LC_MESSAGES/spectrum.mo ]] || {
-    printf 'The signed Desktop package must include the language runtime and catalogs.\n' >&2; exit 1;
+install -d -m 0755 "$staging/airootfs/usr/local/share/spectrumos/live-translations"
+cp -a -- "$temporary_root/localization/translations/." "$staging/airootfs/usr/local/share/spectrumos/live-translations/"
+[[ -s $staging/airootfs/usr/local/share/spectrumos/live-translations/spectrum_es_MX.qm && \
+   -s $staging/airootfs/usr/local/share/spectrumos/live-translations/es_MX/LC_MESSAGES/spectrum.mo ]] || {
+    printf 'The live desktop language catalogs are missing.\n' >&2; exit 1;
 }
 install -m 0755 "$project_root/installer/spectrum-installer" \
     "$staging/airootfs/usr/local/bin/spectrum-installer"
@@ -138,6 +159,8 @@ install -m 0755 "$project_root/installer/spectrum-installer-storage" \
     "$staging/airootfs/usr/local/lib/spectrumos/spectrum-installer-storage"
 install -m 0755 "$project_root/installer/spectrum-live-session" \
     "$staging/airootfs/usr/local/bin/spectrum-live-session"
+install -m 0755 "$project_root/installer/spectrum-live-welcome" \
+    "$staging/airootfs/usr/local/bin/spectrum-live-welcome"
 install -m 0755 "$project_root/installer/spectrum-live-network" \
     "$staging/airootfs/usr/local/bin/spectrum-live-network"
 install -m 0755 "$project_root/scripts/network-adapter" \
@@ -198,6 +221,7 @@ install -m 0644 "$palette_json/current/gtk-3.css" \
     "$staging/airootfs/home/spectrum/.config/gtk-3.0/gtk.css"
 install -m 0644 "$project_root/installer/live-gtk-settings.ini" \
     "$staging/airootfs/home/spectrum/.config/gtk-3.0/settings.ini"
+python "$project_root/scripts/stage-live-desktop" "$project_root" "$staging/airootfs" "$palette_json"
 install -m 0644 "$project_root/assets/wallpapers/default/S30.png" \
     "$staging/airootfs/usr/share/spectrumos/installer/wallpaper.png"
 install -m 0644 "$project_root/installer/spectrum-installer.desktop" \
@@ -208,8 +232,6 @@ install -m 0644 "$project_root/installer/spectrum-live-user.conf" \
     "$staging/airootfs/usr/lib/sysusers.d/spectrum-live.conf"
 install -m 0644 "$project_root/installer/spectrum-live-home.conf" \
     "$staging/airootfs/usr/lib/tmpfiles.d/spectrum-live.conf"
-install -m 0644 "$project_root/system/zram-generator.conf.d/60-spectrumos.conf" \
-    "$staging/airootfs/usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf"
 install -m 0644 "$project_root/system/flatpak-flathub.flatpakrepo" \
     "$staging/airootfs/etc/flatpak/remotes.d/flathub.flatpakrepo"
 install -m 0644 "$project_root/installer/49-spectrum-installer.rules" \
@@ -217,6 +239,20 @@ install -m 0644 "$project_root/installer/49-spectrum-installer.rules" \
 install -m 0440 "$project_root/installer/10-spectrum-live" \
     "$staging/airootfs/etc/sudoers.d/10-spectrum-live"
 chown -R 1000:1000 "$staging/airootfs/home/spectrum"
+python - "$staging/airootfs" "$staging/profiledef.sh" <<'PY'
+from pathlib import Path
+import shlex
+import sys
+
+root, profile = map(Path, sys.argv[1:])
+home = root / 'home/spectrum'
+with profile.open('a') as output:
+    for path in [home, *sorted(home.rglob('*'))]:
+        if path.is_symlink():
+            continue
+        mode = '750' if path.is_dir() else '644'
+        output.write('\nfile_permissions[' + shlex.quote('/' + str(path.relative_to(root))) + ']=\'1000:1000:' + mode + '\'\n')
+PY
 rm -f "$staging/airootfs/etc/systemd/system/multi-user.target.wants/systemd-networkd.service" \
     "$staging/airootfs/etc/systemd/system/sockets.target.wants/systemd-networkd.socket" \
     "$staging/airootfs/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service" \

@@ -74,8 +74,10 @@ class IsoProfileTests(unittest.TestCase):
         builder = (ROOT / "scripts/build-iso").read_text(encoding="utf-8")
         policy = ROOT / "system/zram-generator.conf.d/60-spectrumos.conf"
         self.assertIn("\nzram-generator\n", f"\n{packages}\n")
-        self.assertIn("system/zram-generator.conf.d/60-spectrumos.conf", builder)
-        self.assertIn("usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf", builder)
+        self.assertIn("\nspectrum-desktop\n", "\n" + packages + "\n")
+        base_package = (ROOT / "packages/spectrum-base/PKGBUILD").read_text()
+        self.assertIn("system/zram-generator.conf.d/60-spectrumos.conf", base_package)
+        self.assertIn("usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf", base_package)
         self.assertIn("zram-size = min(ram, 8192)", policy.read_text(encoding="utf-8"))
 
     def test_iso_source_staging_excludes_private_and_ignored_state(self):

@@ -1,0 +1,46 @@
+pkgname=spectrum-magnet
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Magnet torrent search and background downloads for SpectrumOS"
+arch=(x86_64)
+url="https://github.com/gibranlp/Magnet"
+license=(MIT)
+depends=(gcc-libs glibc)
+makedepends=(cargo)
+provides=("magnet=$pkgver")
+conflicts=(magnet magnet-bin)
+options=(!lto !debug)
+_source_revision=423acb6b5c2728a1
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
+sha256sums=('2d9a27b1aa9841c2a68119b4a7f2759e2aae1246275f20bc543b4590cd6ca4b0')
+
+prepare() {
+    export CARGO_HOME="$srcdir/cargo-home"
+    cd "$srcdir/$_source_root/integrations/magnet"
+    cargo fetch --locked --target x86_64-unknown-linux-gnu
+}
+
+build() {
+    export CARGO_HOME="$srcdir/cargo-home"
+    export CARGO_TARGET_DIR="$srcdir/target"
+    cd "$srcdir/$_source_root/integrations/magnet"
+    cargo build --release --frozen --target x86_64-unknown-linux-gnu
+}
+
+check() {
+    export CARGO_HOME="$srcdir/cargo-home"
+    export CARGO_TARGET_DIR="$srcdir/target"
+    cd "$srcdir/$_source_root/integrations/magnet"
+    cargo test --release --frozen --target x86_64-unknown-linux-gnu
+    "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/magnet" --version
+}
+
+package() {
+    local project="$srcdir/$_source_root/integrations/magnet"
+    install -Dm755 "$srcdir/target/x86_64-unknown-linux-gnu/release/magnet" "$pkgdir/usr/bin/magnet"
+    install -Dm644 "$project/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "$project/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 "$project/provenance.json" "$pkgdir/usr/share/doc/$pkgname/provenance.json"
+}

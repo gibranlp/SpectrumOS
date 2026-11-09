@@ -61,16 +61,18 @@ PanelWindow {
             viewportWidth: panel.screen ? panel.screen.width : 0
             viewportHeight: panel.screen ? panel.screen.height : 0
         }
-        attachTop: true
-        attachLeft: true
+        attachTop: !panel.leftBar
+        attachRight: !panel.leftBar
+        attachLeft: panel.leftBar
+        attachBottom: panel.leftBar
         leftAttachmentWidth: panel.leftBar && panel.theme.barStyle === "islands"
             ? Math.max(0, x - leftFrameThickness) : 0
         topAttachmentHeight: !panel.leftBar && panel.theme.barStyle === "islands"
             ? Math.max(0, y - 8) : 0
         width: Math.min(350, panel.width - (panel.leftBar ? panel.leftInset : 0) - 24)
         height: Math.min(body.implicitHeight + 40, panel.height - panel.topInset - 24)
-        x: Math.max(leftFrameThickness, panel.leftInset)
-        y: panel.topInset
+        x: panel.leftBar ? Math.max(leftFrameThickness, panel.leftInset) : panel.width - width
+        y: panel.leftBar ? panel.height - height - (panel.theme.gamingActive ? 0 : 8) : panel.topInset
         radius: 28
         color: panel.theme.colors.surface
         focus: panel.visible

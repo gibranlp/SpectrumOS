@@ -18,7 +18,7 @@ class PackagingTests(unittest.TestCase):
     def test_source_archive_omits_downloads_but_keeps_project_sources(self):
         if not shutil.which("zstd"):
             self.skipTest("zstd is required for source export")
-        packages=("spectrum-base","spectrum-desktop","spectrum-hyprland","spectrum-plymouth","spectrum-sddm","spectrum-theme","spectrumdrop")
+        packages=("spectrum-base","spectrum-desktop","spectrum-hyprland","spectrum-plymouth","spectrum-sddm","spectrum-theme","spectrumdrop","spectrum-magnet")
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             (root/"scripts").mkdir()
@@ -224,7 +224,10 @@ class PackagingTests(unittest.TestCase):
         ]
         for recipe in recipes:
             self.assertIn("_source_revision=", recipe)
-            self.assertIn('source=("spectrumos-source-$pkgver-$_source_revision.tar.zst"', recipe)
+            version = "_source_version" if "_source_version=" in recipe else "pkgver"
+            self.assertRegex(recipe, version + r"=[0-9]+\.[0-9]+\.[0-9]+")
+            self.assertIn('_source_root="spectrumos-source-$' + version + '"', recipe)
+            self.assertIn('source=("spectrumos-source-$' + version + '-$_source_revision.tar.zst"', recipe)
             self.assertRegex(recipe, r"sha256sums=\('[0-9a-f]{64}'")
             self.assertNotIn("$startdir/../..", recipe)
 

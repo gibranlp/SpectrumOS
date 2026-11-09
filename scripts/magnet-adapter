@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+import json
+import os
+import re
+import subprocess
+import time
+from urllib.parse import parse_qs, urlsplit
+from pathlib import Path
+import shutil
+import socket
+import sys
+
+
+def socket_path():
+    data = os.environ.get("MAGNET_DATA_DIR", str(Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "magnet"))
+    value = 0xcbf29ce484222325
+    for byte in os.fsencode(data):
+        value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+    return Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"magnet-{value & 0xffffffff:08x}.sock"
+
+
+def request(command, timeout=3):
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.settimeout(timeout)
+        connection.connect(str(socket_path()))
+        connection.sendall(json.dumps(command).encode() + b"\n")
+        with connection.makefile("rb") as stream:
+            line = stream.readline(4 * 1024 * 1024)
+        if not line.endswith(b"\n"):
+            raise ValueError("Incomplete response from Magnet")
+        response = json.loads(line)
+        if response.get("error"):
+            raise ValueError(response["error"])
+        return response
+
+
+def data_dir():
+    return Path(os.environ.get("MAGNET_DATA_DIR", str(Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "magnet")))
+
+
+def ensure_daemon():
+    try:
+        request({"cmd": "hello"})
+        return
+    except (FileNotFoundError, ConnectionRefusedError):
+        pass
+    import fcntl
+    lock = socket_path().with_suffix(".start.lock")
+    with lock.open("a") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        try:
+            request({"cmd": "hello"})
+            return
+        except (FileNotFoundError, ConnectionRefusedError):
+            pass
+        binary = shutil.which("magnet")
+        if not binary:
+            raise ValueError("Magnet is not installed")
+        data_dir().mkdir(parents=True, exist_ok=True)
+        with (data_dir() / "daemon.log").open("ab") as log:
+            process = subprocess.Popen([binary, "daemon"], stdin=subprocess.DEVNULL,
+                                       stdout=subprocess.DEVNULL, stderr=log, start_new_session=True)
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            try:
+                request({"cmd": "hello"}, timeout=15)
+                return
+            except (FileNotFoundError, ConnectionRefusedError):
+                if process.poll() is not None:
+                    break
+                time.sleep(0.1)
+        raise ValueError("Magnet could not start; see " + str(data_dir() / "daemon.log"))
+
+
+def valid_magnet(value):
+    if re.fullmatch(r"[a-fA-F0-9]{40}|[A-Za-z2-7]{32}", value):
+        return True
+    parsed = urlsplit(value)
+    if parsed.scheme.lower() != "magnet":
+        return False
+    for topic in parse_qs(parsed.query).get("xt", []):
+        if topic.lower().startswith("urn:btih:") and re.fullmatch(r"[a-fA-F0-9]{40}|[A-Za-z2-7]{32}", topic[9:]):
+            return True
+    return False
+
+
+def search(query, category):
+    if category not in ("all", "games", "movies", "tv", "anime", "music", "other"):
+        raise ValueError("Invalid category")
+    binary = shutil.which("magnet")
+    if not binary:
+        raise ValueError("Magnet is not installed")
+    argv = [binary, "search", "--category", category]
+    if query.strip().lower() == "top100":
+        argv.append("--top")
+    elif query.strip():
+        if query.lstrip().startswith("-"):
+            raise ValueError("Search text cannot begin with a dash")
+        argv.append(query.strip())
+    result = subprocess.run(argv, capture_output=True, text=True, timeout=55)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "Magnet search failed")
+    response = json.loads(result.stdout)
+    if not isinstance(response.get("results"), list) or not isinstance(response.get("sources"), list):
+        raise ValueError("Invalid search response from Magnet")
+    return dict(response, ok=True)
+
+
+def main(args):
+    command = args[0] if args else "status"
+    installed = bool(shutil.which("magnet"))
+    if command == "search" and len(args) == 3:
+        return search(args[1], args[2])
+    if command == "add" and len(args) in (2, 3):
+        magnet = args[1].strip()
+        if not valid_magnet(magnet):
+            raise ValueError("Enter a valid magnet link or info hash")
+        ensure_daemon()
+        response = request({"cmd": "add", "magnet": magnet, "name": args[2] if len(args) == 3 else None}, timeout=15)
+        return dict(response, ok=True)
+    if command == "start" and len(args) == 1:
+        ensure_daemon()
+        return {"ok": True}
+    if command == "status" and len(args) <= 1:
+        try:
+            response = request({"cmd": "rows"})
+        except (FileNotFoundError, ConnectionRefusedError):
+            return {"ok": True, "installed": installed, "running": False, "rows": []}
+        return dict(response, ok=True, installed=installed, running=True)
+    if command in ("toggle", "remove", "delete") and len(args) == 2:
+        torrent_id = int(args[1])
+        if torrent_id < 0:
+            raise ValueError("Invalid torrent id")
+        payload = {"cmd": "remove" if command == "delete" else command, "id": torrent_id}
+        if command in ("remove", "delete"):
+            payload["delete_files"] = command == "delete"
+        request(payload)
+        return {"ok": True}
+    raise ValueError("Usage: magnet-adapter {status|search QUERY CATEGORY|add MAGNET [NAME]|start|toggle ID|remove ID|delete ID}")
+
+
+if __name__ == "__main__":
+    try:
+        result = main(sys.argv[1:])
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        result = {"ok": False, "error": str(error)}
+    print(json.dumps(result))
+    sys.exit(0 if result["ok"] else 1)

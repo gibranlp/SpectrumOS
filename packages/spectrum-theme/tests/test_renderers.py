@@ -430,13 +430,26 @@ class RendererTests(unittest.TestCase):
         vencord = render_vencord_theme(PALETTE)
         telegram = render_telegram_theme(PALETTE)
 
-        self.assertIn(":root {", vencord)
-        self.assertIn("--background-primary: #101218;", vencord)
-        self.assertIn("--text-normal: #e9edf5;", vencord)
-        self.assertIn("--brand-experiment: #76b7ff;", vencord)
+        self.assertIn(":root, .theme-light, .theme-dark {", vencord)
+        self.assertIn("--background-primary: #101218 !important;", vencord)
+        self.assertIn("--text-normal: #e9edf5 !important;", vencord)
+        self.assertIn("--brand-experiment: #76b7ff !important;", vencord)
         self.assertIn("windowBg: #101218;", telegram)
         self.assertIn("windowBgActive: #76b7ff;", telegram)
         self.assertNotIn("pywal", (vencord + telegram).lower())
+
+    def test_vencord_light_text_meets_contrast_on_all_surfaces(self):
+        import re
+        from spectrum_theme.palette import Palette, contrast_ratio
+        light = Palette("Light", "light", "test", dict(PALETTE.roles, background="#fefefe",
+                        surface="#faf1f4", surface_alt="#f7e5ea", foreground="#c93059", muted="#d46c89"))
+        css = render_vencord_theme(light)
+        for token in ("text-normal", "text-muted", "text-primary", "text-secondary", "icon-secondary"):
+            value = re.search(r"--" + token + r": #([0-9a-f]{6})", css).group(1)
+            rgb = tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+            for role in ("background", "surface", "surface_alt"):
+                self.assertGreaterEqual(contrast_ratio(rgb, light.rgb(role)), 4.5)
+        self.assertIn("--background-base-lowest: #fefefe !important;", css)
 
     def test_zen_browser_uses_firefox_lwt_and_zen_custom_properties(self):
         # Firefox's own Lightweight Theme variables are the reliable baseline (stable for

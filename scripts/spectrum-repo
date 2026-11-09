@@ -24,6 +24,7 @@ PACKAGE_NAMES = (
     "spectrum-hyprland",
     "spectrum-base",
     "spectrum-igor",
+    "spectrum-magnet",
     "spectrum-desktop",
     "spectrum-plymouth",
     "spectrum-sddm",

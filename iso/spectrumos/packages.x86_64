@@ -76,6 +76,7 @@ open-iscsi
 openpgp-card-tools
 openssh
 playerctl
+pipewire-jack
 plymouth
 polkit-gnome
 partclone
@@ -111,3 +112,5 @@ wireplumber
 xdg-utils
 zram-generator
 zsh
+spectrum-desktop
+spectrum-magnet

@@ -37,19 +37,19 @@ scripts/spectrum-repo verify --channel edge
 
 The result is written below `repo/output/edge/x86_64/`. Each package has a detached signature. `spectrumos.db.tar.zst`, `snapshot.json`, and both detached signatures describe one coherent snapshot.
 
-Host builds are development-only. To create a snapshot eligible for Testing, first generate the immutable source archive, build all nine recipes through `pkgctl build`, and import the resulting artifacts:
+Host builds are development-only. To create a snapshot eligible for Testing, first generate the immutable source archive, build the dependency-ordered recipes through `pkgctl build`, and import the resulting artifacts:
 
 ```bash
 scripts/build-ukvm-source /path/to/UKVM
 scripts/build-source-archive --build
-# Build the nine dependency-ordered PKGBUILDs with pkgctl build.
+# Build the dependency-ordered PKGBUILDs with pkgctl build.
 scripts/spectrum-repo import-clean
 scripts/spectrum-repo verify --channel edge
 scripts/spectrum-repo promote edge testing
 scripts/spectrum-repo verify --channel testing
 ```
 
-The importer selects the exact artifact named by each current recipe. It rejects a package unless `.BUILDINFO` identifies Arch `devtools`, clean-chroot paths, and the exact current PKGBUILD checksum. The signed manifest retains this evidence for all nine packages.
+The importer selects the exact artifact named by each current recipe. It rejects a package unless `.BUILDINFO` identifies Arch `devtools`, clean-chroot paths, and the exact current PKGBUILD checksum. The signed manifest retains this evidence for every selected package.
 
 The signed repository owns Spectrum-maintained code and defaults. Third-party Arch packages continue to update from the official Arch repositories. Reviewed AUR applications such as Gowall, Vesktop, and Paru remain a separate transaction managed by Paru; they are not silently republished under the Spectrum signing identity. Browser binaries with separate redistribution terms are also not mirrored here.
 
@@ -100,3 +100,19 @@ Never copy a production private key into this repository, an ISO source tree, CI
 M18 adds the independent `ukvm` package and the explicitly managed `spectrum-xdg-desktop-portal-hyprland` replacement. See [UKVM production integration](../docs/ukvm-production.md) for source pins, dependency order, migration and acceptance gates.
 
 SpectrumDrop is built from the maintained transfer/AWDL source in this repository and installed as a desktop dependency. The `spectrumdrop` package replaces the earlier optional `omdrop` and `omdrop-owl` integration packages; those recipes are retained as historical development artifacts, not selected for release.
+
+Magnet is maintained as `spectrum-magnet` and required by `spectrum-desktop`.
+Build it before Desktop. Its Rust source snapshot, lockfile, MIT license, and
+provenance are under `integrations/magnet`; its recipe uses the same immutable
+Spectrum source archive. Dependency fetching is locked in `prepare()`, while
+compilation and tests run frozen without network access. The engine starts on
+demand and installs no login service. Updating the Desktop package pulls Magnet
+into existing installations through Pacman dependency resolution; subsequent
+Magnet releases can update independently. The Update widget recognizes its
+`spectrum-` package prefix automatically.
+
+Before publishing this integration, clean-build `spectrum-magnet`, Desktop, and
+the current Hyprland shortcut defaults, import the complete candidate set, and
+publish it through the normal signed channel workflow. Existing snapshots remain
+unchanged until publication. The ISO's `check-bundled-apps` preflight requires the
+Magnet package, Desktop dependency, engine binary, launcher, adapter, and widget.

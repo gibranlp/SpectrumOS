@@ -30,6 +30,11 @@ with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as tempora
     for line in ['    WlrLayershell.keyboardFocus: panelFocus.mode\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-utilitypanel"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
         source=source.replace(line,'',1)
     panel.write_text(source)
+    calculator=directory/'configs/spectrum-shell/CalculatorPanel.qml'
+    source=calculator.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:1280;implicitHeight:900',1)
+    for line in ['    WlrLayershell.keyboardFocus: panelFocus.mode\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-calculator"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:
+        source=source.replace(line,'',1)
+    calculator.write_text(source)
     dashboard=directory/'configs/spectrum-shell/Dashboard.qml'
     source=dashboard.read_text().replace('PanelWindow {','FloatingWindow {\n    implicitWidth:800;implicitHeight:1000',1)
     for line in ['    WlrLayershell.keyboardFocus: panelFocus.mode\n','    exclusionMode: ExclusionMode.Ignore\n','    WlrLayershell.layer: WlrLayer.Top\n','    WlrLayershell.namespace: "spectrum-widget-dashboard"\n','    anchors { top: true; bottom: true; left: true; right: true }\n']:

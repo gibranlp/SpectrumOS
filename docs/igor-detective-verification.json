@@ -1,0 +1,55 @@
+{
+  "version": "0.3.4",
+  "published": true,
+  "local_installed": true,
+  "runtime_ready": true,
+  "installed_files_missing": 0,
+  "week": {
+    "outfit": "detective",
+    "start": "2026-11-09",
+    "end_exclusive": "2026-11-16",
+    "activation": "once_per_user_preserves_subsequent_choices"
+  },
+  "fixes": [
+    "explicit_paw_z_above_accessory_layers",
+    "magnified_eye_opacity_follows_blink"
+  ],
+  "checks": [
+    {
+      "argv": [
+        "python3",
+        "/tmp/igor-detective-fix/scripts/check.py",
+        "--suite",
+        "tst_IgorOutfitRig,tst_IgorSleeper"
+      ],
+      "exit_code": 0,
+      "passed": 41
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/tmp/igor-detective-fix/tests",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "passed": 96
+    },
+    {
+      "argv": [
+        "makepkg",
+        "--force",
+        "--nodeps",
+        "--noconfirm"
+      ],
+      "exit_code": 0,
+      "passed": 7
+    }
+  ],
+  "private_source": "/home/gibranlp/Projects/Igor"
+}
