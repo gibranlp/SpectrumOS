@@ -34,7 +34,7 @@ def notify(message, critical=False):
 
 def definitions():
     root = ET.Element('actions')
-    items = [('terminal', 'Open Kitty here', 'utilities-terminal', '*', '', 'directories', '1'),
+    items = [('terminal', 'Open Ghostty here', 'utilities-terminal', '*', '', 'directories', '1'),
              ('wallpaper', 'Set as Spectrum wallpaper', 'preferences-desktop-wallpaper',
               '*.png;*.jpg;*.jpeg;*.webp;*.PNG;*.JPG;*.JPEG;*.WEBP', '', 'image-files', '1')]
     patterns = ';'.join(f'*.{suffix}' for suffix in ('png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'bmp', 'avif')
@@ -269,7 +269,7 @@ def main(args):
             directory = Path(args[1]).resolve(strict=True)
             if not directory.is_dir():
                 raise ValueError('Select a folder')
-            subprocess.Popen(['kitty', '--directory', str(directory)], start_new_session=True)
+            subprocess.Popen(['ghostty', '--working-directory='+str(directory)], start_new_session=True)
         elif len(args) == 2 and args[0] == 'wallpaper':
             set_wallpaper(Path(args[1]))
         elif args and args[0] == 'merge-pdf':

@@ -6,3 +6,4 @@ hl.env("QT_STYLE_OVERRIDE", "kvantum")
 -- qt6ct.conf respectively through this one value; appearance-sync keeps both files' fonts
 -- in sync with the global font-size control.
 hl.env("QT_QPA_PLATFORMTHEME", "qt5ct")
+hl.env("GTK_IM_MODULE", os.getenv("GTK_IM_MODULE") or "simple")

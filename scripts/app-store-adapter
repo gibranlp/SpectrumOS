@@ -374,7 +374,7 @@ def start(target):
         with launcher_path.open('w') as launcher_log:
             launcher = subprocess.Popen([
                 'uwsm', 'app', '--', '/usr/bin/env', 'XDG_STATE_HOME='+state_home, 'XDG_CACHE_HOME='+cache_home,
-                'kitty', '--hold', '--title', 'App Store · '+target.get('name', 'Installation'),
+                'ghostty', '--wait-after-command=true', '--title=App Store · '+target.get('name', 'Installation'),
                 '-e', '/usr/bin/script', '--quiet', '--return', '--flush', '--log-out', str(path/'terminal.log'),
                 '--command', command], stdin=subprocess.DEVNULL, stdout=launcher_log, stderr=launcher_log,
                 start_new_session=True, close_fds=True)

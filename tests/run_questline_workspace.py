@@ -11,10 +11,16 @@ root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='spectrum-questline-widget-') as temporary:
     directory=Path(temporary)
     shutil.copytree(root/'configs/spectrum-shell',directory/'configs/spectrum-shell')
+    sound_component = directory/'configs/spectrum-shell/QuestlineSound.qml'
+    sound_source = sound_component.read_text().replace('id: sounds', 'id: sounds\n    objectName: "test-questline-sounds"\n    property var events: []')
+    sound_component.write_text(sound_source.replace('function play(event): void {', 'function play(event): void {\n        events = events.concat([event]);'))
     for name in ['questline-adapter','questline-action','spectrum-shell-tools','hotkey-adapter','spectrumdrop-adapter']:
         shutil.copy2(root/'tests/fixtures/questline-widget-backend.py',directory/name)
         (directory/name).chmod(0o755)
     shutil.copy2(root/'scripts/questline-widget-state',directory/'questline-widget-state')
+    sound = directory/'questline-sound'
+    sound.write_text('#!/bin/sh\nexit 0\n')
+    sound.chmod(0o755)
     catalog={'available':True,'installed':True,'actions_available':True,'sidequests_available':True,'chronicles_available':True,'treasury_fields_available':True,
       'campaigns':[{'id':'campaign-a','name':'Alpha','is_shared':False},{'id':'campaign-b','name':'Beta','is_shared':False},{'id':'shared','name':'Shared','is_shared':True}],
       'tasks':[{'id':'task-a','project_id':'campaign-a','title':'Task','description':'original task','priority':'Medium','campaign':'Alpha','completed':False}],

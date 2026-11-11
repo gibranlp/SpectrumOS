@@ -71,6 +71,24 @@ def render_kitty(palette: Palette, font_size: int = 13, font_family: str = DEFAU
     return "\n".join(lines)
 
 
+def render_ghostty(palette: Palette, font_size: int = 13, font_family: str = DEFAULT_FONT_FAMILY) -> str:
+    names = {"font_family": "font-family", "font_size": "font-size", "background": "background",
+             "foreground": "foreground", "selection_background": "selection-background",
+             "selection_foreground": "selection-foreground", "cursor": "cursor-color",
+             "cursor_text_color": "cursor-text"}
+    lines = []
+    for line in render_kitty(palette, font_size, font_family).splitlines():
+        fields = line.split(maxsplit=1)
+        if len(fields) != 2:
+            continue
+        key, value = fields
+        if key in names:
+            lines.append(f"{names[key]} = {value}")
+        elif key.startswith("color") and key[5:].isdigit():
+            lines.append(f"palette = {key[5:]}={value}")
+    return "\n".join(lines) + "\n"
+
+
 def render_cava(palette: Palette, font_size: int = 13, font_family: str = DEFAULT_FONT_FAMILY) -> str:
     return "\n".join((
         "[color]",
@@ -1907,6 +1925,7 @@ RENDERERS = {
     "hyprland.lua": render_hyprland,
     "hyprlock.conf": render_hyprlock,
     "kitty.conf": render_kitty,
+    "ghostty.conf": render_ghostty,
     "cava.theme": render_cava,
     "alacritty.toml": render_alacritty,
     "colors/spectrum.lua": render_neovim,

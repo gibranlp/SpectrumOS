@@ -69,15 +69,15 @@ PanelWindow {
             animationsEnabled: widget.theme.animationsEnabled !== false
             bounceEnabled: widget.theme.widgetBounceEnabled !== false
             expanded: widget.expanded
-            edge: widget.barPosition === "top" ? "top" : "left"
+            edge: widget.page === "igor" ? "right" : widget.barPosition === "top" ? "top" : "left"
             viewportWidth: widget.screen.width
             viewportHeight: widget.screen.height
         }
         topAttachmentHeight: widget.theme.barStyle === "islands" && widget.theme.barPosition === "top"
             ? Math.max(0, y - 8) : 0
         attachTop: widget.barPosition === "top"
-        attachRight: widget.barPosition === "top"
-        attachLeft: widget.barPosition === "left"
+        attachRight: widget.page === "igor" || widget.barPosition === "top"
+        attachLeft: widget.page !== "igor" && widget.barPosition === "left"
         leftAttachmentWidth: widget.theme.barStyle === "islands" && widget.theme.barPosition === "left"
             ? Math.max(0, x - leftFrameThickness) : 0
         attachBottom: widget.barPosition === "left" || widget.page === "igor"
@@ -87,7 +87,7 @@ PanelWindow {
         height: widget.page === "igor"
             ? widget.height - (widget.barPosition === "top" ? widget.panelTopInset : 16) - (widget.theme.gamingActive ? 0 : 8)
             : Math.min(contentHeight, availableHeight)
-        x: widget.barPosition === "top" ? widget.width - width : widget.panelLeftInset
+        x: widget.page === "igor" || widget.barPosition === "top" ? widget.width - width : widget.panelLeftInset
         y: widget.barPosition === "top" ? widget.panelTopInset : widget.height - height - (widget.theme.gamingActive ? 0 : 8)
         radius: 26
         color: widget.theme.colors.surface

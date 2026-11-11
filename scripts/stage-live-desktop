@@ -22,6 +22,7 @@ def stage(project, destination, theme):
     (generation.parent.parent / "current").symlink_to("generations/live")
     for source, target in [
         ("configs/environment/90-spectrumos-qt.conf", ".config/environment.d/90-spectrumos-qt.conf"),
+        ("configs/terminal/ghostty-user.conf", ".config/ghostty/config"),
         ("configs/terminal/kitty-user.conf", ".config/kitty/kitty.conf"),
         ("configs/terminal/alacritty-user.toml", ".config/alacritty/alacritty.toml"),
     ]:

@@ -42,7 +42,9 @@ class AppStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {'XDG_STATE_HOME':temporary}):
             def launch(argv, **kwargs):
                 self.assertEqual(argv[:4], ['uwsm', 'app', '--', '/usr/bin/env'])
-                self.assertEqual(argv[7], '--hold')
+                self.assertEqual(argv[6], 'ghostty')
+                self.assertEqual(argv[7], '--wait-after-command=true')
+                self.assertTrue(argv[8].startswith('--title='))
                 self.assertIn('--log-out', argv)
                 self.assertNotIn('--log-in', argv)
                 self.assertNotIn('--log-io', argv)

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
-local=Path.home()/'.local/bin/questline'
-binary=str(local) if local.is_file() and os.access(local,os.X_OK) else shutil.which('questline')
-if not binary:
+binary=os.environ.get('SPECTRUM_QUESTLINE_BINARY') or '/usr/bin/questline'
+if not (Path(binary).is_file() and os.access(binary,os.X_OK)):
     print('Questline is required for background sync.',file=sys.stderr)
     raise SystemExit(1)
 result=subprocess.run([binary,'--help'],capture_output=True,text=True,timeout=5)

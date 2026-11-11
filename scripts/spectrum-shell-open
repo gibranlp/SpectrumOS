@@ -84,7 +84,7 @@ case $fallback in
     emoji) exec /usr/lib/spectrumos/panel --emoji ;;
     color) exec /usr/lib/spectrumos/panel --color-picker ;;
     recorder) exec /usr/lib/spectrumos/recorder-menu ;;
-    updates) exec uwsm app -- kitty --hold -e /usr/lib/spectrumos/spectrum-update-run all ;;
+    updates) exec uwsm app -- ghostty --wait-after-command=true -e /usr/lib/spectrumos/spectrum-update-run all ;;
     appearance) exec /usr/lib/spectrumos/panel --appearance ;;
     displays) exec /usr/lib/spectrumos/display-menu ;;
     weather) exec /usr/lib/spectrumos/weather-adapter select-native ;;

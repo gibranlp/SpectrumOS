@@ -5,6 +5,7 @@ Comment=Search for torrents and manage downloads in the terminal
 Exec=/usr/lib/spectrumos/magnet-open
 Icon=folder-download
 Terminal=false
+StartupWMClass=com.spectrumos.magnet
 Categories=Network;FileTransfer;
 Keywords=Torrent;Magnet;Download;Search;
 Actions=Downloads;

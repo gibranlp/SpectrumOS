@@ -9,7 +9,7 @@ import unittest
 import uuid
 from datetime import datetime,timezone
 
-BINARY=Path(os.environ.get('QUESTLINE_TEST_BINARY',str(Path.home()/'.local/bin/questline')))
+BINARY=Path(os.environ.get('QUESTLINE_TEST_BINARY','/usr/bin/questline'))
 
 class QuestlineNotificationTests(unittest.TestCase):
     def setUp(self):
@@ -92,3 +92,29 @@ class QuestlineNotificationTests(unittest.TestCase):
             finally:
                 process.terminate();process.communicate(timeout=5)
         self.assertEqual(tokens[0],tokens[1])
+
+    def test_running_notifier_reloads_interval_and_withdraws_pending_reminder(self):
+        from datetime import date
+        state=dict(token=str(uuid.uuid4()),day=date.today().isoformat(),count=0,target=12,pending=False,acknowledged_at=int(time.time())-3600)
+        (self.root/'questline.hydration.json').write_text(json.dumps(state))
+        with sqlite3.connect(self.db) as db:
+            for key,value in [('hydration_enabled','true'),('hydration_interval_mins','30'),('hydration_active_from','0'),('hydration_active_to','24'),('hydration_target','12')]:
+                db.execute('INSERT OR REPLACE INTO settings VALUES (?,?)',(key,value))
+        process=subprocess.Popen([str(BINARY),'desktop-notifications'],env=self.env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+        try:
+            deadline=time.monotonic()+8
+            while not self.notifications() and time.monotonic()<deadline:time.sleep(0.02)
+            self.assertIn('--hint=string:x-questline-kind:hydration',self.notifications()[0])
+            with sqlite3.connect(self.db) as db:
+                db.execute("INSERT OR REPLACE INTO settings VALUES ('hydration_interval_mins','90')")
+            deadline=time.monotonic()+8
+            while len(self.notifications())<2 and time.monotonic()<deadline:time.sleep(0.02)
+            alerts=self.notifications()
+            self.assertEqual(len(alerts),2)
+            self.assertIn('--hint=string:x-questline-kind:hydration-clear',alerts[-1])
+            state=json.loads((self.root/'questline.hydration.json').read_text())
+            self.assertFalse(state['pending'])
+            with sqlite3.connect(self.db) as db:
+                self.assertEqual(db.execute('SELECT COALESCE(SUM(count),0) FROM hydration_log').fetchone()[0],0)
+        finally:
+            process.terminate();process.communicate(timeout=5)

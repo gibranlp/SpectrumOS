@@ -4,7 +4,6 @@ import datetime
 import uuid
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import time
@@ -12,6 +11,10 @@ import time
 
 def emit(value):
     print(json.dumps(value),flush=True)
+
+
+def progress(message):
+    emit(dict(phase='progress',message=message))
 
 
 def read_request():
@@ -74,18 +77,27 @@ def main():
         if not isinstance(code,str) or not code or len(code)>256:raise ValueError('No Transfer Code to copy.')
         subprocess.run(['wl-copy'],input=code,text=True,check=True,timeout=5)
         emit(dict(ok=True,message='Transfer Code copied. Keep it private.'));return
-    configured=os.environ.get('SPECTRUM_QUESTLINE_BINARY')
-    local=Path.home()/'.local/bin/questline'
-    binary=configured or (str(local) if local.is_file() and os.access(local,os.X_OK) else shutil.which('questline'))
-    if not binary:raise ValueError('Questline is not installed.')
+    binary=os.environ.get('SPECTRUM_QUESTLINE_BINARY') or '/usr/bin/questline'
+    if not (Path(binary).is_file() and os.access(binary,os.X_OK)):raise ValueError('Questline is not installed.')
     capability=subprocess.run([binary,'--help'],capture_output=True,text=True,timeout=5)
     if capability.returncode or 'sync-json' not in capability.stdout:raise ValueError('Update Questline to use Sync and profile controls.')
     if action=='export_profile' and not request.get('path'):
         request['path']=export_destination()
     if action=='restore_backup' and not request.get('path'):
+        progress('Choose a backup file in the file picker…')
         selected=choose_restore()
         if not selected:emit(dict(ok=True,cancelled=True,message='File selection canceled'));return
         request['path']=selected
+    stages={
+        'backup':'Creating a local backup; uploading an encrypted cloud copy if Cloud Sync is on…',
+        'export_profile':'Exporting the local profile; uploading an encrypted cloud copy if Cloud Sync is on…',
+        'restore_backup':'Reading and validating the backup for preview…',
+        'restore_cloud':'Downloading and validating the cloud profile for preview…',
+        'restore_identity':'Downloading and validating the transferred profile for preview…',
+        'sync_now':'Sending local changes and receiving cloud changes…',
+        'prune_tasks':'Finding completed tasks eligible for pruning…',
+    }
+    if action in stages:progress(stages[action])
     process=subprocess.Popen([binary,'sync-json'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,bufsize=1)
     try:
         process.stdin.write(json.dumps(request)+'\n');process.stdin.flush();request={}
@@ -95,7 +107,12 @@ def main():
             emit(value)
             if value.get('phase')=='preview':
                 decision=read_request()
-                if decision.get('confirm')==value.get('token') and action in ('restore_identity','restore_backup','restore_cloud'):preserve_drafts()
+                if decision.get('confirm')==value.get('token'):
+                    if action in ('restore_identity','restore_backup','restore_cloud'):
+                        progress('Saving widget drafts and a safety backup, then applying the restored profile…')
+                        preserve_drafts()
+                    elif action=='prune_tasks':progress('Saving a safety backup and pruning the confirmed tasks…')
+                else:progress('Canceling; keeping the current profile…')
                 process.stdin.write(json.dumps(decision)+'\n');process.stdin.flush()
         if process.wait(timeout=5):raise ValueError('Questline could not complete this operation. Your saved data has been preserved.')
     finally:

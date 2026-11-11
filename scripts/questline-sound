@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import argparse
+from contextlib import closing
+import fcntl
+import math
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+
+
+SOUNDS = {"open": "OpenTasks.mp3", "swarm": "NotificationSwarm.mp3", "hydration": "water-alert.mp3",
+          "complete": "focus-task-complete.ogg"}
+
+
+def effect_volume(database):
+    if not database.is_file():
+        return 0
+    with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)) as connection:
+        settings = dict(connection.execute(
+            "SELECT key, value FROM settings WHERE key IN ('sound_effects_enabled', 'sound_effects_volume')"))
+    if settings.get("sound_effects_enabled", "true") == "false":
+        return 0
+    try:
+        volume = float(settings.get("sound_effects_volume", "1"))
+    except ValueError:
+        volume = 1
+    if not math.isfinite(volume):
+        volume = 1
+    return round(20 * max(0, min(1, volume)))
+
+
+def play(event):
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    storage = Path(os.environ.get("QUESTLINE_STORAGE_DIR") or config / "questline")
+    volume = effect_volume(storage / "questline.db")
+    if not volume:
+        return
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime:
+        return
+    # El bloqueo dura toda la reproducción para no encimar el mismo efecto entre monitores.
+    with (Path(runtime) / ("spectrum-questline-sound-" + event + ".lock")).open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-loglevel", "error",
+                        "-volume", str(volume), "/usr/share/spectrumos/questline/sounds/" + SOUNDS[event]],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=30, check=False)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Play Questline widget effects using Questline sound settings")
+    parser.add_argument("event", choices=SOUNDS)
+    arguments = parser.parse_args()
+    try:
+        play(arguments.event)
+    except (OSError, sqlite3.Error, subprocess.TimeoutExpired):
+        pass

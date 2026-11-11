@@ -655,7 +655,7 @@ pacman() { printf '%s\\n' "$TEST_OWNER"; }
         for mime in ("image/jpeg", "image/png", "image/webp", "image/svg+xml"):
             self.assertIn(f"{mime}=swayimg.desktop", defaults)
         self.assertIn('configs/xdg/mimeapps.list', installer)
-        self.assertIn('for executable in Hyprland uwsm alacritty kitty nvim thunar swayimg', installer)
+        self.assertIn('for executable in Hyprland uwsm ghostty nvim thunar swayimg', installer)
         self.assertIn('[[ -r /etc/xdg/mimeapps.list ]]', installer)
 
     def test_desktop_manifest_includes_transfer_printing_and_samba_support(self):

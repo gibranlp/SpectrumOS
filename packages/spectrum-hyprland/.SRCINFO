@@ -1,6 +1,6 @@
 pkgbase = spectrum-hyprland
 	pkgdesc = Hyprland session defaults for SpectrumOS
-	pkgver = 1.0.5
+	pkgver = 1.0.6
 	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	install = spectrum-hyprland.install
@@ -17,7 +17,7 @@ pkgbase = spectrum-hyprland
 	depends = xdg-desktop-portal-gtk
 	options = !strip
 	options = !debug
-	source = spectrumos-source-1.0.0-50c79736c7c3a6cf.tar.zst
-	sha256sums = db1637d8e0c877410c7d6c8226a8843009652297ef24f258ff56daf3ce890c2e
+	source = spectrumos-source-1.0.0-b041ce1f913a8628.tar.zst
+	sha256sums = 70a32d5ec190c1bee480ce9011a376c7689b446a0d469d40b6f2191c7abdfc53
 
 pkgname = spectrum-hyprland

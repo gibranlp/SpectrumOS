@@ -8,7 +8,7 @@ import unittest
 import uuid
 from datetime import datetime, timezone
 
-BINARY=Path(os.environ.get('QUESTLINE_TEST_BINARY',str(Path.home()/'.local/bin/questline')))
+BINARY=Path(os.environ.get('QUESTLINE_TEST_BINARY','/usr/bin/questline'))
 
 class QuestlineAutosaveTests(unittest.TestCase):
     def setUp(self):

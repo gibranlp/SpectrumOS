@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -f ${HOME}/.local/bin/questline && -x ${HOME}/.local/bin/questline ]]; then
-    questline_binary=${HOME}/.local/bin/questline
-elif command -v questline >/dev/null 2>&1; then
-    questline_binary=$(command -v questline)
-else
+questline_binary=${SPECTRUM_QUESTLINE_BINARY:-/usr/bin/questline}
+if [[ ! -f $questline_binary || ! -x $questline_binary ]]; then
     printf 'Questline is not installed.\n' >&2
     exit 1
 fi
 
 systemctl --user --no-block start spectrum-questline-notifications.service spectrum-questline-sync.service || true
 
-exec kitty --class questline -e "$questline_binary"
+exec ghostty --class=com.spectrumos.questline -e "$questline_binary"

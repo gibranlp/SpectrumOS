@@ -275,10 +275,22 @@ ShellRoot {
             if(action)action.invoke();
         }
     }
+    QuestlineSound { id: questlineSounds; backendDir: shell.backendDir }
+
     function acceptNotification(notification): void {
+        if (notification.appName === "Questline" && (notification.hints || {})["x-questline-kind"] === "hydration-clear") {
+            for (const old of Array.from(notificationServer.trackedNotifications.values)) {
+                if (NotificationStyle.kind(old) === "hydration") old.expire();
+            }
+            shell.notificationHistory = shell.notificationHistory.filter(item => NotificationStyle.kind(item) !== "hydration");
+            notification.tracked = false;
+            return;
+        }
         notification.tracked=true;
         if(notification.appName==="Spectrum Volume")return;
         const kind=NotificationStyle.kind(notification);
+        if (["swarm", "hydration"].includes(kind) && !shell.notificationHistory.some(item => item.notificationId === notification.id))
+            questlineSounds.play(kind);
         const token=NotificationStyle.token(notification);
         const id=notification.id;
         if(kind.startsWith("hydration")) {
@@ -288,7 +300,7 @@ ShellRoot {
         }
         removeNotificationToasts(id);
         const actions=JSON.stringify(NotificationStyle.actions(notification));
-        shell.notificationHistory=[{notification:notification,notificationId:id,appName:notification.appName,summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actions:[]},...shell.notificationHistory.filter(item=>item.notificationId!==id)].slice(0,50);
+        shell.notificationHistory=[{notification:notification,notificationId:id,appName:notification.appName,iconSource:shell.notificationIcon(notification),hints:notification.hints || {},summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actions:[]},...shell.notificationHistory.filter(item=>item.notificationId!==id)].slice(0,50);
         const persistent=NotificationStyle.palette(notification,shell.colors).persistent || notification.expireTimeout===0;
         const timeout=notification.expireTimeout>0 ? notification.expireTimeout : 5000;
         toastModel.append({toastId:++shell.nextToastId,notificationId:id,closing:false,closingAt:0,expiresAt:persistent?0:Date.now()+timeout,appName:notification.appName,iconSource:shell.notificationIcon(notification),summary:notification.summary,body:notification.body,questlineKind:kind,reminderToken:token,actionsJson:actions,actionBusy:false});
@@ -2037,7 +2049,10 @@ ShellRoot {
                         entry !== item && entry.notification !== item);
                 }
                 onQuestlineDrinkRequested:item=>shell.invokeNotificationAction(item.id,"questline-drink")
-                onUpdatesRequested:item=>shell.invokeNotificationAction(item.id,"spectrum-open-updates")
+                onUpdatesRequested:item=> {
+                    shell.openOnFocused("openUpdates");
+                    if (item.dismiss) item.dismiss();
+                }
                 onToggleDoNotDisturb: shell.doNotDisturb = !shell.doNotDisturb
             }
 

@@ -10,6 +10,11 @@ import tempfile
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='spectrum-notification-test-') as temporary:
     directory=Path(temporary);shutil.copytree(root/'configs/spectrum-shell',directory/'shell')
+    logo=directory/'logo.svg';shutil.copy2(root/'assets/branding/logo.svg',logo)
+    for component in (directory/'shell').glob('*.qml'):
+        source=component.read_text()
+        if '/usr/share/spectrumos/branding/logo.svg' in source:
+            component.write_text(source.replace('/usr/share/spectrumos/branding/logo.svg',str(logo)))
     backend=directory/'questline-action'
     backend.write_text('''#!/usr/bin/env python3
 import json,os,sys
@@ -32,7 +37,7 @@ print(json.dumps({'recorded':request['action']=='drink_water'}))
         methods.append(match.group())
     start=shell.index('    QuestlineNotificationActions {');end=shell.index('    function setNotificationBusy',start)
     methods.append(shell[start:end].replace('QuestlineNotificationActions {','Shell.QuestlineNotificationActions {',1))
-    test=(root/'tests/qml/QuestlineNotificationTests.qml').read_text().replace('../../configs/spectrum-shell','shell').replace('// SHELL_NOTIFICATION_METHODS','\n'.join(methods))
+    test=(root/'tests/qml/QuestlineNotificationTests.qml').read_text().replace('../../configs/spectrum-shell','shell').replace('// SHELL_NOTIFICATION_METHODS','\n'.join(methods)).replace('/usr/share/spectrumos/branding/logo.svg',str(logo))
     path=directory/'Test.qml';path.write_text(test);runtime=directory/'runtime';runtime.mkdir(mode=0o700)
     env=dict(os.environ,QT_QPA_PLATFORM='offscreen',QT_QUICK_BACKEND='software',XDG_RUNTIME_DIR=str(runtime),SPECTRUM_NOTIFICATION_TEST_DIR=str(directory))
     result=subprocess.run(['dbus-run-session','--','qs','--path',str(path),'--no-color'],env=env,capture_output=True,text=True,timeout=25)

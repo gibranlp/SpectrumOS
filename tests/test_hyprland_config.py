@@ -114,7 +114,7 @@ class HyprlandConfigTests(unittest.TestCase):
 
     def test_terminal_file_manager_and_audio_choices(self):
         bindings = (CONFIG_DIR / "keybindings.lua").read_text(encoding="utf-8")
-        self.assertIn("uwsm app -- kitty", bindings)
+        self.assertIn("uwsm app -- ghostty", bindings)
         self.assertNotIn('mainMod .. " + SHIFT + Return"', bindings)
         self.assertIn("uwsm app -- thunar", bindings)
         self.assertIn("/usr/lib/spectrumos/volume up", bindings)

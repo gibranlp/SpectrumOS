@@ -1,6 +1,6 @@
 pkgbase = spectrum-desktop
 	pkgdesc = Integrated SpectrumOS desktop frontends and visual defaults
-	pkgver = 1.1.37
+	pkgver = 1.1.38
 	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	arch = x86_64
@@ -47,7 +47,7 @@ pkgbase = spectrum-desktop
 	depends = hyprland
 	depends = hyprlock
 	depends = kdeconnect
-	depends = kitty
+	depends = ghostty
 	depends = kvantum
 	depends = kvantum-qt5
 	depends = libdbusmenu-gtk3
@@ -78,10 +78,10 @@ pkgbase = spectrum-desktop
 	depends = sddm
 	depends = slurp
 	depends = spectrum-base
-	depends = spectrum-hyprland>=1.0.5
+	depends = spectrum-hyprland>=1.0.6
 	depends = spectrum-plymouth
 	depends = spectrum-sddm
-	depends = spectrum-theme>=1.0.0-4
+	depends = spectrum-theme>=1.0.1
 	depends = swayimg
 	depends = systemd-libs
 	depends = thunar
@@ -186,12 +186,12 @@ pkgbase = spectrum-desktop
 	backup = etc/xdg/mimeapps.list
 	backup = etc/xdg/xdg-terminals.list
 	backup = etc/xdg/fastfetch/config.jsonc
-	source = spectrumos-source-1.0.0-842261cdafa09780.tar.zst
-	source = questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-tasks-a9c74783ee3385fa.tar.zst
+	source = spectrumos-source-1.0.0-1852adc20cf50345.tar.zst
+	source = questline-2.0.3-spectrum-hydration-96be4c0a326d57e4.tar.zst::https://spectrum.gibranlp.dev/sources/questline-2.0.3-spectrum-hydration-96be4c0a326d57e4.tar.zst
 	source = questline.LICENSE
 	source = stash-0.7.0-linux-x86_64::https://github.com/gibranlp/stash/releases/download/v0.7.0/stash-linux-x86_64
-	sha256sums = 98d30ce32153639878e74624aea80febbf9a0fb91a9e3ec93d3b44027eb0e5fd
-	sha256sums = a9c74783ee3385fa83fec6fd186543fbbc339a90bad833882c91e2eeba0aa495
+	sha256sums = 248cbec9d0111f47ba0da20d234ccefaebbd49815ccea27308704ed5d86e47d6
+	sha256sums = 96be4c0a326d57e4478e8786d546a135ea86f112b11fa04a4d7d0a7e4d1a18e8
 	sha256sums = 3efed6b0e985fae8682a49dce6785d829e37ce858a799e4b201e59fc14df1daa
 	sha256sums = 01c6f36216ea99770cf44979c756ae661ffb831acb3d9c1ba1af307e7e615802
 

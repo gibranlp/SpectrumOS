@@ -2,7 +2,6 @@
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
@@ -11,9 +10,8 @@ def main():
     if len(sys.argv) != 2:
         print(json.dumps({"error": "Missing Questline action"}))
         return 2
-    local_binary = Path.home() / ".local/bin/questline"
-    binary = str(local_binary) if local_binary.is_file() and os.access(local_binary, os.X_OK) else shutil.which("questline")
-    if not binary:
+    binary = os.environ.get("SPECTRUM_QUESTLINE_BINARY") or "/usr/bin/questline"
+    if not (Path(binary).is_file() and os.access(binary, os.X_OK)):
         print(json.dumps({"error": "Questline is not installed"}))
         return 1
     try:

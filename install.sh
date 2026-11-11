@@ -358,6 +358,8 @@ phase_system() {
     local source
     run sudo install -m 0644 "$PROJECT_ROOT"/configs/terminal/* /usr/share/spectrumos/terminal/
     run sudo install -Dm644 "$PROJECT_ROOT/configs/terminal/kitty-user.conf" /etc/skel/.config/kitty/kitty.conf
+    run sudo install -Dm644 "$PROJECT_ROOT/configs/terminal/ghostty-user.conf" /etc/skel/.config/ghostty/config
+    run sudo install -Dm644 "$PROJECT_ROOT/configs/environment/90-spectrumos-input.conf" /usr/lib/environment.d/90-spectrumos-input.conf
     run sudo install -Dm644 "$PROJECT_ROOT/configs/terminal/alacritty-user.toml" /etc/skel/.config/alacritty/alacritty.toml
     for source in "$PROJECT_ROOT"/configs/hyprland/*.lua "$PROJECT_ROOT"/configs/hyprland/hypridle.conf; do
         run sudo install -m 0644 "$source" "/usr/share/spectrumos/hyprland/$(basename "$source")"
@@ -546,7 +548,7 @@ phase_system() {
         font-family-menu performance-mode resource-monitor session-menu spectrum-update-run window-pin-toggle spectrum-shell spectrum-shell-launcher spectrum-shell-open spectrum-shell-session spectrum-shell-layout spectrum-gaming-session \
         waybar-workspace-icons \
         spectrumdrop-adapter hotkey-adapter network-adapter system-adapter brightness-adapter control-adapter theme-adapter time-region-adapter mouse-adapter audio-recorder \
-        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open magnet-open magnet-adapter spectrum-sleep spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter; do
+        application-adapter app-store-adapter app-store-privileged app-store-paru-bridge appimage-adapter favorites-adapter media-adapter media-control workspace-layout spectrum-shell-tools thunar-actions thunar-productivity spectrum-desktop-cleanup spectrum-terminal-config spectrum-user-avatar questline-adapter questline-open questline-action questline-sound questline-notifications questline-sync questline-sync-control spectrum-update-check stash-open magnet-open magnet-adapter spectrum-sleep spectrum-focus spectrum-breaks local-services-adapter default-apps-adapter; do
         run sudo install -m 0755 "$PROJECT_ROOT/scripts/$desktop_script" "/usr/lib/spectrumos/$desktop_script"
     done
     run sudo install -m 0644 "$PROJECT_ROOT/system/pacman-hooks/90-spectrumos-desktop-cleanup.hook" \
@@ -567,6 +569,8 @@ phase_system() {
     run sudo install -Dm 0644 "$PROJECT_ROOT/integrations/stash/stash.desktop" /usr/share/applications/stash.desktop
     run sudo install -Dm 0644 "$PROJECT_ROOT/system/autostart/spectrum-kdeconnect-indicator.desktop" /etc/xdg/autostart/spectrum-kdeconnect-indicator.desktop
     run sudo install -m 0755 "$PROJECT_ROOT/integrations/questline/spectrum-focus" /usr/lib/spectrumos/questline-focus
+    run sudo install -d -m0755 /usr/share/spectrumos/questline/sounds
+    run sudo install -m0644 "$PROJECT_ROOT"/integrations/questline/sounds/* /usr/share/spectrumos/questline/sounds/
     run sudo install -Dm755 "$PROJECT_ROOT/scripts/spectrum-sleep" /usr/bin/spectrum-sleep
     run sudo install -Dm644 "$PROJECT_ROOT/docs/sleep.md" /usr/share/doc/spectrumos/sleep.md
     local sleep_unit
@@ -769,7 +773,7 @@ phase_validate() {
             "$TARGET_HOME/.config/hypr/hyprland.lua" || die "User Hyprland entrypoint differs from system defaults"
         [[ -e $TARGET_HOME/.cache/spectrumos/theme/current/hyprland.lua ]] || die "Active theme is missing"
         local executable
-        for executable in Hyprland uwsm alacritty kitty nvim thunar swayimg qs hyprlock notify-send wpctl playerctl brightnessctl ffmpeg awww kvantummanager bluetoothctl wf-recorder; do
+        for executable in Hyprland uwsm ghostty nvim thunar swayimg qs hyprlock notify-send wpctl playerctl brightnessctl ffmpeg awww kvantummanager bluetoothctl wf-recorder; do
             command -v "$executable" >/dev/null || die "Required executable is missing: $executable"
         done
         [[ -r $TARGET_HOME/.config/nvim/init.lua ]] || die "Neovim configuration is missing"

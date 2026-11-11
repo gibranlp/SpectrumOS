@@ -4,7 +4,6 @@ import html
 import hashlib
 import os
 from pathlib import Path
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -272,10 +271,9 @@ def main():
         print("Usage: questline-adapter --json", file=sys.stderr)
         return 2
     database_path = storage_path()
-    local_binary = Path.home() / ".local/bin/questline"
-    binary = str(local_binary) if local_binary.is_file() and os.access(local_binary, os.X_OK) else shutil.which("questline")
-    result = {"available": False, "installed": bool(binary), "needs_onboarding": False}
-    if binary:
+    binary = os.environ.get("SPECTRUM_QUESTLINE_BINARY") or "/usr/bin/questline"
+    result = {"available": False, "installed": Path(binary).is_file() and os.access(binary, os.X_OK), "needs_onboarding": False}
+    if result["installed"]:
         try:
             help_result = subprocess.run([binary, "--help"], capture_output=True, text=True, timeout=2)
             result["actions_available"] = help_result.returncode == 0 and "shell-action" in help_result.stdout
@@ -286,7 +284,7 @@ def main():
         except (OSError, subprocess.TimeoutExpired):
             result["actions_available"] = False
     defaults = {}
-    if binary:
+    if result["installed"]:
         try:
             capability = subprocess.run([binary, "shell-action", '{"action":"capabilities"}'],
                                         capture_output=True, text=True, timeout=2)

@@ -9,4 +9,4 @@ Terminal=false
 Categories=AudioVideo;Audio;Music;Player;
 Keywords=music;audio;player;library;
 MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-wav;audio/mp4;audio/aac;
-StartupWMClass=stash
+StartupWMClass=com.spectrumos.stash

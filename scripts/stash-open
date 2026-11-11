@@ -7,4 +7,4 @@ if [[ ! -x $stash_binary ]]; then
     exit 1
 fi
 
-exec kitty --class stash -e "$stash_binary" "$@"
+exec ghostty --class=com.spectrumos.stash -e "$stash_binary" "$@"

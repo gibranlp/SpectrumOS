@@ -463,6 +463,14 @@ def setting(schema: str, key: str, value: str) -> None:
         pass
 
 
+def ensure_gtk_input_method() -> None:
+    result = subprocess.run(("gsettings", "get", "org.gnome.desktop.interface", "gtk-im-module"),
+                            capture_output=True, text=True, check=False, timeout=2)
+    if result.returncode == 0 and result.stdout.strip() in ("''", '""'):
+        # El ajuste en vivo también llega al proceso de Ghostty que ya está abierto.
+        setting("org.gnome.desktop.interface", "gtk-im-module", os.environ.get("GTK_IM_MODULE") or "simple")
+
+
 def font_size() -> int:
     state_file = (
         Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "spectrumos/typography/font-size"
@@ -607,6 +615,7 @@ def apply(include_rgb: bool = True) -> str:
         theme = ensure_gtk_theme(variant)
         for version in ("3", "4"):
             refresh("GTK " + version, lambda version=version: (ensure_import(version), ensure_gtk_settings(version, theme, variant)))
+        refresh("GTK input method", ensure_gtk_input_method)
         setting("org.gnome.desktop.interface", "gtk-theme", theme)
         setting("org.gnome.desktop.interface", "color-scheme", "prefer-dark" if variant == "dark" else "prefer-light")
 
@@ -630,6 +639,13 @@ def apply(include_rgb: bool = True) -> str:
         refresh(name, action)
     try:
         subprocess.run(("pkill", "-USR1", "-u", str(os.getuid()), "-x", "cava"), check=False, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        running = subprocess.run(("gapplication", "list-apps"), capture_output=True, text=True, check=False, timeout=3)
+        if "com.mitchellh.ghostty" in running.stdout.splitlines():
+            subprocess.run(("gapplication", "action", "com.mitchellh.ghostty", "reload-config"),
+                           check=False, timeout=3, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired):
         pass
     if failures:

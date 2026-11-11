@@ -194,12 +194,12 @@ class QuestlineChronicleTests(unittest.TestCase):
 
 
 class QuestlineBinarySelectionTests(unittest.TestCase):
-    def test_all_helpers_prefer_the_user_install_and_fall_back_to_path(self):
+    def test_helpers_use_explicit_binary_override_instead_of_home_or_path(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             local = home / ".local/bin/questline"
             packaged = home / "system-bin/questline"
-            kitty = packaged.parent / "kitty"
+            kitty = packaged.parent / "ghostty"
             for binary, marker in ((local, "local"), (packaged, "packaged")):
                 binary.parent.mkdir(parents=True, exist_ok=True)
                 binary.write_text(
@@ -213,6 +213,7 @@ class QuestlineBinarySelectionTests(unittest.TestCase):
             environment = {**os.environ, "HOME": str(home), "QUESTLINE_STORAGE_DIR": str(home / "profile"),
                            "PATH": str(packaged.parent) + ":/usr/bin"}
             for expected in (local, packaged):
+                environment["SPECTRUM_QUESTLINE_BINARY"] = str(expected)
                 state = json.loads(subprocess.check_output(
                     [str(ROOT / "scripts/questline-adapter"), "--json"], env=environment, text=True))
                 self.assertEqual(state["actions_available"], expected == local)
@@ -222,8 +223,23 @@ class QuestlineBinarySelectionTests(unittest.TestCase):
                 self.assertEqual(result["source"], "local" if expected == local else "packaged")
                 opened = json.loads(subprocess.check_output(
                     [str(ROOT / "scripts/questline-open")], env=environment, text=True))
-                self.assertEqual(opened, ["--class", "questline", "-e", str(expected)])
-                local.chmod(0o644)
+                self.assertEqual(opened, ["--class=com.spectrumos.questline", "-e", str(expected)])
+            environment.pop("SPECTRUM_QUESTLINE_BINARY")
+            default_open = subprocess.run(
+                [str(ROOT / "scripts/questline-open")], env=environment, capture_output=True, text=True)
+            if Path("/usr/bin/questline").is_file() and os.access("/usr/bin/questline", os.X_OK):
+                self.assertEqual(default_open.returncode, 0)
+                self.assertEqual(json.loads(default_open.stdout), ["--class=com.spectrumos.questline", "-e", "/usr/bin/questline"])
+            else:
+                self.assertEqual(default_open.returncode, 1)
+                self.assertIn("Questline is not installed.", default_open.stderr)
+            environment["SPECTRUM_QUESTLINE_BINARY"] = str(home / "missing")
+            state = json.loads(subprocess.check_output(
+                [str(ROOT / "scripts/questline-adapter"), "--json"], env=environment, text=True))
+            self.assertFalse(state["installed"])
+            result = subprocess.run(
+                [str(ROOT / "scripts/questline-open")], env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
 
 
 class QuestlineHeroTests(unittest.TestCase):

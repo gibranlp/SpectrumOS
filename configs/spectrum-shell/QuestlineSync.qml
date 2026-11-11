@@ -19,6 +19,12 @@ Flickable {
     property bool launchPending:false
     property bool finished:false
     property bool holdsWorkspace:false
+    property string progressMessage:""
+    property int elapsedSeconds:0
+    readonly property bool operationVisible:busy && action!=="status"
+    function duration(seconds):string {
+        return Math.floor(seconds/60)+":"+(seconds%60<10?"0":"")+(seconds%60);
+    }
     readonly property bool busy:runner.running || launchPending
     readonly property bool canAct:state.account!==undefined && workspace.ready && !workspace.storageError && !workspace.blocked && !busy && !workspace.busy && workspace.externalActions===0
     signal refreshRequested()
@@ -31,7 +37,11 @@ Flickable {
         if(busy || (name!=="status" && !canAct))return;
         action=name;error="";preview=null;finished=false;
         request=Object.assign({action:name,account:state.account===undefined?null:state.account},extra||{});
-        if(name!=="status") {workspace.externalActions++;holdsWorkspace=true;message=qsTranslate("Spectrum", "Working…");}
+        if(name!=="status") {
+            workspace.externalActions++;holdsWorkspace=true;message="";
+            elapsedSeconds=0;progressMessage=qsTranslate("Spectrum", "Starting operation…");
+            contentY=0;
+        }
         launchPending=true;
         runner.exec([backendDir+"/questline-sync-control"]);
     }
@@ -43,6 +53,10 @@ Flickable {
     function receive(line):void {
         try {
             const result=JSON.parse(line);
+            if(result.phase==="progress") {
+                progressMessage=result.message||qsTranslate("Spectrum", "Operation in progress…");
+                return;
+            }
             if(result.status) {
                 state=result.status;
                 if(state.profile_key && workspace.ready && typeof workspace.bindProfile==="function")workspace.bindProfile(state.profile_key);
@@ -71,6 +85,7 @@ Flickable {
         else {if(preview)decide(false);transferCode="";identityInput.text="";}
     }
     Timer {interval:3000;repeat:true;running:sync.active;onTriggered:sync.run("status")}
+    Timer {interval:1000;repeat:true;running:sync.operationVisible && !sync.preview && !sync.finished;onTriggered:sync.elapsedSeconds++}
     Process {
         id:runner
         stdinEnabled:true
@@ -108,6 +123,27 @@ Flickable {
         width:sync.width
         spacing:12
         Label {text:qsTranslate("Spectrum", "Sync & profile");font.bold:true;font.pixelSize:sync.theme.fontSize+4}
+        ColumnLayout {
+            visible:sync.operationVisible
+            Layout.fillWidth:true
+            Label {
+                objectName:"questline-sync-progress-stage"
+                text:sync.preview?qsTranslate("Spectrum", "Waiting for your confirmation — no restore or pruning has been applied."):sync.finished?qsTranslate("Spectrum", "Finishing…"):qsTranslate("Spectrum", sync.progressMessage)
+            }
+            Controls.ProgressBar {
+                objectName:"questline-sync-progress"
+                Layout.fillWidth:true
+                palette.highlight:sync.theme.colors.accent
+                indeterminate:visible && !sync.preview && !sync.finished
+                from:0;to:1;value:sync.finished && !sync.error?1:0
+                visible:!sync.preview
+            }
+            Label {
+                objectName:"questline-sync-progress-time"
+                text:qsTranslate("Spectrum", "Elapsed: ")+sync.duration(sync.elapsedSeconds)+(sync.preview?qsTranslate("Spectrum", " · paused for confirmation"):qsTranslate("Spectrum", " · Time remaining: unknown"))
+                color:sync.theme.colors.muted
+            }
+        }
         Label {objectName:"questline-sync-status";text:sync.busy?(sync.preview?qsTranslate("Spectrum", "Waiting for confirmation"):qsTranslate("Spectrum", "Operation in progress…")):sync.state.account===undefined?qsTranslate("Spectrum", "Sync status is unavailable"):!sync.state.available?qsTranslate("Spectrum", "No local profile — restore one below."):sync.state.recovery_hold?qsTranslate("Spectrum", "Recovery hold — restore before enabling sync."):!sync.state.cloud_enabled?qsTranslate("Spectrum", "Local only"):!sync.state.auto_sync?qsTranslate("Spectrum", "Automatic sync paused"):sync.state.error?qsTranslate("Spectrum", "Sync needs attention"):qsTranslate("Spectrum", "Automatic sync enabled")}
         Flow {
             Layout.fillWidth:true;spacing:8
@@ -116,10 +152,15 @@ Flickable {
             Button {objectName:"questline-sync-now";label:qsTranslate("Spectrum", "Sync Now");enabled:sync.canAct && !!sync.state.available && !!sync.state.cloud_enabled && !sync.state.recovery_hold;onClicked:sync.run("sync_now")}
             Button {label:qsTranslate("Spectrum", "Refresh");enabled:!sync.busy;onClicked:sync.run("status")}
         }
+        Label {
+            visible:!!sync.state.recovery_hold
+            text:qsTranslate("Spectrum", "Sync is paused to protect a copied, imported, or recovered profile. Turning Cloud Sync on does not clear this hold. Close the Questline terminal, then preview Restore cloud backup below. If this PC has changes that are missing on your other PC, export this profile first. Check the restore preview before confirming; restoring replaces this PC's local profile. After restoring, review your data and enable Auto Sync.")
+            color:sync.theme.colors.accent
+        }
         Label {text:(sync.state.queued||0)+qsTranslate("Spectrum", " pending · ")+(sync.state.deferred||0)+qsTranslate("Spectrum", " waiting · ")+(sync.state.quarantined||0)+qsTranslate("Spectrum", " quarantined")}
         Label {text:qsTranslate("Spectrum", "Last successful sync: ")+(sync.state.last_success?new Date(sync.state.last_success).toLocaleString():qsTranslate("Spectrum", "Not recorded"))}
         Label {text:qsTranslate("Spectrum", "Background service: ")+((sync.state.service||{}).active||qsTranslate("Spectrum", "Checking…"))+" · "+((sync.state.service||{}).enabled||"")}
-        Label {visible:!!sync.state.error;text:qsTranslate("Spectrum", sync.state.error)||"";color:sync.theme.colors.accent}
+        Label {visible:!!sync.state.error;text:qsTranslate("Spectrum", sync.state.error||"");color:sync.theme.colors.accent}
         Label {text:qsTranslate("Spectrum", "Disabling Auto Sync keeps changes saved locally. Sync Now still works when Cloud Sync is enabled.");color:sync.theme.colors.muted}
         Label {text:qsTranslate("Spectrum", "Backups and export");font.bold:true}
         Flow {

@@ -138,10 +138,10 @@ class ThunarActionsTests(unittest.TestCase):
             self.assertEqual(Path(run.call_args.args[0][2]).name, 'photo (1).png')
             self.assertEqual((library / source.name).read_bytes(), b'existing')
 
-    def test_kitty_directory_is_passed_as_one_argument(self):
+    def test_ghostty_directory_is_passed_as_one_argument(self):
         with tempfile.TemporaryDirectory(prefix='folder space ') as directory, patch.object(actions.subprocess, 'Popen') as popen:
             self.assertEqual(actions.main(['terminal', directory]), 0)
-            self.assertEqual(popen.call_args.args[0], ['kitty', '--directory', directory])
+            self.assertEqual(popen.call_args.args[0], ['ghostty', '--working-directory='+directory])
 
     def test_audio_menu_groups_formats_and_passes_all_selected_files(self):
         definitions = actions.definitions()
@@ -218,7 +218,7 @@ class ThunarActionsTests(unittest.TestCase):
         for mime in ('text/plain', 'text/x-python', 'application/json', 'application/yaml', 'application/toml', 'application/xml'):
             self.assertIn(mime + '=nvim.desktop', defaults)
         self.assertNotIn('inode/directory=nvim.desktop', defaults)
-        self.assertEqual((ROOT / 'configs/xdg/xdg-terminals.list').read_text().splitlines()[0], 'kitty.desktop')
+        self.assertEqual((ROOT / 'configs/xdg/xdg-terminals.list').read_text().splitlines()[0], 'com.mitchellh.ghostty.desktop')
         self.assertIn('xdg-terminal-exec', (ROOT / 'bootstrap/packages/desktop.txt').read_text().splitlines())
 
     def test_package_installer_and_session_include_actions(self):

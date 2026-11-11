@@ -40,6 +40,7 @@ class GenerationTests(unittest.TestCase):
                     "hyprland.lua",
                     "hyprlock.conf",
                     "kitty.conf",
+                    "ghostty.conf",
                     "cava.theme",
                     "alacritty.toml",
                     "colors",
@@ -82,12 +83,15 @@ class GenerationTests(unittest.TestCase):
             self.assertIn("font-size: 18px", (generation / "gtk-4.css").read_text())
             self.assertIn("font-size: 18px", (generation / "gtk-4.css").read_text())
             self.assertIn('"font_size": 18', (generation / "generation.json").read_text())
+            self.assertIn("font-size = 18", (generation / "ghostty.conf").read_text())
 
     def test_generation_records_and_renders_font_family(self):
         with tempfile.TemporaryDirectory() as directory:
             generation = generate(PALETTE, Path(directory) / "theme", font_family="FiraCode Nerd Font")
 
             self.assertIn("font_family FiraCode Nerd Font", (generation / "kitty.conf").read_text())
+            self.assertIn("font-family = FiraCode Nerd Font", (generation / "ghostty.conf").read_text())
+            self.assertIn("palette = 15=", (generation / "ghostty.conf").read_text())
             self.assertIn('family = "FiraCode Nerd Font"', (generation / "alacritty.toml").read_text())
             self.assertIn('"font_family": "FiraCode Nerd Font"', (generation / "generation.json").read_text())
 

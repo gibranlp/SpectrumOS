@@ -14,6 +14,11 @@ Scope {
     property string backendDir:Quickshell.env("SPECTRUM_NOTIFICATION_TEST_DIR")
     property var fixtures:[]
     property var updatesRequests:[]
+    QtObject {
+        id: questlineSounds
+        property var events: []
+        function play(event) { events = events.concat([event]); }
+    }
     function openOnFocused(method){updatesRequests=updatesRequests.concat([method]);}
     ListModel {id:toastModel}
     property bool nativeMode:false
@@ -94,7 +99,10 @@ Scope {
         expanded:false
         topInset:8
         onQuestlineDrinkRequested:item=>shell.invokeNotificationAction(item.id,"questline-drink")
-        onUpdatesRequested:item=>shell.invokeNotificationAction(item.id,"spectrum-open-updates")
+        onUpdatesRequested:item=> {
+                    shell.openOnFocused("openUpdates");
+                    if (item.dismiss) item.dismiss();
+                }
     }
     TestCase {
         name:"QuestlineNotifications"
@@ -103,6 +111,25 @@ Scope {
         function settle(){tryVerify(()=>questlineNotificationActions.job===null && questlineNotificationActions.queue.length===0,5000);wait(30);}
         function init(){shell.updatesRequests=[];settle();toastModel.clear();shell.nativeMode=qtest_results.functionName.startsWith("test_native_");if(!shell.nativeMode)fakeNotificationServer.trackedNotifications={values:[]};shell.notificationHistory=[];shell.colors={surface:"#222222",surface_alt:"#333333",foreground:"#eeeeee",muted:"#aaaaaa",accent:"#ffbb00"};}
         function cleanup(){center.expanded=false;if(shell.nativeMode)for(const item of Array.from(liveNotificationServer.trackedNotifications.values))item.dismiss();settle();toastModel.clear();if(!shell.nativeMode)fakeNotificationServer.trackedNotifications={values:[]};for(const item of shell.fixtures)item.destroy();shell.fixtures=[];}
+        function test_swarm_sound_plays_once_for_new_notification(){
+            questlineSounds.events = [];
+            const item = makeNotification(901, {hints:{"x-questline-kind":"swarm"}});
+            compare(questlineSounds.events.length, 1);
+            compare(questlineSounds.events[0], "swarm");
+            acceptNotification(item);
+            compare(questlineSounds.events.length, 1);
+            makeNotification(902, {appName:"Other app"});
+            compare(questlineSounds.events.length, 1);
+        }
+        function test_hydration_reminder_sound_excludes_progress_and_replacements(){
+            questlineSounds.events = [];
+            const item = makeNotification(903);
+            compare(questlineSounds.events.join(","), "hydration");
+            acceptNotification(item);
+            compare(questlineSounds.events.length, 1);
+            makeNotification(904, {hints:{"x-questline-kind":"hydration-progress"}});
+            compare(questlineSounds.events.length, 1);
+        }
         function test_purple_and_blue_remain_fixed_after_palette_changes(){
             try {
             makeNotification(1,{summary:"The Swarm",hints:{"x-questline-kind":"swarm"},expireTimeout:10000});makeNotification(2);
@@ -166,8 +193,9 @@ Scope {
             nativeNotification("hydration","native-refresh","4/12 today");tryVerify(()=>toastModel.count===1 && toastModel.get(0).body==="4/12 today",3000);compare(Array.from(liveNotificationServer.trackedNotifications.values).length,1);
         }
         function test_native_stable_update_button_opens_widget_once(){
-            Quickshell.execDetached(["notify-send","--app-name=SpectrumOS Updates","--expire-time=15000","--hint=string:x-spectrumos-kind:stable-updates","Fresh loot on Stable","1 SpectrumOS package update is ready."]);
+            Quickshell.execDetached(["notify-send","--app-name=SpectrumOS Updates","--expire-time=0","--hint=string:x-spectrumos-kind:stable-updates","Fresh loot on Stable","1 SpectrumOS package update is ready."]);
             tryCompare(toastModel,"count",1,3000);wait(50);
+            compare(toastModel.get(0).expiresAt,0);
             const button=findChild(cards.itemAt(0),"notification-actions").itemAt(0);compare(button.label,"Open Updates");
             mouseClick(button);wait(30);compare(shell.updatesRequests.length,1);compare(shell.updatesRequests[0],"openUpdates");compare(toastModel.count,0);
         }
@@ -176,6 +204,35 @@ Scope {
             center.expanded=true;wait(100);const list=findChild(center,"notification-center-items");list.forceLayout();wait(40);
             const entry=list.itemAtIndex(0);verify(entry!==null);const button=findChild(entry,"notification-center-open-updates");verify(button.visible);
             mouseClick(button);wait(30);compare(shell.updatesRequests.length,1);compare(shell.updatesRequests[0],"openUpdates");compare(toastModel.count,0);
+        }
+        function test_stable_update_survives_hidden_toast_and_retains_history_action(){
+            try {
+            window.visible=false;
+            const notice=makeNotification(81,{appName:"SpectrumOS Updates",appIcon:"/usr/share/spectrumos/branding/logo.svg",summary:"Fresh loot on Stable",hints:{"x-spectrumos-kind":"stable-updates"},expireTimeout:0});
+            wait(100);
+            compare(toastModel.count,1);compare(toastModel.get(0).expiresAt,0);
+            window.visible=true;
+            notice.expire();settle();
+            verify(NotificationStyle.isStableUpdate(shell.notificationHistory[0]));
+            compare(shell.notificationHistory[0].iconSource,"/usr/share/spectrumos/branding/logo.svg");
+            center.expanded=true;wait(100);
+            const list=findChild(center,"notification-center-items");list.forceLayout();wait(40);
+            const entry=list.itemAtIndex(0);verify(entry!==null);
+            const icon=findChild(entry,"notification-center-spectrum-icon");verify(icon.visible);
+            tryCompare(icon,"status",Image.Ready);
+            mouseClick(findChild(entry,"notification-center-open-updates"));
+            compare(shell.updatesRequests.length,1);
+            }catch(e){console.warn("stable_history",e.message,String(e.stack));throw e;}
+        }
+        function test_hydration_clear_withdraws_reminder_without_recording_drink(){
+            makeNotification(82);
+            makeNotification(83,{appName:"Other",hints:{},expireTimeout:0});
+            const clear=fakeNotification.createObject(shell,{id:84,appName:"Questline",hints:{"x-questline-kind":"hydration-clear"}});
+            fixtures=fixtures.concat([clear]);
+            acceptNotification(clear);settle();
+            compare(toastModel.count,1);compare(toastModel.get(0).appName,"Other");
+            compare(shell.notificationHistory.length,1);compare(shell.notificationHistory[0].appName,"Other");
+            verify(!clear.tracked);
         }
         function test_z_preview(){
             const file=Quickshell.env("SPECTRUM_NOTIFICATION_SCREENSHOT");if(!file)return;

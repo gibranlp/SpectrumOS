@@ -373,7 +373,7 @@ def proton_action(name: str, value: str | None) -> None:
     if not shutil.which("protonvpn"):
         raise ValueError("Install proton-vpn-cli first")
     if name == "vpn-signin":
-        subprocess.Popen(["kitty", "--title", "Proton VPN sign in", "--hold", sys.executable,
+        subprocess.Popen(["ghostty", "--title=Proton VPN sign in", "--wait-after-command=true", "-e", sys.executable,
                           str(Path(__file__).resolve()), "vpn-signin-prompt"],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)

@@ -134,6 +134,15 @@ PanelWindow {
                         spacing: 5
                         RowLayout {
                             Layout.fillWidth: true
+                            Image {
+                                objectName: "notification-center-spectrum-icon"
+                                Layout.preferredWidth: 24
+                                Layout.preferredHeight: 24
+                                source: NotificationStyle.isStableUpdate(modelData)
+                                    ? "file:///usr/share/spectrumos/branding/logo.svg" : ""
+                                visible: source.toString().length > 0
+                                fillMode: Image.PreserveAspectFit
+                            }
                             Text {
                                 text: modelData.appName || qsTranslate("Spectrum", "Application")
                                 color: noticeEntry.palette.accent

@@ -14,7 +14,7 @@ class StashIntegrationTests(unittest.TestCase):
     def test_launcher_preserves_paths_with_spaces(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            kitty = directory / "kitty"
+            kitty = directory / "ghostty"
             kitty.write_text("#!/usr/bin/env python3\nimport json, os, sys\nfrom pathlib import Path\nPath(os.environ['STASH_TEST_ARGUMENTS']).write_text(json.dumps(sys.argv[1:]))\n")
             kitty.chmod(0o755)
             output = directory / "arguments.json"
@@ -22,7 +22,7 @@ class StashIntegrationTests(unittest.TestCase):
             environment = {**os.environ, "PATH": f"{directory}:{os.environ['PATH']}",
                            "STASH_BINARY": "/usr/bin/true", "STASH_TEST_ARGUMENTS": str(output)}
             subprocess.run(["bash", str(ROOT / "scripts/stash-open"), track], env=environment, check=True)
-            self.assertEqual(json.loads(output.read_text()), ["--class", "stash", "-e", "/usr/bin/true", track])
+            self.assertEqual(json.loads(output.read_text()), ["--class=com.spectrumos.stash", "-e", "/usr/bin/true", track])
 
     def test_missing_binary_fails_before_starting_terminal(self):
         result = subprocess.run(["bash", str(ROOT / "scripts/stash-open")],

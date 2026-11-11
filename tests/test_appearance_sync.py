@@ -25,6 +25,16 @@ def load_module():
 
 
 class AppearanceSyncTests(unittest.TestCase):
+    def test_live_input_method_defaults_only_when_unconfigured(self):
+        module = load_module()
+        for current in ("''", "'simple'", "'fcitx'"):
+            with self.subTest(current=current), mock.patch.object(module.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, current)), mock.patch.object(module, "setting") as setting, mock.patch.dict(os.environ, {"GTK_IM_MODULE": "simple"}):
+                module.ensure_gtk_input_method()
+                if current == "''":
+                    setting.assert_called_once_with("org.gnome.desktop.interface", "gtk-im-module", "simple")
+                else:
+                    setting.assert_not_called()
+
     def test_gtk_defaults_work_without_a_session_bus_and_preserve_user_settings(self):
         module = load_module()
         with tempfile.TemporaryDirectory() as temporary:

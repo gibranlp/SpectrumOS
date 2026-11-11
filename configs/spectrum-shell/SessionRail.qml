@@ -101,11 +101,11 @@ Scope {
                         implicitWidth: 48
                         implicitHeight: 48
                         radius: 11
-                        color: rail.selectedIndex === index ? Qt.tint(rail.theme.colors.surface_alt, Qt.rgba(rail.theme.colors.accent.r, rail.theme.colors.accent.g, rail.theme.colors.accent.b, 0.35)) : actionMouse.containsMouse ? rail.theme.colors.surface_alt : "transparent"
+                        color: rail.selectedIndex === index ? rail.theme.colors.accent : actionMouse.containsMouse ? rail.theme.colors.surface_alt : "transparent"
                         Text {
                             anchors.centerIn: parent
                             text: modelData.icon
-                            color: rail.theme.colors.foreground
+                            color: rail.selectedIndex === index ? rail.theme.colors.background : rail.theme.colors.foreground
                             font { family: rail.theme.fontFamily; pixelSize: rail.theme.fontSize + 10 }
                         }
                         KeyboardAction {

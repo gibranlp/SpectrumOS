@@ -239,7 +239,7 @@ PanelWindow {
         { combo: "Super + 4", action: qsTranslate("Spectrum", "Switch to workspace 4"), command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = 4 })"] },
         { combo: "Super + 5", action: qsTranslate("Spectrum", "Switch to workspace 5"), command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = 5 })"] },
         { combo: "Super + 6", action: qsTranslate("Spectrum", "Switch to workspace 6"), command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = 6 })"] },
-        { combo: "Super + Return", action: qsTranslate("Spectrum", "Terminal"), command: ["uwsm", "app", "--", "kitty"] },
+        { combo: "Super + Return", action: qsTranslate("Spectrum", "Terminal"), command: ["uwsm", "app", "--", "ghostty"] },
         { combo: "Super + Shift + T", action: qsTranslate("Spectrum", "Time and region"), command: [backendDir + "/spectrum-shell-open", "time"] },
         { combo: "Super + Space", action: qsTranslate("Spectrum", "Toggle floating window"), command: ["hyprctl", "dispatch", "hl.dsp.window.float({ action = \"toggle\" })"] },
         { combo: "Super + F", action: qsTranslate("Spectrum", "Toggle fullscreen"), command: ["hyprctl", "dispatch", "hl.dsp.window.fullscreen()"] },
@@ -261,6 +261,7 @@ PanelWindow {
     mask: Region { item: panel.calculatorCompanion ? frame : backdrop }
 
     function open(name): void {
+        if (name === "questline" && (!expanded || page !== "questline")) questlineSounds.play("open");
         clearPasswordCopyFeedback();
         if (page === "questline") { rememberQuestline(); questlineWorkspace.flush(); }
         if (name === "questline") questlineContent.ensureLoaded();
@@ -809,6 +810,7 @@ PanelWindow {
         });
     }
     function switchQuestlineTab(tab): void {
+        if (expanded && page === "questline" && tab !== questlineTab) questlineSounds.play("open");
         questlineContent.ensureLoaded();
         rememberQuestline();
         questlineWorkspace.flush();
@@ -877,6 +879,7 @@ PanelWindow {
     }
 
     signal questlineCompleted()
+    QuestlineSound { id: questlineSounds; backendDir: panel.backendDir }
     property bool questlineCompletionPending: false
 
     function runQuestlineAction(payload): void {
@@ -931,8 +934,10 @@ PanelWindow {
                 panel.questlineError = result.error || "";
                 panel.questlineMessage = result.message || "";
                 if (!result.error) {
-                    if (panel.questlineCompletionPending && result.id)
+                    if (panel.questlineCompletionPending && result.id) {
+                        questlineSounds.play("complete");
                         panel.questlineCompleted();
+                    }
                     if (panel.questlineDeleteTarget) panel.questlineWorkspace.forget(panel.questlineDeleteTarget.id);
                     panel.questlineEditing = false;
                     panel.questlineSelected = null;

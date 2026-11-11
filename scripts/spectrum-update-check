@@ -102,8 +102,8 @@ def fingerprint(packages):
 
 def notify(packages):
     count = len(packages)
-    result = run('notify-send', '--app-name=SpectrumOS Updates', '--icon=system-software-update',
-                 '--expire-time=15000', '--hint=string:x-spectrumos-kind:stable-updates',
+    result = run('notify-send', '--app-name=SpectrumOS Updates', '--icon=/usr/share/spectrumos/branding/logo.svg',
+                 '--expire-time=0', '--hint=string:x-spectrumos-kind:stable-updates',
                  translate('Fresh loot on Stable'),
                  plural('%n SpectrumOS package update is ready.\nOpen Updates to review and install.',
                         '%n SpectrumOS package updates are ready.\nOpen Updates to review and install.', count))

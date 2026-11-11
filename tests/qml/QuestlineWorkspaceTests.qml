@@ -68,6 +68,29 @@ Scope {
             tryCompare(panel,"questlineLoaded",true,3000);
             wait(80);
         }
+        function test_audio_open_tabs_and_successful_completion_only() {
+            const sounds = findChild(panel, "test-questline-sounds");
+            verify(sounds !== null);
+            panel.expanded = false;
+            sounds.events = [];
+            panel.open("questline");
+            compare(sounds.events.join(","), "open");
+            panel.open("questline");
+            compare(sounds.events.length, 1);
+            panel.switchQuestlineTab("Tasks");
+            panel.switchQuestlineTab("Scrolls");
+            const count = sounds.events.length;
+            panel.switchQuestlineTab("Scrolls");
+            compare(sounds.events.length, count);
+            verify(count > 1);
+            tryCompare(workspace, "busy", false, 3000);
+            panel.runQuestlineAction({action:"complete_task",id:"task-a",fixture_fail:true});
+            tryCompare(workspace, "externalActions", 0, 3000);
+            verify(!sounds.events.includes("complete"));
+            panel.runQuestlineAction({action:"complete_task",id:"task-a"});
+            tryCompare(workspace, "externalActions", 0, 3000);
+            compare(sounds.events.filter(event => event === "complete").length, 1);
+        }
         function test_calculator_companion_preserves_questline_editor() {
             try {
             panel.openQuestlineSearchResult({kind:"Scrolls", item:panel.questline.scrolls[0]});

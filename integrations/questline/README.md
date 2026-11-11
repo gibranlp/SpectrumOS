@@ -1,5 +1,15 @@
 # Questline focus integration
 
+The widget uses Questline's original `OpenTasks.mp3`, `NotificationSwarm.mp3`,
+`water-alert.mp3`, and `focus-task-complete.ogg` effects, copied from `Questline-cli/assets/sounds`
+under the included Questline MIT license. `questline-sound` reads the active
+profile's sound-effects toggle and volume without modifying the database and
+uses the native 20% maximum gain. Opening the widget and changing tabs play
+OpenTasks; successful quest, sidequest and step completion plays the completion
+effect; new Swarm notifications play NotificationSwarm, and hydration reminders
+play water-alert. Hydration progress updates stay silent. Per-effect runtime locks
+prevent overlapping copies. Playback uses the existing FFmpeg dependency.
+
 `spectrum-focus.rs` is a companion executable built against Questline 2.0.0's
 library. It uses Questline's `App::start_focus_session` and
 `App::tick_focus_session`, including XP, session history, achievements, class
@@ -76,3 +86,9 @@ source; no public release is implied by local deployment. See the checkout's
 The terminal loop checks SQLite `PRAGMA data_version` once per second on its existing connection and reloads data caches after another connection commits. Widget completion already uses the native completion/reward API; this refresh makes its result visible in an open terminal without restarting it for every action. Open editor buffers are retained. An existing terminal process must be reopened once after installing the updated executable.
 
 The local CLI was built offline with no tests from the source matching the previously installed binary plus this patch, avoiding unrelated checkout changes. Matching binary/source bundle metadata is recorded in `artifacts/questline-task-fields-20261024/cli-source-bundle.json`; the archive is staged in `packages/spectrum-desktop` and `repo/sources` for the next explicitly requested package publication. It has not been uploaded and the public package recipe still references the preceding published archive. The owner's checkout contains the same two-file API/refresh changes; web app work remains paused.
+
+## Hydration settings refresh
+
+`hydration-settings.patch` fixes pending desktop reminders against the task-fields source bundle. The background notifier checks the current interval, active hours, focus-pause setting, enabled state, external-notification toggle, and daily goal before restoring or refreshing a reminder. Schedule changes withdraw the old reminder, invalidate its drink token, and rearm using the configured interval. SpectrumShell silently consumes the internal `hydration-clear` event. Legacy pending reminders are withdrawn once during migration.
+
+The matching binary and source bundle is pinned by the desktop package recipe. It is built from the previously packaged Questline source plus these two notification modules; unrelated changes in the Questline checkout and web application are excluded. Publish this bundle with the next requested desktop package release.

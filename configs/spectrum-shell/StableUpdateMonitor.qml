@@ -41,5 +41,5 @@ Scope {
         }
     }
     Timer { interval: 60000; running: true; onTriggered: monitor.refresh() }
-    Timer { interval: 1800000; running: true; repeat: true; onTriggered: monitor.refresh() }
+    Timer { interval: 300000; running: true; repeat: true; onTriggered: monitor.refresh() }
 }

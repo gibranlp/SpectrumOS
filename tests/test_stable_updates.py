@@ -157,6 +157,8 @@ class StableUpdatesTests(unittest.TestCase):
         args = run.call_args.args
         self.assertIn('--hint=string:x-spectrumos-kind:stable-updates', args)
         self.assertNotIn('--wait', args)
+        self.assertIn('--expire-time=0', args)
+        self.assertIn('--icon=/usr/share/spectrumos/branding/logo.svg', args)
         self.assertIn('1 SpectrumOS package update is ready.', args[-1])
 
     def test_saved_state_is_private_and_atomic(self):

@@ -1,7 +1,7 @@
 pkgbase = spectrum-theme
 	pkgdesc = Semantic palette extraction and atomic theme generation for SpectrumOS
-	pkgver = 1.0.0
-	pkgrel = 5
+	pkgver = 1.0.1
+	pkgrel = 1
 	url = https://spectrum.gibranlp.dev
 	arch = any
 	license = MIT
@@ -11,7 +11,7 @@ pkgbase = spectrum-theme
 	optdepends = matugen: Material color extraction backend
 	options = !strip
 	options = !debug
-	source = spectrumos-source-1.0.0-a1d68347eb8e7fe9.tar.zst
-	sha256sums = 223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20
+	source = spectrumos-source-1.0.0-b041ce1f913a8628.tar.zst
+	sha256sums = 70a32d5ec190c1bee480ce9011a376c7689b446a0d469d40b6f2191c7abdfc53
 
 pkgname = spectrum-theme

@@ -12,7 +12,6 @@ from pathlib import Path
 import re
 import runpy
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -312,9 +311,8 @@ def questline_binary():
     if configured:return configured
     storage=Path(os.environ.get('QUESTLINE_STORAGE_DIR') or Path(os.environ.get('XDG_CONFIG_HOME') or Path.home()/'.config')/'questline')
     if not (storage/'questline.db').is_file():return None
-    local=Path.home()/'.local/bin/questline'
-    binary=str(local) if local.is_file() and os.access(local,os.X_OK) else shutil.which('questline')
-    if not binary:return None
+    binary=os.environ.get('SPECTRUM_QUESTLINE_BINARY') or '/usr/bin/questline'
+    if not (Path(binary).is_file() and os.access(binary,os.X_OK)):return None
     try:
         result=subprocess.run([binary,'--help'],capture_output=True,text=True,timeout=3)
         return binary if result.returncode==0 and 'favorites-json' in result.stdout else None

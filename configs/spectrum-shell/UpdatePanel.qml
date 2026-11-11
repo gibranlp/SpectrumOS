@@ -35,7 +35,7 @@ PanelWindow {
         if (!ready || planProcess.running)
             return;
         expanded = false;
-        ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", "kitty", "--hold", "-e", backendDir + "/spectrum-update-run", mode]);
+        ApplicationLaunch.start(["uwsm", "app", "-t", "scope", "--", "ghostty", "--wait-after-command=true", "-e", backendDir + "/spectrum-update-run", mode]);
     }
 
     screen: targetScreen

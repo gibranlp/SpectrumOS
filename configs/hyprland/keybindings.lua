@@ -4,7 +4,7 @@ hl.bind(mainMod .. " + SHIFT + U", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum
 hl.bind(mainMod .. " + F10", hl.dsp.exec_cmd("/usr/lib/spectrumos/spectrum-shell-open bar"))
 
 -- Aplicaciones y sesión
-hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("uwsm app -- kitty"))
+hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("uwsm app -- ghostty"))
 hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 -- `hyprctl kill` (not a `dispatch`, a standalone request) puts the cursor into a crosshair
 -- kill mode -- click any window to force it closed, for one that Super+Q's graceful close

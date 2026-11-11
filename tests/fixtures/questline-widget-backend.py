@@ -13,7 +13,7 @@ elif name=='questline-action':
     payload=json.loads(sys.argv[1])
     time.sleep(0.12)
     with (root/'actions.jsonl').open('a') as output:output.write(json.dumps(payload)+'\n')
-    print(json.dumps({'id':payload.get('id',payload.get('autosave_id','generated'))}))
+    print(json.dumps({'error':'Fixture action failed'} if payload.get('fixture_fail') else {'id':payload.get('id',payload.get('autosave_id','generated'))}))
 elif len(sys.argv)>1 and sys.argv[1]=='colors':print('[]')
 elif len(sys.argv)>1 and sys.argv[1]=='questline-campaign':print('campaign-a')
 else:print('{}')

@@ -28,7 +28,7 @@ hyprpicker
 htop
 ipp-usb
 kdeconnect
-kitty
+ghostty
 libdbusmenu-gtk3
 kvantum
 kvantum-qt5

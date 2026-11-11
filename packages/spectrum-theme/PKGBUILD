@@ -1,6 +1,6 @@
 pkgname=spectrum-theme
-pkgver=1.0.0
-pkgrel=5
+pkgver=1.0.1
+pkgrel=1
 pkgdesc="Semantic palette extraction and atomic theme generation for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
@@ -8,10 +8,11 @@ license=(MIT)
 depends=(python ffmpeg imagemagick)
 optdepends=('matugen: Material color extraction backend')
 options=(!strip !debug)
-_source_revision=a1d68347eb8e7fe9
-_source_root="spectrumos-source-$pkgver"
-source=("spectrumos-source-$pkgver-$_source_revision.tar.zst")
-sha256sums=('223d49538bff00cf7b88035f32f7096c0312f374a6465c62fa346aa9ab6d5f20')
+_source_revision=b041ce1f913a8628
+_source_version=1.0.0
+_source_root="spectrumos-source-$_source_version"
+source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
+sha256sums=('70a32d5ec190c1bee480ce9011a376c7689b446a0d469d40b6f2191c7abdfc53')
 
 check() {
     local _theme_source="$srcdir/$_source_root/packages/spectrum-theme"
