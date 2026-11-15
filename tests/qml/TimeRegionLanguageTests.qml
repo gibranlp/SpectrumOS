@@ -58,6 +58,19 @@ FloatingWindow {
             compare(editor.settings.region, "pt_BR.UTF-8");
             verify(!editor.busy);
         }
+        function test_timezone_detection_previews_without_applying() {
+            editor.settings = {available: true, timezone: "Europe/London", timezones: ["America/Cancun"]};
+            editor.selectedZone = "";
+            const button = findChild(editor, "detect-timezone");
+            verify(button !== null);
+            verify(button.enabled);
+            button.clicked();
+            tryCompare(editor, "selectedZone", "America/Cancun");
+            tryCompare(editor, "busy", false);
+            compare(editor.settings.timezone, "Europe/London");
+            verify(editor.message.length > 0);
+            compare(editor.error, "");
+        }
         function test_shared_and_new_widgets_use_the_same_language() {
             const other = anotherEditor.createObject(test);
             verify(other !== null);

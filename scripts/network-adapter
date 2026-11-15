@@ -418,6 +418,11 @@ def action(name: str, value: str | None = None) -> None:
         result = run("nmcli", "radio", "wifi", "off" if enabled else "on")
     elif name == "rescan":
         result = run("nmcli", "device", "wifi", "rescan")
+    elif name == "forget" and value:
+        identifier = str(uuid.UUID(value))
+        if profile_value(identifier, "connection.type") not in ("wifi", "802-11-wireless"):
+            raise ValueError("Only Wi-Fi connections can be forgotten here")
+        result = run("nmcli", "connection", "delete", "uuid", identifier)
     elif name == "connect" and value:
         try:
             identifier = str(uuid.UUID(value))
@@ -433,7 +438,17 @@ def action(name: str, value: str | None = None) -> None:
             password = sys.stdin.readline(256).rstrip("\n")
             if not password or "\r" in password:
                 raise SystemExit("Wi-Fi password is required")
-            result = run("nmcli", "device", "wifi", "connect", value, "password", password, timeout=60)
+            identifier = saved_wifi().get(value)
+            if identifier:
+                security = profile_value(identifier, "802-11-wireless-security.key-mgmt")
+                if security not in ("wpa-psk", "sae"):
+                    raise ValueError("Use Edit connections to change credentials for this security type")
+                result = run("nmcli", "connection", "modify", "uuid", identifier,
+                             "802-11-wireless-security.psk", password)
+                if result.returncode == 0:
+                    result = run("nmcli", "connection", "up", "uuid", identifier, timeout=60)
+            else:
+                result = run("nmcli", "device", "wifi", "connect", value, "password", password, timeout=60)
     elif name == "settings":
         open_network_menu()
         return

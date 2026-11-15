@@ -1,18 +1,19 @@
 pkgname=spectrum-base
-pkgver=1.0.2
+pkgver=1.0.4
 pkgrel=1
 pkgdesc="Core identity and shared appearance handoff for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
 license=(MIT)
 depends=(python ffmpeg limine btrfs-progs exfatprogs libarchive pacman neovim thefuck zram-generator zsh zsh-autosuggestions zsh-completions zsh-syntax-highlighting)
+depends+=(kmod)
 install=spectrum-base.install
 options=(!strip !debug)
-_source_revision=fae8caa461f4b93c
+_source_revision=7d52fa1f33318056
 _source_version=1.0.0
 _source_root="spectrumos-source-$_source_version"
 source=("spectrumos-source-$_source_version-$_source_revision.tar.zst")
-sha256sums=('427342449fac2c1d561007b5777dcde1b55155e6e903894579be59b1daa03142')
+sha256sums=('1aaee07a445cbd4bec97e2241e42793cb4e5e28e7587e537c3f07d4e081c5677')
 
 check() {
     local _project="$srcdir/$_source_root"
@@ -27,6 +28,7 @@ check() {
     python -m unittest discover -s "$_project/tests" -p 'test_spectrum_info.py' -v
     python -m unittest discover -s "$_project/tests" -p 'test_spectrum_doctor.py' -v
     python -m unittest discover -s "$_project/tests" -p 'test_update_plan.py' -v
+    python -m unittest discover -s "$_project/tests" -p 'test_legion_audio.py' -v
 }
 
 package() {
@@ -71,6 +73,14 @@ package() {
         "$pkgdir/usr/lib/spectrumos/spectrumos-build-rescue-image"
     install -m 0755 "$_project/scripts/spectrum" \
         "$pkgdir/usr/bin/spectrum"
+    install -m 0755 "$_project/scripts/legion-audio" \
+        "$pkgdir/usr/bin/spectrum-legion-audio"
+    install -Dm644 "$_project/docs/hardware-legion-audio.md" \
+        "$pkgdir/usr/share/doc/spectrumos/hardware-legion-audio.md"
+    install -m 0644 "$_project/system/systemd/system/spectrumos-legion-audio.service" \
+        "$pkgdir/usr/lib/systemd/system/spectrumos-legion-audio.service"
+    install -m 0644 "$_project/system/pacman-hooks/85-spectrumos-legion-audio.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/85-spectrumos-legion-audio.hook"
     install -m 0644 "$_project/system/release/release.toml" \
         "$pkgdir/usr/share/spectrumos/release.toml"
     install -m 0644 "$_project/migrations/manifest.toml" \
@@ -99,7 +109,7 @@ package() {
         "$pkgdir/usr/lib/systemd/zram-generator.conf.d/60-spectrumos.conf"
     install -m 0644 "$_project"/system/systemd/system/spectrumos-limine-appearance.* \
         "$pkgdir/usr/lib/systemd/system/"
-    printf 'enable spectrumos-limine-appearance.path\n' > \
+    printf 'enable spectrumos-limine-appearance.path\nenable spectrumos-legion-audio.service\n' > \
         "$pkgdir/usr/lib/systemd/system-preset/60-spectrumos.preset"
     install -m 0644 "$_project/packages/$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

@@ -535,7 +535,7 @@ EOF
     # by far the slowest single step in the whole install.
     printf '##PACKAGES %s %s\n' "$((${#packages[@]} + 1))" 65
     progress 20
-    run pacstrap -K "$target" linux-zen "${packages[@]}"
+    run pacstrap -K "$target" 'linux-zen>=7.3' "${packages[@]}"
     progress 65
     if [[ $mode == apply ]]; then
         genfstab -U "$target" >> "$target/etc/fstab"

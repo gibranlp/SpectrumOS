@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+import urllib.request
+
+
+FIRMWARE_URL = (
+    "https://raw.githubusercontent.com/nadimkobeissi/16iax10h-linux-sound-saga/"
+    "113031db46e1781ad55a2eafbcb284c2d7df9830/fix/firmware/aw88399_acf.bin"
+)
+FIRMWARE_SHA256 = "1e927c9bca76d868181c0f81df2bccef3cf19c7d0910219f229360c87babd42c"
+FIRMWARE_SIZE = 152416
+DRIVER = "snd_hda_scodec_aw88399_i2c"
+
+
+def read_text(path):
+    try:
+        return path.read_text()
+    except OSError:
+        return ""
+
+
+def detect_hardware(root=Path("/")):
+    dmi = root / "sys/class/dmi/id"
+    if read_text(dmi / "sys_vendor").strip().lower() != "lenovo":
+        return None
+    if read_text(dmi / "product_name").strip() != "83F5":
+        return None
+    if not list((root / "sys/bus/acpi/devices").glob("AWDZ8399:*")):
+        return None
+    for codec in sorted((root / "proc/asound").glob("card*/codec#*")):
+        content = read_text(codec)
+        if "Codec: Realtek ALC287\n" not in content:
+            continue
+        match = re.search(r"^Subsystem Id: 0x(17aa390[67])$", content, re.MULTILINE)
+        if match:
+            return match.group(1)
+    return None
+
+
+def firmware_paths(ssid, root=Path("/")):
+    firmware = root / "usr/lib/firmware"
+    return [firmware / "aw88399_acf.bin", firmware / "awinic" / f"aw88399_acf_{ssid}.bin"]
+
+
+def firmware_present(path):
+    return any(candidate.is_file() for candidate in (path, Path(str(path) + ".zst"), Path(str(path) + ".xz")))
+
+
+def driver_available():
+    try:
+        return subprocess.run(
+            ["modinfo", "-F", "filename", DRIVER], capture_output=True, check=False
+        ).returncode == 0
+    except OSError:
+        return False
+
+
+def status(root=Path("/")):
+    ssid = detect_hardware(root)
+    if not ssid:
+        return {"supported_hardware": False, "action": "none"}
+    available = driver_available()
+    missing = [str(path) for path in firmware_paths(ssid, root) if not firmware_present(path)]
+    return {
+        "supported_hardware": True,
+        "codec_ssid": ssid,
+        "driver_available": available,
+        "driver_loaded": (root / "sys/module" / DRIVER).is_dir(),
+        "missing_firmware": missing,
+        "kernel_action": "none" if available else "Update to a kernel with AW88399 HDA support (Linux 7.3 or later), then reboot.",
+    }
+
+
+def download_firmware():
+    with urllib.request.urlopen(FIRMWARE_URL, timeout=20) as response:
+        payload = response.read(FIRMWARE_SIZE + 1)
+    if len(payload) != FIRMWARE_SIZE or hashlib.sha256(payload).hexdigest() != FIRMWARE_SHA256:
+        raise ValueError("AW88399 firmware verification failed; no firmware was installed")
+    return payload
+
+
+def install_missing_firmware(ssid, root=Path("/")):
+    missing = [path for path in firmware_paths(ssid, root) if not firmware_present(path)]
+    if not missing:
+        return []
+    payload = None
+    for existing in firmware_paths(ssid, root):
+        if existing.is_file():
+            with existing.open("rb") as handle:
+                candidate = handle.read(FIRMWARE_SIZE + 1)
+            if len(candidate) == FIRMWARE_SIZE and hashlib.sha256(candidate).hexdigest() == FIRMWARE_SHA256:
+                payload = candidate
+                break
+    if payload is None:
+        payload = download_firmware()
+    installed = []
+    for path in missing:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".spectrum-aw88399-", delete=False) as temporary:
+            temporary_path = Path(temporary.name)
+            try:
+                temporary.write(payload)
+                temporary.flush()
+                os.fchmod(temporary.fileno(), 0o644)
+                os.fsync(temporary.fileno())
+                # El enlace publica el archivo completo sin reemplazar firmware existente.
+                if not firmware_present(path):
+                    try:
+                        os.link(temporary_path, path)
+                        installed.append(str(path))
+                    except FileExistsError:
+                        pass
+            finally:
+                temporary_path.unlink(missing_ok=True)
+    return installed
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Inspect or provision Legion 16IAX10H speaker firmware")
+    parser.add_argument("command", choices=("status", "setup"), nargs="?", default="status")
+    options = parser.parse_args()
+    try:
+        report = status()
+        if options.command == "setup" and report["supported_hardware"]:
+            if os.geteuid() != 0:
+                parser.error("setup requires root")
+            report["installed_firmware"] = install_missing_firmware(report["codec_ssid"])
+            report["missing_firmware"] = [str(path) for path in firmware_paths(report["codec_ssid"]) if not firmware_present(path)]
+            if report["installed_firmware"]:
+                report["activation"] = "Reboot to initialize the speaker amplifiers with the installed firmware."
+        print(json.dumps(report, indent=2))
+        return 0
+    except (OSError, ValueError) as error:
+        print(json.dumps({"error": str(error), "retry": "sudo spectrum-legion-audio setup"}))
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

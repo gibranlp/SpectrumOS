@@ -98,7 +98,7 @@ class SpectrumShellNetworkTests(unittest.TestCase):
 
     def test_secured_connection_reads_password_from_stdin(self):
         completed = subprocess.CompletedProcess([], 0, "", "")
-        with patch.object(NETWORK, "run", return_value=completed) as command, patch.object(
+        with patch.object(NETWORK, "saved_wifi", return_value={}), patch.object(NETWORK, "run", return_value=completed) as command, patch.object(
             NETWORK, "invalidate_public_ip"
         ) as invalidate, patch("sys.stdin", io.StringIO("sample passphrase\n")):
             NETWORK.action("connect-secured", "Example Wi-Fi")
@@ -106,6 +106,35 @@ class SpectrumShellNetworkTests(unittest.TestCase):
             "nmcli", "device", "wifi", "connect", "Example Wi-Fi", "password", "sample passphrase", timeout=60
         )
         invalidate.assert_called_once()
+
+    def test_saved_password_is_replaced_before_reconnecting(self):
+        identifier = "12345678-1234-1234-1234-123456789abc"
+        with patch.object(NETWORK, "saved_wifi", return_value={"Home": identifier}), patch.object(
+            NETWORK, "profile_value", return_value="wpa-psk"
+        ), patch.object(NETWORK, "run", return_value=subprocess.CompletedProcess([], 0, "", "")) as command, patch.object(
+            NETWORK, "invalidate_public_ip"
+        ), patch("sys.stdin", io.StringIO("replacement password\n")):
+            NETWORK.action("connect-secured", "Home")
+        self.assertEqual(command.call_args_list[0].args, (
+            "nmcli", "connection", "modify", "uuid", identifier, "802-11-wireless-security.psk", "replacement password"))
+        self.assertEqual(command.call_args_list[1].args, ("nmcli", "connection", "up", "uuid", identifier))
+
+    def test_failed_password_update_does_not_reconnect(self):
+        with patch.object(NETWORK, "saved_wifi", return_value={"Home": "profile"}), patch.object(
+            NETWORK, "profile_value", return_value="sae"
+        ), patch.object(NETWORK, "run", return_value=subprocess.CompletedProcess([], 1, "", "Permission denied")) as command, patch(
+            "sys.stdin", io.StringIO("replacement password\n")
+        ), self.assertRaisesRegex(SystemExit, "Permission denied"):
+            NETWORK.action("connect-secured", "Home")
+        self.assertEqual(command.call_count, 1)
+
+    def test_forget_deletes_only_selected_wifi_profile(self):
+        identifier = "12345678-1234-1234-1234-123456789abc"
+        with patch.object(NETWORK, "profile_value", return_value="wifi"), patch.object(
+            NETWORK, "run", return_value=subprocess.CompletedProcess([], 0, "", "")
+        ) as command:
+            NETWORK.action("forget", identifier)
+        command.assert_called_once_with("nmcli", "connection", "delete", "uuid", identifier)
 
     def test_empty_password_does_not_attempt_connection(self):
         with patch.object(NETWORK, "run") as command, patch("sys.stdin", io.StringIO("\n")):

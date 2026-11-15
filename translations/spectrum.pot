@@ -81,8 +81,8 @@ msgid ""
 "Clipboard: "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:576
-#: configs/spectrum-shell/BarWidget.qml:606
+#: configs/spectrum-shell/BarWidget.qml:598
+#: configs/spectrum-shell/BarWidget.qml:628
 msgctxt "Spectrum"
 msgid ""
 "\n"
@@ -96,16 +96,16 @@ msgid ""
 "Higher quality makes larger files. Auto records frames as the screen changes. Audio bitrate applies when audio is enabled."
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:576
-#: configs/spectrum-shell/BarWidget.qml:606
+#: configs/spectrum-shell/BarWidget.qml:598
+#: configs/spectrum-shell/BarWidget.qml:628
 msgctxt "Spectrum"
 msgid ""
 "\n"
 "IPv6  "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:576
-#: configs/spectrum-shell/BarWidget.qml:606
+#: configs/spectrum-shell/BarWidget.qml:598
+#: configs/spectrum-shell/BarWidget.qml:628
 msgctxt "Spectrum"
 msgid ""
 "\n"
@@ -119,17 +119,17 @@ msgid ""
 "Service: "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:562
+#: configs/spectrum-shell/BarWidget.qml:584
 msgctxt "Spectrum"
 msgid "    Link  "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:592
+#: configs/spectrum-shell/BarWidget.qml:614
 msgctxt "Spectrum"
 msgid "    Rate  "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:592
+#: configs/spectrum-shell/BarWidget.qml:614
 msgctxt "Spectrum"
 msgid "    Signal  "
 msgstr ""
@@ -164,7 +164,7 @@ msgctxt "Spectrum"
 msgid " SpectrumOS package update(s) ready on Stable."
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:798
+#: configs/spectrum-shell/BarWidget.qml:854
 msgctxt "Spectrum"
 msgid " W"
 msgstr ""
@@ -342,7 +342,7 @@ msgctxt "Spectrum"
 msgid " quests/steps, "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:786
+#: configs/spectrum-shell/BarWidget.qml:842
 #: configs/spectrum-shell/BreakReminders.qml:42
 msgctxt "Spectrum"
 msgid " remaining"
@@ -416,7 +416,7 @@ msgctxt "Spectrum"
 msgid " unlocked"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:786
+#: configs/spectrum-shell/BarWidget.qml:842
 msgctxt "Spectrum"
 msgid " until full"
 msgstr ""
@@ -451,7 +451,7 @@ msgctxt "Spectrum"
 msgid " · Locked"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:319
+#: configs/spectrum-shell/BarWidget.qml:320
 #: configs/spectrum-shell/QuestlineHero.qml:142
 msgctxt "Spectrum"
 msgid " · Selected"
@@ -650,12 +650,12 @@ msgctxt "Spectrum"
 msgid "APP STORE"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "APPIMAGES"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "AUDIO"
 msgstr ""
@@ -969,20 +969,20 @@ msgid ""
 "distance for external mice."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:220
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:254
 msgctxt "Spectrum"
 msgid ""
 "Applies immediately to translated Spectrum controls. Untranslated text uses "
 "English."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:206
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:240
 #: configs/spectrum-ukvm/UkvmPage.qml:275
 msgctxt "Spectrum"
 msgid "Apply"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:234
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:268
 msgctxt "Spectrum"
 msgid "Apply language and region"
 msgstr ""
@@ -1017,7 +1017,7 @@ msgctxt "Spectrum"
 msgid "Applying mouse settings…"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:263
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:297
 msgctxt "Spectrum"
 msgid "Applying settings…"
 msgstr ""
@@ -1125,12 +1125,18 @@ msgctxt "Spectrum"
 msgid "Automatic sync paused"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:187
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:225
+msgctxt "Spectrum"
+msgid ""
+"Automatic time synchronizes the clock. Your time zone is set separately."
+msgstr ""
+
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:209
 msgctxt "Spectrum"
 msgid "Automatic time · synchronized"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:187
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:209
 msgctxt "Spectrum"
 msgid "Automatic time · waiting for synchronization"
 msgstr ""
@@ -1172,7 +1178,7 @@ msgctxt "Spectrum"
 msgid "BITRATE · kbps"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "BLUETOOTH"
 msgstr ""
@@ -1210,7 +1216,7 @@ msgctxt "Spectrum"
 msgid "Backups and export"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:850
+#: configs/spectrum-shell/BarWidget.qml:906
 #: configs/spectrum-shell/RecorderPanel.qml:218
 msgctxt "Spectrum"
 msgid "Balanced"
@@ -1221,17 +1227,17 @@ msgctxt "Spectrum"
 msgid "Bank"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:792
+#: configs/spectrum-shell/BarWidget.qml:848
 msgctxt "Spectrum"
 msgid "Battery health  "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:780
+#: configs/spectrum-shell/BarWidget.qml:836
 msgctxt "Spectrum"
 msgid "Battery status unavailable"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:111
+#: configs/spectrum-shell/ProtonVpnControl.qml:113
 msgctxt "Spectrum"
 msgid "Block ads / malware"
 msgstr ""
@@ -1302,7 +1308,7 @@ msgid "Break · "
 msgstr ""
 
 #: configs/spectrum-shell/BarControls.qml:25
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 #: configs/spectrum-shell/LevelIndicator.qml:281
 #: configs/spectrum-shell/WidgetActions.qml:28
 msgctxt "Spectrum"
@@ -1329,7 +1335,7 @@ msgctxt "Spectrum"
 msgid "CONNECTED DISPLAYS"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:510
+#: configs/spectrum-shell/BarWidget.qml:532
 msgctxt "Spectrum"
 msgid "CONNECTION PROTOCOLS"
 msgstr ""
@@ -1349,7 +1355,7 @@ msgctxt "Spectrum"
 msgid "CPU "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:816
+#: configs/spectrum-shell/BarWidget.qml:872
 msgctxt "Spectrum"
 msgid "CPU load"
 msgstr ""
@@ -1490,6 +1496,11 @@ msgctxt "Spectrum"
 msgid "Celebrate"
 msgstr ""
 
+#: configs/spectrum-shell/BarWidget.qml:680
+msgctxt "Spectrum"
+msgid "Change password"
+msgstr ""
+
 #: configs/spectrum-shell/UtilityPanel.qml:179
 msgctxt "Spectrum"
 msgid "Change window arrangement"
@@ -1505,7 +1516,7 @@ msgctxt "Spectrum"
 msgid "Changing Bluetooth power…"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:780
+#: configs/spectrum-shell/BarWidget.qml:836
 #: configs/spectrum-shell/BatteryIndicator.qml:11
 msgctxt "Spectrum"
 msgid "Charging"
@@ -1576,7 +1587,7 @@ msgctxt "Spectrum"
 msgid "Choose Find devices to search for a new device."
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:517
+#: configs/spectrum-shell/BarWidget.qml:539
 msgctxt "Spectrum"
 msgid "Choose IPv4, IPv6 or both. Changes may reconnect that connection."
 msgstr ""
@@ -1648,7 +1659,7 @@ msgid ""
 "Questline finishes setup."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:225
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:259
 msgctxt "Spectrum"
 msgid "Choose language"
 msgstr ""
@@ -1658,7 +1669,7 @@ msgctxt "Spectrum"
 msgid "Choose one source for this recording."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:228
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:262
 msgctxt "Spectrum"
 msgid "Choose region"
 msgstr ""
@@ -1668,7 +1679,7 @@ msgctxt "Spectrum"
 msgid "Choose supported currencies"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:205
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:239
 msgctxt "Spectrum"
 msgid "Choose time zone"
 msgstr ""
@@ -1688,7 +1699,7 @@ msgctxt "Spectrum"
 msgid "Choose where to install"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:292
+#: configs/spectrum-shell/BarWidget.qml:293
 msgctxt "Spectrum"
 msgid "Choose which app media keys control"
 msgstr ""
@@ -1904,9 +1915,9 @@ msgctxt "Spectrum"
 msgid "Confirm removal"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:683
+#: configs/spectrum-shell/BarWidget.qml:740
 #: configs/spectrum-shell/BluetoothWidgetContent.qml:99
-#: configs/spectrum-shell/ProtonVpnControl.qml:89
+#: configs/spectrum-shell/ProtonVpnControl.qml:91
 msgctxt "Spectrum"
 msgid "Connect"
 msgstr ""
@@ -1939,7 +1950,7 @@ msgctxt "Spectrum"
 msgid "Connected"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:242
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:276
 msgctxt "Spectrum"
 msgid "Connected to %1"
 msgstr ""
@@ -2065,6 +2076,13 @@ msgstr ""
 #: translations/messages.json:1
 msgctxt "Spectrum"
 msgid "Could not create language settings directory"
+msgstr ""
+
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:96
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:103
+msgctxt "Spectrum"
+msgid ""
+"Could not detect the time zone. Check your connection or choose it manually."
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineCalendar.qml:199
@@ -2229,7 +2247,7 @@ msgctxt "Spectrum"
 msgid "Counting active desk time"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:75
+#: configs/spectrum-shell/ProtonVpnControl.qml:77
 msgctxt "Spectrum"
 msgid "Country code (US, MX); empty = fastest"
 msgstr ""
@@ -2327,7 +2345,7 @@ msgctxt "Spectrum"
 msgid "Current selection: "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:254
+#: configs/spectrum-shell/BarWidget.qml:255
 msgctxt "Spectrum"
 msgid "Current: "
 msgstr ""
@@ -2342,7 +2360,7 @@ msgctxt "Spectrum"
 msgid "Custom recurrence"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:253
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:287
 msgctxt "Spectrum"
 msgid "Custom server settings require systemd-timesyncd."
 msgstr ""
@@ -2357,7 +2375,7 @@ msgctxt "Spectrum"
 msgid "DESKTOP LOGO · ALL MONITORS"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "DISPLAYS"
 msgstr ""
@@ -2427,7 +2445,7 @@ msgctxt "Spectrum"
 msgid "Default category"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:245
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:279
 msgctxt "Spectrum"
 msgid "Default servers (or enter hostnames / IPs)"
 msgstr ""
@@ -2490,6 +2508,16 @@ msgctxt "Spectrum"
 msgid "Details"
 msgstr ""
 
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:229
+msgctxt "Spectrum"
+msgid "Detect time zone from location"
+msgstr ""
+
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:297
+msgctxt "Spectrum"
+msgid "Detecting time zone…"
+msgstr ""
+
 #: configs/spectrum-shell/AudioRecorderPanel.qml:115
 msgctxt "Spectrum"
 msgid "Device level · "
@@ -2538,7 +2566,7 @@ msgid "Discard draft: "
 msgstr ""
 
 #: configs/spectrum-shell/BluetoothWidgetContent.qml:99
-#: configs/spectrum-shell/ProtonVpnControl.qml:89
+#: configs/spectrum-shell/ProtonVpnControl.qml:91
 msgctxt "Spectrum"
 msgid "Disconnect"
 msgstr ""
@@ -2719,7 +2747,7 @@ msgctxt "Spectrum"
 msgid "Dwindle"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:553
+#: configs/spectrum-shell/BarWidget.qml:575
 msgctxt "Spectrum"
 msgid "ETHERNET  ·  "
 msgstr ""
@@ -2750,7 +2778,7 @@ msgctxt "Spectrum"
 msgid "Edit "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:709
+#: configs/spectrum-shell/BarWidget.qml:765
 msgctxt "Spectrum"
 msgid "Edit connections"
 msgstr ""
@@ -2833,7 +2861,7 @@ msgctxt "Spectrum"
 msgid "Energy"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:266 installer/spectrum-installer:354
+#: configs/spectrum-shell/BarWidget.qml:267 installer/spectrum-installer:354
 msgctxt "Spectrum"
 msgid "English (US)"
 msgstr ""
@@ -3018,7 +3046,7 @@ msgctxt "Spectrum"
 msgid "Failed"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:257
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:291
 msgctxt "Spectrum"
 msgid "Fallback: %1"
 msgstr ""
@@ -3203,6 +3231,7 @@ msgctxt "Spectrum"
 msgid "Forest Sounds"
 msgstr ""
 
+#: configs/spectrum-shell/BarWidget.qml:694
 #: configs/spectrum-shell/BluetoothWidgetContent.qml:126
 #: configs/spectrum-shell/SpectrumDrop.qml:257
 msgctxt "Spectrum"
@@ -3255,13 +3284,13 @@ msgctxt "Spectrum"
 msgid "Full"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:780
+#: configs/spectrum-shell/BarWidget.qml:836
 #: configs/spectrum-shell/BatteryIndicator.qml:12
 msgctxt "Spectrum"
 msgid "Fully charged"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:192
+#: configs/spectrum-shell/BarWidget.qml:193
 msgctxt "Spectrum"
 msgid "GLOBAL FONT SIZE  ·  "
 msgstr ""
@@ -3322,7 +3351,7 @@ msgctxt "Spectrum"
 msgid "Grove Guardian"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:262
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:296
 msgctxt "Spectrum"
 msgid "Hardware clock: %1"
 msgstr ""
@@ -3383,13 +3412,13 @@ msgctxt "Spectrum"
 msgid "Humidity  "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "IGOR WARDROBE"
 msgstr ""
 
 #: configs/spectrum-shell/AudioRecorderPanel.qml:215
-#: configs/spectrum-shell/BarWidget.qml:484
+#: configs/spectrum-shell/BarWidget.qml:485
 msgctxt "Spectrum"
 msgid "INPUT DEVICE"
 msgstr ""
@@ -3399,8 +3428,8 @@ msgctxt "Spectrum"
 msgid "IPv4"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:576
-#: configs/spectrum-shell/BarWidget.qml:606
+#: configs/spectrum-shell/BarWidget.qml:598
+#: configs/spectrum-shell/BarWidget.qml:628
 msgctxt "Spectrum"
 msgid "IPv4  "
 msgstr ""
@@ -3630,8 +3659,8 @@ msgctxt "Spectrum"
 msgid "Interest rate (%)"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:562
-#: configs/spectrum-shell/BarWidget.qml:592
+#: configs/spectrum-shell/BarWidget.qml:584
+#: configs/spectrum-shell/BarWidget.qml:614
 msgctxt "Spectrum"
 msgid "Interface  "
 msgstr ""
@@ -3677,7 +3706,7 @@ msgctxt "Spectrum"
 msgid "Islands"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:247
+#: configs/spectrum-shell/BarWidget.qml:248
 msgctxt "Spectrum"
 msgid "KEYBOARD LAYOUT"
 msgstr ""
@@ -3728,12 +3757,12 @@ msgctxt "Spectrum"
 msgid "Keyboard shortcuts"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:107
+#: configs/spectrum-shell/ProtonVpnControl.qml:109
 msgctxt "Spectrum"
 msgid "Kill switch on"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:209
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:243
 msgctxt "Spectrum"
 msgid "LANGUAGE & REGION"
 msgstr ""
@@ -3936,7 +3965,7 @@ msgctxt "Spectrum"
 msgid "Low"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:259
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:293
 msgctxt "Spectrum"
 msgid "MANUAL DATE & TIME"
 msgstr ""
@@ -3946,17 +3975,17 @@ msgctxt "Spectrum"
 msgid "MKV"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:216
+#: configs/spectrum-shell/BarWidget.qml:217
 msgctxt "Spectrum"
 msgid "MONOSPACE FONT FAMILY"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "MORE"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "MOUSE"
 msgstr ""
@@ -3991,7 +4020,7 @@ msgctxt "Spectrum"
 msgid "Make primary"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:700
+#: configs/spectrum-shell/BarWidget.qml:756
 msgctxt "Spectrum"
 msgid "Manage networks"
 msgstr ""
@@ -4001,7 +4030,7 @@ msgctxt "Spectrum"
 msgid "Managed AppImage removed. Application settings were preserved."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:187
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:209
 msgctxt "Spectrum"
 msgid "Manual time"
 msgstr ""
@@ -4022,7 +4051,7 @@ msgctxt "Spectrum"
 msgid "Maximum level · "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:292
+#: configs/spectrum-shell/BarWidget.qml:293
 msgctxt "Spectrum"
 msgid "Media keys control"
 msgstr ""
@@ -4042,7 +4071,7 @@ msgctxt "Spectrum"
 msgid "Meeting"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:817
+#: configs/spectrum-shell/BarWidget.qml:873
 msgctxt "Spectrum"
 msgid "Memory"
 msgstr ""
@@ -4222,12 +4251,12 @@ msgctxt "Spectrum"
 msgid "NEARBY MACHINES"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:615
+#: configs/spectrum-shell/BarWidget.qml:637
 msgctxt "Spectrum"
 msgid "NEARBY NETWORKS"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "NETWORK"
 msgstr ""
@@ -4237,7 +4266,7 @@ msgctxt "Spectrum"
 msgid "NOTIFICATIONS"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:240
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:274
 msgctxt "Spectrum"
 msgid "NTP SERVERS"
 msgstr ""
@@ -4287,7 +4316,7 @@ msgctxt "Spectrum"
 msgid "Needs approval"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:112
+#: configs/spectrum-shell/ProtonVpnControl.qml:114
 msgctxt "Spectrum"
 msgid "NetShield off"
 msgstr ""
@@ -4355,7 +4384,7 @@ msgctxt "Spectrum"
 msgid "No active campaign"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:242
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:276
 msgctxt "Spectrum"
 msgid "No active server"
 msgstr ""
@@ -4462,7 +4491,7 @@ msgctxt "Spectrum"
 msgid "No matching files"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:181
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:203
 msgctxt "Spectrum"
 msgid "No matching results"
 msgstr ""
@@ -4637,7 +4666,7 @@ msgid "OPEN WITH"
 msgstr ""
 
 #: configs/spectrum-shell/AudioRecorderPanel.qml:234
-#: configs/spectrum-shell/BarWidget.qml:466
+#: configs/spectrum-shell/BarWidget.qml:467
 msgctxt "Spectrum"
 msgid "OUTPUT DEVICE"
 msgstr ""
@@ -4651,7 +4680,7 @@ msgstr ""
 #: configs/spectrum-shell/ControlCenter.qml:349
 #: configs/spectrum-shell/MouseWidgetContent.qml:86
 #: configs/spectrum-shell/MouseWidgetContent.qml:107
-#: configs/spectrum-shell/ProtonVpnControl.qml:108
+#: configs/spectrum-shell/ProtonVpnControl.qml:110
 #: configs/spectrum-ukvm/UkvmModel.js:75
 #: configs/spectrum-ukvm/UkvmPage.qml:235
 msgctxt "Spectrum"
@@ -4682,7 +4711,7 @@ msgctxt "Spectrum"
 msgid "On"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:780
+#: configs/spectrum-shell/BarWidget.qml:836
 #: configs/spectrum-shell/BatteryIndicator.qml:12
 msgctxt "Spectrum"
 msgid "On battery"
@@ -4893,17 +4922,17 @@ msgctxt "Spectrum"
 msgid "PALETTE BACKEND"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "POWER & BATTERY"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "POWER & SYSTEM"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:843
+#: configs/spectrum-shell/BarWidget.qml:899
 msgctxt "Spectrum"
 msgid "POWER MODE"
 msgstr ""
@@ -4998,7 +5027,7 @@ msgctxt "Spectrum"
 msgid "Password generator"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:654
+#: configs/spectrum-shell/BarWidget.qml:711
 msgctxt "Spectrum"
 msgid "Password · "
 msgstr ""
@@ -5049,7 +5078,7 @@ msgctxt "Spectrum"
 msgid "Pending"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:859
+#: configs/spectrum-shell/BarWidget.qml:915
 msgctxt "Spectrum"
 msgid "Performance"
 msgstr ""
@@ -5127,12 +5156,12 @@ msgctxt "Spectrum"
 msgid "Power & battery"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:870
+#: configs/spectrum-shell/BarWidget.qml:926
 msgctxt "Spectrum"
 msgid "Power Saver"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:880
+#: configs/spectrum-shell/BarWidget.qml:936
 msgctxt "Spectrum"
 msgid "Power mode control is unavailable"
 msgstr ""
@@ -5147,7 +5176,7 @@ msgctxt "Spectrum"
 msgid "Power profiles"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:798
+#: configs/spectrum-shell/BarWidget.qml:854
 msgctxt "Spectrum"
 msgid "Power rate  "
 msgstr ""
@@ -5380,7 +5409,7 @@ msgctxt "Spectrum"
 msgid "Reading search location…"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:188
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:210
 msgctxt "Spectrum"
 msgid "Reading time settings…"
 msgstr ""
@@ -5494,7 +5523,7 @@ msgstr ""
 
 #: configs/spectrum-shell/MagnetDownloads.qml:292
 #: configs/spectrum-shell/QuestlineSync.qml:153
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:199
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:221
 #: configs/spectrum-shell/UtilityPanel.qml:1575
 #: configs/spectrum-shell/WeatherWidgetContent.qml:110
 #: configs/spectrum-ukvm/UkvmPage.qml:251
@@ -5522,7 +5551,7 @@ msgctxt "Spectrum"
 msgid "Regional formats"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:227
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:261
 msgctxt "Spectrum"
 msgid "Regional formats · dates, numbers and currency"
 msgstr ""
@@ -5621,7 +5650,7 @@ msgid ""
 "keep your BitLocker recovery key available before changing boot settings."
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:621 installer/live-shell.qml:288
+#: configs/spectrum-shell/BarWidget.qml:643 installer/live-shell.qml:288
 msgctxt "Spectrum"
 msgid "Rescan"
 msgstr ""
@@ -5897,7 +5926,7 @@ msgctxt "Spectrum"
 msgid "Save savings settings"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:249
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:283
 msgctxt "Spectrum"
 msgid "Save servers"
 msgstr ""
@@ -5916,6 +5945,11 @@ msgstr ""
 #: configs/spectrum-shell/WidgetActions.qml:22
 msgctxt "Spectrum"
 msgid "Saved colors"
+msgstr ""
+
+#: configs/spectrum-shell/BarWidget.qml:513
+msgctxt "Spectrum"
+msgid "Saved connection settings"
 msgstr ""
 
 #: configs/spectrum-shell/AudioRecorderPanel.qml:180
@@ -6034,7 +6068,7 @@ msgctxt "Spectrum"
 msgid "Search applications and packages…"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:154
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:176
 msgctxt "Spectrum"
 msgid "Search city or time zone…"
 msgstr ""
@@ -6062,7 +6096,7 @@ msgid ""
 " to browse, or enter top100."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:154
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:176
 msgctxt "Spectrum"
 msgid "Search interface language…"
 msgstr ""
@@ -6072,7 +6106,7 @@ msgctxt "Spectrum"
 msgid "Search in…"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:154
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:176
 msgctxt "Spectrum"
 msgid "Search locale, e.g. en_US or es_MX…"
 msgstr ""
@@ -6156,7 +6190,7 @@ msgctxt "Spectrum"
 msgid "Select a trusted machine to open its remote desktop."
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "Select an app to "
 msgstr ""
@@ -6243,7 +6277,7 @@ msgctxt "Spectrum"
 msgid "Sending local changes and receiving cloud changes…"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:253
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:287
 msgctxt "Spectrum"
 msgid ""
 "Separate servers with spaces. Saving reconnects automatic time when it is "
@@ -6295,7 +6329,7 @@ msgctxt "Spectrum"
 msgid "Session portal unavailable."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:261
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:295
 msgctxt "Spectrum"
 msgid "Set date and time"
 msgstr ""
@@ -6348,12 +6382,12 @@ msgctxt "Spectrum"
 msgid "Sidequests"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:84
+#: configs/spectrum-shell/ProtonVpnControl.qml:86
 msgctxt "Spectrum"
 msgid "Sign in"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:100
+#: configs/spectrum-shell/ProtonVpnControl.qml:102
 msgctxt "Spectrum"
 msgid ""
 "Sign in opens a terminal for your password and two-factor code. Country "
@@ -6370,7 +6404,7 @@ msgctxt "Spectrum"
 msgid "Sign in to restore purchased packs. Existing outfits stay free."
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:94
+#: configs/spectrum-shell/ProtonVpnControl.qml:96
 msgctxt "Spectrum"
 msgid "Sign out"
 msgstr ""
@@ -6450,12 +6484,12 @@ msgctxt "Spectrum"
 msgid "Spacious"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:268 installer/spectrum-installer:356
+#: configs/spectrum-shell/BarWidget.qml:269 installer/spectrum-installer:356
 msgctxt "Spectrum"
 msgid "Spanish (Latin America)"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:269 installer/spectrum-installer:357
+#: configs/spectrum-shell/BarWidget.qml:270 installer/spectrum-installer:357
 msgctxt "Spectrum"
 msgid "Spanish (Spain)"
 msgstr ""
@@ -6475,7 +6509,7 @@ msgctxt "Spectrum"
 msgid "Spectrum PCs"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:210
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:244
 msgctxt "Spectrum"
 msgid "Spectrum interface language"
 msgstr ""
@@ -6884,12 +6918,12 @@ msgctxt "Spectrum"
 msgid "System"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:224
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:258
 msgctxt "Spectrum"
 msgid "System language"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:238
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:272
 msgctxt "Spectrum"
 msgid ""
 "System language and regional formats apply to applications after signing "
@@ -6917,12 +6951,12 @@ msgctxt "Spectrum"
 msgid "THEME COLORS"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "TIME & REGION"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:202
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:224
 msgctxt "Spectrum"
 msgid "TIME ZONE"
 msgstr ""
@@ -6937,7 +6971,7 @@ msgctxt "Spectrum"
 msgid "TREASURY ENTRIES"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "TYPOGRAPHY"
 msgstr ""
@@ -6977,7 +7011,7 @@ msgctxt "Spectrum"
 msgid "Tasks · "
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:818
+#: configs/spectrum-shell/BarWidget.qml:874
 msgctxt "Spectrum"
 msgid "Temperature"
 msgstr ""
@@ -6997,6 +7031,12 @@ msgctxt "Spectrum"
 msgid ""
 "The download service is idle. Search to add a download, or resume saved "
 "downloads."
+msgstr ""
+
+#: translations/messages.json:1
+msgctxt "Spectrum"
+msgid ""
+"The location service did not return a valid time zone. Choose it manually."
 msgstr ""
 
 #: configs/spectrum-shell/QuestlineSync.qml:97
@@ -7095,7 +7135,7 @@ msgctxt "Spectrum"
 msgid "Time and region"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:90
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:112
 msgctxt "Spectrum"
 msgid "Time settings could not be updated"
 msgstr ""
@@ -7103,6 +7143,11 @@ msgstr ""
 #: translations/messages.json:1
 msgctxt "Spectrum"
 msgid "Time to move"
+msgstr ""
+
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:94
+msgctxt "Spectrum"
+msgid "Time zone detected. Select Apply to use it."
 msgstr ""
 
 #: installer/spectrum-installer:456
@@ -7238,12 +7283,12 @@ msgctxt "Spectrum"
 msgid "Try SpectrumOS"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:195
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:217
 msgctxt "Spectrum"
 msgid "Turn automatic time off"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:195
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:217
 msgctxt "Spectrum"
 msgid "Turn automatic time on"
 msgstr ""
@@ -7280,22 +7325,22 @@ msgctxt "Spectrum"
 msgid "UNIVERSALKVM"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:270
+#: configs/spectrum-shell/BarWidget.qml:271
 msgctxt "Spectrum"
 msgid "US + Latin America"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:267
+#: configs/spectrum-shell/BarWidget.qml:268
 msgctxt "Spectrum"
 msgid "US International"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:271
+#: configs/spectrum-shell/BarWidget.qml:272
 msgctxt "Spectrum"
 msgid "US International + Latin America"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:272
+#: configs/spectrum-shell/BarWidget.qml:273
 msgctxt "Spectrum"
 msgid "US International + Spain"
 msgstr ""
@@ -7470,7 +7515,7 @@ msgctxt "Spectrum"
 msgid "Updates"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:819
+#: configs/spectrum-shell/BarWidget.qml:875
 msgctxt "Spectrum"
 msgid "Uptime"
 msgstr ""
@@ -7485,7 +7530,7 @@ msgctxt "Spectrum"
 msgid "Use a password with at least 8 characters."
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:250
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:284
 msgctxt "Spectrum"
 msgid "Use defaults"
 msgstr ""
@@ -7525,6 +7570,13 @@ msgid ""
 "cursor after reopening."
 msgstr ""
 
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:236
+msgctxt "Spectrum"
+msgid ""
+"Uses your public IP via ipapi.co. A VPN may detect its server's location. "
+"Select Apply to confirm."
+msgstr ""
+
 #: configs/spectrum-shell/RecorderPanel.qml:218
 msgctxt "Spectrum"
 msgid "VIDEO QUALITY"
@@ -7555,7 +7607,7 @@ msgctxt "Spectrum"
 msgid "Videos"
 msgstr ""
 
-#: configs/spectrum-shell/ProtonVpnControl.qml:106
+#: configs/spectrum-shell/ProtonVpnControl.qml:108
 msgctxt "Spectrum"
 msgid "View settings"
 msgstr ""
@@ -7582,12 +7634,12 @@ msgctxt "Spectrum"
 msgid "WALLPAPER FILTERS"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:120
+#: configs/spectrum-shell/BarWidget.qml:121
 msgctxt "Spectrum"
 msgid "WEATHER"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:583
+#: configs/spectrum-shell/BarWidget.qml:605
 msgctxt "Spectrum"
 msgid "WI-FI"
 msgstr ""
@@ -7729,12 +7781,12 @@ msgctxt "Spectrum"
 msgid "Wi-Fi disabled"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:542 installer/live-shell.qml:199
+#: configs/spectrum-shell/BarWidget.qml:564 installer/live-shell.qml:199
 msgctxt "Spectrum"
 msgid "Wi-Fi off"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:542 installer/live-shell.qml:199
+#: configs/spectrum-shell/BarWidget.qml:564 installer/live-shell.qml:199
 msgctxt "Spectrum"
 msgid "Wi-Fi on"
 msgstr ""
@@ -7766,7 +7818,7 @@ msgstr ""
 
 #: configs/spectrum-shell/AppImageWidgetContent.qml:37
 #: configs/spectrum-shell/DefaultApps.qml:249
-#: configs/spectrum-shell/ProtonVpnControl.qml:118
+#: configs/spectrum-shell/ProtonVpnControl.qml:120
 msgctxt "Spectrum"
 msgid "Working…"
 msgstr ""
@@ -7863,7 +7915,7 @@ msgctxt "Spectrum"
 msgid "chronicle"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "control playback"
 msgstr ""
@@ -7884,7 +7936,7 @@ msgctxt "Spectrum"
 msgid "empty"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "go to the previous track"
 msgstr ""
@@ -7894,7 +7946,7 @@ msgctxt "Spectrum"
 msgid "keyboard/pointer unavailable"
 msgstr ""
 
-#: configs/spectrum-shell/TimeRegionWidgetContent.qml:262
+#: configs/spectrum-shell/TimeRegionWidgetContent.qml:296
 msgctxt "Spectrum"
 msgid "local time"
 msgstr ""
@@ -7915,7 +7967,7 @@ msgctxt "Spectrum"
 msgid "occupied"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "play / pause"
 msgstr ""
@@ -7935,12 +7987,12 @@ msgctxt "Spectrum"
 msgid "sidequest"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "skip to the next track"
 msgstr ""
 
-#: configs/spectrum-shell/BarWidget.qml:300
+#: configs/spectrum-shell/BarWidget.qml:301
 msgctxt "Spectrum"
 msgid "stop playback"
 msgstr ""

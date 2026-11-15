@@ -28,6 +28,7 @@ PanelWindow {
         return false;
     }
     signal extraRequested(string action)
+    property bool showConnectionProfiles: false
     property string pendingSsid: ""
     onExpandedChanged: if (!expanded && page === "audio") theme.dismissMediaChoice()
     readonly property var battery: UPower.displayDevice
@@ -75,7 +76,7 @@ PanelWindow {
         }
         topAttachmentHeight: widget.theme.barStyle === "islands" && widget.theme.barPosition === "top"
             ? Math.max(0, y - 8) : 0
-        attachTop: widget.barPosition === "top"
+        attachTop: widget.page === "igor" || widget.barPosition === "top"
         attachRight: widget.page === "igor" || widget.barPosition === "top"
         attachLeft: widget.page !== "igor" && widget.barPosition === "left"
         leftAttachmentWidth: widget.theme.barStyle === "islands" && widget.theme.barPosition === "left"
@@ -85,10 +86,10 @@ PanelWindow {
         width: Math.min(widget.page === "igor" ? 640 : ["displays", "appimages"].includes(widget.page) ? 560 : 440, widget.width - (widget.barPosition === "left" ? widget.panelLeftInset + 16 : 16))
         readonly property int availableHeight: widget.height - (widget.barPosition === "top" ? widget.panelTopInset + 16 : 24)
         height: widget.page === "igor"
-            ? widget.height - (widget.barPosition === "top" ? widget.panelTopInset : 16) - (widget.theme.gamingActive ? 0 : 8)
+            ? widget.height - widget.panelTopInset - (widget.theme.gamingActive ? 0 : 8)
             : Math.min(contentHeight, availableHeight)
         x: widget.page === "igor" || widget.barPosition === "top" ? widget.width - width : widget.panelLeftInset
-        y: widget.barPosition === "top" ? widget.panelTopInset : widget.height - height - (widget.theme.gamingActive ? 0 : 8)
+        y: widget.page === "igor" || widget.barPosition === "top" ? widget.panelTopInset : widget.height - height - (widget.theme.gamingActive ? 0 : 8)
         radius: 26
         color: widget.theme.colors.surface
         focus: widget.expanded
@@ -498,21 +499,42 @@ PanelWindow {
                     }
                 }
 
-                ProtonVpnControl {
-                    Layout.fillWidth: true
+                RowLayout {
                     visible: widget.page === "wifi"
+                    Layout.fillWidth: true
+                    ShellButton {
+                        label: "Proton VPN"
+                        backgroundColor: protonVpn.expanded ? widget.theme.colors.accent : widget.theme.colors.surface_alt
+                        foregroundColor: protonVpn.expanded ? widget.theme.colors.background : widget.theme.colors.foreground
+                        onClicked: protonVpn.expanded = !protonVpn.expanded
+                    }
+                    ShellButton {
+                        visible: (widget.theme.network.profiles || []).length > 0
+                        label: (widget.showConnectionProfiles ? "▾ " : "▸ ") + qsTranslate("Spectrum", "Saved connection settings")
+                        fontFamily: widget.theme.fontFamily
+                        fontSize: widget.theme.fontSize - 2
+                        backgroundColor: widget.theme.colors.surface_alt
+                        foregroundColor: widget.theme.colors.foreground
+                        onClicked: widget.showConnectionProfiles = !widget.showConnectionProfiles
+                    }
+                }
+                ProtonVpnControl {
+                    id: protonVpn
+                    Layout.fillWidth: true
+                    visible: widget.page === "wifi" && expanded
                     active: widget.page === "wifi" && widget.visible
+                    showToggle: false
                     theme: widget.theme
                 }
 
                 Text {
-                    visible: widget.page === "wifi" && (widget.theme.network.profiles || []).length > 0
+                    visible: widget.page === "wifi" && widget.showConnectionProfiles && (widget.theme.network.profiles || []).length > 0
                     text: qsTranslate("Spectrum", "CONNECTION PROTOCOLS")
                     color: widget.theme.colors.accent
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2; bold: true }
                 }
                 Text {
-                    visible: widget.page === "wifi" && (widget.theme.network.profiles || []).length > 0
+                    visible: widget.page === "wifi" && widget.showConnectionProfiles && (widget.theme.network.profiles || []).length > 0
                     Layout.fillWidth: true
                     text: qsTranslate("Spectrum", "Choose IPv4, IPv6 or both. Changes may reconnect that connection.")
                     color: widget.theme.colors.muted
@@ -520,7 +542,7 @@ PanelWindow {
                     font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 2 }
                 }
                 Repeater {
-                    model: widget.page === "wifi" ? widget.theme.network.profiles || [] : []
+                    model: widget.page === "wifi" && widget.showConnectionProfiles ? widget.theme.network.profiles || [] : []
                     ConnectionIpControl {
                         required property var modelData
                         Layout.fillWidth: true
@@ -628,23 +650,58 @@ PanelWindow {
                 }
                 Repeater {
                     model: widget.page === "wifi" ? widget.theme.network.networks || [] : []
-                    ShellButton {
+                    ColumnLayout {
+                        id: networkRow
                         required property var modelData
                         Layout.fillWidth: true
-                        label: (modelData.active ? "✓ " : "") + modelData.ssid + "  ·  " + modelData.signal + "%  ·  " + modelData.security
-                        enabled: !modelData.active && !widget.theme.actionBusy
-                        fontFamily: widget.theme.fontFamily
-                        fontSize: widget.theme.fontSize - 1
-                        backgroundColor: modelData.active ? widget.theme.colors.accent : widget.theme.colors.surface_alt
-                        foregroundColor: modelData.active ? widget.theme.colors.background : widget.theme.colors.foreground
-                        onClicked: {
-                            if (modelData.saved)
-                                widget.theme.runAction([widget.theme.backend("network-adapter"), "connect", modelData.uuid]);
-                            else if (modelData.security === "Open" || modelData.security === "--")
-                                widget.theme.runAction([widget.theme.backend("network-adapter"), "connect-open", modelData.ssid]);
-                            else {
-                                widget.pendingSsid = modelData.ssid;
-                                passwordInput.forceActiveFocus();
+                        ShellButton {
+                            property var modelData: networkRow.modelData
+                            Layout.fillWidth: true
+                            label: (modelData.active ? "✓ " : "") + modelData.ssid + "  ·  " + modelData.signal + "%  ·  " + modelData.security
+                            enabled: !modelData.active && !widget.theme.actionBusy
+                            fontFamily: widget.theme.fontFamily
+                            fontSize: widget.theme.fontSize - 1
+                            backgroundColor: modelData.active ? widget.theme.colors.accent : widget.theme.colors.surface_alt
+                            foregroundColor: modelData.active ? widget.theme.colors.background : widget.theme.colors.foreground
+                            onClicked: {
+                                if (modelData.saved)
+                                    widget.theme.runAction([widget.theme.backend("network-adapter"), "connect", modelData.uuid]);
+                                else if (modelData.security === "Open" || modelData.security === "--")
+                                    widget.theme.runAction([widget.theme.backend("network-adapter"), "connect-open", modelData.ssid]);
+                                else {
+                                    widget.pendingSsid = modelData.ssid;
+                                    passwordInput.forceActiveFocus();
+                                }
+                            }
+                        }
+                        RowLayout {
+                            visible: networkRow.modelData.saved
+                            ShellButton {
+                                label: qsTranslate("Spectrum", "Change password")
+                                visible: networkRow.modelData.security !== "Open" && networkRow.modelData.security !== "--"
+                                enabled: !widget.theme.actionBusy
+                                fontFamily: widget.theme.fontFamily
+                                fontSize: widget.theme.fontSize - 2
+                                backgroundColor: widget.theme.colors.surface_alt
+                                foregroundColor: widget.theme.colors.foreground
+                                onClicked: {
+                                    widget.pendingSsid = networkRow.modelData.ssid;
+                                    passwordInput.text = "";
+                                    passwordInput.forceActiveFocus();
+                                }
+                            }
+                            ShellButton {
+                                label: qsTranslate("Spectrum", "Forget")
+                                enabled: !widget.theme.actionBusy
+                                fontFamily: widget.theme.fontFamily
+                                fontSize: widget.theme.fontSize - 2
+                                backgroundColor: widget.theme.colors.surface_alt
+                                foregroundColor: widget.theme.colors.foreground
+                                onClicked: {
+                                    widget.pendingSsid = "";
+                                    passwordInput.text = "";
+                                    widget.theme.runAction([widget.theme.backend("network-adapter"), "forget", networkRow.modelData.uuid]);
+                                }
                             }
                         }
                     }
@@ -671,9 +728,9 @@ PanelWindow {
                         selectionColor: widget.theme.colors.accent
                         font { family: widget.theme.fontFamily; pixelSize: widget.theme.fontSize - 1 }
                         Keys.onReturnPressed: {
+                            if (widget.theme.actionBusy || !text) return;
                             widget.theme.connectSecuredWifi(widget.pendingSsid, text);
                             text = "";
-                            widget.pendingSsid = "";
                         }
                     }
                 }
@@ -681,7 +738,7 @@ PanelWindow {
                     visible: widget.page === "wifi" && widget.pendingSsid.length > 0
                     Layout.fillWidth: true
                     label: qsTranslate("Spectrum", "Connect")
-                    enabled: passwordInput.text.length > 0
+                    enabled: passwordInput.text.length > 0 && !widget.theme.actionBusy
                     fontFamily: widget.theme.fontFamily
                     fontSize: widget.theme.fontSize - 1
                     backgroundColor: widget.theme.colors.accent
@@ -689,7 +746,6 @@ PanelWindow {
                     onClicked: {
                         widget.theme.connectSecuredWifi(widget.pendingSsid, passwordInput.text);
                         passwordInput.text = "";
-                        widget.pendingSsid = "";
                     }
                 }
                 RowLayout {

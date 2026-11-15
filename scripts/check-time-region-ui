@@ -22,7 +22,7 @@ import json,os,sys
 from pathlib import Path
 with (Path(os.environ['SPECTRUM_TIME_REGION_FIXTURE'])/'calls.jsonl').open('a') as output:
     output.write(json.dumps(sys.argv[1:])+'\\n')
-print(json.dumps({'available':True,'language':'en_US.UTF-8','region':'pt_BR.UTF-8','timezones':[],'locales':[],'ntp':True}))
+print(json.dumps({'timezone':'America/Cancun'} if sys.argv[1:] == ['detect-timezone'] else {'available':True,'language':'en_US.UTF-8','region':'pt_BR.UTF-8','timezones':['America/Cancun'],'locales':[],'ntp':True}))
 ''')
     backend.chmod(0o755)
     ui = folder / 'ui'
@@ -45,4 +45,5 @@ print(json.dumps({'available':True,'language':'en_US.UTF-8','region':'pt_BR.UTF-
     print(output)
     assert result.returncode == 0 and '0 failed' in output and 'FAIL!' not in output, output
     calls = (folder / 'calls.jsonl').read_text().splitlines()
-    assert calls and all(line == '["--json"]' for line in calls), calls
+    assert calls and all(line in ('["--json"]', '["detect-timezone"]') for line in calls), calls
+    assert '["detect-timezone"]' in calls, calls

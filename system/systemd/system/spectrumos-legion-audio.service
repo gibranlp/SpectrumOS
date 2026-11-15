@@ -1,0 +1,19 @@
+[Unit]
+Description=Provision speaker firmware for supported Lenovo Legion hardware
+Wants=network-online.target
+After=network-online.target
+ConditionPathExistsGlob=/sys/bus/acpi/devices/AWDZ8399:*
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/spectrum-legion-audio setup
+RemainAfterExit=yes
+TimeoutStartSec=60
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/usr/lib/firmware
+
+[Install]
+WantedBy=multi-user.target

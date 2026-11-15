@@ -191,7 +191,7 @@ class LiveInstallerTests(unittest.TestCase):
             "sgdisk --zap-all",
             "mkfs.btrfs",
             'btrfs subvolume create "$target/@"',
-            'pacstrap -K "$target" linux-zen',
+            'pacstrap -K "$target" \'linux-zen>=7.3\'',
             "genfstab -U",
             "BOOTX64.EFI",
             "limine bios-install",

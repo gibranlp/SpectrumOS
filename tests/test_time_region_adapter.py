@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 ROOT = Path(__file__).resolve().parents[1]
 LOADER = importlib.machinery.SourceFileLoader('time_region_adapter', str(ROOT / 'scripts/time-region-adapter'))
@@ -14,6 +14,31 @@ LOADER.exec_module(ADAPTER)
 
 
 class TimeRegionAdapterTests(unittest.TestCase):
+    def test_detect_timezone_validates_location_without_changing_system_settings(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"timezone":"America/Cancun"}'
+        with patch.object(ADAPTER, 'urlopen', return_value=response), patch.object(
+                ADAPTER, 'run', return_value='America/Cancun\nUTC') as run:
+            self.assertEqual(ADAPTER.detect_timezone(), {'timezone': 'America/Cancun'})
+        run.assert_called_once_with('timedatectl', 'list-timezones')
+
+    def test_invalid_location_responses_never_change_timezone(self):
+        for payload in (b'null', b'[]', b'{"error":true}', b'{"timezone":"../etc/passwd"}',
+                        b'{"timezone":123}', b'not json', b'x' * 32769):
+            response = MagicMock()
+            response.__enter__.return_value.read.return_value = payload
+            with self.subTest(payload=payload[:70]), patch.object(ADAPTER, 'urlopen', return_value=response), \
+                    patch.object(ADAPTER, 'run', return_value='UTC') as run:
+                with self.assertRaises(RuntimeError):
+                    ADAPTER.detect_timezone()
+                self.assertFalse(any('set-timezone' in call.args for call in run.call_args_list))
+
+    def test_location_network_failure_preserves_manual_settings(self):
+        with patch.object(ADAPTER, 'urlopen', side_effect=OSError('offline')), patch.object(ADAPTER, 'run') as run:
+            with self.assertRaisesRegex(RuntimeError, 'Check your connection'):
+                ADAPTER.detect_timezone()
+            run.assert_not_called()
+
     def test_status_keeps_interface_language_separate_from_regional_formats(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'locale.conf'

@@ -1,10 +1,20 @@
 post_install() {
     _spectrumos_install_boot_restore
+    _spectrumos_enable_legion_audio
 }
 
 post_upgrade() {
     _spectrumos_prepare_boot_restore
     _spectrumos_refresh_boot_entry
+    _spectrumos_enable_legion_audio
+}
+
+_spectrumos_enable_legion_audio() {
+    systemctl preset spectrumos-legion-audio.service || true
+    if [ -x usr/bin/spectrum-legion-audio ]; then
+        usr/bin/spectrum-legion-audio setup || \
+            printf '%s\n' 'Speaker firmware setup will retry at boot; you can also run sudo spectrum-legion-audio setup.'
+    fi
 }
 
 # La primera instalación prepara el preset porque el hook todavía no existía

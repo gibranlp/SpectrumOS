@@ -1,6 +1,6 @@
 pkgname=spectrum-igor
-pkgver=0.3.4
-pkgrel=1
+pkgver=0.3.5
+pkgrel=2
 pkgdesc="Free Igor desktop companion runtime for SpectrumOS"
 arch=(any)
 url="https://spectrum.gibranlp.dev"
@@ -10,9 +10,27 @@ makedepends=(qt6-tools)
 options=(!strip !debug)
 _runtime_version=0.3.4
 _runtime_revision=967c714997740029
-source=("igor-runtime-$_runtime_version-$_runtime_revision.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-$_runtime_version-$_runtime_revision.tar.zst" 'RuntimeTests.qml')
+source=("igor-runtime-$_runtime_version-$_runtime_revision.tar.zst::https://spectrum.gibranlp.dev/sources/igor-runtime-$_runtime_version-$_runtime_revision.tar.zst" 'RuntimeTests.qml' 'star-trooper.patch'
+        'star-trooper-accent.png'
+        'star-trooper-base.png'
+        'star-trooper-glow.png'
+        'star-trooper-pauldron-stripes.png'
+        'star-trooper-pauldrons.png'
+        'star-trooper-scan.png')
 sha256sums=('ab2fb92bc565670c7f3ff506e516f521f21628602a5db762c94ccaada2f2f307'
-            'fb67391626ee089b15a49842a396f309c61641fcaaeeb5c867242cdf20527c5d')
+            '6547fa8a7eb87e2009a138fc2f00535051a5caebc4d13cd9add4b19ac670789a'
+            '31ed1f5cd9a3d05436bb1338b19616aad9cf529e44ca761d60a5bd55996ab49b'
+            '3791c98e1a6cdaf3cb87c95a5c4a33b362e604bcf9d1fdc58d6a7708b754d049'
+            '2873e77749ab850f354b472a08e8564a5fd2fde5f238d37600f4e905e61455b5'
+            '26f6d4e292c8b2689da229038663486e8a3814cedc2d5ad5a15b9c5a1d4774a7'
+            'f4881badd36c18fd0d50444410f79a7fcb1936f8285ecdba6d375366d1736035'
+            '1170c4e47fc272fac77884ed06baa32c34f116da46c8fafdfa83b388f23668a1'
+            '41aafefe696750a62280484e7305e2998f6b989c6e488dc294235a8373912f37')
+
+prepare() {
+    patch -Np1 -i "$srcdir/star-trooper.patch"
+    install -m 0644 "$srcdir/"star-trooper-*.png "$srcdir/Spectrum/Igor/igor/"
+}
 
 check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QML_IMPORT_PATH="$srcdir" \

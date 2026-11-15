@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = linux-*
+Target = spectrum-base
+
+[Action]
+Description = Preparing speaker firmware for supported Lenovo Legion hardware...
+When = PostTransaction
+Exec = /usr/bin/spectrum-legion-audio setup

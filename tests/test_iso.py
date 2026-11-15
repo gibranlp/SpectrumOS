@@ -65,7 +65,7 @@ class IsoProfileTests(unittest.TestCase):
         self.assertIn('install_dir="spectrum"', profile)
         for package in ("inxi", "brightnessctl", "mesa", "vulkan-tools", "bluez-utils"):
             self.assertIn(f"\n{package}\n", f"\n{packages}\n")
-        self.assertIn("\nlinux-zen\n", f"\n{packages}\n")
+        self.assertIn("\nlinux-zen>=7.3\n", f"\n{packages}\n")
         self.assertNotIn("\nlinux\n", f"\n{packages}\n")
         self.assertTrue((ROOT / "iso/spectrumos/airootfs/usr/local/bin/spectrum-hardware-report").is_file())
 

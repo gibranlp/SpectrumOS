@@ -15,9 +15,18 @@ Item {
         function cleanup() { routine.visitsEnabled = false; routine.retreat(); }
         function test_supported_api_and_free_baseline() {
             compare(Igor.RuntimeInfo.apiVersion, 1);
-            compare(Igor.RuntimeInfo.version, "0.3.4");
-            compare(Igor.RuntimeInfo.freeOutfitIds, ["day-of-the-dead", "christmas", "christmas-lights", "winter", "detective"]);
+            compare(Igor.RuntimeInfo.version, "0.3.5");
+            compare(Igor.RuntimeInfo.freeOutfitIds, ["day-of-the-dead", "christmas", "christmas-lights", "winter", "detective", "star-trooper"]);
             verify(String(Igor.RuntimeInfo.faceAsset).endsWith("/igor/face.svg"));
+        }
+        function test_star_trooper_assets_load() {
+            const outfit = findChild(illustration, "igorSeasonalOutfit");
+            findChild(illustration, "igorOutfitClock").running = false;
+            outfit.outfitSelection = {mode: "manual", outfitId: "star-trooper"};
+            compare(outfit.outfitId, "star-trooper");
+            compare(outfit.layers.length, 5);
+            tryCompare(outfit, "status", Image.Ready);
+            outfit.outfitSelection = {mode: "auto", outfitId: "none"};
         }
         function test_manual_visit_works_without_accounts_or_network() {
             routine.visitsEnabled = true;

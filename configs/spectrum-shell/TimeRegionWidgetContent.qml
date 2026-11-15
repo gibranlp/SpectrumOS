@@ -17,7 +17,7 @@ ColumnLayout {
     property string selectedRegion: ""
     property bool serversEdited: false
     property date now: new Date()
-    readonly property bool busy: action.running
+    readonly property bool busy: action.running || detection.running
     readonly property string interfaceLanguage: Translator.selectedLanguage
     readonly property var interfaceChoices: ["system", ...Translator.languages.map(row => row.id)]
     spacing: 9
@@ -81,6 +81,28 @@ ColumnLayout {
     }
     Timer { interval: 10000; running: content.active && !content.busy; repeat: true; onTriggered: content.refresh() }
     Timer { interval: 1000; running: content.active; repeat: true; onTriggered: content.now = new Date() }
+    Process {
+        id: detection
+        command: [content.theme.backend("time-region-adapter"), "detect-timezone"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(text);
+                    if (!result.timezone || !(content.settings.timezones || []).includes(result.timezone))
+                        throw new Error("Invalid time zone");
+                    content.selectedZone = result.timezone;
+                    content.message = qsTranslate("Spectrum", "Time zone detected. Select Apply to use it.");
+                } catch (error) {
+                    content.error = qsTranslate("Spectrum", "Could not detect the time zone. Check your connection or choose it manually.");
+                }
+            }
+        }
+        stderr: StdioCollector { onStreamFinished: { if (text.trim()) content.error = text.trim(); } }
+        onExited: (code) => {
+            if (code !== 0 && !content.error)
+                content.error = qsTranslate("Spectrum", "Could not detect the time zone. Check your connection or choose it manually.");
+        }
+    }
     Process {
         id: action
         stdout: StdioCollector { onStreamFinished: content.message = text.trim() }
@@ -200,6 +222,18 @@ ColumnLayout {
     }
 
     Label { text: qsTranslate("Spectrum", "TIME ZONE"); font.bold: true }
+    Label { text: qsTranslate("Spectrum", "Automatic time synchronizes the clock. Your time zone is set separately."); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
+    Button {
+        objectName: "detect-timezone"
+        Layout.fillWidth: true
+        label: qsTranslate("Spectrum", "Detect time zone from location")
+        onClicked: {
+            content.error = "";
+            content.message = "";
+            detection.running = true;
+        }
+    }
+    Label { text: qsTranslate("Spectrum", "Uses your public IP via ipapi.co. A VPN may detect its server's location. Select Apply to confirm."); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
     RowLayout {
         Layout.fillWidth: true
         Button { objectName: "timezone-selector"; Layout.fillWidth: true; label: content.selectedZone || content.settings.timezone || qsTranslate("Spectrum", "Choose time zone"); onClicked: content.choose("timezone") }
@@ -260,7 +294,7 @@ ColumnLayout {
     Input { id: manual; visible: !content.settings.ntp && content.settings.available; placeholder: "YYYY-MM-DD HH:MM:SS" }
     Button { visible: !content.settings.ntp && content.settings.available; Layout.fillWidth: true; label: qsTranslate("Spectrum", "Set date and time"); onClicked: content.apply(["time", manual.text]) }
     Label { text: qsTranslate("Spectrum", "Hardware clock: %1").arg(content.settings.local_rtc ? qsTranslate("Spectrum", "local time") : "UTC"); color: content.theme.colors.muted; font.pixelSize: content.theme.fontSize - 2 }
-    Label { visible: content.busy; text: qsTranslate("Spectrum", "Applying settings…"); color: content.theme.colors.accent }
+    Label { visible: content.busy; text: detection.running ? qsTranslate("Spectrum", "Detecting time zone…") : qsTranslate("Spectrum", "Applying settings…"); color: content.theme.colors.accent }
     Label { objectName: "time-region-message"; visible: !!content.message && !content.error; text: qsTranslate("Spectrum", content.message); color: content.theme.colors.accent; font.pixelSize: content.theme.fontSize - 1 }
     Label { visible: !!content.error; text: qsTranslate("Spectrum", content.error); color: content.theme.colors.error || "#ff8c9a"; font.pixelSize: content.theme.fontSize - 1 }
 }

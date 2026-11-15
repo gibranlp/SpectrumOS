@@ -351,5 +351,7 @@
   "Finding completed tasks eligible for pruning…",
   "Saving widget drafts and a safety backup, then applying the restored profile…",
   "Saving a safety backup and pruning the confirmed tasks…",
-  "Canceling; keeping the current profile…"
+  "Canceling; keeping the current profile…",
+  "Could not detect the time zone. Check your connection or choose it manually.",
+  "The location service did not return a valid time zone. Choose it manually."
 ]

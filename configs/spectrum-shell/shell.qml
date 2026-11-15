@@ -130,7 +130,7 @@ ShellRoot {
     property var keyboardLayout: ({ id: "", label: "" })
     property var workspaceIcons: ({ current: "pacman", states: { active: "󰮯", occupied: "󰊠", empty: "•" }, glyphs: [], sets: [] })
     property string actionError: ""
-    readonly property bool actionBusy: actionProcess.running
+    readonly property bool actionBusy: actionProcess.running || wifiProcess.running
     property string fontFamily: "JetBrainsMono Nerd Font"
     readonly property int fontSize: Math.max(8, Math.min(24, parseInt(overview.font_size) || 13))
     property string pendingPassword: ""

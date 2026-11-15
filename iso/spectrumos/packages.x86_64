@@ -43,7 +43,7 @@ kmscon-terminfo
 less
 libfido2
 libnotify
-linux-zen
+linux-zen>=7.3
 linux-atm
 linux-firmware
 linux-firmware-marvell

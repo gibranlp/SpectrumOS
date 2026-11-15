@@ -1,0 +1,61 @@
+--- a/Spectrum/Igor/IgorOutfits.js
++++ b/Spectrum/Igor/IgorOutfits.js
+@@ -9,7 +9,8 @@
+     // Las luces enredadas salen un poco por arriba y por abajo del marco de la cabeza.
+     { id: "christmas-lights", month: 12, probability: 0.5, asset: "christmas-lights.svg", frame: [0, -20, 400, 200] },
+     {"id": "winter", "frame": [0, -10, 400, 190], "layers": [{"image": "winter-pompom.png", "anchor": "head", "frame": [180, -10, 42, 40], "motion": {"type": "bounce", "gain": 1.6}}, {"image": "winter-muff-left.png", "anchor": "ear-left", "frame": [100, 18, 44, 44]}, {"image": "winter-muff-right.png", "anchor": "ear-right", "frame": [278, 34, 44, 44]}, {"image": "winter-snow.png", "anchor": "world", "frame": [0, -80, 400, 260], "motion": {"type": "particles", "count": 34, "speed": 26, "sway": 10, "size": [5, 5]}}], "asset": "winter-base.png"},
+-    {"id": "detective", "name": "Detective Igor", "asset": "detective-base.png", "layers": [{"image": "detective-magnifier.png", "anchor": "paw-right", "frame": [298, 16, 64, 140], "pawOnTop": true, "motion": {"type": "keyframes", "period": 6, "pivot": [346, 150], "keys": [{"t": 0, "rotation": 0}, {"t": 0.27, "rotation": 0}, {"t": 0.4, "rotation": -65}, {"t": 0.8, "rotation": -65}, {"t": 0.93, "rotation": 0}, {"t": 1, "rotation": 0}]}}, {"image": "detective-big-eye.png", "followBlink": true, "anchor": "paw-right", "frame": [298, 16, 64, 140], "motion": {"type": "keyframes", "period": 6, "pivot": [346, 150], "keys": [{"t": 0, "rotation": 0, "opacity": 0}, {"t": 0.27, "rotation": 0, "opacity": 0}, {"t": 0.4, "rotation": -65, "opacity": 1}, {"t": 0.8, "rotation": -65, "opacity": 1}, {"t": 0.93, "rotation": 0, "opacity": 0}, {"t": 1, "rotation": 0, "opacity": 0}]}}]}
++    {"id": "detective", "name": "Detective Igor", "asset": "detective-base.png", "layers": [{"image": "detective-magnifier.png", "anchor": "paw-right", "frame": [298, 16, 64, 140], "pawOnTop": true, "motion": {"type": "keyframes", "period": 6, "pivot": [346, 150], "keys": [{"t": 0, "rotation": 0}, {"t": 0.27, "rotation": 0}, {"t": 0.4, "rotation": -65}, {"t": 0.8, "rotation": -65}, {"t": 0.93, "rotation": 0}, {"t": 1, "rotation": 0}]}}, {"image": "detective-big-eye.png", "followBlink": true, "anchor": "paw-right", "frame": [298, 16, 64, 140], "motion": {"type": "keyframes", "period": 6, "pivot": [346, 150], "keys": [{"t": 0, "rotation": 0, "opacity": 0}, {"t": 0.27, "rotation": 0, "opacity": 0}, {"t": 0.4, "rotation": -65, "opacity": 1}, {"t": 0.8, "rotation": -65, "opacity": 1}, {"t": 0.93, "rotation": 0, "opacity": 0}, {"t": 1, "rotation": 0, "opacity": 0}]}}]},
++    {"id": "star-trooper", "name": "Star Trooper Igor", "asset": "star-trooper-base.png", "frame": [60, -10, 290, 180], "layers": [{"image": "star-trooper-accent.png", "anchor": "head", "frame": [60, -10, 290, 180], "tint": "accent"}, {"image": "star-trooper-glow.png", "anchor": "head", "frame": [60, -10, 290, 180], "tint": "accent", "motion": {"type": "pulse", "period": 2.1, "min": 0.2, "max": 0.38}}, {"image": "star-trooper-scan.png", "anchor": "head", "frame": [96, 76, 214, 84], "motion": {"type": "sprite", "frames": 20, "frameWidth": 428, "frameHeight": 168, "fps": 9}}, {"image": "star-trooper-pauldrons.png", "anchor": "behind-paws", "frame": [-10, 100, 420, 80]}, {"image": "star-trooper-pauldron-stripes.png", "anchor": "behind-paws", "frame": [-10, 100, 420, 80], "tint": "accent"}]}
+ ];
+ 
+ function forDate(date, roll = 1) {
+--- a/Spectrum/Igor/RuntimeInfo.qml
++++ b/Spectrum/Igor/RuntimeInfo.qml
+@@ -3,7 +3,7 @@
+ 
+ QtObject {
+     readonly property int apiVersion: 1
+-    readonly property string version: "0.3.4"
++    readonly property string version: "0.3.5"
+     readonly property url faceAsset: Qt.resolvedUrl("igor/face.svg")
+     readonly property url headAsset: Qt.resolvedUrl("igor/head.svg")
+     readonly property var animations: [
+@@ -12,5 +12,5 @@
+         {id:"music",name:"Music"},{id:"movie",name:"Movie"},{id:"meeting",name:"Meeting"},
+         {id:"celebrate",name:"Celebrate"},{id:"peek",name:"Paws first"}
+     ]
+-    readonly property var freeOutfitIds: ["day-of-the-dead", "christmas", "christmas-lights", "winter", "detective"]
++    readonly property var freeOutfitIds: ["day-of-the-dead", "christmas", "christmas-lights", "winter", "detective", "star-trooper"]
+ }
+--- a/Spectrum/Igor/Desktop/igor-outfits
++++ b/Spectrum/Igor/Desktop/igor-outfits
+@@ -7,12 +7,13 @@
+ from pathlib import Path
+ import tempfile
+ 
+-FREE_IDS = {'none', 'day-of-the-dead', 'christmas', 'christmas-lights', 'winter', 'detective'}
++FREE_IDS = {'none', 'day-of-the-dead', 'christmas', 'christmas-lights', 'winter', 'detective', 'star-trooper'}
+ DEFAULT = {'version': 1, 'selection': {'mode': 'auto', 'outfitId': 'none'}}
+ 
+ 
+ WEEKS = (
+     (date(2026, 11, 2), date(2026, 11, 9), '2026-W45-winter', 'winter'),
++    (date(2026, 11, 16), date(2026, 11, 23), '2026-W47-star-trooper', 'star-trooper'),
+     (date(2026, 11, 9), date(2026, 11, 16), '2026-W46-detective', 'detective'),
+ )
+ 
+--- a/Spectrum/Igor/catalog.json
++++ b/Spectrum/Igor/catalog.json
+@@ -30,6 +30,11 @@
+       "id": "detective",
+       "name": "Detective Igor",
+       "access": "free"
++    },
++    {
++      "id": "star-trooper",
++      "name": "Star Trooper Igor",
++      "access": "free"
+     }
+   ]
+ }

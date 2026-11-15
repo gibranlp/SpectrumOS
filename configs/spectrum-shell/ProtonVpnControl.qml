@@ -9,6 +9,7 @@ ColumnLayout {
     required property var theme
     property bool active: false
     property bool expanded: false
+    property bool showToggle: true
     property var state: ({installed: false, connected: false, status: "Checking Proton VPN…"})
     property string message: ""
     readonly property bool busy: statusProcess.running || actionProcess.running
@@ -48,6 +49,7 @@ ColumnLayout {
     Timer { interval: 10000; repeat: true; running: vpn.active && vpn.expanded; onTriggered: vpn.refresh() }
     ShellButton {
         objectName: "proton-vpn-toggle"
+        visible: vpn.showToggle
         label: "Proton VPN"
         backgroundColor: vpn.expanded ? vpn.theme.colors.accent : vpn.theme.colors.surface_alt
         foregroundColor: vpn.expanded ? vpn.theme.colors.background : vpn.theme.colors.foreground

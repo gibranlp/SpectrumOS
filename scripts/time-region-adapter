@@ -10,12 +10,30 @@ import re
 import subprocess
 import sys
 import tempfile
+from urllib.request import Request, urlopen
 
 LOCALE_GEN = Path('/etc/locale.gen')
 LOCALE_CONF = Path('/etc/locale.conf')
 SUPPORTED = Path('/usr/share/i18n/SUPPORTED')
 NTP_CONF = Path('/etc/systemd/timesyncd.conf.d/90-spectrumos.conf')
 HELPER = '/usr/lib/spectrumos/time-region-adapter'
+IP_GEOLOCATION_URL = 'https://ipapi.co/json/'
+
+
+def detect_timezone() -> dict:
+    try:
+        request = Request(IP_GEOLOCATION_URL, headers={'User-Agent': 'SpectrumOS-TimeRegion/1.0'})
+        with urlopen(request, timeout=10) as response:
+            payload = response.read(32769)
+        if len(payload) > 32768:
+            raise ValueError('Response too large')
+        data = json.loads(payload)
+    except (OSError, ValueError) as error:
+        raise RuntimeError('Could not detect the time zone. Check your connection or choose it manually.') from error
+    zone = data.get('timezone') if isinstance(data, dict) and not data.get('error') else None
+    if not isinstance(zone, str) or zone not in run('timedatectl', 'list-timezones').splitlines():
+        raise RuntimeError('The location service did not return a valid time zone. Choose it manually.')
+    return {'timezone': zone}
 
 
 def run(*args: str, timeout: int = 15, check: bool = True) -> str:
@@ -158,6 +176,9 @@ def configure_servers(value: str) -> None:
 
 def main() -> int:
     args = sys.argv[1:]
+    if args == ['detect-timezone']:
+        print(json.dumps(detect_timezone(), separators=(',', ':')))
+        return 0
     if args == ['--json']:
         try:
             result = state()
@@ -183,7 +204,7 @@ def main() -> int:
     elif len(args) == 2 and args[0] == 'servers':
         configure_servers(args[1])
     else:
-        raise ValueError('Usage: time-region-adapter --json|timezone ZONE|ntp on|off|time DATETIME|locale LANGUAGE REGION|servers SERVERS')
+        raise ValueError('Usage: time-region-adapter --json|detect-timezone|timezone ZONE|ntp on|off|time DATETIME|locale LANGUAGE REGION|servers SERVERS')
     print('Language and region saved. Sign out to apply them to all applications.' if args[0] == 'locale' else 'Time settings updated')
     return 0
 
